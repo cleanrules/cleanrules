@@ -1,0 +1,159 @@
+import pickle
+from importlib.resources import files
+
+import pytest
+
+import rulepy
+from rulepy.errors import (
+    EvaluationError,
+    RulePyError,
+    RuleSyntaxError,
+    UnsupportedOperation,
+)
+
+SAMPLES: list[RulePyError] = [
+    RulePyError("something failed", hint="try again"),
+    UnsupportedOperation(
+        "matches", "polars", reason="lookaround is not portable", rule="r1", node="F.a", hint="x"
+    ),
+    RuleSyntaxError("unexpected token", source="IF x > THEN y", line=1, column=8),
+    EvaluationError("cannot compare str with int", rule="vip", node="F.total > 1000"),
+]
+
+
+@pytest.mark.parametrize("cls", [UnsupportedOperation, RuleSyntaxError, EvaluationError])
+def test_every_error_derives_from_base(cls: type[Exception]) -> None:
+    assert issubclass(cls, RulePyError)
+
+
+def test_syntax_error_is_also_a_value_error() -> None:
+    assert issubclass(RuleSyntaxError, ValueError)
+
+
+def test_unsupported_operation_is_also_not_implemented() -> None:
+    assert issubclass(UnsupportedOperation, NotImplementedError)
+
+
+def test_errors_are_exported_at_top_level() -> None:
+    for name in ("RulePyError", "UnsupportedOperation", "RuleSyntaxError", "EvaluationError"):
+        assert name in rulepy.__all__
+        assert getattr(rulepy, name) is getattr(rulepy.errors, name)
+
+
+def test_hint_is_shown_on_its_own_line() -> None:
+    err = RulePyError("bad rule", hint="use & instead of 'and'")
+    assert str(err) == "bad rule\nhint: use & instead of 'and'"
+
+
+def test_message_without_hint_is_unchanged() -> None:
+    assert str(RulePyError("bad rule")) == "bad rule"
+
+
+def test_unsupported_operation_names_operation_backend_and_reason() -> None:
+    err = UnsupportedOperation("matches", "polars", reason="lookaround is not portable")
+    assert (
+        str(err) == "'matches' is not supported by the polars backend: lookaround is not portable"
+    )
+    assert (err.operation, err.backend, err.reason) == (
+        "matches",
+        "polars",
+        "lookaround is not portable",
+    )
+
+
+def test_unsupported_operation_without_reason() -> None:
+    assert str(UnsupportedOperation("between", "rust")) == (
+        "'between' is not supported by the rust backend"
+    )
+
+
+def test_unsupported_operation_names_rule_and_node() -> None:
+    err = UnsupportedOperation("matches", "rust", rule="email_ok", node="F.email.matches('(?=x)')")
+    assert str(err) == (
+        "rule 'email_ok': 'matches' is not supported by the rust backend"
+        " in `F.email.matches('(?=x)')`"
+    )
+    assert (err.rule, err.node) == ("email_ok", "F.email.matches('(?=x)')")
+
+
+def test_syntax_error_points_at_the_column() -> None:
+    err = RuleSyntaxError(
+        "expected a value after '>'",
+        source="IF total > THEN discount = 0.1",
+        line=1,
+        column=12,
+        hint="write a number or a field, e.g. total > 1000",
+    )
+    assert str(err) == (
+        "expected a value after '>' (line 1, column 12)\n"
+        "  IF total > THEN discount = 0.1\n"
+        "             ^\n"
+        "hint: write a number or a field, e.g. total > 1000"
+    )
+
+
+def test_syntax_error_on_a_later_line_shows_that_line() -> None:
+    err = RuleSyntaxError("unknown operator '=>'", source="IF a > 1\nAND b => 2", line=2, column=7)
+    assert str(err).splitlines()[1:] == ["  AND b => 2", "        ^"]
+
+
+def test_syntax_error_keeps_only_the_offending_line() -> None:
+    err = RuleSyntaxError("bad", source="line one\nline two\nline three", line=2, column=1)
+    assert err.text == "line two"
+    assert "source" not in vars(err)
+
+
+def test_syntax_error_caret_follows_tabs() -> None:
+    err = RuleSyntaxError("bad", source="\tIF a ?? 1", line=1, column=6)
+    assert str(err).splitlines()[1:] == ["  \tIF a ?? 1", "  \t    ^"]
+
+
+@pytest.mark.parametrize(("line", "column"), [(0, 1), (1, 0), (-1, None)])
+def test_syntax_error_rejects_positions_that_are_not_1_based(line: int, column: int | None) -> None:
+    with pytest.raises(ValueError, match="1-based"):
+        RuleSyntaxError("bad", source="IF a", line=line, column=column)
+
+
+def test_syntax_error_without_position_is_just_the_message() -> None:
+    err = RuleSyntaxError("empty rule file", hint="add at least one rule")
+    assert str(err) == "empty rule file\nhint: add at least one rule"
+
+
+def test_syntax_error_without_column_shows_line_but_no_caret() -> None:
+    err = RuleSyntaxError("rule has no THEN", source="IF a > 1\nAND b < 2", line=2)
+    assert str(err) == "rule has no THEN (line 2)\n  AND b < 2"
+
+
+def test_syntax_error_without_source_only_reports_position() -> None:
+    assert str(RuleSyntaxError("unexpected end", line=3, column=1)) == (
+        "unexpected end (line 3, column 1)"
+    )
+
+
+def test_syntax_error_with_line_out_of_range_skips_snippet() -> None:
+    assert str(RuleSyntaxError("oops", source="IF a", line=5, column=1)) == (
+        "oops (line 5, column 1)"
+    )
+
+
+def test_evaluation_error_names_rule_and_node() -> None:
+    err = EvaluationError("cannot compare str with int", rule="vip", node="F.total > 1000")
+    assert str(err) == "rule 'vip': cannot compare str with int in `F.total > 1000`"
+    assert (err.rule, err.node) == ("vip", "F.total > 1000")
+
+
+def test_evaluation_error_without_context() -> None:
+    assert str(EvaluationError("missing field")) == "missing field"
+
+
+@pytest.mark.parametrize("err", SAMPLES, ids=lambda e: type(e).__name__)
+def test_errors_survive_pickling(err: RulePyError) -> None:
+    clone = pickle.loads(pickle.dumps(err))
+    assert type(clone) is type(err)
+    assert str(clone) == str(err)
+    assert vars(clone) == vars(err)
+    assert clone.args == err.args
+
+
+def test_package_ships_py_typed_marker() -> None:
+    assert files("rulepy").joinpath("py.typed").is_file()

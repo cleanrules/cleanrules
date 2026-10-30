@@ -103,7 +103,13 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
   - ruff: línea de 100 caracteres; los docstrings no se exigen en `tests/` ni en `benchmarks/`. ruff 0.17 también formatea los bloques de código de los `.md`.
   - El hook de formato usa ahora el ruff de `.venv` (fijado en `uv.lock`) y recurre a `uvx` solo si no existe.
   - Tests de humo en `tests/test_package.py`: la versión coincide con los metadatos y `__all__` está declarado.
-- [ ] 1.4 Esqueleto de `src/rulepy/` con `errors.py` (`RulePyError`, `UnsupportedOperation`, `RuleSyntaxError`, `EvaluationError`) y `py.typed`.
+- [x] 1.4 Esqueleto de `src/rulepy/` con `errors.py` (`RulePyError`, `UnsupportedOperation`, `RuleSyntaxError`, `EvaluationError`) y `py.typed`.
+  - Todas las excepciones admiten un `hint` (pista de corrección) y sobreviven a pickle con sus atributos, gracias a `__reduce__` y `_rebuild`. El nombre `_rebuild` debe mantenerse.
+  - `RuleSyntaxError` es también `ValueError`; `UnsupportedOperation` es también `NotImplementedError`.
+  - `UnsupportedOperation` y `EvaluationError` aceptan `rule` y `node`. `operation` es la etiqueta del operador en `docs/spec/ast.md`.
+  - `RuleSyntaxError` usa posiciones 1-based (lanza `ValueError` si no lo son), guarda solo la línea problemática (`text`) y dibuja un circunflejo que respeta los tabuladores.
+  - Desviación: ruff ignora D105 y D107 en todo el proyecto, porque los argumentos se documentan en el docstring de la clase. Contrapartida: D417 ya no compara la sección `Args:` con los parámetros del constructor, y pueden desincronizarse sin aviso.
+  - Revisado por `api-reviewer`. Los hallazgos que se dejaron para más adelante están anotados en 2.3, 2.6 y 3.2.
 - [ ] 1.5 Test de "núcleo sin dependencias": `import rulepy` no importa numpy, polars, pandas, fuzzytool, sklearn ni z3.
 - [ ] 1.6 CI con GitHub Actions: matriz Python 3.11–3.14 × Linux, macOS y Windows; lint, tipos, tests y cobertura.
 - [ ] 1.7 Esqueleto de mkdocs-material (mismo estilo que fuzzytool) y `docs/spec/README.md`.
@@ -128,6 +134,7 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
   - `__bool__` lanza un error claro, lo que impide `a and b` y comparaciones encadenadas como `0 < F.x < 10`;
   - `__eq__` devuelve un nodo, así que se ofrece `expr.same_as(other)` y `__hash__` estructural para poder usar los nodos en dicts y sets;
   - `repr` legible.
+  - *Nota de 1.4*: cuando existan nodos reales, los tests de `errors` que comparan con `vars(a) == vars(b)` fallarán si `node` es un `Expr` (porque `__eq__` devuelve un nodo). En ese caso se compara con `same_as`. Error previsto para el mal uso de `__bool__`: `RulePyError` + `TypeError`.
 
 **Lógica (`core/logic.py`)**
 - [ ] 2.4 Protocolo `Logic` (`and_`, `or_`, `not_`, `from_bool`, `is_true`, `TRUE`/`FALSE`/`UNKNOWN`) con registro por nombre.
@@ -135,6 +142,9 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
 
 **Evaluación y reglas**
 - [ ] 2.6 Evaluador de referencia `core/evaluate.py`, sobre `Mapping`, dataclasses, objetos con atributos y modelos Pydantic (por duck typing, sin depender de Pydantic).
+  - *Nota de 1.4*:
+    - restringir la anotación de `node` en `EvaluationError` y `UnsupportedOperation` a `Expr | str | None` (Python pasa el nodo; los demás backends pasan su texto);
+    - errores nuevos previstos: campo ausente en modo estricto (2.5), `HitPolicyError(EvaluationError)` con `rules: tuple[str, ...]` para `UNIQUE` (2.8), y un índice de fila para `evaluate_many`.
 - [ ] 2.7 `Rule(name, when, then, priority=0, tags=(), description=None, metadata={})`. `then` puede ser un dict (payload de decisión), una función `(ctx) -> None` o una lista de acciones declarativas (`Set`, `Append`, `Emit`).
 - [ ] 2.8 `RuleSet` con políticas de acierto al estilo DMN:
   - `FIRST`, `PRIORITY`, `UNIQUE`, `ANY`, `COLLECT` (con agregadores `sum`, `min`, `max`, `count` y `list`), `RULE_ORDER`;
@@ -167,6 +177,7 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
 
 - [ ] 3.1 `docs/spec/ast.md` y `ast-schema.json` (JSON Schema) con `rulepy_ast: 1`: cada nodo con su forma, semántica y tratamiento de nulos.
 - [ ] 3.2 `to_dict`/`from_dict` para nodos, reglas y rulesets; validación contra el esquema.
+  - *Nota de 1.4*: los errores de esquema o de versión se localizan por ruta JSON, no por línea y columna. Hará falta un error específico (p. ej. `SchemaError(RuleSyntaxError)` con `path`), así como un error para nombres desconocidos en los registros. Las posiciones de PyYAML empiezan en 0 y hay que sumarles 1.
 - [ ] 3.3 Cargador y volcador YAML (extra `yaml`, `safe_load`) y JSON. Las acciones con funciones se referencian por nombre mediante un registro (`@action("enviar_alerta")`).
 - [ ] 3.4 DSL de texto con parser Pratt propio:
   - `rule_from_text("IF cliente.antiguedad > 5 AND pedido.total > 1000 THEN descuento = 0.15")`;

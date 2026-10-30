@@ -101,6 +101,9 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "D"]
+# Constructor arguments are documented in the class docstring (Google style), and
+# dunder methods follow their standard contract.
+ignore = ["D105", "D107"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
