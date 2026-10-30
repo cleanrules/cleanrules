@@ -110,7 +110,10 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
   - `RuleSyntaxError` usa posiciones 1-based (lanza `ValueError` si no lo son), guarda solo la línea problemática (`text`) y dibuja un circunflejo que respeta los tabuladores.
   - Desviación: ruff ignora D105 y D107 en todo el proyecto, porque los argumentos se documentan en el docstring de la clase. Contrapartida: D417 ya no compara la sección `Args:` con los parámetros del constructor, y pueden desincronizarse sin aviso.
   - Revisado por `api-reviewer`. Los hallazgos que se dejaron para más adelante están anotados en 2.3, 2.6 y 3.2.
-- [ ] 1.5 Test de "núcleo sin dependencias": `import rulepy` no importa numpy, polars, pandas, fuzzytool, sklearn ni z3.
+- [x] 1.5 Test de "núcleo sin dependencias": `import rulepy` no importa numpy, polars, pandas, fuzzytool, sklearn ni z3.
+  - `tests/test_core_dependencies.py`. Usa una **lista blanca** en vez de una lista de paquetes prohibidos: en un intérprete limpio (`python -I`), `import rulepy` solo puede cargar módulos de `sys.stdlib_module_names` o de `rulepy`, así que detecta cualquier dependencia accidental.
+  - Un test de control comprueba que el detector sí señala las dependencias de hypothesis (`sortedcontainers`), para que el test principal no pueda pasar en falso.
+  - Los módulos `_sysconfigdata_*` se tratan como estándar: se generan por plataforma y no aparecen en `stdlib_module_names`.
 - [ ] 1.6 CI con GitHub Actions: matriz Python 3.11–3.14 × Linux, macOS y Windows; lint, tipos, tests y cobertura.
 - [ ] 1.7 Esqueleto de mkdocs-material (mismo estilo que fuzzytool) y `docs/spec/README.md`.
 
