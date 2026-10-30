@@ -96,7 +96,13 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
   - Desviación: `dev` **no** es un extra, sino que irá en `[dependency-groups]` (PEP 735) en la 1.3, porque las herramientas de desarrollo no deben poder instalarse con `pip install rulepy[dev]`.
   - Se excluyen del sdist `.claude/`, `CLAUDE.md` y `docs/PLAN.md`. El `[tool.uv.workspace]` se declarará en la fase 7, al añadir `rulepy-core`.
   - Verificado: `uv sync`, `import rulepy` y `uv build`; el wheel contiene solo `rulepy/` y los metadatos son correctos. `uv.lock` se versiona.
-- [ ] 1.3 Configuración de ruff (reglas `E,F,I,B,UP,SIM,RUF,D` con convención google), pyright estricto y pytest (marcador `slow`, perfiles de hypothesis `dev` y `ci`, cobertura).
+- [x] 1.3 Configuración de ruff (reglas `E,F,I,B,UP,SIM,RUF,D` con convención google), pyright estricto y pytest (marcador `slow`, perfiles de hypothesis `dev` y `ci`, cobertura).
+  - Grupo `dev` (PEP 735): pytest 9.2, pytest-cov 7.1, hypothesis 6.170, ruff 0.17 y pyright 1.1.414.
+  - pytest con `--strict-markers --strict-config`, `xfail_strict` y avisos convertidos en errores. Cobertura con ramas y `fail_under = 90` (se aplica con `--cov`).
+  - Perfiles de hypothesis en `tests/conftest.py`: `dev` (50 ejemplos, por defecto) y `ci` (500), seleccionados con `HYPOTHESIS_PROFILE`.
+  - ruff: línea de 100 caracteres; los docstrings no se exigen en `tests/` ni en `benchmarks/`. ruff 0.17 también formatea los bloques de código de los `.md`.
+  - El hook de formato usa ahora el ruff de `.venv` (fijado en `uv.lock`) y recurre a `uvx` solo si no existe.
+  - Tests de humo en `tests/test_package.py`: la versión coincide con los metadatos y `__all__` está declarado.
 - [ ] 1.4 Esqueleto de `src/rulepy/` con `errors.py` (`RulePyError`, `UnsupportedOperation`, `RuleSyntaxError`, `EvaluationError`) y `py.typed`.
 - [ ] 1.5 Test de "núcleo sin dependencias": `import rulepy` no importa numpy, polars, pandas, fuzzytool, sklearn ni z3.
 - [ ] 1.6 CI con GitHub Actions: matriz Python 3.11–3.14 × Linux, macOS y Windows; lint, tipos, tests y cobertura.

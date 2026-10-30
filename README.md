@@ -10,14 +10,12 @@ rule sets can be audited for contradictions, dead rules and coverage gaps.
 > API will change. See the [roadmap](docs/PLAN.md) (in Spanish).
 
 ```python
-from rulepy import Rule, RuleSet, F   # planned API
+from rulepy import Rule, RuleSet, F  # planned API
 
-vip = Rule("vip",
-           when=(F.customer.years > 5) & (F.order.total > 1000),
-           then={"discount": 0.15})
+vip = Rule("vip", when=(F.customer.years > 5) & (F.order.total > 1000), then={"discount": 0.15})
 
 decision = RuleSet([vip]).evaluate(data)
-print(decision.explain())   # which rules fired, which did not, and why
+print(decision.explain())  # which rules fired, which did not, and why
 ```
 
 ## License

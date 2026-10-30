@@ -12,6 +12,8 @@ Motor de reglas para Python que cubre cuatro casos de uso con un único núcleo:
 uv sync --all-extras                 # entorno de desarrollo
 uv run pytest                        # tests (incluye hypothesis)
 uv run pytest -m "not slow"          # ciclo rápido
+uv run pytest --cov                  # con cobertura (falla por debajo del 90 %)
+HYPOTHESIS_PROFILE=ci uv run pytest  # búsqueda de hypothesis más profunda (500 ejemplos)
 uv run ruff check . && uv run ruff format --check .
 uv run pyright                       # tipado estricto
 uv run maturin develop -m crates/rulepy-py/Cargo.toml   # compilar el núcleo Rust (fase 7+)

@@ -1,4 +1,4 @@
-"""RulePy: a rules engine for business rules, expert systems, data validation and ML explanations."""
+"""RulePy: rules engine for business rules, expert systems, data validation and ML explanations."""
 
 __version__ = "0.0.1.dev0"
 

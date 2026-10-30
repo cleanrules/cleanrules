@@ -6,10 +6,14 @@
 f=$(jq -r '.tool_response.filePath // .tool_input.file_path // empty')
 [ -n "$f" ] && [ -f "$f" ] || exit 0
 
+# Prefer the ruff pinned in uv.lock so the hook and CI format identically.
+ruff="${CLAUDE_PROJECT_DIR:-.}/.venv/bin/ruff"
+[ -x "$ruff" ] || ruff="uvx ruff"
+
 case "$f" in
   *.py)
-    uvx ruff check --select I --fix --quiet --exit-zero "$f"
-    uvx ruff format --quiet "$f"
+    $ruff check --select I --fix --quiet --exit-zero "$f"
+    $ruff format --quiet "$f"
     ;;
   *.rs)
     rustfmt --edition 2024 "$f"
