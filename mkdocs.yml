@@ -34,7 +34,9 @@ nav:
   - Home: index.md
   - Specification:
       - Overview: spec/README.md
+      - Condition AST: spec/ast.md
   - API reference:
+      - Condition AST: reference/expr.md
       - Errors: reference/errors.md
 
 plugins:

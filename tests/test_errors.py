@@ -6,6 +6,7 @@ import pytest
 import rulepy
 from rulepy.errors import (
     EvaluationError,
+    ExpressionError,
     RulePyError,
     RuleSyntaxError,
     UnsupportedOperation,
@@ -18,12 +19,27 @@ SAMPLES: list[RulePyError] = [
     ),
     RuleSyntaxError("unexpected token", source="IF x > THEN y", line=1, column=8),
     EvaluationError("cannot compare str with int", rule="vip", node="F.total > 1000"),
+    ExpressionError("'and' needs at least two operands", hint="use the operand directly"),
 ]
 
 
-@pytest.mark.parametrize("cls", [UnsupportedOperation, RuleSyntaxError, EvaluationError])
+@pytest.mark.parametrize(
+    "cls", [UnsupportedOperation, RuleSyntaxError, EvaluationError, ExpressionError]
+)
 def test_every_error_derives_from_base(cls: type[Exception]) -> None:
     assert issubclass(cls, RulePyError)
+
+
+def test_expression_error_names_rule_and_node() -> None:
+    err = ExpressionError("'and' needs at least two operands", rule="vip", node="$.rules[0].when")
+    assert str(err) == "rule 'vip': 'and' needs at least two operands in `$.rules[0].when`"
+
+
+def test_expression_error_is_also_a_type_and_value_error() -> None:
+    # Malformed trees are sometimes a wrong type (an int where a node is expected) and
+    # sometimes a wrong value (an empty path); generic handlers for either catch it.
+    assert issubclass(ExpressionError, TypeError)
+    assert issubclass(ExpressionError, ValueError)
 
 
 def test_syntax_error_is_also_a_value_error() -> None:
@@ -35,7 +51,13 @@ def test_unsupported_operation_is_also_not_implemented() -> None:
 
 
 def test_errors_are_exported_at_top_level() -> None:
-    for name in ("RulePyError", "UnsupportedOperation", "RuleSyntaxError", "EvaluationError"):
+    for name in (
+        "RulePyError",
+        "UnsupportedOperation",
+        "RuleSyntaxError",
+        "EvaluationError",
+        "ExpressionError",
+    ):
         assert name in rulepy.__all__
         assert getattr(rulepy, name) is getattr(rulepy.errors, name)
 

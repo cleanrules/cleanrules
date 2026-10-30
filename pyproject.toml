@@ -117,7 +117,7 @@ convention = "google"
 "benchmarks/**" = ["D"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["rulepy"]
+known-first-party = ["rulepy", "tests"]
 
 [tool.pyright]
 include = ["src", "tests"]

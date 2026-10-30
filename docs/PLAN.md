@@ -150,16 +150,31 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
   - `And`/`Or` n-arios (aplanados) y `Not`;
   - `In`, `Between`, `IsNull`, `Matches`, `StartsWith`/`EndsWith`/`Contains`;
   - aritmética `+ - * /` y `abs`.
+  - Dividida en dos subtareas, para que cada una quepa en un commit revisable:
+    - [x] 2.1a Base `Expr` (inmutable, `children`, `walk`, `key`, `same_as`), `Field`, `Const`, `Compare`, `And`/`Or` (n-arios, aplanados), `Not` y validación al construir. Incluye `docs/spec/ast.md` con **todos** los nodos.
+      - Constructores con argumentos sueltos: `Field("pedidos", 0, "total")` y `And(a, b, c)`, como el `And(a, b)` de fuzzytool. `key()` pasa a llamarse `structural_key()`.
+      - Tipos de nodo `condition`/`value`/`any` (antes `boolean`, renombrado para encajar con la lógica difusa). `Compare` rechaza condiciones como operandos y `Const(None)` (pista: `IsNull`). `Const(True)` es de tipo `any`.
+      - `Const` normaliza a tipos exactos (numpy, Enum, subclases) y rechaza NaN, enteros de más de 64 bits y datetimes con nanosegundos.
+      - Unión cerrada `Node`, `Tag` y `TAGS` por clase. Un test comprueba que todos los tags están en `docs/spec/ast.md`.
+      - Nodos con hash por identidad y `weakref_slot`. `structural_key()` lanza `TypeError` ante datos que no sean escalares.
+      - `ExpressionError(RulePyError, TypeError, ValueError)` con `rule` y `node`.
+      - **Cambio de semántica tras la revisión**: comparar valores de grupos distintos (p. ej. `str` frente a `int`) da `UNKNOWN`, con el motivo en la traza. Antes lanzaba un error, lo que hacía depender el resultado del orden de evaluación y abortaba lotes enteros. En modo `strict` se lanza `TypeMismatchError` (2.5). La especificación concreta además los nodos de la 2.1b y las notas para polars (4.3).
+      - Pendiente: cachear `structural_key()` si Rete o la auditoría lo necesitan (se recalcula de forma recursiva; si se cachea en un slot, excluirlo de `fields()` con `init=False`).
+    - [ ] 2.1b `In`, `Between`, `IsNull`, `Matches`, `StartsWith`/`EndsWith`/`Contains`, aritmética, `Abs` y `Neg`.
 - [ ] 2.2 Proxy `F` con acceso por atributo e índice (`F.cliente.antiguedad`, `F["clave con espacios"]`) y construcción con operadores `&`, `|` y `~`.
 - [ ] 2.3 Trampas de Python resueltas:
   - `__bool__` lanza un error claro, lo que impide `a and b` y comparaciones encadenadas como `0 < F.x < 10`;
-  - `__eq__` devuelve un nodo, así que se ofrece `expr.same_as(other)` y `__hash__` estructural para poder usar los nodos en dicts y sets;
+  - `__eq__` devuelve un nodo (la igualdad estructural es `same_as()`). **El hash sigue siendo por identidad**: un hash estructural no funciona, porque dict y set llaman a `__eq__` cuando coinciden los hashes y `bool(Compare)` lanzaría un error. Para claves estructurales se usa `structural_key()`.
+    - Al definir `__eq__`, Python pone `__hash__ = None`: hay que declarar `__hash__ = object.__hash__` en `Expr` y comprobar con un test que todos los nodos son hashables.
+    - También hay que sobrecargar `__ne__`.
+    - Documentar en "trampas comunes" lo que deja de funcionar: `nodo in lista` (salvo que sea el mismo objeto), `list.index`/`remove`/`count`, `==` entre tuplas o listas de nodos, `assert n1 == n2` en pytest y `WeakKeyDictionary`.
   - `repr` legible.
-  - *Nota de 1.4*: cuando existan nodos reales, los tests de `errors` que comparan con `vars(a) == vars(b)` fallarán si `node` es un `Expr` (porque `__eq__` devuelve un nodo). En ese caso se compara con `same_as`. Error previsto para el mal uso de `__bool__`: `RulePyError` + `TypeError`.
+  - *Nota de 1.4*: cuando existan nodos reales, los tests de `errors` que comparan con `vars(a) == vars(b)` fallarán si `node` es un `Expr` (porque `__eq__` devuelve un nodo). En ese caso se compara con `same_as`. El mal uso de `__bool__` lanza `ExpressionError` (que ya es `TypeError`). Los tests de nodos comparan con el helper `same_nodes` (por identidad) o con `same_as`, nunca con `==`.
 
 **Lógica (`core/logic.py`)**
 - [ ] 2.4 Protocolo `Logic` (`and_`, `or_`, `not_`, `from_bool`, `is_true`, `TRUE`/`FALSE`/`UNKNOWN`) con registro por nombre.
 - [ ] 2.5 `BooleanLogic` de Kleene con 3 valores. Un campo ausente o `None` da `UNKNOWN`, y la regla no se dispara. Hay un modo `strict=True` que lanza una excepción.
+  - *Nota de 2.1a*: los tipos incompatibles dan `UNKNOWN` con el motivo en la traza. En modo `strict`, `TypeMismatchError(EvaluationError)` con la ruta del campo y los dos tipos. Grupos de comparación según `docs/spec/ast.md` (número = `numbers.Real` sin `bool`).
 
 **Evaluación y reglas**
 - [ ] 2.6 Evaluador de referencia `core/evaluate.py`, sobre `Mapping`, dataclasses, objetos con atributos y modelos Pydantic (por duck typing, sin depender de Pydantic).
@@ -182,6 +197,7 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
 
 **Calidad**
 - [ ] 2.13 `tests/strategies.py`: estrategias de hypothesis para generar AST, datos (con nulos, NaN y unicode) y reglas.
+  - Empezado en 2.1a (`scalars`, `fields`, `value_exprs`, `compares`, `conditions`). Faltan los datos y las reglas.
 - [ ] 2.14 Propiedades: De Morgan, doble negación, tablas de verdad de Kleene, conmutatividad y asociatividad de `And`/`Or`, idempotencia de aplanar.
 - [ ] 2.15 Snapshots de `explain()`.
 - [ ] 2.16 `benchmarks/run.py` con la suite `eval` (100k registros × 100 reglas), comparada con rule-engine y business-rules. Se guarda como línea base.
@@ -197,6 +213,7 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
 **Objetivo**: que personas que no programan editen las reglas, y que estas se versionen como ficheros.
 
 - [ ] 3.1 `docs/spec/ast.md` y `ast-schema.json` (JSON Schema) con `rulepy_ast: 1`: cada nodo con su forma, semántica y tratamiento de nulos.
+  - *Nota de 2.1a*: el catálogo y la semántica ya están en `ast.md` (versión 0). Falta la forma JSON, incluida la codificación de `inf`/`-inf` (JSON no la tiene), de las fechas y de las zonas horarias.
 - [ ] 3.2 `to_dict`/`from_dict` para nodos, reglas y rulesets; validación contra el esquema.
   - *Nota de 1.4*: los errores de esquema o de versión se localizan por ruta JSON, no por línea y columna. Hará falta un error específico (p. ej. `SchemaError(RuleSyntaxError)` con `path`), así como un error para nombres desconocidos en los registros. Las posiciones de PyYAML empiezan en 0 y hay que sumarles 1.
 - [ ] 3.3 Cargador y volcador YAML (extra `yaml`, `safe_load`) y JSON. Las acciones con funciones se referencian por nombre mediante un registro (`@action("enviar_alerta")`).
@@ -240,7 +257,7 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
 
 **Integración con fuzzytool (extra `fuzzy`)**
 - [ ] 5.1 `FuzzyLogic(tnorm="min", snorm="max", complement="standard")`, que resuelve las conectivas con `fuzzytool.norms.get_tnorm/get_snorm/get_complement`. Los predicados nítidos valen {0, 1}.
-- [ ] 5.2 Nodo `FuzzyTerm`, que envuelve una `fuzzytool.sets.Proposition` (variable y término) y se evalúa con `Antecedent.eval(inputs, tnorm, snorm, complement=...)`. Se serializa con `Variable.to_dict()`.
+- [ ] 5.2 Nodo `FuzzyTerm`, que envuelve una `fuzzytool.sets.Proposition` (variable y término) y se evalúa con `Antecedent.eval(inputs, tnorm, snorm, complement=...)`. Se serializa con `Variable.to_dict()`. *Nota de 2.1a*: debe redefinir `structural_key()`, porque `Proposition` no tiene igualdad estructural.
 - [ ] 5.3 Interoperabilidad de operadores:
   - en RulePy, `fz(term)` y `__rand__`/`__ror__`;
   - **cambio en fuzzytool 0.8**: `Antecedent.__and__/__or__` devuelven `NotImplemented` cuando reciben tipos ajenos, para que `score["poor"] & (F.x > 2)` funcione en ambos órdenes.

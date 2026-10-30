@@ -20,6 +20,7 @@ from typing import Any
 
 __all__ = [
     "EvaluationError",
+    "ExpressionError",
     "RulePyError",
     "RuleSyntaxError",
     "UnsupportedOperation",
@@ -100,6 +101,36 @@ class UnsupportedOperation(RulePyError, NotImplementedError):
         self.operation = operation
         self.backend = backend
         self.reason = reason
+        self.rule = rule
+        self.node = node
+
+    def _body(self) -> str:
+        return _with_context(self.message, self.rule, self.node)
+
+
+class ExpressionError(RulePyError, TypeError, ValueError):
+    """A condition tree is malformed, e.g. `and` with one operand or a non-scalar constant.
+
+    Raised when a node is built, never during evaluation. It is both a `TypeError`
+    (wrong kind of operand) and a `ValueError` (invalid value such as an empty path),
+    so generic handlers for either catch it.
+
+    Args:
+        message: What is wrong with the node.
+        rule: Name of the rule being built, if known.
+        node: The offending node (or its rendered text, or a JSON path), if known.
+        hint: Optional suggestion on how to build it correctly.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        rule: str | None = None,
+        node: object = None,
+        hint: str | None = None,
+    ) -> None:
+        super().__init__(message, hint=hint)
         self.rule = rule
         self.node = node
 

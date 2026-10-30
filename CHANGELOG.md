@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reporting 1-based line/column with a caret under the offending line;
   `EvaluationError` naming the rule and node. All errors pickle with their
   attributes intact.
+- `ExpressionError` (also a `TypeError` and `ValueError`) for malformed
+  condition trees, with optional rule and node context.
+- `rulepy.core.expr`: immutable condition AST with `Field("a", 0, "b")`,
+  `Const` (normalizes numpy/Enum/subclass scalars; rejects NaN and integers
+  beyond 64 bits), `Compare`, n-ary flattened `And(*conditions)` and
+  `Or(*conditions)`, and `Not`. Trees are checked when built, can be walked,
+  compared with `same_as()` and keyed with `structural_key()`, and pickle.
+- Condition AST specification (`docs/spec/ast.md`, draft): node catalogue,
+  Kleene three-valued semantics, null and type-mismatch rules.
 - The package ships a `py.typed` marker.
 - Documentation site skeleton (MkDocs Material + mkdocstrings) with the API
   reference for `rulepy.errors` and the conventions shared by every backend
