@@ -4,7 +4,7 @@ Motor de reglas para Python que cubre cuatro casos de uso con un único núcleo:
 
 - **Hoja de ruta y estado**: [docs/PLAN.md](docs/PLAN.md) es la fuente de verdad. Antes de empezar cualquier tarea, léela y localiza la fase y la tarea.
 - **Contratos**: [docs/spec/](docs/spec/) contiene las especificaciones que comparten Python y Rust, empezando por el formato del AST. Si cambia el comportamiento, primero se actualiza la especificación.
-- **Fase actual**: 0 completada (especificaciones). Siguiente: fase 1 (andamiaje).
+- **Fase actual**: 0 y 1 completadas (especificaciones y andamiaje). Siguiente: fase 2 (núcleo: AST, lógica, reglas y motor secuencial).
 
 ## Comandos
 
@@ -19,6 +19,7 @@ uv run pyright                       # tipado estricto
 uv run maturin develop -m crates/rulepy-py/Cargo.toml   # compilar el núcleo Rust (fase 7+)
 cargo test --workspace && cargo clippy --workspace -- -D warnings
 uv run python benchmarks/run.py      # benchmarks (fase 2+)
+uv run --group docs mkdocs build --strict   # documentación (también en CI); `mkdocs serve` para verla
 ```
 
 Un hook (`.claude/hooks/format.sh`) formatea cada `.py` y `.rs` tras editarlo, así que no hace falta formatear a mano.

@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Repository skeleton: README, MIT license, changelog, `.gitignore`.
 - Package metadata (`pyproject.toml`, hatchling, `src/` layout): Python >= 3.11,
   no runtime dependencies, optional extras `fuzzy`, `polars`, `pandas`, `yaml`,
-  `audit`, `ml`, `fast`, `bench` and `docs` reserved for upcoming features.
+  `audit`, `ml`, `fast` and `bench` reserved for upcoming features.
 - `rulepy.errors` (also exported from `rulepy`): `RulePyError` base class with an
   optional `hint`; `UnsupportedOperation` (also a `NotImplementedError`) naming
   the operation, backend, rule and node; `RuleSyntaxError` (also a `ValueError`)
@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `EvaluationError` naming the rule and node. All errors pickle with their
   attributes intact.
 - The package ships a `py.typed` marker.
+- Documentation site skeleton (MkDocs Material + mkdocstrings) with the API
+  reference for `rulepy.errors` and the conventions shared by every backend
+  (`docs/spec/README.md`).
 - Development tooling: `dev` dependency group (pytest, pytest-cov, hypothesis,
   ruff, pyright) with strict pytest, branch coverage (>= 90%), strict pyright
   and ruff (Google docstrings) configured in `pyproject.toml`.

@@ -1,0 +1,61 @@
+site_name: RulePy
+site_description: >-
+  A rules engine for business rules, expert systems, data validation and ML
+  explanations, with crisp and fuzzy logic.
+site_author: Jose L. Salmeron
+copyright: Copyright &copy; 2026 Jose L. Salmeron &middot; MIT License
+
+# The Spanish development roadmap lives in docs/ for the team, not on the site.
+exclude_docs: |
+  PLAN.md
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Specification:
+      - Overview: spec/README.md
+  - API reference:
+      - Errors: reference/errors.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            members_order: source
+            merge_init_into_class: true
+            separate_signature: true
+            show_signature_annotations: true
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.inlinehilite

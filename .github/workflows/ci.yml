@@ -48,6 +48,19 @@ jobs:
       - run: uv sync
       - run: uv run pytest --cov
 
+  docs:
+    name: Build documentation
+    runs-on: ubuntu-latest
+    env:
+      NO_MKDOCS_2_WARNING: "1"  # Material EOL notice, tracked in docs/PLAN.md task 9.1
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      # --strict turns broken links and unresolved API references into failures.
+      - run: uv run --group docs mkdocs build --strict
+
   build:
     name: Build and smoke-test the wheel
     runs-on: ubuntu-latest

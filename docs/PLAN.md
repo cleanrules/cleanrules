@@ -126,9 +126,16 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
     - el job `build` se reprodujo correctamente.
     - Windows y Linux quedan sin probar hasta la primera ejecución.
   - Las Actions están fijadas por versión mayor (`checkout@v5`, `setup-uv@v6`, `upload-artifact@v4`). Fijarlas por SHA queda para la fase 9, con la publicación.
-- [ ] 1.7 Esqueleto de mkdocs-material (mismo estilo que fuzzytool) y `docs/spec/README.md`.
+- [x] 1.7 Esqueleto de mkdocs-material (mismo estilo que fuzzytool) y `docs/spec/README.md`.
+  - `mkdocs.yml` (Material con modo claro y oscuro, mkdocstrings en estilo Google) con estas páginas: `docs/index.md`, `docs/reference/errors.md` (API generada) y `docs/spec/README.md`. `PLAN.md` queda fuera del sitio.
+  - `docs/spec/README.md` fija las convenciones comunes: Kleene, etiquetas de operador, versión `rulepy_ast`, posiciones 1-based, subconjunto de regex y determinismo. Está en inglés porque la lee también `rust-engineer`.
+  - Desviación: `docs` es un **grupo de dependencias** (mkdocs-material 9.8 y mkdocstrings 1.0), no un extra, por la misma razón que `dev`. Se ha retirado el extra vacío `docs`.
+  - Nuevo job `docs` en CI: `mkdocs build --strict`.
+  - ⚠️ **Material for MkDocs termina su soporte el 5 de mayo de 2027**; el sucesor es Zensical, compatible con `mkdocs.yml`. Ver 9.1. (También afecta a fuzzytool.)
 
 **Aceptación**: `uv sync && uv run pytest && uv run ruff check . && uv run pyright` en verde, en local y en CI.
+
+> **Estado (2026-10-30)**: todo verde en local (33 tests, 100 % de cobertura, macOS con Python 3.11–3.14) y documentación en modo estricto correcta. Falta la verificación en CI, que llegará con la primera ejecución en GitHub (pendiente de la organización).
 
 ---
 
@@ -346,7 +353,8 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
 
 ### Fase 9. Documentación, comparativa y publicación · v1.0 · tamaño M
 
-- [ ] 9.1 Sitio mkdocs-material:
+- [ ] 9.0 Migrar la documentación de Material for MkDocs (fin de soporte: 5 de mayo de 2027) a **Zensical**, que lee `mkdocs.yml`. Debe hacerse antes de esa fecha, sea cual sea la fase en curso; conviene coordinarlo con fuzzytool.
+- [ ] 9.1 Sitio de documentación:
   - tutoriales por caso de uso;
   - "trampas comunes";
   - referencia de la API con mkdocstrings;
