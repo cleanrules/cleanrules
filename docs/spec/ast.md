@@ -42,7 +42,7 @@ lists its tags in `TAGS`, `Node` is the closed union of concrete classes, and
 | `between` | `Between` | `operand`, `low`, `high`, `closed` | condition | 2.1b |
 | `is_null` | `IsNull` | `operand` | condition | 2.1b |
 | `matches` | `Matches` | `operand`, `pattern: str` | condition | 2.1b |
-| `starts_with` `ends_with` `contains` | `StringTest` | `op`, `operand`, `text` | condition | 2.1b |
+| `starts_with` `ends_with` `contains` | `StringTest` | `op`, `operand`, `text: str` | condition | 2.1b |
 | `add` `sub` `mul` `div` | `Arith` | `op`, `left`, `right` | value | 2.1b |
 | `abs` | `Abs` | `operand` | value | 2.1b |
 | `neg` | `Neg` | `operand` | value | 2.1b |
@@ -70,9 +70,31 @@ lists its tags in `TAGS`, `Node` is the closed union of concrete classes, and
   an `And` operand that is itself an `And` is spliced in, and the same for `Or`.
   They need at least two operands after flattening. Operand order is kept,
   because it determines explanation order.
-- **`Compare(op, left, right)`**: both sides must be value or `any` nodes, never
-  conditions. `Const(None)` on either side is rejected, because under Kleene
-  logic `x == null` is never true; use `IsNull` instead.
+- **Value operands.** These operands must be value or `any` nodes, never
+  conditions:
+  - both sides of `Compare` and `Arith`;
+  - the operand of `In`, `IsNull`, `Matches`, `StringTest`, `Abs` and `Neg`;
+  - all three nodes of `Between`.
+
+  `Const(None)` is rejected everywhere except as the operand of `IsNull`. Under
+  Kleene logic, `x == null` or `x + null` would be null for every input; use
+  `IsNull` to test for missing values.
+- **Arithmetic** (`Arith`, `Abs`, `Neg`) also rejects constants that are not
+  numbers (booleans included), such as `Const("a") + 1`.
+- **`In(operand, values)`** accepts any iterable of values, including a `set`.
+  The values are normalized like `Const`, must be non-empty and non-null, and
+  must all belong to one type group; a `str`, `bytes` or mapping is not a
+  collection of values here. They are stored **sorted and without duplicates**
+  (equal `int` and `float`, such as `1` and `1.0`, are both kept, in a fixed
+  order), so the node is deterministic and `In(x, [2, 1])` is the same node as
+  `In(x, [1, 2])`.
+- **`Between(operand, low, high, closed="both")`**: `closed` is `"both"`,
+  `"left"`, `"right"` or `"none"`. When both bounds are constants, they must belong
+  to one orderable group (not boolean).
+- **`Matches(operand, pattern)`**: the pattern must compile. The check for the
+  portable subset (no lookaround, no backreferences) arrives in task 3.6.
+- **`StringTest(op, operand, text)`**: `op` is `starts_with`, `ends_with` or
+  `contains`, and `text` is a literal `str`.
 
 ### Structural identity
 
@@ -179,7 +201,9 @@ Values belong to one of these comparison groups:
 - **`matches`** uses **search** semantics (Python `re.search`, Rust
   `Regex::is_match`, polars `str.contains`). It is case-sensitive unless the
   pattern starts with the inline flag `(?i)`. Patterns are restricted to the
-  subset shared by Python `re` and Rust `regex`.
+  subset shared by Python `re` and Rust `regex`. Note that `$` differs: in
+  Python it also matches before a trailing newline, in Rust it does not, so task
+  3.6 either rejects `$` or rewrites it to `\z`.
 - **`starts_with`, `ends_with`, `contains`** take **literal** text; polars must
   call `str.contains(..., literal=True)`.
 - **Arithmetic** (`add`, `sub`, `mul`, `div`, `abs`, `neg`) is defined on

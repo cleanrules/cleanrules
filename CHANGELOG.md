@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   beyond 64 bits), `Compare`, n-ary flattened `And(*conditions)` and
   `Or(*conditions)`, and `Not`. Trees are checked when built, can be walked,
   compared with `same_as()` and keyed with `structural_key()`, and pickle.
+- More condition nodes: `In` (canonical sorted set of same-type values),
+  `Between` (polars-style `closed`), `IsNull`, `Matches` (regex search),
+  `StringTest` (`starts_with` / `ends_with` / `contains`, literal text) and
+  arithmetic (`Arith` with `add` / `sub` / `mul` / `div`, `Abs`, `Neg`), with
+  the type aliases `StringOp`, `ArithOp` and `Closed`.
 - Condition AST specification (`docs/spec/ast.md`, draft): node catalogue,
   Kleene three-valued semantics, null and type-mismatch rules.
 - The package ships a `py.typed` marker.

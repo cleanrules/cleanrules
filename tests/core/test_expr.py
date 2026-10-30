@@ -128,7 +128,7 @@ def test_const_rejects_sub_microsecond_datetimes() -> None:
 
 @pytest.mark.parametrize("value", [[1], {"a": 1}, (1, 2), object(), b"bytes", 1j])
 def test_const_rejects_non_scalars(value: object) -> None:
-    with pytest.raises(ExpressionError, match="Const"):
+    with pytest.raises(ExpressionError, match="not a valid constant"):
         Const(value)  # pyright: ignore[reportArgumentType]
 
 

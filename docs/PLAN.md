@@ -144,7 +144,7 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
 **Objetivo**: reglas de negocio sin estado, con explicación completa. Es la base de todo lo demás.
 
 **AST (`core/expr.py`)**
-- [ ] 2.1 Nodos inmutables con igualdad estructural:
+- [x] 2.1 Nodos inmutables con igualdad estructural:
   - `Field(path)` y `Const`;
   - `Compare` (`== != < <= > >=`);
   - `And`/`Or` n-arios (aplanados) y `Not`;
@@ -160,7 +160,18 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
       - `ExpressionError(RulePyError, TypeError, ValueError)` con `rule` y `node`.
       - **Cambio de semántica tras la revisión**: comparar valores de grupos distintos (p. ej. `str` frente a `int`) da `UNKNOWN`, con el motivo en la traza. Antes lanzaba un error, lo que hacía depender el resultado del orden de evaluación y abortaba lotes enteros. En modo `strict` se lanza `TypeMismatchError` (2.5). La especificación concreta además los nodos de la 2.1b y las notas para polars (4.3).
       - Pendiente: cachear `structural_key()` si Rete o la auditoría lo necesitan (se recalcula de forma recursiva; si se cachea en un slot, excluirlo de `fields()` con `init=False`).
-    - [ ] 2.1b `In`, `Between`, `IsNull`, `Matches`, `StartsWith`/`EndsWith`/`Contains`, aritmética, `Abs` y `Neg`.
+    - [x] 2.1b `In`, `Between`, `IsNull`, `Matches`, `StartsWith`/`EndsWith`/`Contains`, aritmética, `Abs` y `Neg`.
+      - Las pruebas de texto son un único nodo, `StringTest(op, operand, text)`, con `text` literal (`str`).
+      - Los nodos que reciben valores rechazan condiciones y `Const(None)` (salvo `IsNull`). La aritmética rechaza constantes no numéricas.
+      - `In`:
+        - acepta cualquier colección, incluido un `set`, pero no `str`, `bytes` ni mapas;
+        - rechaza `None` y la mezcla de grupos de tipos;
+        - guarda los valores ordenados y sin duplicados, de forma determinista (`1` y `1.0` se conservan ambos).
+      - `Between` rechaza límites constantes de grupos distintos o booleanos.
+      - `Matches` y `StringTest` normalizan las subclases de `str`.
+      - Desviación: `Matches` solo comprueba que el patrón compila; el subconjunto portable Python/Rust queda para la 3.6.
+      - Las estrategias de hypothesis generan ya el AST completo.
+      - Revisado por `api-reviewer`, sin bloqueantes. Se corrigieron tres fallos: orden de `In` con `1`/`1.0`, `In(x, "abc")` partido en caracteres, y subclases de `str` que rompían `structural_key()`.
 - [ ] 2.2 Proxy `F` con acceso por atributo e índice (`F.cliente.antiguedad`, `F["clave con espacios"]`) y construcción con operadores `&`, `|` y `~`.
 - [ ] 2.3 Trampas de Python resueltas:
   - `__bool__` lanza un error claro, lo que impide `a and b` y comparaciones encadenadas como `0 < F.x < 10`;
@@ -222,7 +233,7 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
   - sintaxis alineada con `fuzzytool.rule_from_text`;
   - errores con línea y columna.
 - [ ] 3.5 Tablas de decisión (`io/tables.py`) desde una lista de filas, CSV o un DataFrame, con políticas de acierto, celdas de rango (`[18..65)`) y comodín `-`.
-- [ ] 3.6 Restricción de regex: se validan los patrones contra el subconjunto del crate `regex` (sin *lookaround* ni *backreferences*) y se documenta el riesgo ReDoS en Python.
+- [ ] 3.6 Restricción de regex (*nota de 2.1b*: `$` difiere entre Python, donde también encaja antes de un salto de línea final, y Rust; hay que rechazarlo o reescribirlo como `\z`): se validan los patrones contra el subconjunto del crate `regex` (sin *lookaround* ni *backreferences*) y se documenta el riesgo ReDoS en Python.
 - [ ] 3.7 Propiedad de ida y vuelta: `parse(serialize(x)) == x` para JSON, YAML y texto (mediante `parity-tester`).
 
 **Aceptación**: todos los ejemplos de la fase 2 existen en Python, YAML y texto con resultados idénticos.

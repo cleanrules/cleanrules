@@ -17,24 +17,36 @@ import datetime as dt
 import math
 import numbers
 import operator
-from collections.abc import Iterator
+import re
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, fields
 from typing import Any, ClassVar, Literal, TypeAlias, get_args
 
 from rulepy.errors import ExpressionError
 
 __all__ = [
+    "Abs",
     "And",
+    "Arith",
+    "ArithOp",
+    "Between",
+    "Closed",
     "Compare",
     "CompareOp",
     "Const",
     "Expr",
     "Field",
+    "In",
+    "IsNull",
     "Kind",
+    "Matches",
+    "Neg",
     "Node",
     "Not",
     "Or",
     "Scalar",
+    "StringOp",
+    "StringTest",
     "Tag",
 ]
 
@@ -47,10 +59,47 @@ Kind: TypeAlias = Literal["condition", "value", "any"]
 CompareOp: TypeAlias = Literal["eq", "ne", "lt", "le", "gt", "ge"]
 """Comparison operators; each one is also the tag of its `Compare` node."""
 
-Tag: TypeAlias = Literal["field", "const", "eq", "ne", "lt", "le", "gt", "ge", "and", "or", "not"]
-"""Every operator tag defined so far (see `docs/spec/ast.md`)."""
+StringOp: TypeAlias = Literal["starts_with", "ends_with", "contains"]
+"""Literal-text tests; each one is also the tag of its `StringTest` node."""
+
+ArithOp: TypeAlias = Literal["add", "sub", "mul", "div"]
+"""Binary arithmetic operators; each one is also the tag of its `Arith` node."""
+
+Closed: TypeAlias = Literal["both", "left", "right", "none"]
+"""Which ends of a `Between` interval are included (same values as polars)."""
+
+Tag: TypeAlias = Literal[
+    "field",
+    "const",
+    "eq",
+    "ne",
+    "lt",
+    "le",
+    "gt",
+    "ge",
+    "and",
+    "or",
+    "not",
+    "in",
+    "between",
+    "is_null",
+    "matches",
+    "starts_with",
+    "ends_with",
+    "contains",
+    "add",
+    "sub",
+    "mul",
+    "div",
+    "abs",
+    "neg",
+]
+"""Every operator tag (see `docs/spec/ast.md`)."""
 
 _COMPARE_OPS: frozenset[str] = frozenset(get_args(CompareOp))
+_STRING_OPS: frozenset[str] = frozenset(get_args(StringOp))
+_ARITH_OPS: frozenset[str] = frozenset(get_args(ArithOp))
+_CLOSED: frozenset[str] = frozenset(get_args(Closed))
 _I64_MIN, _I64_MAX = -(2**63), 2**63 - 1
 
 
@@ -146,6 +195,51 @@ def _require_condition(node: Expr, where: str) -> None:
         )
 
 
+def _require_value(value: object, where: str, *, allow_null: bool = False) -> Expr:
+    node = _require_node(value, where)
+    if node.kind == "condition":
+        raise ExpressionError(
+            f"{where} is a condition ({node.tag!r}); this operand takes a value",
+            hint="combine conditions with & and |, or negate with ~",
+        )
+    if not allow_null and isinstance(node, Const) and node.value is None:
+        raise ExpressionError(
+            f"{where} is None: the result would be missing for every input",
+            hint="use IsNull(...) / F.x.is_null() to test for missing values",
+        )
+    return node
+
+
+def _require_number(value: object, where: str) -> Expr:
+    node = _require_value(value, where)
+    if isinstance(node, Const) and _group(node.value) != "number":
+        raise ExpressionError(
+            f"{where} must be a number, got {type(node.value).__name__} {node.value!r}",
+            hint="arithmetic is defined on int and float only",
+        )
+    return node
+
+
+def _require_op(op: object, allowed: frozenset[str], what: str) -> None:
+    if op not in allowed:
+        raise ExpressionError(
+            f"unknown {what} {op!r}", hint=f"use one of {', '.join(sorted(allowed))}"
+        )
+
+
+def _group(value: Scalar) -> str:
+    """Return the comparison group of a normalized scalar (see `docs/spec/ast.md`)."""
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, int | float):
+        return "number"
+    if isinstance(value, dt.datetime):
+        return "naive datetime" if value.tzinfo is None else "aware datetime"
+    if isinstance(value, dt.date):
+        return "date"
+    return "string" if isinstance(value, str) else "null"
+
+
 def _normalize_scalar(value: object) -> Scalar:
     """Return `value` as an exact built-in scalar type, or raise `ExpressionError`."""
     if value is None or type(value) in (bool, str, dt.date):
@@ -164,7 +258,7 @@ def _normalize_scalar(value: object) -> Scalar:
         number = float(value)
         if math.isnan(number):
             raise ExpressionError(
-                "Const cannot hold NaN: RulePy treats NaN as a missing value",
+                "NaN is not a valid constant: RulePy treats NaN as a missing value",
                 hint="use IsNull(...) / F.x.is_null() to test for missing values",
             )
         return number
@@ -187,7 +281,7 @@ def _normalize_scalar(value: object) -> Scalar:
     if isinstance(value, dt.date):
         return dt.date(value.year, value.month, value.day)
     raise ExpressionError(
-        f"Const cannot hold {type(value).__name__} {value!r}",
+        f"{type(value).__name__} {value!r} is not a valid constant",
         hint="constants are None, bool, int, float, str, date or datetime (use .item() on"
         " numpy scalars); use In(...) for a set of values",
     )
@@ -196,6 +290,11 @@ def _normalize_scalar(value: object) -> Scalar:
 def _is_index(value: object) -> bool:
     # bool is an Integral too, but True/False as a path index is almost surely a bug.
     return not isinstance(value, bool) and isinstance(value, numbers.Integral)
+
+
+def _is_value_collection(values: object) -> bool:
+    # A str is iterable, but splitting "abc" into characters is never what was meant.
+    return isinstance(values, Iterable) and not isinstance(values, str | bytes | Mapping)
 
 
 def _is_numpy_bool(value: object) -> bool:
@@ -287,24 +386,9 @@ class Compare(Expr):
     _kind = "condition"
 
     def __post_init__(self) -> None:
-        if self.op not in _COMPARE_OPS:
-            raise ExpressionError(
-                f"unknown comparison operator {self.op!r}",
-                hint=f"use one of {', '.join(sorted(_COMPARE_OPS))}",
-            )
-        for side, node in (("left", self.left), ("right", self.right)):
-            where = f"the {side} side of {self.op!r}"
-            _require_node(node, where)
-            if node.kind == "condition":
-                raise ExpressionError(
-                    f"{where} is a condition ({node.tag!r}); comparisons take values",
-                    hint="combine conditions with & and |, or negate with ~",
-                )
-            if isinstance(node, Const) and node.value is None:
-                raise ExpressionError(
-                    f"{where} is None: a comparison with a missing value is never true",
-                    hint="use IsNull(...) / F.x.is_null() to test for missing values",
-                )
+        _require_op(self.op, _COMPARE_OPS, "comparison operator")
+        _require_value(self.left, f"the left side of {self.op!r}")
+        _require_value(self.right, f"the right side of {self.op!r}")
 
     @property
     def tag(self) -> str:
@@ -381,5 +465,259 @@ class Not(Expr):
         _require_condition(_require_node(self.operand, where), where)
 
 
-Node: TypeAlias = Field | Const | Compare | And | Or | Not
+@dataclass(frozen=True, eq=False, slots=True, init=False)
+class In(Expr):
+    """Membership in a finite set of constants, e.g. `In(F.country, {"ES", "PT"})`.
+
+    Values are normalized like `Const`, must be non-null and of one type group, and
+    are stored sorted and deduplicated, so the node is deterministic.
+
+    Args:
+        operand: The value to look up.
+        values: The allowed values (any iterable, including a `set`).
+    """
+
+    operand: Expr
+    values: tuple[Scalar, ...]
+
+    TAGS = frozenset({"in"})
+    _tag = "in"
+    _kind = "condition"
+
+    def __init__(self, operand: Expr, values: Iterable[Scalar]) -> None:
+        _require_value(operand, "the operand of 'in'")
+        if not _is_value_collection(values):
+            raise ExpressionError(
+                f"'in' values must be a collection of scalars,"
+                f" got {type(values).__name__} {values!r}",
+                hint=f"wrap a single value: In(x, [{values!r}])",
+            )
+        normalized: list[Scalar] = []
+        for value in values:
+            if value is None:
+                raise ExpressionError(
+                    "'in' values cannot contain None",
+                    hint="combine with IsNull(...): In(x, [...]) | IsNull(x)",
+                )
+            try:
+                normalized.append(_normalize_scalar(value))
+            except ExpressionError as err:
+                raise ExpressionError(f"'in' values: {err.message}", hint=err.hint) from None
+        if not normalized:
+            raise ExpressionError(
+                "'in' needs at least one value",
+                hint="a condition that is never true is better written as Const(False)",
+            )
+        groups = {_group(v) for v in normalized}
+        if len(groups) > 1:
+            raise ExpressionError(
+                f"'in' values mix type groups: {', '.join(sorted(groups))}",
+                hint="use values of a single type; comparisons across types are never true",
+            )
+        # Sort by value, then type name, and deduplicate on the structural key, so that
+        # equal int and float values (1 and 1.0) are both kept in a fixed order.
+        ordered = sorted(normalized, key=lambda v: (v, type(v).__name__))  # pyright: ignore[reportArgumentType, reportUnknownLambdaType]
+        unique: list[Scalar] = []
+        for value in ordered:
+            if not unique or _key_of(value) != _key_of(unique[-1]):
+                unique.append(value)
+        object.__setattr__(self, "operand", operand)
+        object.__setattr__(self, "values", tuple(unique))
+
+
+@dataclass(frozen=True, eq=False, slots=True)
+class Between(Expr):
+    """Range test `low <= operand <= high`, with `closed` choosing the inclusive ends.
+
+    Args:
+        operand: The value to test.
+        low: Lower bound (a node, so it may be another field).
+        high: Upper bound.
+        closed: `"both"` (default), `"left"`, `"right"` or `"none"`.
+    """
+
+    operand: Expr
+    low: Expr
+    high: Expr
+    closed: Closed = "both"
+
+    TAGS = frozenset({"between"})
+    _tag = "between"
+    _kind = "condition"
+
+    def __post_init__(self) -> None:
+        for name in ("operand", "low", "high"):
+            _require_value(getattr(self, name), f"the {name} of 'between'")
+        _require_op(self.closed, _CLOSED, "'closed' value for 'between'")
+        if isinstance(self.low, Const) and isinstance(self.high, Const):
+            groups = {_group(self.low.value), _group(self.high.value)}
+            if len(groups) > 1 or groups == {"boolean"}:
+                raise ExpressionError(
+                    f"'between' bounds {self.low.value!r} and {self.high.value!r} cannot"
+                    " bound one ordered value",
+                    hint="use two bounds of the same orderable type (number, string, date)",
+                )
+
+
+@dataclass(frozen=True, eq=False, slots=True)
+class IsNull(Expr):
+    """True when the operand is missing or null (never `UNKNOWN`).
+
+    Args:
+        operand: The value to test.
+    """
+
+    operand: Expr
+
+    TAGS = frozenset({"is_null"})
+    _tag = "is_null"
+    _kind = "condition"
+
+    def __post_init__(self) -> None:
+        _require_value(self.operand, "the operand of 'is_null'", allow_null=True)
+
+
+@dataclass(frozen=True, eq=False, slots=True)
+class Matches(Expr):
+    """Regular-expression search in a string (case-sensitive unless `(?i)`).
+
+    Args:
+        operand: The string value.
+        pattern: The regular expression; it must compile.
+    """
+
+    operand: Expr
+    pattern: str
+
+    TAGS = frozenset({"matches"})
+    _tag = "matches"
+    _kind = "condition"
+
+    def __post_init__(self) -> None:
+        _require_value(self.operand, "the operand of 'matches'")
+        if not isinstance(self.pattern, str):  # pyright: ignore[reportUnnecessaryIsInstance]
+            raise ExpressionError(f"the 'matches' pattern must be a str, got {self.pattern!r}")
+        object.__setattr__(self, "pattern", str.__str__(self.pattern))
+        try:
+            re.compile(self.pattern)
+        except re.error as err:
+            raise ExpressionError(
+                f"invalid regular expression {self.pattern!r}: {err.msg} at position {err.pos}",
+                hint="escape special characters with re.escape(...) to match them literally",
+            ) from None
+
+
+@dataclass(frozen=True, eq=False, slots=True)
+class StringTest(Expr):
+    """Literal-text test; its tag is the operator (`starts_with`, `ends_with`, `contains`).
+
+    Args:
+        op: The test.
+        operand: The string value.
+        text: The literal text to look for (not a pattern).
+    """
+
+    op: StringOp
+    operand: Expr
+    text: str
+
+    TAGS = _STRING_OPS
+    _kind = "condition"
+
+    def __post_init__(self) -> None:
+        _require_op(self.op, _STRING_OPS, "string test")
+        _require_value(self.operand, f"the operand of {self.op!r}")
+        if not isinstance(self.text, str):  # pyright: ignore[reportUnnecessaryIsInstance]
+            raise ExpressionError(
+                f"the text of {self.op!r} must be a literal str, got {self.text!r}",
+                hint="use Matches(...) for patterns",
+            )
+        object.__setattr__(self, "text", str.__str__(self.text))
+
+    @property
+    def tag(self) -> str:
+        """The string test operator."""
+        return self.op
+
+
+@dataclass(frozen=True, eq=False, slots=True)
+class Arith(Expr):
+    """Binary arithmetic on numbers; its tag is the operator (`add`, `sub`, `mul`, `div`).
+
+    Args:
+        op: The operator; `div` is true division.
+        left: Left-hand number.
+        right: Right-hand number.
+    """
+
+    op: ArithOp
+    left: Expr
+    right: Expr
+
+    TAGS = _ARITH_OPS
+    _kind = "value"
+
+    def __post_init__(self) -> None:
+        _require_op(self.op, _ARITH_OPS, "arithmetic operator")
+        _require_number(self.left, f"the left side of {self.op!r}")
+        _require_number(self.right, f"the right side of {self.op!r}")
+
+    @property
+    def tag(self) -> str:
+        """The arithmetic operator."""
+        return self.op
+
+
+@dataclass(frozen=True, eq=False, slots=True)
+class Abs(Expr):
+    """Absolute value of a number.
+
+    Args:
+        operand: The number.
+    """
+
+    operand: Expr
+
+    TAGS = frozenset({"abs"})
+    _tag = "abs"
+    _kind = "value"
+
+    def __post_init__(self) -> None:
+        _require_number(self.operand, "the operand of 'abs'")
+
+
+@dataclass(frozen=True, eq=False, slots=True)
+class Neg(Expr):
+    """Negation of a number.
+
+    Args:
+        operand: The number.
+    """
+
+    operand: Expr
+
+    TAGS = frozenset({"neg"})
+    _tag = "neg"
+    _kind = "value"
+
+    def __post_init__(self) -> None:
+        _require_number(self.operand, "the operand of 'neg'")
+
+
+Node: TypeAlias = (
+    Field
+    | Const
+    | Compare
+    | And
+    | Or
+    | Not
+    | In
+    | Between
+    | IsNull
+    | Matches
+    | StringTest
+    | Arith
+    | Abs
+    | Neg
+)
 """Closed union of concrete nodes: backends `match` on it with `assert_never`."""
