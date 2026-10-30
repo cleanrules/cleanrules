@@ -34,7 +34,8 @@ Lo que nos diferencia es la combinación: **condiciones como AST** + **lógica i
 | D10 | uv workspace (Python) + Cargo workspace (Rust) en un monorepo | Un único repositorio, un único CI y versiones sincronizadas |
 
 ### Decisiones pendientes (confirmar con el autor)
-- [ ] Python mínimo: propuesto **3.11** (fuzzytool admite ≥3.9; 3.11 aporta `Self`, `StrEnum` y grupos de excepciones). Wheels Rust `abi3-py311` más una build *free-threaded* 3.14t.
+
+- [x] Python mínimo: **3.11**, aplicado en 1.2 (fuzzytool admite ≥3.9; 3.11 aporta `Self`, `StrEnum` y grupos de excepciones). Wheels Rust `abi3-py311` más una build *free-threaded* 3.14t.
 - [x] Licencia: **MIT**, como fuzzytool (aplicada en 1.1).
 - [ ] Organización de GitHub y dominio de la documentación (¿`rulepy.github.io`, siguiendo el patrón de fuzzytool?).
 - [ ] Hacer en fuzzytool 0.8 el cambio de `Antecedent.__and__/__or__`, que debe devolver `NotImplemented` cuando recibe tipos ajenos (ver fase 5).
@@ -90,7 +91,11 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
 
 - [x] 1.1 `git init`, `.gitignore` (Python, Rust, `.claude/settings.local.json`), `LICENSE`, `README.md` mínimo y `CHANGELOG.md`.
   - Rama `main`, todavía sin commits. Licencia MIT (© 2026 Jose L. Salmeron). README y CHANGELOG en inglés (de cara al público); el README avisa de que la API es provisional.
-- [ ] 1.2 `pyproject.toml`: hatchling, estructura `src/`, `requires-python`, extras vacíos ya declarados (`fuzzy`, `polars`, `pandas`, `yaml`, `audit`, `ml`, `fast`, `bench`, `docs`, `dev`).
+- [x] 1.2 `pyproject.toml`: hatchling, estructura `src/`, `requires-python`, extras vacíos ya declarados (`fuzzy`, `polars`, `pandas`, `yaml`, `audit`, `ml`, `fast`, `bench`, `docs`, `dev`).
+  - Versión `0.0.1.dev0`, con una única fuente en `src/rulepy/__init__.py` (versión dinámica de hatch). Licencia en formato PEP 639 (`license = "MIT"`, hatchling ≥ 1.27).
+  - Desviación: `dev` **no** es un extra, sino que irá en `[dependency-groups]` (PEP 735) en la 1.3, porque las herramientas de desarrollo no deben poder instalarse con `pip install rulepy[dev]`.
+  - Se excluyen del sdist `.claude/`, `CLAUDE.md` y `docs/PLAN.md`. El `[tool.uv.workspace]` se declarará en la fase 7, al añadir `rulepy-core`.
+  - Verificado: `uv sync`, `import rulepy` y `uv build`; el wheel contiene solo `rulepy/` y los metadatos son correctos. `uv.lock` se versiona.
 - [ ] 1.3 Configuración de ruff (reglas `E,F,I,B,UP,SIM,RUF,D` con convención google), pyright estricto y pytest (marcador `slow`, perfiles de hypothesis `dev` y `ci`, cobertura).
 - [ ] 1.4 Esqueleto de `src/rulepy/` con `errors.py` (`RulePyError`, `UnsupportedOperation`, `RuleSyntaxError`, `EvaluationError`) y `py.typed`.
 - [ ] 1.5 Test de "núcleo sin dependencias": `import rulepy` no importa numpy, polars, pandas, fuzzytool, sklearn ni z3.
