@@ -31,6 +31,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `StringTest` (`starts_with` / `ends_with` / `contains`, literal text) and
   arithmetic (`Arith` with `add` / `sub` / `mul` / `div`, `Abs`, `Neg`), with
   the type aliases `StringOp`, `ArithOp` and `Closed`.
+- `F` (exported from `rulepy`) for writing conditions in Python:
+  `(F.customer.age >= 18) & F.country.is_in({"ES", "PT"}) & ~F.blocked`,
+  `F["key with spaces"]`, `F.orders[0].total`. Comparison, logical (`&`, `|`,
+  `~`) and arithmetic operators build nodes, as do the methods `is_in`,
+  `between`, `is_null`, `matches`, `starts_with`, `ends_with`, `contains` and
+  `abs`.
+- Nodes guard against Python pitfalls with a clear `ExpressionError`:
+  `and`/`or`/`not`, `if node:`, chained comparisons, `== None`, Python bools
+  next to `&`/`|`, iterating a node, numpy arrays and pandas objects as
+  operands, polars-style namespaces, and calling a field path (with a "did you
+  mean" hint). Nodes hash by identity.
+- `repr()` of a condition is Python that rebuilds the same tree.
+- "Common pitfalls" documentation page.
 - Condition AST specification (`docs/spec/ast.md`, draft): node catalogue,
   Kleene three-valued semantics, null and type-mismatch rules.
 - The package ships a `py.typed` marker.

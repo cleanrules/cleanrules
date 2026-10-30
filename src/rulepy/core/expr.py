@@ -4,9 +4,15 @@ Conditions are data, never opaque functions, so the same tree can be evaluated,
 explained, serialized, vectorized, audited and compiled to Rust. The catalogue of
 nodes, their kinds and their semantics are specified in `docs/spec/ast.md`.
 
-Nodes deliberately keep identity-based `==` and `hash`: from task 2.3 on, `==`
-builds a `Compare` node (as in polars or SQLAlchemy), so structural equality is
-`same_as` and structural hashing is `structural_key()`.
+Trees are normally built with the `F` proxy and Python operators:
+
+    (F.customer.age >= 18) & F.country.is_in({"ES", "PT"}) & ~F.blocked
+
+Like in polars or SQLAlchemy, `==` on a node builds a `Compare` node instead of
+returning a bool, and using a node as a Python bool raises `ExpressionError`
+(`and`/`or`/`not`, `if node:`, chained comparisons such as `0 < F.x < 10`).
+Structural equality is `same_as`, structural hashing is `structural_key()`, and
+nodes hash by identity. See the "Common pitfalls" page of the documentation.
 
 Note: `Field` here is a condition node, unrelated to `pydantic.Field`.
 """
@@ -14,13 +20,15 @@ Note: `Field` here is a condition node, unrelated to `pydantic.Field`.
 from __future__ import annotations
 
 import datetime as dt
+import difflib
+import keyword
 import math
 import numbers
 import operator
 import re
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, fields
-from typing import Any, ClassVar, Literal, TypeAlias, get_args
+from typing import Any, ClassVar, Literal, NoReturn, TypeAlias, get_args
 
 from rulepy.errors import ExpressionError
 
@@ -35,6 +43,7 @@ __all__ = [
     "CompareOp",
     "Const",
     "Expr",
+    "F",
     "Field",
     "In",
     "IsNull",
@@ -163,6 +172,230 @@ class Expr:
 
     def _field_values(self) -> list[object]:
         return [getattr(self, f.name) for f in fields(self) if f.init]
+
+    # --- Python protocol -------------------------------------------------------------
+
+    def __repr__(self) -> str:
+        return _render(self)
+
+    def __bool__(self) -> bool:
+        raise ExpressionError(
+            f"a condition node cannot be used as a Python bool: {self!r}",
+            hint="combine conditions with &, | and ~ (not and/or/not, not `if`); write"
+            " ranges as F.x.between(low, high) instead of chained comparisons; use"
+            " F.x.is_in([...]) instead of `in`",
+        )
+
+    def __iter__(self) -> Iterator[Expr]:
+        # Without this, __getitem__ on fields would make Python iterate F.x[0], F.x[1],
+        # ... forever (the legacy sequence protocol).
+        raise ExpressionError(
+            f"condition nodes are not iterable: {self!r}",
+            hint="use F.items[0] for one element and F.x.is_in([...]) for membership",
+        )
+
+    def __contains__(self, item: object) -> bool:
+        raise ExpressionError(
+            f"`in` cannot test membership in a condition node: {item!r} in {self!r}",
+            hint="use F.x.is_in([...]) to test a value against a set of constants",
+        )
+
+    # Defining __eq__ would set __hash__ to None; nodes keep identity hashing.
+    __hash__ = object.__hash__
+
+    # Make numpy arrays and pandas objects on the left of an operator defer to the node
+    # (which then rejects them clearly) instead of broadcasting element by element.
+    __array_ufunc__: ClassVar[None] = None
+    __pandas_priority__: ClassVar[int] = 5000
+
+    # --- Comparisons (return nodes, not bools) ---------------------------------------
+
+    def __eq__(self, other: object) -> Compare:  # pyright: ignore[reportIncompatibleMethodOverride]
+        return Compare("eq", self, _lift(other))
+
+    def __ne__(self, other: object) -> Compare:  # pyright: ignore[reportIncompatibleMethodOverride]
+        return Compare("ne", self, _lift(other))
+
+    def __lt__(self, other: object) -> Compare:
+        return Compare("lt", self, _lift(other))
+
+    def __le__(self, other: object) -> Compare:
+        return Compare("le", self, _lift(other))
+
+    def __gt__(self, other: object) -> Compare:
+        return Compare("gt", self, _lift(other))
+
+    def __ge__(self, other: object) -> Compare:
+        return Compare("ge", self, _lift(other))
+
+    # --- Logical connectives ---------------------------------------------------------
+
+    def __and__(self, other: object) -> And:
+        return And(self, _lift_condition(other))
+
+    def __rand__(self, other: object) -> And:
+        return And(_lift_condition(other), self)
+
+    def __or__(self, other: object) -> Or:
+        return Or(self, _lift_condition(other))
+
+    def __ror__(self, other: object) -> Or:
+        return Or(_lift_condition(other), self)
+
+    def __invert__(self) -> Not:
+        return Not(self)
+
+    # --- Arithmetic ------------------------------------------------------------------
+
+    def __add__(self, other: object) -> Arith:
+        return Arith("add", self, _lift(other))
+
+    def __radd__(self, other: object) -> Arith:
+        return Arith("add", _lift(other), self)
+
+    def __sub__(self, other: object) -> Arith:
+        return Arith("sub", self, _lift(other))
+
+    def __rsub__(self, other: object) -> Arith:
+        return Arith("sub", _lift(other), self)
+
+    def __mul__(self, other: object) -> Arith:
+        return Arith("mul", self, _lift(other))
+
+    def __rmul__(self, other: object) -> Arith:
+        return Arith("mul", _lift(other), self)
+
+    def __truediv__(self, other: object) -> Arith:
+        return Arith("div", self, _lift(other))
+
+    def __rtruediv__(self, other: object) -> Arith:
+        return Arith("div", _lift(other), self)
+
+    def __neg__(self) -> Neg:
+        return Neg(self)
+
+    def __abs__(self) -> Abs:
+        return Abs(self)
+
+    # --- Predicates and functions ----------------------------------------------------
+
+    def is_in(self, values: Iterable[Scalar]) -> In:
+        """Test membership in a set of constants, e.g. `F.country.is_in({"ES", "PT"})`.
+
+        Args:
+            values: A collection (list, tuple, set, ...) of non-null scalars of one
+                type group. A `str`, `bytes` or mapping is not accepted as the
+                collection.
+
+        Returns:
+            An `In` node; its values are stored sorted and deduplicated.
+
+        Raises:
+            ExpressionError: If `values` is empty, not a collection, contains `None`
+                or mixes type groups.
+        """
+        return In(self, values)
+
+    def between(self, low: object, high: object, closed: Closed = "both") -> Between:
+        """Test a range, e.g. `F.age.between(18, 65)` or `F.x.between(F.lo, F.hi)`.
+
+        Args:
+            low: Lower bound, a constant or a node.
+            high: Upper bound, a constant or a node.
+            closed: Included ends: `"both"` (default), `"left"`, `"right"` or `"none"`.
+
+        Returns:
+            A `Between` node.
+
+        Raises:
+            ExpressionError: If `closed` is unknown, or both bounds are constants of
+                different type groups or booleans.
+        """
+        return Between(self, _lift(low), _lift(high), closed)
+
+    def is_null(self) -> IsNull:
+        """Test whether the value is missing or null; never `UNKNOWN`.
+
+        Returns:
+            An `IsNull` node.
+        """
+        return IsNull(self)
+
+    def matches(self, pattern: str) -> Matches:
+        """Search a string with a regular expression, e.g. `F.email.matches(r".+@.+")`.
+
+        Args:
+            pattern: The regular expression (search semantics; `(?i)` for
+                case-insensitive).
+
+        Returns:
+            A `Matches` node.
+
+        Raises:
+            ExpressionError: If the pattern does not compile.
+        """
+        return Matches(self, pattern)
+
+    def starts_with(self, text: str) -> StringTest:
+        """Test that a string starts with literal `text` (not a pattern).
+
+        Args:
+            text: The prefix.
+
+        Returns:
+            A `StringTest` node.
+        """
+        return StringTest("starts_with", self, text)
+
+    def ends_with(self, text: str) -> StringTest:
+        """Test that a string ends with literal `text` (not a pattern).
+
+        Args:
+            text: The suffix.
+
+        Returns:
+            A `StringTest` node.
+        """
+        return StringTest("ends_with", self, text)
+
+    def contains(self, text: str) -> StringTest:
+        """Test that a string contains literal `text`.
+
+        This works on strings only: it is not list membership (use `is_in` to test a
+        value against constants) and not a pattern (use `matches`).
+
+        Args:
+            text: The substring.
+
+        Returns:
+            A `StringTest` node.
+        """
+        return StringTest("contains", self, text)
+
+    def abs(self) -> Abs:
+        """Return the absolute value of a number; same as `abs(node)`.
+
+        Returns:
+            An `Abs` node.
+        """
+        return Abs(self)
+
+
+def _lift(value: object) -> Expr:
+    """Return `value` if it is a node, else wrap it in `Const`."""
+    return value if isinstance(value, Expr) else Const(value)  # pyright: ignore[reportArgumentType]
+
+
+def _lift_condition(value: object) -> Expr:
+    # A Python bool next to & or | almost always comes from a comparison Python
+    # evaluated itself, e.g. `F.product.tag == "sale"` (tag is the node's own tag).
+    if isinstance(value, bool) or _is_numpy_bool(value):
+        raise ExpressionError(
+            f"cannot combine a condition with a Python bool ({value!r})",
+            hint="if you compared a field named like a node attribute (kind, tag, path,"
+            ' ...), use item access such as F.x["kind"]; for a constant write Const(True)',
+        )
+    return _lift(value)
 
 
 def _key_of(value: object) -> object:
@@ -303,7 +536,7 @@ def _is_numpy_bool(value: object) -> bool:
     return cls.__module__ == "numpy" and cls.__name__ in ("bool", "bool_")
 
 
-@dataclass(frozen=True, eq=False, slots=True, init=False)
+@dataclass(frozen=True, eq=False, slots=True, init=False, repr=False)
 class Field(Expr):
     """A value looked up in the input data by path, e.g. `Field("orders", 0, "total")`.
 
@@ -339,8 +572,37 @@ class Field(Expr):
                 )
         object.__setattr__(self, "path", tuple(normalized))
 
+    def __getattr__(self, name: str) -> Field:
+        # Only called when normal lookup fails. Underscore names are never fields, so
+        # protocols probed by copy, pickle, numpy, ... (`__deepcopy__`, ...) still work;
+        # reserved names reach here only while unset (a failed __init__), never as fields.
+        if name.startswith("_") or name in _RESERVED:
+            raise AttributeError(name)
+        if name in _NAMESPACES:
+            raise AttributeError(
+                f"{name!r} looks like a polars namespace; RulePy methods live on the field"
+                f" itself (e.g. F.x.starts_with(...)). For a field named {name!r} use"
+                f" F.x[{name!r}]"
+            )
+        return Field(*self.path, name)
 
-@dataclass(frozen=True, eq=False, slots=True)
+    def __call__(self, *args: object, **kwargs: object) -> NoReturn:
+        """Fail clearly when a field path is called like a method (`F.x.isin(...)`)."""
+        method = str(self.path[-1])
+        close = difflib.get_close_matches(method, _METHODS, n=1, cutoff=0.6)
+        hint = (
+            f"did you mean .{close[0]}(...)?"
+            if close
+            else "fields are values; build conditions with operators and methods such as"
+            " .is_in(...), .between(...), .starts_with(...)"
+        )
+        raise ExpressionError(f"{self!r} is a field path, not a method", hint=hint)
+
+    def __getitem__(self, key: str | int | tuple[str | int, ...]) -> Field:
+        return Field(*self.path, *(key if isinstance(key, tuple) else (key,)))
+
+
+@dataclass(frozen=True, eq=False, slots=True, repr=False)
 class Const(Expr):
     """A constant scalar, normalized to an exact built-in type.
 
@@ -368,7 +630,7 @@ class Const(Expr):
         return "any" if self.value is None or isinstance(self.value, bool) else "value"
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@dataclass(frozen=True, eq=False, slots=True, repr=False)
 class Compare(Expr):
     """A binary comparison; its tag is the operator (`eq`, `ne`, `lt`, `le`, `gt`, `ge`).
 
@@ -396,7 +658,7 @@ class Compare(Expr):
         return self.op
 
 
-@dataclass(frozen=True, eq=False, slots=True, init=False)
+@dataclass(frozen=True, eq=False, slots=True, init=False, repr=False)
 class _Connective(Expr):
     operands: tuple[Expr, ...]
 
@@ -422,7 +684,7 @@ class _Connective(Expr):
         object.__setattr__(self, "operands", tuple(flat))
 
 
-@dataclass(frozen=True, eq=False, slots=True, init=False)
+@dataclass(frozen=True, eq=False, slots=True, init=False, repr=False)
 class And(_Connective):
     """Conjunction of two or more conditions, e.g. `And(a, b, c)`; nested `And`s are flattened.
 
@@ -434,7 +696,7 @@ class And(_Connective):
     _tag = "and"
 
 
-@dataclass(frozen=True, eq=False, slots=True, init=False)
+@dataclass(frozen=True, eq=False, slots=True, init=False, repr=False)
 class Or(_Connective):
     """Disjunction of two or more conditions, e.g. `Or(a, b)`; nested `Or`s are flattened.
 
@@ -446,7 +708,7 @@ class Or(_Connective):
     _tag = "or"
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@dataclass(frozen=True, eq=False, slots=True, repr=False)
 class Not(Expr):
     """Negation of a condition.
 
@@ -465,7 +727,7 @@ class Not(Expr):
         _require_condition(_require_node(self.operand, where), where)
 
 
-@dataclass(frozen=True, eq=False, slots=True, init=False)
+@dataclass(frozen=True, eq=False, slots=True, init=False, repr=False)
 class In(Expr):
     """Membership in a finite set of constants, e.g. `In(F.country, {"ES", "PT"})`.
 
@@ -525,7 +787,7 @@ class In(Expr):
         object.__setattr__(self, "values", tuple(unique))
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@dataclass(frozen=True, eq=False, slots=True, repr=False)
 class Between(Expr):
     """Range test `low <= operand <= high`, with `closed` choosing the inclusive ends.
 
@@ -559,7 +821,7 @@ class Between(Expr):
                 )
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@dataclass(frozen=True, eq=False, slots=True, repr=False)
 class IsNull(Expr):
     """True when the operand is missing or null (never `UNKNOWN`).
 
@@ -577,7 +839,7 @@ class IsNull(Expr):
         _require_value(self.operand, "the operand of 'is_null'", allow_null=True)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@dataclass(frozen=True, eq=False, slots=True, repr=False)
 class Matches(Expr):
     """Regular-expression search in a string (case-sensitive unless `(?i)`).
 
@@ -607,7 +869,7 @@ class Matches(Expr):
             ) from None
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@dataclass(frozen=True, eq=False, slots=True, repr=False)
 class StringTest(Expr):
     """Literal-text test; its tag is the operator (`starts_with`, `ends_with`, `contains`).
 
@@ -640,7 +902,7 @@ class StringTest(Expr):
         return self.op
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@dataclass(frozen=True, eq=False, slots=True, repr=False)
 class Arith(Expr):
     """Binary arithmetic on numbers; its tag is the operator (`add`, `sub`, `mul`, `div`).
 
@@ -668,7 +930,7 @@ class Arith(Expr):
         return self.op
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@dataclass(frozen=True, eq=False, slots=True, repr=False)
 class Abs(Expr):
     """Absolute value of a number.
 
@@ -686,7 +948,7 @@ class Abs(Expr):
         _require_number(self.operand, "the operand of 'abs'")
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@dataclass(frozen=True, eq=False, slots=True, repr=False)
 class Neg(Expr):
     """Negation of a number.
 
@@ -721,3 +983,125 @@ Node: TypeAlias = (
     | Neg
 )
 """Closed union of concrete nodes: backends `match` on it with `assert_never`."""
+
+
+class _FieldRoot:
+    """The `F` proxy: `F.name` and `F["name"]` start a `Field` path."""
+
+    __slots__ = ()
+
+    def __getattr__(self, name: str) -> Field:
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return Field(name)
+
+    def __getitem__(self, key: str | int | tuple[str | int, ...]) -> Field:
+        return Field(*(key if isinstance(key, tuple) else (key,)))
+
+    def __iter__(self) -> Iterator[Field]:
+        raise ExpressionError(
+            "F is not iterable", hint='start a field path with F.name or F["name"]'
+        )
+
+    def __contains__(self, item: object) -> bool:
+        raise ExpressionError(
+            "`in` cannot test membership in F", hint="use F.x.is_in([...]) for membership"
+        )
+
+    def __repr__(self) -> str:
+        return "F"
+
+
+F = _FieldRoot()
+"""Entry point for building conditions: `F.customer.age >= 18`, `F["a key"]`, `F.items[0]`."""
+
+
+# --- Rendering: repr() is Python that rebuilds the same tree with F and Const ----------
+
+_COMPARE_SYMBOLS = {"eq": "==", "ne": "!=", "lt": "<", "le": "<=", "gt": ">", "ge": ">="}
+_ARITH_SYMBOLS = {"add": "+", "sub": "-", "mul": "*", "div": "/"}
+# Names that already mean something on a Field (methods, properties, `path`, ...).
+_RESERVED = frozenset(name for name in dir(Field) if not name.startswith("_"))
+# Builder methods, for "did you mean" hints when a field path is called.
+_METHODS = frozenset(
+    name for name in _RESERVED if callable(getattr(Field, name)) and name.islower()
+)
+# polars-style namespaces (F.x.str.starts_with) would silently become field paths.
+_NAMESPACES = frozenset({"str", "dt", "list", "arr", "struct", "cat"})
+
+
+def _render(node: Expr) -> str:
+    match node:
+        case Field():
+            return _render_path(node.path)
+        case Const():
+            return f"Const({_literal(node.value)})"
+        case Compare():
+            left, right = _operand(node.left), _operand(node.right, literal=True)
+            return f"{left} {_COMPARE_SYMBOLS[node.op]} {right}"
+        case And() | Or():
+            symbol = " & " if isinstance(node, And) else " | "
+            parts = (_operand(op, parens=(Compare, And, Or)) for op in node.operands)
+            return symbol.join(parts)
+        case Not():
+            return f"~{_operand(node.operand, parens=(Compare, And, Or))}"
+        case In():
+            values = ", ".join(_literal(v) for v in node.values)
+            return f"{_receiver(node.operand)}.is_in([{values}])"
+        case Between():
+            closed = "" if node.closed == "both" else f", closed={node.closed!r}"
+            low, high = _operand(node.low, literal=True), _operand(node.high, literal=True)
+            return f"{_receiver(node.operand)}.between({low}, {high}{closed})"
+        case IsNull():
+            return f"{_receiver(node.operand)}.is_null()"
+        case Matches():
+            return f"{_receiver(node.operand)}.matches({node.pattern!r})"
+        case StringTest():
+            return f"{_receiver(node.operand)}.{node.op}({node.text!r})"
+        case Arith():
+            left = _operand(node.left, parens=(Arith,))
+            right = _operand(node.right, literal=True, parens=(Arith,))
+            return f"{left} {_ARITH_SYMBOLS[node.op]} {right}"
+        case Abs():
+            return f"abs({_operand(node.operand)})"
+        case Neg():
+            return f"-{_operand(node.operand, parens=(Arith,))}"
+        case _:  # pragma: no cover - a node subclass outside the closed union
+            return f"<{type(node).__name__} {node.tag}>"
+
+
+def _operand(node: Expr, *, literal: bool = False, parens: tuple[type, ...] = ()) -> str:
+    # A bare literal is only safe where the other operand is already a node, so Python
+    # dispatches to the node's operator (`F.x > 5`); elsewhere it would be computed by
+    # Python itself (`1 + 2`, `True & False`), so it is spelled `Const(...)`.
+    if isinstance(node, Const) and literal:
+        return _literal(node.value)
+    text = _render(node)
+    return f"({text})" if isinstance(node, parens) else text
+
+
+def _receiver(node: Expr) -> str:
+    return _operand(node, parens=(Arith, Neg))
+
+
+def _render_path(path: tuple[str | int, ...]) -> str:
+    out = ["F"]
+    for i, segment in enumerate(path):
+        if isinstance(segment, str) and _is_attribute_name(segment, root=i == 0):
+            out.append(f".{segment}")
+        else:
+            out.append(f"[{segment!r}]")
+    return "".join(out)
+
+
+def _is_attribute_name(name: str, *, root: bool) -> bool:
+    # ASCII only: Python NFKC-normalizes non-ASCII identifiers (F.ª would read "a").
+    plain = name.isascii() and name.isidentifier() and not keyword.iskeyword(name)
+    reserved = name in _RESERVED or name in _NAMESPACES
+    return plain and not name.startswith("_") and (root or not reserved)
+
+
+def _literal(value: Scalar) -> str:
+    if isinstance(value, float) and math.isinf(value):
+        return "float('inf')" if value > 0 else "float('-inf')"
+    return repr(value)

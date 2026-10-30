@@ -172,8 +172,18 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
       - Desviación: `Matches` solo comprueba que el patrón compila; el subconjunto portable Python/Rust queda para la 3.6.
       - Las estrategias de hypothesis generan ya el AST completo.
       - Revisado por `api-reviewer`, sin bloqueantes. Se corrigieron tres fallos: orden de `In` con `1`/`1.0`, `In(x, "abc")` partido en caracteres, y subclases de `str` que rompían `structural_key()`.
-- [ ] 2.2 Proxy `F` con acceso por atributo e índice (`F.cliente.antiguedad`, `F["clave con espacios"]`) y construcción con operadores `&`, `|` y `~`.
-- [ ] 2.3 Trampas de Python resueltas:
+- [x] 2.2 Proxy `F` con acceso por atributo e índice (`F.cliente.antiguedad`, `F["clave con espacios"]`) y construcción con operadores `&`, `|` y `~`.
+  - **Hecha junto con la 2.3**: con `F.x > 5` devolviendo un nodo pero sin proteger `bool()`, `0 < F.x < 10` se habría evaluado en silencio como `F.x < 10`.
+  - Operadores: comparaciones, `&`/`|`/`~`, `+ - * /`, `-x` y `abs()` (todos con versión reflejada). Métodos `is_in`, `between`, `is_null`, `matches`, `starts_with`, `ends_with`, `contains` y `abs`.
+  - Rutas: `F["a", 0, "b"]`. `F` se exporta desde `rulepy`.
+  - Tras la revisión de `api-reviewer`:
+    - `&` y `|` rechazan `bool` de Python (antes `(F.p > 5) & (F.producto.tag == "x")` se convertía en `& False` sin avisar);
+    - los nodos y `F` no son iterables (antes `list(F.x)` era un bucle infinito por el protocolo de secuencias heredado);
+    - `__array_ufunc__ = None` y `__pandas_priority__` para numpy y pandas a la izquierda;
+    - `Field` rechaza los nombres reservados y los espacios de nombres al estilo polars (`str`, `dt`, ...);
+    - llamar a una ruta (`F.x.isin(...)`) sugiere el método correcto.
+  - Único caso silencioso que queda, documentado: `F.a == F.b.kind`.
+- [x] 2.3 Trampas de Python resueltas (hecha con la 2.2; ver `docs/pitfalls.md`):
   - `__bool__` lanza un error claro, lo que impide `a and b` y comparaciones encadenadas como `0 < F.x < 10`;
   - `__eq__` devuelve un nodo (la igualdad estructural es `same_as()`). **El hash sigue siendo por identidad**: un hash estructural no funciona, porque dict y set llaman a `__eq__` cuando coinciden los hashes y `bool(Compare)` lanzaría un error. Para claves estructurales se usa `structural_key()`.
     - Al definir `__eq__`, Python pone `__hash__ = None`: hay que declarar `__hash__ = object.__hash__` en `Expr` y comprobar con un test que todos los nodos son hashables.
@@ -193,6 +203,7 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
     - restringir la anotación de `node` en `EvaluationError` y `UnsupportedOperation` a `Expr | str | None` (Python pasa el nodo; los demás backends pasan su texto);
     - errores nuevos previstos: campo ausente en modo estricto (2.5), `HitPolicyError(EvaluationError)` con `rules: tuple[str, ...]` para `UNIQUE` (2.8), y un índice de fila para `evaluate_many`.
 - [ ] 2.7 `Rule(name, when, then, priority=0, tags=(), description=None, metadata={})`. `then` puede ser un dict (payload de decisión), una función `(ctx) -> None` o una lista de acciones declarativas (`Set`, `Append`, `Emit`).
+  - *Nota de 2.2*: `Rule` necesita `eq=False` o su propio `__eq__`, porque comparar dos reglas compararía sus `when` y lanzaría un error. En 2.6 y 2.7, nunca usar duck typing (`hasattr`/`getattr`), `==` ni `if x:` sobre algo que pueda ser un nodo: comprobar antes `isinstance(x, Expr)`.
 - [ ] 2.8 `RuleSet` con políticas de acierto al estilo DMN:
   - `FIRST`, `PRIORITY`, `UNIQUE`, `ANY`, `COLLECT` (con agregadores `sum`, `min`, `max`, `count` y `list`), `RULE_ORDER`;
   - la política `UNIQUE` lanza un error si se disparan dos reglas.
