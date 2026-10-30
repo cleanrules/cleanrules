@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+.eggs/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Rust / maturin
+target/
+*.so
+*.pyd
+*.dylib
+
+# Docs
+site/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Local environment and editors
+.env
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code: personal overrides only (.claude/settings.json is shared)
+.claude/settings.local.json
+.claude/worktrees/
