@@ -136,7 +136,27 @@ lists each unordered pair once.
 `not T = F`, `not F = T` and `not U = U`.
 
 Under fuzzy logic the connectives are the configured t-norm, s-norm and
-complement, and truth values are in `[0, 1]`.
+complement, and truth values are degrees in `[0, 1]`.
+
+**Unknown under fuzzy logic** (*proposed, pending the author's confirmation;
+needed by phase 5*): a fuzzy truth value is an interval `[lo, hi]` of degrees.
+- A known degree `d` is `[d, d]`, and `UNKNOWN` is `[0, 1]`.
+- Each connective is applied to the endpoints: `[a, b] and [c, d] =
+  [T(a, c), T(b, d)]`, and the same with the s-norm for `or`. `not [a, b] =
+  [N(b), N(a)]`.
+- This works because norms and complements are monotone. It is associative for
+  every norm, reduces exactly to Kleene's tables on `{0, 1}`, and matches
+  fuzzytool's interval evaluation (`Antecedent.eval_interval`).
+- A rule fires to degree `lo`; an undetermined interval never fires fully.
+
+No single number works instead:
+- `0.5` would partly fire rules on missing data;
+- `0` makes `not x` fire when `x` is missing;
+- NaN breaks the laws;
+- a Kleene-style sentinel breaks associativity under Łukasiewicz.
+
+**Data values used as conditions** under a fuzzy logic: numbers in `[0, 1]` are
+degrees, and a number outside that range is a type mismatch.
 
 Results never depend on evaluation order. A backend may skip evaluating an
 operand only when that cannot change the result, and no operand can turn a
@@ -146,8 +166,9 @@ result into an error that another order would not raise (see *Types*).
 
 - A `Field` whose path cannot be resolved (missing key, missing attribute,
   index out of range) evaluates to **null**, the same as an explicit `None`.
-  Strict mode (task 2.5) raises `EvaluationError` instead.
-- A float **NaN read from the data is null**. This keeps Python, whose
+  Strict mode (task 2.6) raises `MissingFieldError` instead.
+- **NaN read from the data is null**: Python, numpy and `Decimal` NaN, as well
+  as `pandas.NA` and `NaT` (`rulepy.core._compat.is_null`). This keeps Python, whose
   comparisons with NaN are `False`, and polars, which orders NaN above every
   number, from diverging. NaN produced by arithmetic, such as `inf - inf`, is
   null too.

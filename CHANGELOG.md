@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mean" hint). Nodes hash by identity.
 - `repr()` of a condition is Python that rebuilds the same tree.
 - "Common pitfalls" documentation page.
+- `rulepy.core.logic`: `Truth` (ordered `FALSE < UNKNOWN < TRUE`, not usable as a
+  Python bool), the `Logic` protocol (provisional until 1.0), the optional
+  `GradedLogic` protocol, and `BooleanLogic` (Kleene three-valued logic), with
+  a registry (`get_logic(name, **params)`, `register_logic`,
+  `unregister_logic`, `logic_names`).
+- Errors for evaluation and registries: `TypeMismatchError`,
+  `MissingFieldError` (both name the field path) and `RegistryError`.
 - Condition AST specification (`docs/spec/ast.md`, draft): node catalogue,
   Kleene three-valued semantics, null and type-mismatch rules.
 - The package ships a `py.typed` marker.

@@ -30,6 +30,7 @@ from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, fields
 from typing import Any, ClassVar, Literal, NoReturn, TypeAlias, get_args
 
+from rulepy.core._compat import is_numpy_bool
 from rulepy.errors import ExpressionError
 
 __all__ = [
@@ -389,7 +390,7 @@ def _lift(value: object) -> Expr:
 def _lift_condition(value: object) -> Expr:
     # A Python bool next to & or | almost always comes from a comparison Python
     # evaluated itself, e.g. `F.product.tag == "sale"` (tag is the node's own tag).
-    if isinstance(value, bool) or _is_numpy_bool(value):
+    if isinstance(value, bool) or is_numpy_bool(value):
         raise ExpressionError(
             f"cannot combine a condition with a Python bool ({value!r})",
             hint="if you compared a field named like a node attribute (kind, tag, path,"
@@ -477,7 +478,7 @@ def _normalize_scalar(value: object) -> Scalar:
     """Return `value` as an exact built-in scalar type, or raise `ExpressionError`."""
     if value is None or type(value) in (bool, str, dt.date):
         return value  # pyright: ignore[reportReturnType]
-    if isinstance(value, bool) or _is_numpy_bool(value):
+    if isinstance(value, bool) or is_numpy_bool(value):
         return bool(value)  # pyright: ignore[reportUnknownArgumentType]
     if isinstance(value, numbers.Integral):
         number = operator.index(value)
@@ -528,12 +529,6 @@ def _is_index(value: object) -> bool:
 def _is_value_collection(values: object) -> bool:
     # A str is iterable, but splitting "abc" into characters is never what was meant.
     return isinstance(values, Iterable) and not isinstance(values, str | bytes | Mapping)
-
-
-def _is_numpy_bool(value: object) -> bool:
-    # Checked by name so numpy is never imported by the core (invariant 4).
-    cls = type(value)
-    return cls.__module__ == "numpy" and cls.__name__ in ("bool", "bool_")
 
 
 @dataclass(frozen=True, eq=False, slots=True, init=False, repr=False)

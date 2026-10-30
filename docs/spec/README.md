@@ -25,8 +25,9 @@ acceptable backend-specific behaviour.
 - **Truth values.** Crisp logic is Kleene three-valued: `TRUE`, `FALSE` and
   `UNKNOWN`. A missing field or a null makes a comparison `UNKNOWN`, and a rule
   fires only when its condition is `TRUE`. This matches polars' null handling.
-  Fuzzy logic maps truth to `[0, 1]` using the connectives configured in
-  fuzzytool.
+  Fuzzy logic maps truth to degrees in `[0, 1]` using the connectives
+  configured in fuzzytool; unknown is the interval `[0, 1]` (proposed, see
+  `ast.md`).
 - **Operator tags.** Each node has a stable lowercase tag, such as `"and"`,
   `"between"` or `"matches"`. The tag is used in serialized rules, in
   `UnsupportedOperation.operation` and in every backend. It is never a Python

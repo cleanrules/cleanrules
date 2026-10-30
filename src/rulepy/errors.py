@@ -21,8 +21,11 @@ from typing import Any
 __all__ = [
     "EvaluationError",
     "ExpressionError",
+    "MissingFieldError",
+    "RegistryError",
     "RulePyError",
     "RuleSyntaxError",
+    "TypeMismatchError",
     "UnsupportedOperation",
 ]
 
@@ -111,7 +114,8 @@ class UnsupportedOperation(RulePyError, NotImplementedError):
 class ExpressionError(RulePyError, TypeError, ValueError):
     """A condition tree is malformed, e.g. `and` with one operand or a non-scalar constant.
 
-    Raised when a node is built, never during evaluation. It is both a `TypeError`
+    Raised when a node is built, or when a node or truth value is misused as a Python
+    `bool`; never as the result of evaluating data. It is both a `TypeError`
     (wrong kind of operand) and a `ValueError` (invalid value such as an empty path),
     so generic handlers for either catch it.
 
@@ -217,3 +221,78 @@ class EvaluationError(RulePyError):
 
     def _body(self) -> str:
         return _with_context(self.message, self.rule, self.node)
+
+
+def _format_path(path: tuple[str | int, ...]) -> str:
+    """Render a field path for messages, e.g. `orders[0].total`."""
+    out = ""
+    for segment in path:
+        out += f"[{segment}]" if isinstance(segment, int) else f".{segment}" if out else segment
+    return out
+
+
+class TypeMismatchError(EvaluationError):
+    """Values of incompatible types met during evaluation, e.g. comparing `str` with `int`.
+
+    Only raised in strict mode; by default a mismatch makes the comparison `UNKNOWN`
+    and the trace records why (see `docs/spec/ast.md`).
+
+    Args:
+        message: What could not be compared or converted.
+        types: The type names involved, e.g. `("str", "int")`.
+        path: Path of the field that held the offending value, if any.
+        rule: Name of the rule being evaluated, if known.
+        node: The failing node, or its rendered text, if known.
+        hint: Optional suggestion on how to fix the rule or the data.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        types: tuple[str, ...] = (),
+        path: tuple[str | int, ...] | None = None,
+        rule: str | None = None,
+        node: object = None,
+        hint: str | None = None,
+    ) -> None:
+        super().__init__(message, rule=rule, node=node, hint=hint)
+        self.types = types
+        self.path = path
+
+    def _body(self) -> str:
+        message = self.message
+        if self.path is not None:
+            message = f"{message} (field {_format_path(self.path)})"
+        return _with_context(message, self.rule, self.node)
+
+
+class MissingFieldError(EvaluationError):
+    """A field path could not be resolved in the input data (strict mode only).
+
+    Args:
+        path: The field path that is missing.
+        rule: Name of the rule being evaluated, if known.
+        node: The failing node, or its rendered text, if known.
+        hint: Optional suggestion, e.g. which keys the data has.
+    """
+
+    def __init__(
+        self,
+        path: tuple[str | int, ...],
+        *,
+        rule: str | None = None,
+        node: object = None,
+        hint: str | None = None,
+    ) -> None:
+        super().__init__(f"missing field {_format_path(path)}", rule=rule, node=node, hint=hint)
+        self.path = path
+
+
+class RegistryError(RulePyError, LookupError):
+    """A name was not found in, or clashes with, a registry (logics, actions, ...).
+
+    Args:
+        message: What was looked up or registered.
+        hint: Optional suggestion, usually the available names.
+    """

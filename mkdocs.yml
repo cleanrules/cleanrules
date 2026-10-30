@@ -38,6 +38,7 @@ nav:
       - Condition AST: spec/ast.md
   - API reference:
       - Condition AST: reference/expr.md
+      - Logic and truth values: reference/logic.md
       - Errors: reference/errors.md
 
 plugins:

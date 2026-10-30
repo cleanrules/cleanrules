@@ -5,8 +5,11 @@ from rulepy.core.expr import F
 from rulepy.errors import (
     EvaluationError,
     ExpressionError,
+    MissingFieldError,
+    RegistryError,
     RulePyError,
     RuleSyntaxError,
+    TypeMismatchError,
     UnsupportedOperation,
 )
 
@@ -16,8 +19,11 @@ __all__ = [
     "EvaluationError",
     "ExpressionError",
     "F",
+    "MissingFieldError",
+    "RegistryError",
     "RulePyError",
     "RuleSyntaxError",
+    "TypeMismatchError",
     "UnsupportedOperation",
     "__version__",
     "errors",

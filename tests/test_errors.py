@@ -7,8 +7,11 @@ import rulepy
 from rulepy.errors import (
     EvaluationError,
     ExpressionError,
+    MissingFieldError,
+    RegistryError,
     RulePyError,
     RuleSyntaxError,
+    TypeMismatchError,
     UnsupportedOperation,
 )
 
@@ -20,6 +23,9 @@ SAMPLES: list[RulePyError] = [
     RuleSyntaxError("unexpected token", source="IF x > THEN y", line=1, column=8),
     EvaluationError("cannot compare str with int", rule="vip", node="F.total > 1000"),
     ExpressionError("'and' needs at least two operands", hint="use the operand directly"),
+    TypeMismatchError("cannot compare", types=("str", "int"), path=("code",), rule="r"),
+    MissingFieldError(("customer", "age"), rule="adult"),
+    RegistryError("unknown logic 'x'", hint="use one of: boolean"),
 ]
 
 
@@ -28,6 +34,26 @@ SAMPLES: list[RulePyError] = [
 )
 def test_every_error_derives_from_base(cls: type[Exception]) -> None:
     assert issubclass(cls, RulePyError)
+
+
+def test_type_mismatch_error_is_an_evaluation_error_with_types_and_path() -> None:
+    err = TypeMismatchError(
+        "cannot compare str with int", types=("str", "int"), path=("code",), rule="vip"
+    )
+    assert isinstance(err, EvaluationError)
+    assert (err.types, err.path) == (("str", "int"), ("code",))
+    assert str(err) == "rule 'vip': cannot compare str with int (field code)"
+
+
+def test_missing_field_error_names_the_path() -> None:
+    err = MissingFieldError(("orders", 0, "total"), rule="big", hint="check the input")
+    assert isinstance(err, EvaluationError)
+    assert err.path == ("orders", 0, "total")
+    assert str(err) == "rule 'big': missing field orders[0].total\nhint: check the input"
+
+
+def test_registry_error_is_a_lookup_error() -> None:
+    assert issubclass(RegistryError, LookupError)
 
 
 def test_expression_error_names_rule_and_node() -> None:
@@ -57,6 +83,9 @@ def test_errors_are_exported_at_top_level() -> None:
         "RuleSyntaxError",
         "EvaluationError",
         "ExpressionError",
+        "TypeMismatchError",
+        "MissingFieldError",
+        "RegistryError",
     ):
         assert name in rulepy.__all__
         assert getattr(rulepy, name) is getattr(rulepy.errors, name)

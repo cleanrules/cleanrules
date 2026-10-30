@@ -193,8 +193,19 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
   - *Nota de 1.4*: cuando existan nodos reales, los tests de `errors` que comparan con `vars(a) == vars(b)` fallarán si `node` es un `Expr` (porque `__eq__` devuelve un nodo). En ese caso se compara con `same_as`. El mal uso de `__bool__` lanza `ExpressionError` (que ya es `TypeError`). Los tests de nodos comparan con el helper `same_nodes` (por identidad) o con `same_as`, nunca con `==`.
 
 **Lógica (`core/logic.py`)**
-- [ ] 2.4 Protocolo `Logic` (`and_`, `or_`, `not_`, `from_bool`, `is_true`, `TRUE`/`FALSE`/`UNKNOWN`) con registro por nombre.
-- [ ] 2.5 `BooleanLogic` de Kleene con 3 valores. Un campo ausente o `None` da `UNKNOWN`, y la regla no se dispara. Hay un modo `strict=True` que lanza una excepción.
+- [x] 2.4 Protocolo `Logic` (`and_`, `or_`, `not_`, `from_bool`, `is_true`, `TRUE`/`FALSE`/`UNKNOWN`) con registro por nombre.
+- [x] 2.5 `BooleanLogic` de Kleene con 3 valores. Un campo ausente o `None` da `UNKNOWN`, y la regla no se dispara. Hay un modo `strict=True` que lanza una excepción.
+  - Hecha junto con la 2.4.
+  - `Truth`: `Enum` ordenado (`FALSE < UNKNOWN < TRUE`) que no se puede usar como `bool` ni compararse con números.
+  - `Logic[TruthT]`: protocolo genérico, **provisional hasta la 1.0**. `all_` y `any_` reciben una `Sequence` ya evaluada (nunca un generador), para que el resultado no dependa del orden; tienen implementación por defecto en el protocolo.
+  - `GradedLogic` (`degree`, `from_degree`): capacidad opcional para las funciones basadas en grados de la fase 5.
+  - Registro: `get_logic(nombre, **parámetros)`, `register_logic` con cerrojo (Python sin GIL) y `unregister_logic`. `boolean` es integrada: no se puede sustituir ni desregistrar.
+  - Las lógicas del mismo tipo y parámetros son iguales, y deben ser inmutables y sin estado.
+  - `is_null` único en `_compat` (NaN de numpy y `Decimal`, `pd.NA`, `NaT`).
+  - Errores nuevos: `TypeMismatchError`, `MissingFieldError` y `RegistryError`.
+  - Desviación: el modo `strict` vive en el **evaluador** (2.6), no en `BooleanLogic`. La lógica lanza `TypeMismatchError` y el evaluador decide entre `UNKNOWN` (con el motivo en la traza) y el error.
+  - Revisado por `api-reviewer`, sin bloqueantes. **Pendiente de confirmar por el autor**: `UNKNOWN` en lógica difusa como intervalo `[0, 1]` (ver `docs/spec/ast.md`).
+  - *Nota de 2.5*: al leer un campo, aplicar `is_null` una sola vez para normalizar los nulos a `None`. Pasar siempre listas ya evaluadas a `all_`/`any_`. El motivo de `UNKNOWN` (nulo, ausente, tipos incompatibles) va en el nodo de la traza, no en `Truth`.
   - *Nota de 2.1a*: los tipos incompatibles dan `UNKNOWN` con el motivo en la traza. En modo `strict`, `TypeMismatchError(EvaluationError)` con la ruta del campo y los dos tipos. Grupos de comparación según `docs/spec/ast.md` (número = `numbers.Real` sin `bool`).
 
 **Evaluación y reglas**
@@ -278,7 +289,7 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
 **Objetivo**: los dos grandes diferenciadores.
 
 **Integración con fuzzytool (extra `fuzzy`)**
-- [ ] 5.1 `FuzzyLogic(tnorm="min", snorm="max", complement="standard")`, que resuelve las conectivas con `fuzzytool.norms.get_tnorm/get_snorm/get_complement`. Los predicados nítidos valen {0, 1}.
+- [ ] 5.1 (*nota de 2.5*: implementar `GradedLogic` con valores de verdad como intervalos `[lo, hi]` si el autor confirma la propuesta de `ast.md`; registrarla como `get_logic("fuzzy", tnorm=..., snorm=..., complement=...)`, con igualdad por parámetros) `FuzzyLogic(tnorm="min", snorm="max", complement="standard")`, que resuelve las conectivas con `fuzzytool.norms.get_tnorm/get_snorm/get_complement`. Los predicados nítidos valen {0, 1}.
 - [ ] 5.2 Nodo `FuzzyTerm`, que envuelve una `fuzzytool.sets.Proposition` (variable y término) y se evalúa con `Antecedent.eval(inputs, tnorm, snorm, complement=...)`. Se serializa con `Variable.to_dict()`. *Nota de 2.1a*: debe redefinir `structural_key()`, porque `Proposition` no tiene igualdad estructural.
 - [ ] 5.3 Interoperabilidad de operadores:
   - en RulePy, `fz(term)` y `__rand__`/`__ror__`;
@@ -324,7 +335,7 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
   - estrategias de conflicto `salience`, `LEX`, `MEA`, `depth`/`breadth`, todas deterministas.
 - [ ] 6.5 Matcher ingenuo (oráculo) y **Rete incremental en Python** (memorias alfa e índices hash en beta). Paridad entre ambos con `parity-tester`.
 - [ ] 6.6 Mantenimiento de verdad: `ctx.assert_logical()`, que retira el hecho cuando desaparece su soporte.
-- [ ] 6.7 Hechos con grado o certeza que se propagan con la `Logic` activa (nítida, difusa o factores de certeza al estilo MYCIN como `Logic` adicional).
+- [ ] 6.7 (*nota de 2.5*: la atenuación `CF(premisa) × CF(regla)` y la combinación de evidencias son una capacidad opcional aparte, p. ej. `EvidenceLogic`, no miembros de `Logic`) Hechos con grado o certeza que se propagan con la `Logic` activa (nítida, difusa o factores de certeza al estilo MYCIN como `Logic` adicional).
 - [ ] 6.8 Explicación:
   - árbol de derivación de cada hecho ("¿por qué se cree X?");
   - `why_not(patrón)`;
