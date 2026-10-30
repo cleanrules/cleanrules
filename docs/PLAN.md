@@ -114,7 +114,18 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
   - `tests/test_core_dependencies.py`. Usa una **lista blanca** en vez de una lista de paquetes prohibidos: en un intérprete limpio (`python -I`), `import rulepy` solo puede cargar módulos de `sys.stdlib_module_names` o de `rulepy`, así que detecta cualquier dependencia accidental.
   - Un test de control comprueba que el detector sí señala las dependencias de hypothesis (`sortedcontainers`), para que el test principal no pueda pasar en falso.
   - Los módulos `_sysconfigdata_*` se tratan como estándar: se generan por plataforma y no aparecen en `stdlib_module_names`.
-- [ ] 1.6 CI con GitHub Actions: matriz Python 3.11–3.14 × Linux, macOS y Windows; lint, tipos, tests y cobertura.
+- [x] 1.6 CI con GitHub Actions: matriz Python 3.11–3.14 × Linux, macOS y Windows; lint, tipos, tests y cobertura.
+  - `.github/workflows/ci.yml` con tres jobs:
+    - `lint`: ruff y pyright;
+    - `test`: 12 combinaciones con `--cov` y `HYPOTHESIS_PROFILE=ci`;
+    - `build`: construye el wheel, lo instala solo en un entorno aislado, lo importa y lo sube como artefacto.
+  - Configuración común: `UV_LOCKED=1` (falla si `uv.lock` está desactualizado), permisos de solo lectura y cancelación de ejecuciones obsoletas. `.github/dependabot.yml` actualiza las Actions cada mes.
+  - **Todavía no se ha ejecutado en GitHub**: el repositorio no tiene remoto (la organización está pendiente). Verificado en local:
+    - `actionlint` sin errores;
+    - la suite pasa en macOS con 3.11, 3.12, 3.13 y 3.14;
+    - el job `build` se reprodujo correctamente.
+    - Windows y Linux quedan sin probar hasta la primera ejecución.
+  - Las Actions están fijadas por versión mayor (`checkout@v5`, `setup-uv@v6`, `upload-artifact@v4`). Fijarlas por SHA queda para la fase 9, con la publicación.
 - [ ] 1.7 Esqueleto de mkdocs-material (mismo estilo que fuzzytool) y `docs/spec/README.md`.
 
 **Aceptación**: `uv sync && uv run pytest && uv run ruff check . && uv run pyright` en verde, en local y en CI.
