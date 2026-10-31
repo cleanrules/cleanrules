@@ -38,4 +38,6 @@ decision.fired  # ('vip',)
 - The [reference evaluator](reference/evaluate.md), which reports *why* a value
   is unknown.
 - [Rules and rule sets](reference/rules.md) with DMN-style hit policies.
+- [Explanations](reference/explain.md): `decision.explain()` and `decision.why_not(name)`,
+  with the minimal causes and counterfactual hints (`short by 200`).
 - The [specification](spec/README.md) that every backend shares.

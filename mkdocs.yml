@@ -39,6 +39,7 @@ nav:
       - Rules and decisions: spec/rules.md
   - API reference:
       - Rules and rule sets: reference/rules.md
+      - Explanations: reference/explain.md
       - Condition AST: reference/expr.md
       - Logic and truth values: reference/logic.md
       - Evaluation: reference/evaluate.md

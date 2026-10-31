@@ -5,13 +5,27 @@ import pickle
 import re
 import weakref
 from collections.abc import Sequence
+from decimal import Decimal
 from pathlib import Path
 from typing import get_args
 
 import pytest
 from hypothesis import given
 
-from rulepy.core.expr import And, Compare, Const, Expr, Field, Node, Not, Or, Tag
+from rulepy.core.expr import (
+    And,
+    Arith,
+    Between,
+    Compare,
+    Const,
+    Expr,
+    Field,
+    In,
+    Node,
+    Not,
+    Or,
+    Tag,
+)
 from rulepy.errors import ExpressionError
 from tests.strategies import I64_MAX, I64_MIN, conditions, scalars
 
@@ -365,3 +379,42 @@ def test_structural_key_is_stable_across_copies(tree: Expr) -> None:
 def test_const_is_idempotent(value: object) -> None:
     once = Const(value)  # pyright: ignore[reportArgumentType]
     assert Const(once.value).same_as(once)
+
+
+# --- Decimal constants -----------------------------------------------------------------
+
+
+def test_const_accepts_decimals_exactly() -> None:
+    node = Const(Decimal("0.10"))
+    assert type(node.value) is Decimal
+    assert node.value == Decimal("0.10")
+    assert node.kind == "value"
+
+
+def test_decimal_subclasses_are_normalized() -> None:
+    class Money(Decimal):
+        pass
+
+    assert type(Const(Money("1.5")).value) is Decimal
+
+
+@pytest.mark.parametrize("value", [Decimal("NaN"), Decimal("sNaN")], ids=["nan", "snan"])
+def test_decimal_nan_is_rejected(value: Decimal) -> None:
+    with pytest.raises(ExpressionError, match="NaN"):
+        Const(value)
+
+
+def test_decimal_infinity_is_kept() -> None:
+    assert Const(Decimal("Infinity")).value == Decimal("Infinity")
+
+
+def test_decimal_identity_differs_from_int_and_float() -> None:
+    assert not Const(Decimal("1")).same_as(Const(1))
+    assert not Const(Decimal("1")).same_as(Const(1.0))
+    assert Const(Decimal("1.5")).same_as(Const(Decimal("1.5")))
+
+
+def test_decimals_are_numbers_for_arithmetic_and_ranges() -> None:
+    assert Arith("mul", Field("x"), Const(Decimal("0.1"))).kind == "value"
+    assert Between(Field("x"), Const(Decimal("1")), Const(2)).tag == "between"
+    assert In(Field("x"), [Decimal("1"), 2, 3.5]).values == (Decimal("1"), 2, 3.5)

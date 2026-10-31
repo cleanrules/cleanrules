@@ -864,3 +864,11 @@ def test_any_treats_incomparable_values_as_different() -> None:
     rules = [Rule("a", when=F.x > 0, then={"v": F.o}), Rule("b", when=F.x > 0, then={"v": F.o})]
     with pytest.raises(HitPolicyError):
         RuleSet(rules, hit_policy="any").evaluate({"x": 1, "o": _Incomparable()})
+
+
+def test_decimal_payloads_stay_exact() -> None:
+    rule = Rule("rate", when=F.x > Decimal("100"), then={"rate": Decimal("0.075")})
+    output = RuleSet([rule]).evaluate({"x": Decimal("100.01")}).output
+    assert output == {"rate": Decimal("0.075")}
+    assert output is not None
+    assert type(output["rate"]) is Decimal

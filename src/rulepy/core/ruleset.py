@@ -34,6 +34,7 @@ from rulepy.errors import EvaluationError, HitPolicyError, RuleDefinitionError, 
 
 if TYPE_CHECKING:
     from rulepy.core.evaluate import NodeResult
+    from rulepy.core.explain import Explanation, RuleExplanation
 
 __all__ = ["Aggregate", "Decision", "HitPolicy", "RuleResult", "RuleSet"]
 
@@ -92,6 +93,7 @@ class Decision(Generic[TruthT]):
         hit_policy: The policy that produced it.
         aggregate: The `COLLECT` aggregate, if any.
         aggregated: The aggregate's value (`None` when nothing was selected).
+        logic: The logic the conditions were evaluated with.
     """
 
     results: tuple[RuleResult[TruthT], ...]
@@ -99,6 +101,7 @@ class Decision(Generic[TruthT]):
     hit_policy: HitPolicy
     aggregate: Aggregate | None = None
     aggregated: Mapping[str, object] | None = None
+    logic: Logic[Any] | None = None
 
     @property
     def outputs(self) -> tuple[Mapping[str, object], ...]:
@@ -126,6 +129,46 @@ class Decision(Generic[TruthT]):
     def fired(self) -> tuple[str, ...]:
         """Names of the rules that fired, in rule order (selected or not)."""
         return tuple(r.rule.name for r in self.results if r.fired)
+
+    def explain(self) -> Explanation[TruthT]:
+        """Explain every rule: selected, fired but not selected, not fired, or unknown.
+
+        Nothing is evaluated again: the explanation is built from the result trees
+        this decision already holds.
+
+        Returns:
+            An `Explanation`. `print()` it for a readable report, or use its
+            structure: `rules`, each with `status`, `requirement` (causes grouped as
+            `all` / `any`), `causes` and, for unselected rules, a `note`.
+
+        Raises:
+            UnsupportedOperation: If the decision was not made with Kleene truth
+                values (graded explanations arrive with phase 5).
+
+        Example:
+            >>> print(rules.evaluate({"total": 800}).explain())  # doctest: +SKIP
+            FIRST decision: selected nothing
+            [ ] big (not fired): F.total > 1000
+                - F.total > 1000 is false (total = 800); short by 200
+        """
+        from rulepy.core.explain import explain  # deferred: explain imports this module
+
+        return explain(self)
+
+    def why_not(self, name: str) -> RuleExplanation[TruthT]:
+        """Explain one rule, typically one that did not fire or was not selected.
+
+        Args:
+            name: The rule's name.
+
+        Returns:
+            Its `RuleExplanation` (see `explain`).
+
+        Raises:
+            RuleNotFoundError: If the decision has no rule with that name.
+            UnsupportedOperation: As `explain`.
+        """
+        return self.explain().for_rule(name)
 
 
 class RuleSet(Sequence[Rule]):

@@ -261,11 +261,33 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
     - unos 25 tests nuevos, varios procedentes de mutantes que sobrevivían a la suite.
 
 **Explicación (`core/trace.py`)**
-- [ ] 2.10 Árbol de traza con el valor de verdad de cada nodo y los valores de campo resueltos.
-- [ ] 2.11 Métodos de `Decision`:
+- [x] 2.10 Árbol de traza con el valor de verdad de cada nodo y los valores de campo resueltos.
+  - Lo cubre `NodeResult` (evaluador, 2.6): valor, motivo estructurado e hijos de cada nodo, más `RuleResult.output_trees` para los payloads. No hace falta un `core/trace.py` aparte.
+- [x] 2.11 Métodos de `Decision`:
   - `.explain()` (texto y estructura): por qué se disparó cada regla y por qué no se disparó el resto, destacando la subcondición mínima que falla;
   - `.why_not(rule_name)`;
   - una **pista contrafactual** en las comparaciones ("se dispararía si `total > 1000`; ahora vale 800").
+  - Hecho en `core/explain.py`:
+    - `decision.explain()` devuelve una `Explanation`, con `str()` legible y una `RuleExplanation` por regla (`status`, `causes`, `note`);
+    - `decision.why_not(nombre)` devuelve la de una sola regla.
+  - **Requisito en árbol** (tras la revisión de `api-reviewer`): `RuleExplanation.requirement` es una `Cause` o un `CauseGroup("all"|"any")`. Así se distingue "hay que cambiar todas" de "basta con una".
+    - De Morgan bajo `not`.
+    - Un `and` falso incluye también los operandos desconocidos, porque arreglar solo los falsos lo dejaría en UNKNOWN.
+    - Fusión de condiciones repetidas y absorción (`a & (a | b)` → `a`).
+    - `causes` es la lista plana de hojas.
+    - Revisión de cierre: cada forma de arreglar una regla no disparada se **reevalúa con todas las apariciones de la misma condición vinculadas**, y se descartan las que no la dispararían (`A & (~A | B)`).
+    - Si no queda ninguna, `achievable=False` y el texto dice "cannot fire by changing these conditions alone; they conflict". Los requisitos de más de 64 opciones no se validan.
+    - Límite documentado: condiciones *distintas* sobre el mismo campo se tratan como independientes.
+    - Corregido también el fallo con infinitos y desbordamientos `Decimal` en la distancia.
+  - Una propiedad de **suficiencia** con hypothesis comprueba que forzar cualquier opción del requisito dispara la regla, y que romper lo que sostiene una regla disparada la detiene.
+  - Cada `Cause` guarda su polaridad (`negated`) y los valores leídos (acotados, sin direcciones de memoria), y lleva una pista estructurada `Counterfactual(path, op, target, gap)`:
+    - la distancia: "short by 200", "over by 30 days", "at the limit (needs x > 1000)", 12 cifras significativas con float y `Decimal` en texto plano;
+    - bajo un `not`, la condición necesaria: "needs total <= 1000 (over by 300)".
+  - El texto usa marcas ASCII (`[x]`, `[ ]`, `[?]`), entrecomilla los nombres raros e indenta las descripciones. Con una lógica que no sea de Kleene lanza `UnsupportedOperation`; `Decision` guarda su `logic`.
+  - Las reglas disparadas pero no elegidas explican el motivo (FIRST: va antes; PRIORITY: más prioridad).
+  - Snapshots del texto en `tests/snapshots/` (adelanto de la 2.15; `RULEPY_UPDATE_SNAPSHOTS=1` los regenera). Hay una propiedad de hypothesis: las causas concuerdan con el resultado de cada regla.
+  - Por ahora solo para lógica de Kleene; los grados llegarán en la fase 5.
+  - Detectado aquí y **decidido por el autor**: `Const` admite `Decimal` (exacto; NaN rechazado; subclases normalizadas), así que `F.x > Decimal("10")` y `then={"tasa": Decimal("0.1")}` funcionan. Se compara de forma exacta y en la aritmética pasa a float64, como los `Decimal` de los datos. Pendiente para la 3.1: serializarlo como texto para no perder precisión. Pendiente para la 7: representación exacta en Rust.
 - [ ] 2.12 `summary()` de `RuleSet` (estilo fuzzytool).
 
 **Calidad**
@@ -286,6 +308,7 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
 **Objetivo**: que personas que no programan editen las reglas, y que estas se versionen como ficheros.
 
 - [ ] 3.1 `docs/spec/ast.md` y `ast-schema.json` (JSON Schema) con `rulepy_ast: 1`: cada nodo con su forma, semántica y tratamiento de nulos.
+  - *Nota de 2.11*: las constantes `Decimal` se serializan como texto (`{"decimal": "0.075"}` o similar), nunca como número JSON.
   - *Nota de 2.1a*: el catálogo y la semántica ya están en `ast.md` (versión 0). Falta la forma JSON, incluida la codificación de `inf`/`-inf` (JSON no la tiene), de las fechas y de las zonas horarias.
 - [ ] 3.2 `to_dict`/`from_dict` para nodos, reglas y rulesets; validación contra el esquema.
   - *Nota de 1.4*: los errores de esquema o de versión se localizan por ruta JSON, no por línea y columna. Hará falta un error específico (p. ej. `SchemaError(RuleSyntaxError)` con `path`), así como un error para nombres desconocidos en los registros. Las posiciones de PyYAML empiezan en 0 y hay que sumarles 1.

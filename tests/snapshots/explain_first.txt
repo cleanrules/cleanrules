@@ -1,0 +1,14 @@
+FIRST decision: selected 'adult'
+[x] adult (selected): F.age >= 18
+    - F.age >= 18 is true (age = 70)
+[x] senior (fired, not selected): F.age >= 65
+    fired, but FIRST selected 'adult', which comes first
+    - F.age >= 65 is true (age = 70)
+[ ] not_blocked (not fired): ~F.blocked
+    - F.blocked is true (blocked = True), but the rule needs it false
+[ ] deadline (not fired): F.sent < datetime.date(2026, 1, 1)
+    - F.sent < datetime.date(2026, 1, 1) is false (sent = datetime.date(2026, 3, 1)); over by 59 days
+[ ] promo (not fired): ((F.age < 25) & F.student) | (F.coupon == 'X')
+    would fire if any of these changed:
+    - F.age < 25 is false (age = 70); over by 45
+    - F.coupon == 'X' is false (coupon = 'Y')

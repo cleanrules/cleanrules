@@ -54,15 +54,18 @@ lists its tags in `TAGS`, `Node` is the closed union of concrete classes, and
   sequence. `bool` is not accepted as an index. `Field("total")` is a
   one-segment path.
 - **`Const(value)`** is normalized to an exact built-in type:
-  - `bool` (including numpy's), `int`, `float`, `str`, `date`, `datetime` or
-    `None`;
+  - `bool` (including numpy's), `int`, `float`, `Decimal`, `str`, `date`,
+    `datetime` or `None`;
   - integer-likes such as `np.int64` and `IntEnum` become `int`, `str`
-    subclasses such as `StrEnum` become `str`, and date and datetime subclasses
-    are rebuilt;
+    subclasses such as `StrEnum` become `str`, `Decimal` subclasses become
+    `Decimal`, and date and datetime subclasses are rebuilt;
+  - a `Decimal` is kept **exact**, never converted to float, including its
+    infinities;
   - a time zone is kept.
 
   The following are rejected:
-  - **NaN**, which RulePy treats as missing: use `IsNull`;
+  - **NaN** (float or `Decimal`, quiet or signaling), which RulePy treats as
+    missing: use `IsNull`;
   - integers outside the signed 64-bit range;
   - datetimes with sub-microsecond precision;
   - any other type.
@@ -102,9 +105,10 @@ lists its tags in `TAGS`, `Node` is the closed union of concrete classes, and
 `a.structural_key()` returns a hashable value with the same meaning, for use as
 a dict key.
 
-- Constants compare by **type and value**: `Const(1)`, `Const(1.0)` and
-  `Const(True)` are three different nodes.
-- `0.0` and `-0.0` are the same node.
+- Constants compare by **type and value**: `Const(1)`, `Const(1.0)`,
+  `Const(Decimal("1"))` and `Const(True)` are four different nodes.
+- `0.0` and `-0.0` are the same node, and so are `Decimal("1.0")` and
+  `Decimal("1.00")`, although they may serialize differently.
 - Two aware datetimes for the same instant in different zones are the same
   node, but they may serialize differently.
 
@@ -228,7 +232,8 @@ result into an error that another order would not raise (see *Types*).
 Values belong to one of these comparison groups:
 
 - **number**: `numbers.Real` except `bool` and `numpy.bool_` (so `np.int64` is a
-  number), plus finite `Decimal`, which databases return for NUMERIC columns;
+  number), plus `Decimal`, in data (databases return it for NUMERIC columns) and
+  in constants;
 - **string**: including polars `Categorical`/`Enum` columns;
 - **boolean**;
 - **date**;

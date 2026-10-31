@@ -18,6 +18,7 @@ vip = Rule("vip", when=(F.customer.years > 5) & (F.order.total > 1000), then={"d
 data = {"customer": {"years": 7}, "order": {"total": 1500}}
 decision = RuleSet([vip]).evaluate(data)
 print(decision.output)  # {'discount': 0.15}
+print(decision.explain())  # which rules fired, which did not, and why
 ```
 
 ## License

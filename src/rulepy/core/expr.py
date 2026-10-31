@@ -28,6 +28,7 @@ import operator
 import re
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, fields
+from decimal import Decimal
 from typing import Any, ClassVar, Literal, NoReturn, TypeAlias, get_args
 
 from rulepy.core._compat import is_numpy_bool
@@ -58,9 +59,10 @@ __all__ = [
     "StringOp",
     "StringTest",
     "Tag",
+    "format_scalar",
 ]
 
-Scalar: TypeAlias = bool | int | float | str | dt.date | dt.datetime | None
+Scalar: TypeAlias = bool | int | float | Decimal | str | dt.date | dt.datetime | None
 """Python types a `Const` holds after normalization."""
 
 Kind: TypeAlias = Literal["condition", "value", "any"]
@@ -178,6 +180,10 @@ class Expr:
 
     def __repr__(self) -> str:
         return _render(self)
+
+    def _repr_pretty_(self, printer: Any, cycle: bool) -> None:
+        # Used by IPython and by hypothesis when it shows a failing example.
+        printer.text(repr(self))
 
     def __bool__(self) -> bool:
         raise ExpressionError(
@@ -405,8 +411,8 @@ def _key_of(value: object) -> object:
     if isinstance(value, tuple):
         items: tuple[object, ...] = value  # pyright: ignore[reportUnknownVariableType]
         return tuple(_key_of(v) for v in items)
-    if value is None or type(value) in (bool, int, float, str, dt.date, dt.datetime):
-        # Tag with the type so Const(1), Const(1.0) and Const(True) differ.
+    if value is None or type(value) in (bool, int, float, Decimal, str, dt.date, dt.datetime):
+        # Tag with the type so Const(1), Const(1.0), Const(Decimal(1)) and Const(True) differ.
         return (type(value).__name__, value)
     # A node holding other data (e.g. a fuzzytool term) must define its own key.
     raise TypeError(f"no structural key for {type(value).__name__}; override structural_key()")
@@ -465,7 +471,7 @@ def _group(value: Scalar) -> str:
     """Return the comparison group of a normalized scalar (see `docs/spec/ast.md`)."""
     if isinstance(value, bool):
         return "boolean"
-    if isinstance(value, int | float):
+    if isinstance(value, int | float | Decimal):
         return "number"
     if isinstance(value, dt.datetime):
         return "naive datetime" if value.tzinfo is None else "aware datetime"
@@ -478,6 +484,13 @@ def _normalize_scalar(value: object) -> Scalar:
     """Return `value` as an exact built-in scalar type, or raise `ExpressionError`."""
     if value is None or type(value) in (bool, str, dt.date):
         return value  # pyright: ignore[reportReturnType]
+    if isinstance(value, Decimal):
+        if value.is_nan():
+            raise ExpressionError(
+                "NaN is not a valid constant: RulePy treats NaN as a missing value",
+                hint="use IsNull(...) / F.x.is_null() to test for missing values",
+            )
+        return value if type(value) is Decimal else Decimal(value)  # exact, never via float
     if isinstance(value, bool) or is_numpy_bool(value):
         return bool(value)  # pyright: ignore[reportUnknownArgumentType]
     if isinstance(value, numbers.Integral):
@@ -516,7 +529,7 @@ def _normalize_scalar(value: object) -> Scalar:
         return dt.date(value.year, value.month, value.day)
     raise ExpressionError(
         f"{type(value).__name__} {value!r} is not a valid constant",
-        hint="constants are None, bool, int, float, str, date or datetime (use .item() on"
+        hint="constants are None, bool, int, float, Decimal, str, date or datetime (use .item() on"
         " numpy scalars); use In(...) for a set of values",
     )
 
@@ -606,8 +619,8 @@ class Const(Expr):
     are rejected.
 
     Args:
-        value: `None`, `bool`, `int`, `float`, `str`, `datetime.date` or
-            `datetime.datetime`.
+        value: `None`, `bool`, `int`, `float`, `Decimal` (kept exact), `str`,
+            `datetime.date` or `datetime.datetime`.
     """
 
     value: Scalar
@@ -1030,7 +1043,7 @@ def _render(node: Expr) -> str:
         case Field():
             return _render_path(node.path)
         case Const():
-            return f"Const({_literal(node.value)})"
+            return f"Const({format_scalar(node.value)})"
         case Compare():
             left, right = _operand(node.left), _operand(node.right, literal=True)
             return f"{left} {_COMPARE_SYMBOLS[node.op]} {right}"
@@ -1041,7 +1054,7 @@ def _render(node: Expr) -> str:
         case Not():
             return f"~{_operand(node.operand, parens=(Compare, And, Or))}"
         case In():
-            values = ", ".join(_literal(v) for v in node.values)
+            values = ", ".join(format_scalar(v) for v in node.values)
             return f"{_receiver(node.operand)}.is_in([{values}])"
         case Between():
             closed = "" if node.closed == "both" else f", closed={node.closed!r}"
@@ -1070,7 +1083,7 @@ def _operand(node: Expr, *, literal: bool = False, parens: tuple[type, ...] = ()
     # dispatches to the node's operator (`F.x > 5`); elsewhere it would be computed by
     # Python itself (`1 + 2`, `True & False`), so it is spelled `Const(...)`.
     if isinstance(node, Const) and literal:
-        return _literal(node.value)
+        return format_scalar(node.value)
     text = _render(node)
     return f"({text})" if isinstance(node, parens) else text
 
@@ -1096,7 +1109,8 @@ def _is_attribute_name(name: str, *, root: bool) -> bool:
     return plain and not name.startswith("_") and (root or not reserved)
 
 
-def _literal(value: Scalar) -> str:
+def format_scalar(value: Scalar) -> str:
+    """Render a constant as Python source, as `repr()` of nodes does (`float('inf')`)."""
     if isinstance(value, float) and math.isinf(value):
         return "float('inf')" if value > 0 else "float('-inf')"
     return repr(value)

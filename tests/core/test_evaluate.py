@@ -659,3 +659,21 @@ def test_evaluate_value_tree_reports_why_and_names_the_rule() -> None:
 
 def test_signaling_decimal_nan_is_null() -> None:
     assert ev(F.x.is_null(), {"x": Decimal("sNaN")}) is T
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [(Decimal("10.01"), T), (10, FALSE), (10.5, T), (Decimal("10.00"), FALSE)],
+    ids=["decimal", "int", "float", "equal-decimal"],
+)
+def test_decimal_constants_compare_exactly(value: object, expected: Truth) -> None:
+    assert ev(F.x > Decimal("10.00"), {"x": value}) is expected
+
+
+def test_decimal_constant_is_not_equal_to_its_float_approximation() -> None:
+    assert ev(F.x == Decimal("0.1"), {"x": 0.1}) is FALSE
+    assert ev(F.x == Decimal("0.1"), {"x": Decimal("0.1")}) is T
+
+
+def test_decimal_constants_in_arithmetic_are_float64() -> None:
+    assert evaluate_value(F.x * Decimal("0.1"), {"x": 3}) == 3 * 0.1

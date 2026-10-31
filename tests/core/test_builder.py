@@ -4,6 +4,7 @@ import copy
 import datetime
 import pickle
 from collections.abc import Callable
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -364,7 +365,7 @@ def test_repr_is_readable_python(node: Expr, text: str) -> None:
     assert str(node) == text
 
 
-ENV = {"F": F, "Const": Const, "datetime": datetime}
+ENV = {"F": F, "Const": Const, "datetime": datetime, "Decimal": Decimal}
 
 
 @given(conditions)
@@ -375,3 +376,9 @@ def test_repr_of_conditions_round_trips(tree: Expr) -> None:
 @given(value_exprs)
 def test_repr_of_values_round_trips(tree: Expr) -> None:
     assert eval(repr(tree), ENV).same_as(tree)
+
+
+def test_pretty_printers_use_the_readable_repr() -> None:
+    from hypothesis.vendor.pretty import pretty
+
+    assert pretty((F.a > 1) & ~F.b) == "(F.a > 1) & ~F.b"

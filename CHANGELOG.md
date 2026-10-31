@@ -24,8 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `rulepy.core.expr`: immutable condition AST with `Field("a", 0, "b")`,
   `Const` (normalizes numpy/Enum/subclass scalars; rejects NaN and integers
   beyond 64 bits), `Compare`, n-ary flattened `And(*conditions)` and
-  `Or(*conditions)`, and `Not`. Trees are checked when built, can be walked,
-  compared with `same_as()` and keyed with `structural_key()`, and pickle.
+  `Or(*conditions)`, and `Not`. `Const` also keeps `Decimal` values exact (for
+  money and rates), rejecting `Decimal` NaN. Trees are checked when built, can
+  be walked, compared with `same_as()` and keyed with `structural_key()`, and
+  pickle.
 - More condition nodes: `In` (canonical sorted set of same-type values),
   `Between` (polars-style `closed`), `IsNull`, `Matches` (regex search),
   `StringTest` (`starts_with` / `ends_with` / `contains`, literal text) and
@@ -69,6 +71,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decision and the actions already run), `RuleNotFoundError` (a `KeyError`);
   `EvaluationError.row` names the input in batches.
 - `rulepy.core.evaluate.evaluate_value_tree` and `type_group`.
+- Explanations (`rulepy.core.explain`): `Decision.explain()` reports, for every
+  rule, whether it was selected, fired without being selected (and why), did not
+  fire or is unknown, and its requirement: the conditions behind the outcome,
+  grouped as `all` (each must change / each is needed) or `any` (one is enough),
+  with the data values they read and structured counterfactuals
+  (`short by 200`, `needs total <= 1000 (over by 300)`). The text report is
+  ASCII. Suggested fixes are checked against the rule, and conflicting
+  conditions are reported as such (`achievable`). `Decision.why_not(name)`
+  explains one rule; `Decision.logic` records
+  the logic used. `rulepy.core.expr.format_scalar` renders constants.
 - `rulepy.errors.format_path` renders field paths unambiguously
   (`orders[0].total`, `['x y']`).
 - Errors for evaluation and registries: `TypeMismatchError`,

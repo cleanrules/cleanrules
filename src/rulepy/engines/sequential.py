@@ -43,7 +43,7 @@ def decide(ruleset: RuleSet, data: object) -> Decision[Any]:
         _check_any(results, fired)
     selected = tuple(results[i] for i in chosen)
     aggregated = _aggregate(ruleset, selected) if ruleset.aggregate is not None else None
-    return Decision(tuple(results), selected, policy, ruleset.aggregate, aggregated)
+    return Decision(tuple(results), selected, policy, ruleset.aggregate, aggregated, ruleset.logic)
 
 
 def execute(decision: Decision[Any], data: object) -> None:

@@ -1,6 +1,7 @@
 """Shared hypothesis strategies. Extend these instead of writing parallel ones."""
 
 import datetime as dt
+from decimal import Decimal
 
 from hypothesis import strategies as st
 
@@ -30,8 +31,10 @@ I64_MIN, I64_MAX = -(2**63), 2**63 - 1
 
 # Values a Const accepts as-is. NaN is excluded: RulePy treats it as missing, and
 # Const rejects it. Timezones are limited to UTC so no tzdata is needed on Windows.
-numbers: st.SearchStrategy[int | float] = st.one_of(
-    st.integers(min_value=I64_MIN, max_value=I64_MAX), st.floats(allow_nan=False)
+numbers: st.SearchStrategy[int | float | Decimal] = st.one_of(
+    st.integers(min_value=I64_MIN, max_value=I64_MAX),
+    st.floats(allow_nan=False),
+    st.decimals(allow_nan=False, places=4),
 )
 
 scalars: st.SearchStrategy[Scalar] = st.one_of(
