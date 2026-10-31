@@ -4,13 +4,17 @@ A phase's tasks are its `- [ ]` / `- [x]` items whose label is a task id such as
 `B.3` or `A.1c`. When a task is split into subtasks (`A.1` into `A.1a`...), only
 the subtasks count. A phase whose heading says it is completed counts as done.
 
-    python3 scripts/progress.py [--width N]
+    python3 scripts/progress.py [--width N] [--line] [--watch]
+
+`--watch` keeps the bars on screen and redraws them whenever the plan changes.
 """
 
 from __future__ import annotations
 
 import argparse
 import re
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -81,12 +85,65 @@ def render(phases: list[Phase], width: int) -> str:
     return "\n".join(lines)
 
 
+def bar(done: int, count: int, width: int) -> str:
+    """A bar of `width` characters, filled in proportion to `done / count`."""
+    filled = round(width * done / count) if count else width
+    return "█" * filled + "░" * (width - filled)
+
+
+def render_line(phases: list[Phase], width: int) -> str:
+    """One line for a status bar: the current phase and the whole plan."""
+    counts = [(phase, sum(phase.leaves().values()), len(phase.leaves())) for phase in phases]
+    pending = [(p, d, c) for p, d, c in counts if c and d < c and not p.completed]
+    done_total = sum(d for _, d, _ in counts)
+    count_total = sum(c for _, _, c in counts)
+    percent = 100 * done_total / count_total if count_total else 100.0
+    total = f"plan {done_total}/{count_total} ({percent:.0f} %)"
+    if not pending:
+        return f"cleanrules · {total}"
+    phase, done, count = pending[0]
+    return f"cleanrules · phase {phase.id} {bar(done, count, width)} {done}/{count} · {total}"
+
+
+def watch(draw: Callable[[], str], interval: float) -> None:
+    """Redraw the screen whenever the plan changes, until interrupted."""
+    last: int | None = None
+    try:
+        while True:
+            try:
+                stamp = PLAN.stat().st_mtime_ns
+            except FileNotFoundError:
+                stamp = None
+            if stamp != last:
+                last = stamp
+                now = time.strftime("%H:%M:%S")
+                # Clear the screen and move the cursor home before redrawing.
+                print(f"\033[2J\033[H{draw()}\n\nupdated {now} · Ctrl+C to stop", flush=True)
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        print()
+
+
 def main() -> None:
     """Parse the arguments and print the bars."""
     parser = argparse.ArgumentParser(description="Progress bar per phase of docs/PLAN.md.")
     parser.add_argument("--width", type=int, default=20, help="bar width in characters")
+    parser.add_argument("--line", action="store_true", help="one line, for a status bar")
+    parser.add_argument("--watch", action="store_true", help="redraw whenever docs/PLAN.md changes")
+    parser.add_argument(
+        "--interval", type=float, default=1.0, help="seconds between checks in --watch"
+    )
     args = parser.parse_args()
-    print(render(read_plan(PLAN), max(args.width, 1)))
+    width = max(args.width, 1)
+
+    def draw() -> str:
+        phases = read_plan(PLAN)
+        return render_line(phases, width) if args.line else render(phases, width)
+
+    if args.watch:
+        watch(draw, max(args.interval, 0.2))
+    else:
+        print(draw())
 
 
 if __name__ == "__main__":
