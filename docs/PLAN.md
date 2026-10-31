@@ -32,16 +32,32 @@ Lo que nos diferencia es la combinación: **condiciones como AST serializable** 
 | D8 | **Lógica difusa**: t-normas, s-normas y complementos en el núcleo Rust (con fuzzytool como referencia de comportamiento); lo avanzado (ANFIS, tipo 2, clustering) sigue en fuzzytool, desde Python | Difusa básica en todos los lenguajes sin duplicar fuzzytool entero |
 | D9 | Regex con el crate `regex` (tiempo lineal, sin *lookaround* ni *backreferences*): su semántica es la de referencia | Desaparece el problema de compatibilidad Python/Rust; sin ReDoS |
 | D10 | Monorepo: workspace de Cargo + un paquete por lenguaje, CI única | Versiones sincronizadas y conformidad en cada cambio |
-| D11 | Nuevo **nombre neutro** del proyecto (pendiente) | "RulePy" no encaja fuera de Python |
+| D11 | El proyecto se llama **cleanrules** (decidido el 2026-10-31; *clean* ≈ *Kleene*) | "RulePy" no encaja fuera de Python |
+
+**Nombres por registro** (libres a 2026-10-31 en crates.io, PyPI, npm con y sin scope, y como organización de GitHub; sin marcas ni productos homónimos conocidos). Descartados:
+
+- `rulengine`: ocupado en PyPI por un paquete abandonado y confundible con `rule-engine`;
+- `rulewise`: RuleWise® es marca de un framework de cumplimiento normativo, y la organización de GitHub está ocupada;
+- `rulewizard`: RULEWIZARD es marca registrada de software (EE. UU., nº 2652799) y producto de Parasoft;
+- `rulemachine`: "Rules Machine" ya es un motor de reglas serializables en npm, y "Rule Machine" es la app de reglas de Hubitat.
+
+| Registro | Nombre |
+|---|---|
+| crates.io | `cleanrules` (núcleo, en `crates/core`), `cleanrules-ffi`, `cleanrules-cli` |
+| PyPI | `cleanrules` (`import cleanrules`) |
+| npm | `cleanrules`; binarios por plataforma de napi-rs en el scope `@cleanrules/*` |
+| Maven Central | `io.github.cleanrules:cleanrules` (+ `cleanrules-scala_3`) |
+| Go | `github.com/cleanrules/cleanrules/bindings/go` |
+| C/C++ | biblioteca `libcleanrules`, prefijo de símbolos `cr_`, paquetes Conan y vcpkg `cleanrules` |
 
 ### Decisiones pendientes (confirmar con el autor)
 
-- [ ] **Nombre del proyecto.** Libres en crates.io, PyPI y npm a 2026-10-31: `kleene`, `regla`, `decisa`, `reglo`. Hasta decidirlo, el código usa nombres de trabajo neutros (`core`, `ffi`) y el paquete Python sigue siendo `rulepy`.
+- [x] **Nombre del proyecto**: `cleanrules`. La implementación Python de la v1 conserva `rulepy` hasta su retirada en la fase A.
 - [ ] Java: FFM (Java 22+, sin código nativo propio) frente a JNI (Java 8+). Propuesto: FFM, con JNI solo si hace falta soportar Java antiguo.
 - [ ] JavaScript: napi-rs (Node, más rápido) y wasm (navegador, Deno). Propuesto: los dos, con la misma API TypeScript.
 - [ ] MSRV de Rust y edición (propuesto: edición 2024, MSRV = estable actual menos 2).
 - [ ] UNKNOWN en lógica difusa como intervalo `[0, 1]` (propuesta de la v1, ver `spec/ast.md`).
-- [ ] Organización de GitHub (para la CI y los registros de paquetes).
+- [x] Organización de GitHub: `cleanrules` (la crea el autor el 2026-10-31). La necesitan el groupId de Maven y la ruta del módulo Go.
 
 ## 2. Estructura objetivo del repositorio
 
@@ -55,7 +71,7 @@ Lo que nos diferencia es la combinación: **condiciones como AST serializable** 
 │   ├── ffi/                        C ABI: handles opacos, errores, JSON in/out; cbindgen
 │   └── cli/                        (opcional) evaluar reglas JSON sobre datos JSON
 ├── bindings/
-│   ├── python/                     PyO3 + maturin (paquete `rulepy` mientras no haya nombre)
+│   ├── python/                     PyO3 + maturin (paquete `cleanrules`)
 │   ├── c/ · cpp/                   cabecera C generada; envoltorio C++ RAII; CMake
 │   ├── js/                         napi-rs (Node) + wasm-bindgen (web); TypeScript
 │   ├── jvm/                        Java (FFM sobre la C ABI) + módulo Scala
@@ -87,8 +103,10 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
 
 ### Fase 0'. Adaptar las especificaciones para Claude · tamaño S
 
-- [ ] 0'.1 Reescribir `CLAUDE.md` para la nueva arquitectura (invariantes, comandos, estructura).
+- [x] 0'.1 Reescribir `CLAUDE.md` para la nueva arquitectura (invariantes, comandos, estructura).
+  - Se añadieron dos invariantes: memoria segura (sin `unsafe` en el núcleo) y dependencias mínimas con *features*. "Python es el oráculo" pasa a "la especificación y la conformidad son el oráculo".
 - [ ] 0'.2 `.claude/`: `rust-engineer` pasa a ser el agente principal; `parity-tester` pasa a `conformance-tester`; `api-reviewer` revisa la API en todos los lenguajes; `/add-operator` recorre núcleo, especificación, vectores y bindings; permisos para cargo, maturin, npm, gradle/sbt y go (instalar dependencias pide confirmación).
+  - Hechos los agentes y las skills. Pendientes de que el autor los aplique (Claude no puede modificar sus propios permisos ni hooks): los permisos de `.claude/settings.json` y el hook `format.sh`, que añade gofmt, clang-format y prettier.
 
 ---
 
@@ -96,7 +114,7 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
 
 **Objetivo**: que la especificación y los vectores contengan todo el conocimiento de la v1 antes de borrar el código.
 
-- [ ] A.1 `spec/json-format.md` y JSON Schemas (antes tarea 3.1): AST con `"version": 1`, reglas y rule sets, valores (`Decimal` como texto, `inf`/`-inf`, fechas ISO 8601, zonas horarias), decisiones, motivos (`Reason`), explicaciones (requisitos, `Counterfactual`) y resúmenes.
+- [ ] A.1 Mover `docs/spec/` a `spec/` y escribir `spec/json-format.md` y los JSON Schemas (antes tarea 3.1): AST con `"version": 1`, reglas y rule sets, valores (`Decimal` como texto, `inf`/`-inf`, fechas ISO 8601, zonas horarias), decisiones, motivos (`Reason`), explicaciones (requisitos, `Counterfactual`) y resúmenes.
 - [ ] A.2 `spec/data-model.md`: `Value` y cómo convierte cada binding sus tipos nativos. La sección "Reading data" de `ast.md` (mapas, registros, atributos **públicos**, nunca privados ni de módulos o clases) pasa a ser una obligación de cada binding.
 - [ ] A.3 Exportador temporal en Python (`conformance/tools/`) que, con la implementación de la v1, genera **vectores de conformidad**: árboles y errores de construcción, evaluaciones con motivos, modo estricto, decisiones de las 6 políticas, agregados, explicaciones y resúmenes. Las propiedades de hypothesis se convierten en miles de casos fijados.
 - [ ] A.4 Retirada: tag `python-reference` y eliminación de `src/rulepy` y de sus tests. Se conservan `spec/`, `docs/pitfalls.md` (pasa a la documentación del binding de Python) y los vectores.

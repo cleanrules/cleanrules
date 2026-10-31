@@ -1,86 +1,111 @@
-# RulePy
+# cleanrules
 
-Motor de reglas para Python que cubre cuatro casos de uso con un único núcleo: reglas de negocio, sistema experto (encadenamiento hacia delante), validación de datos y explicaciones de modelos de ML. Admite lógica nítida y difusa (integra `fuzzytool`). El núcleo de referencia está en Python y, más adelante, habrá un acelerador opcional en Rust (`rulepy-core`).
+Motor de reglas con **un único núcleo en Rust** y bindings para Rust, C/C++, Python, JavaScript, Java/Scala y Go. Cubre cuatro casos de uso con la misma semántica en todos los lenguajes: reglas de negocio, sistema experto (encadenamiento hacia delante), validación de datos y explicaciones de modelos de ML. Admite lógica nítida (Kleene, tres valores) y difusa (normas de `fuzzytool` portadas al núcleo).
 
 - **Hoja de ruta y estado**: [docs/PLAN.md](docs/PLAN.md) es la fuente de verdad. Antes de empezar cualquier tarea, léela y localiza la fase y la tarea.
-- **Contratos**: [docs/spec/](docs/spec/) contiene las especificaciones que comparten Python y Rust, empezando por el formato del AST. Si cambia el comportamiento, primero se actualiza la especificación.
-- **Fase actual**: 0 y 1 completadas (especificaciones y andamiaje). Siguiente: fase 2 (núcleo: AST, lógica, reglas y motor secuencial).
+- **Contratos**: la especificación ([docs/spec/](docs/spec/), que pasa a `spec/` en la fase A) y la batería de conformidad (`conformance/`) definen la semántica. Si cambia el comportamiento, primero se actualizan la especificación y los vectores.
+- **Fase actual**: P (implementación Python v1, paquete `rulepy`) completada y congelada; 0' en curso. Siguiente: fase A (formato JSON, modelo de datos, vectores de conformidad y retirada de Python), después B (núcleo Rust).
+
+## Estructura
+
+```text
+crates/core      el motor: valores, AST, lógicas, evaluador, reglas, políticas, explain, summary (crate `cleanrules`)
+crates/ffi       C ABI (cbindgen) que usan C/C++, Go y la JVM (crate `cleanrules-ffi`)
+bindings/<lang>  python (PyO3), c, cpp, js (napi-rs + wasm), jvm (Java FFM + Scala), go (cgo)
+spec/            especificación normativa y JSON Schemas
+conformance/     vectores JSON + un runner por lenguaje
+src/rulepy       implementación Python v1: solo se toca para generar vectores (fase A); se borra en A.4
+```
+
+Las carpetas aparecen a medida que avanzan las fases; no existe ninguna antes de su tarea.
 
 ## Comandos
 
 ```bash
-uv sync --all-extras                 # entorno de desarrollo
-uv run pytest                        # tests (incluye hypothesis)
-uv run pytest -m "not slow"          # ciclo rápido
-uv run pytest --cov                  # con cobertura (falla por debajo del 90 %)
-HYPOTHESIS_PROFILE=ci uv run pytest  # búsqueda de hypothesis más profunda (500 ejemplos)
-uv run ruff check . && uv run ruff format --check .
-uv run pyright                       # tipado estricto
-uv run maturin develop -m crates/rulepy-py/Cargo.toml   # compilar el núcleo Rust (fase 7+)
-cargo test --workspace && cargo clippy --workspace -- -D warnings
-uv run python benchmarks/run.py      # benchmarks (fase 2+)
-uv run --group docs mkdocs build --strict   # documentación (también en CI); `mkdocs serve` para verla
+# Núcleo Rust (fase B+)
+cargo build --workspace
+cargo nextest run --workspace        # o `cargo test --workspace`
+cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --all --check
+cargo llvm-cov --workspace           # cobertura
+cargo bench -p cleanrules              # criterion
+
+# Conformidad (fase A+)
+cargo test -p cleanrules --test conformance
+
+# Bindings, cuando existan
+uv run maturin develop -m bindings/python/Cargo.toml && uv run pytest bindings/python
+cmake -S bindings/cpp -B build/cpp && ctest --test-dir build/cpp
+npm --prefix bindings/js test
+(cd bindings/jvm && ./gradlew test)
+(cd bindings/go && go test ./...)
+
+# Implementación Python v1 (hasta A.4)
+uv run pytest -m "not slow" && uv run ruff check . && uv run pyright
 ```
 
-Un hook (`.claude/hooks/format.sh`) formatea cada `.py` y `.rs` tras editarlo, así que no hace falta formatear a mano.
+Un hook (`.claude/hooks/format.sh`) formatea tras cada edición los `.rs` (rustfmt), `.py` (ruff), `.go` (gofmt) y, si hay herramienta instalada, C/C++ (clang-format) y JS/TS (prettier del proyecto), así que no hace falta formatear a mano.
 
 ## Invariantes de arquitectura (no romper)
 
-1. **Las condiciones son datos.** Una condición es un AST (`rulepy.core.expr`), nunca una lambda opaca. Las *acciones* sí pueden ser funciones de Python. Todo lo demás (serializar, explicar, vectorizar, auditar, compilar a Rust) depende de esto.
-2. **Cada nodo del AST funciona en todos los backends** (evaluador Python, explicación, serialización, compilador polars, auditoría y Rust) o lanza `UnsupportedOperation` de forma explícita. Para añadir un operador, usa la skill `/add-operator`.
-3. **La lógica es intercambiable.** El evaluador nunca usa `and`/`or`/`not` de Python sobre los valores de verdad: todo pasa por el protocolo `Logic` (`BooleanLogic` de Kleene con 3 valores, `FuzzyLogic` con normas de fuzzytool).
-4. **El núcleo no tiene dependencias en tiempo de ejecución.** numpy, polars, pandas, fuzzytool, scikit-learn, z3, PyYAML y `rulepy-core` son *extras*, y se importan de forma perezosa dentro de su módulo. `tests/test_core_dependencies.py` comprueba que `import rulepy` solo carga la biblioteca estándar.
-5. **Python es el oráculo.** La implementación Python define la semántica. Rust, polars y Rete deben dar exactamente el mismo resultado, y lo verifican tests diferenciales con hypothesis. Un cambio de semántica toca ambos lados en el mismo PR.
-6. **El formato del AST está versionado** (`"rulepy_ast": <n>` en `docs/spec/ast.md` y `ast-schema.json`). Es el contrato con Rust y con los ficheros YAML/JSON de los usuarios.
-7. **Determinismo.** Las mismas entradas producen el mismo orden de disparo y la misma traza. La resolución de conflictos es estable y no depende del orden de iteración de `set` ni del `hash` de objetos.
-8. **Todo resultado se explica.** Cada motor devuelve un objeto con `.explain()`. Las explicaciones forman parte de la API pública y tienen tests de *snapshot*.
-9. **Nada de `eval`/`exec`.** El DSL de texto usa un parser propio, y YAML se carga solo con `safe_load`. Las expresiones regulares se limitan al subconjunto compatible con el crate `regex` de Rust (sin *lookaround* ni *backreferences*).
+1. **Las condiciones son datos.** Una condición es un AST serializable, nunca una función opaca. Las *acciones* sí son código del lenguaje anfitrión. Serializar, explicar, vectorizar, auditar y cruzar la frontera entre lenguajes depende de esto.
+2. **Un solo motor.** Toda la semántica vive en `crates/core`. Los bindings son capas finas: construyen reglas de forma idiomática, convierten datos a `Value`, ejecutan acciones y traducen errores. Nunca evalúan, explican ni deciden por su cuenta.
+3. **Cada nodo del AST funciona en todo el núcleo** (evaluador, explicación, resumen, serialización, evaluación Arrow, auditoría y Rete) y se puede construir desde todos los bindings, o devuelve un error `Unsupported` explícito. Para añadir un operador, usa la skill `/add-operator`.
+4. **La lógica es intercambiable.** El evaluador nunca combina valores de verdad con `&&`, `||` o `!`: todo pasa por el trait `Logic` (Kleene de tres valores; normas difusas con capacidad `Graded`).
+5. **La especificación y la conformidad son el oráculo.** Los vectores de `conformance/` se ejecutan en el núcleo y en todos los bindings. Un cambio de semántica actualiza `spec/`, los vectores y el núcleo en el mismo PR. Los contraejemplos de `proptest` se añaden como vectores.
+6. **El formato JSON está versionado** (`"version": <n>` en `spec/json-format.md` y los JSON Schemas). Es el contrato entre lenguajes y con los ficheros de los usuarios; un cambio no aditivo sube la versión.
+7. **Determinismo.** Las mismas entradas producen la misma decisión, el mismo orden de disparo y la misma explicación en todos los lenguajes. Nada depende del orden de iteración de un `HashMap`/`HashSet` ni de direcciones de memoria: usa `BTreeMap`, `IndexMap` o vectores ordenados.
+8. **Todo resultado se explica.** Cada motor devuelve un resultado con `explain()`. Las explicaciones forman parte de la API pública, tienen forma JSON en la especificación y tests de *snapshot*.
+9. **Nada de `eval`.** El DSL de texto tiene parser propio, YAML se carga de forma segura y las regex usan el crate `regex` (tiempo lineal, sin *lookaround* ni *backreferences*). Los parsers tienen límites de profundidad y tamaño.
+10. **Memoria segura.** Sin `unsafe` en `crates/core`. En `crates/ffi` y los bindings, cada bloque `unsafe` lleva un comentario `// SAFETY:` y se prueba con `miri` o sanitizers. La propiedad de cada puntero de la C ABI está documentada en la cabecera.
+11. **Dependencias mínimas.** El núcleo depende solo de lo imprescindible (serde, regex, decimal, fechas). Arrow, YAML, rayon y z3 van detrás de *features* de Cargo. En cada binding, las integraciones (pandas, polars, fuzzytool, scikit-learn…) son opcionales y se cargan de forma perezosa.
 
 ## Coherencia con fuzzytool
 
-fuzzytool es del mismo autor, y RulePy debe sentirse como su hermana:
-- operadores `&` (AND/t-norma), `|` (OR/s-norma) y `~` (NOT);
-- conectivas y estrategias resueltas por nombre mediante registros y `Protocol`s;
-- verbos `explain()`, `audit()`, `summary()` y `rule_from_text()`;
-- docstrings en estilo Google con `Args:`/`Returns:`.
+fuzzytool es del mismo autor, y cleanrules debe sentirse como su hermana en todos los lenguajes:
 
-**No se reimplementa lógica difusa en RulePy**: se usa `fuzzytool.norms.get_tnorm/get_snorm/get_complement` y `fuzzytool.sets.Antecedent.eval(...)`.
+- operadores `&` (AND/t-norma), `|` (OR/s-norma) y `~` (NOT), o su equivalente idiomático donde no hay sobrecarga;
+- conectivas y estrategias resueltas por nombre mediante registros;
+- verbos `explain()`, `audit()`, `summary()` y `rule_from_text()`.
 
-Un detalle conocido: `fuzzytool.sets.Antecedent.__and__` no devuelve `NotImplemented` cuando recibe un tipo ajeno. Por eso `score["poor"] & (F.x > 2)` construye un `And` de fuzzytool inválido. Hay que poner la expresión de RulePy a la izquierda o envolverla con `fz(score["poor"])`. La corrección en fuzzytool está prevista en el plan (fase 5).
+Las t-normas, s-normas y complementos se portan al núcleo con **fuzzytool como referencia de comportamiento** (tests contra sus valores). Lo avanzado (ANFIS, tipo 2, clustering) no se reimplementa: se usa fuzzytool desde el binding de Python.
+
+Un detalle para el binding de Python: `fuzzytool.sets.Antecedent.__and__` no devuelve `NotImplemented` cuando recibe un tipo ajeno, así que `score["poor"] & (F.x > 2)` construye un `And` de fuzzytool inválido. Hay que poner la expresión de cleanrules a la izquierda o envolver el término. La corrección en fuzzytool está prevista en la fase J.3.
 
 ## Convenciones
 
-- Python ≥ 3.11, estructura `src/`, `pyright` en modo estricto y `ruff` (configuración en `pyproject.toml`).
-- **Todo lo que se publica va en inglés**: código, identificadores, docstrings, mensajes de error, documentación de usuario y commits. Este fichero y `docs/PLAN.md` están en español.
-- Errores: todos heredan de `rulepy.errors.RulePyError`, y los mensajes indican qué regla o nodo falla y cómo corregirlo.
-- API pública: solo lo que exporta `__all__`. Cualquier cambio en ella actualiza `CHANGELOG.md` (formato Keep a Changelog) y la documentación.
-- Commits: Conventional Commits (`feat(core): ...`, `fix(rete): ...`). Un commit o PR por tarea del plan.
-- Tests: `tests/` refleja la estructura de `src/rulepy/`. Las propiedades algebraicas y la paridad entre backends se prueban con hypothesis. Las estrategias compartidas viven en `tests/strategies.py`.
-- Los tests lentos o de benchmark se marcan con `@pytest.mark.slow`.
-- No usar `print` en la librería. El logging va por `logging.getLogger("rulepy")`.
+- **Todo lo que se publica va en inglés**: código, identificadores, documentación, mensajes de error y commits. Este fichero y `docs/PLAN.md` están en español.
+- **Rust**: edición 2024, `clippy` pedante, `rustfmt`. Errores con `thiserror`: un tipo de error del núcleo con códigos estables (los mismos que en la especificación) y mensajes que indican qué regla o nodo falla y cómo corregirlo. Sin `unwrap`/`expect` en código de biblioteca salvo invariantes demostrables y comentadas. Logging con `tracing`, nunca `println!`.
+- **Bindings**: API idiomática de cada lenguaje (excepciones en Python, Java y C++; `error` como valor en Go; códigos de retorno en C), con los mismos nombres de conceptos (`Rule`, `RuleSet`, `Decision`, `explain`, `summary`) y la misma jerarquía de errores, que en Python cuelga de `cleanrules.CleanRulesError`.
+- **API pública**: lo exportado por cada paquete. Cualquier cambio actualiza `CHANGELOG.md` (Keep a Changelog), la documentación de los lenguajes afectados y, si toca el formato, la especificación. SemVer común a todos los paquetes; la versión del formato JSON es independiente.
+- **Commits**: Conventional Commits con ámbito por componente: `core`, `ffi`, `py`, `c`, `cpp`, `js`, `jvm`, `go`, `spec`, `conformance`, `docs`, `ci`. Un commit o PR por tarea del plan.
+- **Tests**: unitarios junto al código en Rust; propiedades con `proptest` (leyes lógicas, De Morgan, suficiencia de explicaciones); vectores en `conformance/` para todo lo observable desde fuera; *snapshots* con `insta` para texto de `explain()` y `summary()`. Los tests lentos se marcan (`#[ignore]` con motivo, o `slow` en cada binding).
 
 ## Definición de terminado (cada tarea)
 
 1. Los tests nuevos fallaban antes del cambio y ahora pasan, y pasa la suite completa.
-2. `ruff`, `pyright` y (si hay Rust) `cargo clippy -D warnings` están limpios.
-3. Cobertura ≥ 90 % en los módulos tocados (95 % en `core/`).
-4. Si el cambio afecta a la API pública, hay docstrings, una entrada en `CHANGELOG.md` y un ejemplo en `docs/`.
-5. La casilla de la tarea está marcada en `docs/PLAN.md`, y se ha anotado cualquier desviación del plan.
+2. `cargo clippy -D warnings` y `cargo fmt --check` limpios, y los linters de cada binding tocado (ruff y pyright en Python, eslint/tsc en JS, `go vet` en Go).
+3. Los vectores de conformidad pasan en el núcleo y en todos los bindings existentes.
+4. Cobertura ≥ 90 % en lo tocado (95 % en `crates/core`).
+5. Si el cambio afecta a la API pública, hay documentación, una entrada en `CHANGELOG.md` y un ejemplo en `docs/`.
+6. La casilla de la tarea está marcada en `docs/PLAN.md`, y se ha anotado cualquier desviación del plan.
 
 ## Qué no hacer
 
-- Añadir dependencias al núcleo, o añadir cualquier dependencia sin preguntar (`uv add` y `cargo add` piden confirmación).
-- Publicar en PyPI o crates.io, crear tags o hacer push: los comandos de publicación están denegados en `.claude/settings.json`.
-- Optimizar en Python algo que la fase 7 llevará a Rust. Primero se prioriza que sea correcto y claro.
-- Cambiar la semántica de un operador sin actualizar `docs/spec/` y los tests de paridad.
+- Añadir dependencias sin preguntar (`cargo add`, `uv add`, `npm install <paquete>`, `go get` y Gradle piden confirmación). En el núcleo, solo con un motivo fuerte.
+- Publicar en cualquier registro, crear tags o hacer push: los comandos de publicación están denegados en `.claude/settings.json`.
+- Poner lógica de evaluación en un binding, o "arreglar" en un binding una diferencia que debe corregirse en el núcleo.
+- Ampliar la implementación Python v1: solo se toca para extraer vectores en la fase A.
+- Cambiar la semántica sin actualizar `spec/` y los vectores.
+- Afirmar una mejora de rendimiento sin benchmark (`/bench`).
 
 ## Herramientas de Claude en este repo (`.claude/`)
 
 - **Skills**:
   - `/plan-task [fase.tarea]` implementa una tarea de `docs/PLAN.md` de principio a fin.
-  - `/add-operator <nombre>` añade un nodo al AST en todos los backends.
+  - `/add-operator <nombre>` añade un nodo al AST en la especificación, los vectores, el núcleo y los bindings.
   - `/bench [suite]` ejecuta benchmarks y los compara con la línea base y con los rivales.
 - **Subagentes**:
-  - `api-reviewer` revisa los cambios de API pública (solo lectura).
-  - `parity-tester` escribe tests diferenciales entre backends.
-  - `rust-engineer` trabaja en `crates/`.
+  - `rust-engineer` es el agente principal: trabaja en `crates/` y en la parte Rust de los bindings (PyO3, napi-rs, wasm, C ABI).
+  - `conformance-tester` escribe vectores de conformidad y propiedades, y ejecuta los runners de todos los lenguajes.
+  - `api-reviewer` revisa los cambios de API pública en todos los lenguajes y en el formato JSON (solo lectura).

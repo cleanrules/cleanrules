@@ -1,6 +1,6 @@
 ---
 name: add-operator
-description: Add a new node/operator to RulePy's condition AST (e.g. between, matches, is_null, startswith, arithmetic, aggregations) and wire it through every backend so invariant 2 holds. Use whenever a new kind of condition or expression is needed.
+description: Add a new node/operator to cleanrules's condition AST (e.g. between, matches, is_null, startswith, arithmetic, aggregations) and wire it through the spec, the conformance vectors, every part of the Rust core and every existing binding so invariant 3 holds. Use whenever a new kind of condition or expression is needed.
 argument-hint: "<nombre-del-operador> [semántica breve]"
 ---
 
@@ -8,22 +8,20 @@ argument-hint: "<nombre-del-operador> [semántica breve]"
 
 Operador: `$ARGUMENTS`
 
-Un operador no está terminado hasta que todos los puntos de esta lista estén hechos o lancen explícitamente `UnsupportedOperation` con un motivo. Lleva la lista como checklist en tu respuesta.
+Un operador no está terminado hasta que todos los puntos de esta lista estén hechos o devuelvan explícitamente un error `Unsupported` con un motivo. Lleva la lista como checklist en tu respuesta. Si una parte del núcleo o un binding todavía no existe según `docs/PLAN.md`, márcala como "no aplica aún".
 
-1. **Especificación**: en `docs/spec/ast.md`, documenta la forma JSON del nodo, su semántica con valores ausentes y nulos (Kleene), con tipos mixtos y en lógica difusa. Actualiza `ast-schema.json`, y sube la versión `rulepy_ast` si el cambio no es aditivo.
-2. **Nodo** en `src/rulepy/core/expr.py`: una dataclass inmutable con igualdad estructural y su constructor público (método en `F`/`Field` o función).
-3. **Evaluador de referencia** (`core/evaluate.py`): debe pasar por `Logic` cuando produce un valor de verdad.
-4. **Traza y explicación** (`core/trace.py`): el valor de cada hijo, el texto para `explain()` y la pista contrafactual si tiene sentido ("fallaría si x <= 5").
-5. **Serialización**: `to_dict`/`from_dict` y, si lo hay, la sintaxis en el DSL de texto (`io/text.py`) con su precedencia.
-6. **Backend polars** (`validation/polars_backend.py`): la compilación a `pl.Expr` con la misma semántica de nulos.
-7. **Auditoría** (`audit/`): la abstracción por intervalos o conjuntos y su traducción a z3. Si no es abstraíble, se trata como desconocido, que es lo correcto.
-8. **Rust** (`crates/rulepy-core`), solo si ya existe la fase 7: la variante serde, la instrucción de bytecode y el soporte en Rete.
-9. **Tests**:
-   - unitarios por backend;
-   - ida y vuelta de serialización;
-   - paridad Python ↔ polars (↔ Rust), mediante el subagente `parity-tester`;
-   - snapshot de `explain()`;
-   - casos con nulos.
-10. **Documentación**: la tabla de operadores en `docs/` y la entrada en `CHANGELOG.md`.
+1. **Especificación** (`spec/`): la forma JSON del nodo y su semántica con valores ausentes y nulos (Kleene), con tipos mixtos (int, float, decimal, texto, fechas), con desbordamiento y en lógica difusa. Actualiza el JSON Schema, y sube la versión del formato si el cambio no es aditivo.
+2. **Vectores** (`conformance/`): construcción válida e inválida, evaluación con sus motivos, modo estricto, explicación y resumen, y nulos. Usa el subagente `conformance-tester`.
+3. **Núcleo** (`crates/core`):
+   - la variante del AST con serde, sus validaciones al construir, la identidad estructural, `field_paths` y `Display`;
+   - el evaluador, que pasa por `Logic` cuando produce un valor de verdad y devuelve un `Reason` cuando no puede evaluar;
+   - la explicación (requisito, texto y contrafactual cuando tenga sentido, por ejemplo "fallaría si x <= 5") y el resumen;
+   - la evaluación Arrow por lotes, con la misma semántica de nulos;
+   - la auditoría (abstracción por intervalos o conjuntos; si no es abstraíble, se trata como desconocido, que es lo correcto);
+   - Rete, si el nodo puede aparecer en patrones;
+   - el DSL de texto (sintaxis y precedencia), si existe.
+4. **Bindings**: el constructor idiomático en cada binding existente (Python, C/C++, JS, JVM, Go), con sus tipos y documentación. Ninguno evalúa el nodo por su cuenta.
+5. **Tests**: unitarios y `proptest` en el núcleo, *snapshots* de `explain()`, ida y vuelta JSON/YAML/DSL, y el runner de conformidad de cada binding en verde.
+6. **Documentación**: la tabla de operadores en `docs/`, ejemplos por lenguaje y la entrada en `CHANGELOG.md`. Lanza el subagente `api-reviewer`.
 
 Al terminar, ejecuta las puertas de calidad de `/plan-task` (paso 5).
