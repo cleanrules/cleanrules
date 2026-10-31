@@ -133,8 +133,11 @@ Every other null (a native null, a NaN) has the reason `null`.
 ### Constants
 
 The conversions below also apply to native constants in conditions and
-payloads (`F.x == 2**70` in Python). There, a result that would be null with a
-reason, or opaque, is an `ExpressionError` instead.
+payloads (`F.x == 2**70` in Python). There, a result that would be null with
+reason `int_overflow`, `decimal_overflow` or `read_error`, or opaque, is an
+`ExpressionError` instead. A NaN constant and a datetime finer than a
+microsecond are rejected too (`ast.md`, *Construction rules*). A native null is
+the null constant.
 
 ### Fuzzy degrees
 
@@ -162,6 +165,9 @@ from which the core derives every truth value, reason and path:
   keeps its length, with holes at the indices no path reads;
 - at the end of a path, a scalar value, a reference to a native list or map
   (with its kind), an opaque value, or a null with a reason;
+- a **record**, a map whose entries also have positions (Python namedtuples
+  and pandas rows), so that a string segment reads a key and an integer
+  segment a position of the same node;
 - for `read_error`, the native exception is kept, so that strict mode can raise
   `EvaluationError` chained to it, in the core's evaluation order.
 
@@ -197,7 +203,26 @@ segment reads through it. Anything not listed is opaque.
 
 #### Python
 
-The Python binding reads exactly as the v1 did.
+The Python binding reads exactly as the v1 did. A string segment reads:
+
+- on a `Mapping`, the value under that key if `key in obj` (checked first, so
+  `__missing__` is never triggered, and subclasses are read through their own
+  `__getitem__`);
+- on an object whose type has `keys()`, such as a pandas row, the value under
+  that key if `key in obj.keys()` (a record);
+- on a namedtuple-like record (a sequence with `_fields`, such as SQLAlchemy
+  rows or `itertuples()`), the attribute, with the restrictions of the next
+  bullet (`row._fields` and `row.count` are missing);
+- on any other object, the attribute if it is public data: never a name
+  starting with `_`, a method, a class or a module, never an attribute of a
+  plain sequence, and never one of a scalar (`bool`, numbers, `str`, `bytes`,
+  `bytearray`, `complex`, `Decimal`, dates, times, `timedelta`), a class or a
+  module. So `F.d.days` on a `timedelta` is missing.
+
+Pydantic models are read by field name, not alias, and their extra and computed
+fields are readable. An integer segment indexes anything with `__len__` and
+`__getitem__` that is not a string, bytes, a mapping, a scalar, a class or a
+module, records included.
 
 | Native | Value |
 |---|---|

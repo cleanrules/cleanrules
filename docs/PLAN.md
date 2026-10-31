@@ -155,7 +155,7 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - Cada causa guarda su condición y un puntero `at` al nodo de la decisión del que sale.
       - La aritmética del hueco es propia y exacta: enteros comprobados en 64 bits, decimales exactos e instantes UTC.
       - Quedan reservados los campos de las explicaciones graduadas.
-- [ ] A.2 `spec/data-model.md`: `Value` y cómo convierte cada binding sus tipos nativos; precisión y rango de `Decimal`; reescribir `ast.md` en términos neutros. Se divide en:
+- [x] A.2 `spec/data-model.md`: `Value` y cómo convierte cada binding sus tipos nativos; precisión y rango de `Decimal`; reescribir `ast.md` en términos neutros. Se divide en:
   - [x] A.2a `spec/data-model.md`.
     - Hecho el 2026-10-31. Decisiones tomadas:
       - Decimales de 38 dígitos con un tipo propio en el núcleo: coeficiente i128 y escala de 0 a 38, como Arrow `Decimal128`, con infinitos. Lo eligió el autor frente a `rust_decimal`, que llega a 28 dígitos, y a la precisión arbitraria.
@@ -170,7 +170,17 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - El binding de Python lee exactamente como la v1; lo que no se puede conservar está en *Differences from the Python v1*.
       - Las zonas horarias se resuelven con la base de datos del núcleo, con un desfase fijo como alternativa.
       - Los opacos se escriben como `{"$opaque": "<tipo>"}`, y solo en decisiones y explicaciones.
-  - [ ] A.2b Reescribir `ast.md` en términos neutros: quedan clases Python, la columna de tareas de la v1 y notas de polars. La sección "Reading data" de `ast.md` (mapas, registros, atributos **públicos**, nunca privados ni de módulos o clases) pasa a ser una obligación de cada binding.
+  - [x] A.2b Reescribir `ast.md` en términos neutros: quedan clases Python, la columna de tareas de la v1 y notas de polars.
+    - Hecho el 2026-10-31:
+      - Sin nombres de clase ni tareas de la v1.
+      - La lectura de datos se expresa sobre valores, y los detalles de Python pasan a `data-model.md`.
+      - Se añade el grupo `other` a los tipos.
+      - Las notas de polars pasan a ser notas informativas para el modo Arrow.
+      - Las diferencias con la v1 quedan en una sección propia.
+      - Revisado por `api-reviewer`, sin hallazgos graves y sin reglas perdidas. Se corrigieron tres incoherencias:
+        - `type_mismatch` cubre también el grupo `other`.
+        - Las constantes nulas se admiten bajo `is_null`, y las fechas con hora más finas que el microsegundo se rechazan.
+        - Los namedtuples y las filas de pandas son **registros**: mapas con posiciones, indexables por entero como en la v1. La sección "Reading data" de `ast.md` (mapas, registros, atributos **públicos**, nunca privados ni de módulos o clases) pasa a ser una obligación de cada binding.
 - [ ] A.3 Exportador temporal en Python (`conformance/tools/`) que, con la implementación de la v1, genera **vectores de conformidad**: árboles y errores de construcción, evaluaciones con motivos, modo estricto, decisiones de las 6 políticas, agregados, explicaciones y resúmenes. Las propiedades de hypothesis se convierten en miles de casos fijados.
   - Vectores de lectura que hacen falta aunque la v1 no los pueda generar:
     - números: `-0`, `9223372036854775808`, `-9223372036854775809`, `18446744073709551616`, `{"$int": 1.0}`, `{"$int": 1e2}` y flotantes difíciles de redondear;

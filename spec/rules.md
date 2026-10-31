@@ -1,6 +1,6 @@
 # Rules, rule sets and decisions
 
-**Status:** draft, normative for every engine (Python reference, Rust). The
+**Status:** draft, normative for every engine mode and every language. The
 serialized form is defined in `json-format.md` (*Rules*, *Rule sets*).
 
 ## Rules
@@ -13,11 +13,11 @@ A rule has:
   such as number or string constants and arithmetic, are rejected when the rule
   is built;
 - a **payload** (`then`, optional): string keys mapped to value nodes, in the
-  order they were defined. Python constants are normalized to `Const` when the
-  rule is built, so a payload is defined with scalars and value expressions. A
-  field in a payload passes through whatever the data holds, which may be a
-  non-scalar value such as a list (type group `other`);
-- an **action** (`do`, optional): a callable. Actions are not part of the
+  order they were defined. Native constants become `const` nodes when the rule
+  is built, so a payload is defined with scalars and value expressions. A field
+  in a payload passes through whatever the data holds, which may be a list, a
+  map or an opaque value (type group `other`; `data-model.md`);
+- an **action** (`do`, optional): code of the host language. Actions are not part of the
   decision (see *Actions*);
 - a **priority** (a signed 64-bit integer, default 0; not a boolean), **tags**
   (strings), a **description** (a string) and **metadata** (string keys mapped
@@ -59,9 +59,9 @@ every key, either both values are null, or they have the same type group and are
 equal:
 
 - values compare as in `ast.md` (*Types*), so `1` equals `1.0`, but `1` does not
-  equal `True` and `"1"` does not equal `1`;
-- `int`, `float` and `Decimal` compare exactly, so `Decimal("0.1")` does not
-  equal `0.1`;
+  equal `true` and `"1"` does not equal `1`;
+- ints, floats and decimals compare exactly, so the decimal `0.1` does not
+  equal the float `0.1`;
 - aware datetimes compare by instant, whatever their time zone;
 - unlike in conditions, null equals null here, whatever the reason;
 - values of the `other` group (lists, maps and opaque values) compare as
@@ -87,8 +87,8 @@ the selected payloads. Within a key:
   `min` and `max` of no values are null;
 - `sum`, `min` and `max` need numbers (not booleans) and raise `HitPolicyError`
   otherwise;
-- `Decimal` values are converted to float64 before `sum`, `min` and `max`, as
-  arithmetic does with `Decimal` operands;
+- decimal values are converted to float64 before `sum`, `min` and `max`, as
+  arithmetic does with decimal operands;
 - the result follows the arithmetic rules: an integer `sum` outside the signed
   64-bit range is null, and a NaN `sum` (such as `inf + -inf`) is null;
 - keys appear in the order they are first met, in rule order;
@@ -102,7 +102,7 @@ These deviations are deliberate:
 - **`count` counts non-null values.** DMN engines differ on whether `C#` counts
   matches or distinct outputs.
 - **`PRIORITY` uses each rule's `priority`**, not DMN's ordered list of output
-  values. Decision tables (task 3.5) compile output-value priorities into rule
+  values. Decision tables (task D.3) compile output-value priorities into rule
   priorities.
 - **`COLLECT` without an aggregate keeps rule order**, because results must be
   deterministic; DMN leaves the order unspecified. It is then equivalent to
@@ -118,9 +118,9 @@ order. A hit-policy error comes last, after all conditions and the needed
 payloads have been evaluated. One exception: `UNIQUE` raises as soon as more
 than one rule has fired, before any payload is evaluated.
 
-When a batch is evaluated (`evaluate_many`), an `EvaluationError` carries the
-position of the input (`row`). Passing something whose iteration does not yield
-inputs (a string, a mapping, a DataFrame) is an error raised immediately.
+When a batch is evaluated, an `EvaluationError` carries the position of the
+input (`row`). Passing something that is not a collection of inputs (a string,
+a mapping, a data frame instead of its rows) is an error raised immediately.
 
 ## Actions
 
