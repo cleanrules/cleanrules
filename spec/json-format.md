@@ -677,6 +677,9 @@ Every array is written even when it is empty.
 
 ## Writing errors
 
+*Not checked by vectors: they need objects (actions, native metadata) that a
+vector cannot hold, so each binding's tests check them.*
+
 A writer fails with `unsupported` when it is given something this version of
 the format cannot hold. It reports the first problem found in rule order, and
 within a rule in the order of the table, with a JSON Pointer to where the value
@@ -709,6 +712,8 @@ The format is stricter than the v1 API in a few deliberate ways:
   wrote `naive datetime`.
 
 ## YAML
+
+*Not checked by vectors yet: YAML loading arrives in task D.1.*
 
 Rule files in YAML (task D.1) are read into exactly this model, with the YAML
 1.2 core schema restricted to JSON: no implicit timestamps (an unquoted

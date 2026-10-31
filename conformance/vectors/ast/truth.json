@@ -5,7 +5,9 @@
     {
       "id": "ast/truth/and-true-true",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "true and true",
       "given": {
@@ -76,7 +78,9 @@
     {
       "id": "ast/truth/or-true-true",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "true or true",
       "given": {
@@ -147,7 +151,9 @@
     {
       "id": "ast/truth/and-true-false",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "true and false",
       "given": {
@@ -218,7 +224,9 @@
     {
       "id": "ast/truth/or-true-false",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "true or false",
       "given": {
@@ -289,7 +297,9 @@
     {
       "id": "ast/truth/and-true-unknown",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "true and unknown",
       "given": {
@@ -384,7 +394,9 @@
     {
       "id": "ast/truth/or-true-unknown",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "true or unknown",
       "given": {
@@ -471,7 +483,9 @@
     {
       "id": "ast/truth/not-true",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "not true",
       "given": {
@@ -517,7 +531,9 @@
     {
       "id": "ast/truth/and-false-true",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "false and true",
       "given": {
@@ -588,7 +604,9 @@
     {
       "id": "ast/truth/or-false-true",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "false or true",
       "given": {
@@ -659,7 +677,9 @@
     {
       "id": "ast/truth/and-false-false",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "false and false",
       "given": {
@@ -730,7 +750,9 @@
     {
       "id": "ast/truth/or-false-false",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "false or false",
       "given": {
@@ -801,7 +823,9 @@
     {
       "id": "ast/truth/and-false-unknown",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "false and unknown",
       "given": {
@@ -888,7 +912,9 @@
     {
       "id": "ast/truth/or-false-unknown",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "false or unknown",
       "given": {
@@ -983,7 +1009,9 @@
     {
       "id": "ast/truth/not-false",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "not false",
       "given": {
@@ -1029,7 +1057,9 @@
     {
       "id": "ast/truth/and-unknown-true",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "unknown and true",
       "given": {
@@ -1124,7 +1154,9 @@
     {
       "id": "ast/truth/or-unknown-true",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "unknown or true",
       "given": {
@@ -1211,7 +1243,9 @@
     {
       "id": "ast/truth/and-unknown-false",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "unknown and false",
       "given": {
@@ -1298,7 +1332,9 @@
     {
       "id": "ast/truth/or-unknown-false",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "unknown or false",
       "given": {
@@ -1393,7 +1429,9 @@
     {
       "id": "ast/truth/and-unknown-unknown",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "unknown and unknown",
       "given": {
@@ -1504,7 +1542,9 @@
     {
       "id": "ast/truth/or-unknown-unknown",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "unknown or unknown",
       "given": {
@@ -1615,7 +1655,9 @@
     {
       "id": "ast/truth/not-unknown",
       "spec": [
-        "ast.md#truth-values"
+        "ast.md#truth-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "not unknown",
       "given": {

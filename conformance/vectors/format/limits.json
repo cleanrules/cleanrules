@@ -2460,7 +2460,8 @@
     {
       "id": "format/limits/depth-first-too-deep",
       "spec": [
-        "json-format.md#errors-and-limits"
+        "json-format.md#errors-and-limits",
+        "errors.md#which-error-comes-first"
       ],
       "description": "the node too deep is the first at depth limit + 1 in pre-order",
       "given": {

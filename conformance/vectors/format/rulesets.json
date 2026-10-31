@@ -237,7 +237,8 @@
       "id": "format/rulesets/duplicates-before-aggregate",
       "spec": [
         "json-format.md#rule-sets",
-        "json-format.md#errors-and-limits"
+        "json-format.md#errors-and-limits",
+        "errors.md#which-error-comes-first"
       ],
       "description": "duplicate names are checked before the aggregate",
       "given": {
@@ -388,7 +389,8 @@
     {
       "id": "format/rulesets/rule-errors-first",
       "spec": [
-        "json-format.md#errors-and-limits"
+        "json-format.md#errors-and-limits",
+        "errors.md#which-error-comes-first"
       ],
       "description": "a rule's errors come before the rule set's",
       "given": {
@@ -428,7 +430,8 @@
     {
       "id": "format/rulesets/aggregate-before-logic",
       "spec": [
-        "json-format.md#rule-sets"
+        "json-format.md#rule-sets",
+        "errors.md#which-error-comes-first"
       ],
       "description": "the aggregate is checked before the logic",
       "given": {

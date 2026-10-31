@@ -5,7 +5,9 @@
     {
       "id": "ast/reading/nested-path",
       "spec": [
-        "ast.md#reading-data"
+        "ast.md#reading-data",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "a nested path reads through maps",
       "given": {
@@ -58,7 +60,9 @@
     {
       "id": "ast/reading/list-index",
       "spec": [
-        "ast.md#reading-data"
+        "ast.md#reading-data",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "an integer segment indexes a list",
       "given": {
@@ -114,7 +118,9 @@
     {
       "id": "ast/reading/index-out-of-range",
       "spec": [
-        "ast.md#reading-data"
+        "ast.md#reading-data",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "an index out of range is missing",
       "given": {
@@ -185,7 +191,9 @@
     {
       "id": "ast/reading/integer-on-map",
       "spec": [
-        "ast.md#reading-data"
+        "ast.md#reading-data",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "an integer segment never looks up a map key",
       "given": {
@@ -252,7 +260,9 @@
     {
       "id": "ast/reading/string-on-list",
       "spec": [
-        "ast.md#reading-data"
+        "ast.md#reading-data",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "a string segment on a list is missing",
       "given": {
@@ -320,7 +330,9 @@
     {
       "id": "ast/reading/underscore-key",
       "spec": [
-        "ast.md#reading-data"
+        "ast.md#reading-data",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "keys starting with an underscore are ordinary keys",
       "given": {
@@ -365,7 +377,9 @@
     {
       "id": "ast/reading/attribute-of-scalar",
       "spec": [
-        "ast.md#reading-data"
+        "ast.md#reading-data",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "a segment on a scalar is missing",
       "given": {
@@ -415,6 +429,134 @@
                   [
                     "name",
                     "length"
+                  ]
+                ]
+              }
+            },
+            {
+              "op": "const",
+              "value": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/reading/int-overflow-in-data",
+      "spec": [
+        "data-model.md#nulls-with-a-reason",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
+      ],
+      "description": "an integer outside 64 bits in the data is null with reason int_overflow",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "gt",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 1
+          }
+        },
+        "input": {
+          "x": 1180591620717411303424
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "gt",
+          "truth": null,
+          "reason": {
+            "code": "int_overflow",
+            "paths": [
+              [
+                "x"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": null,
+              "reason": {
+                "code": "int_overflow",
+                "paths": [
+                  [
+                    "x"
+                  ]
+                ]
+              }
+            },
+            {
+              "op": "const",
+              "value": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/reading/decimal-overflow-in-data",
+      "spec": [
+        "data-model.md#nulls-with-a-reason",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
+      ],
+      "description": "a decimal that does not fit in the data is null with reason decimal_overflow",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "gt",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 1
+          }
+        },
+        "input": {
+          "x": {
+            "$decimal": "100000000000000000000000000000000000000"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "gt",
+          "truth": null,
+          "reason": {
+            "code": "decimal_overflow",
+            "paths": [
+              [
+                "x"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": null,
+              "reason": {
+                "code": "decimal_overflow",
+                "paths": [
+                  [
+                    "x"
                   ]
                 ]
               }

@@ -75,7 +75,8 @@
     {
       "id": "format/conditions/and-one-operand-as-written",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "and needs two operands as written, before flattening",
       "given": {
@@ -237,7 +238,8 @@
     {
       "id": "format/conditions/in-number-types",
       "spec": [
-        "json-format.md#writing"
+        "json-format.md#writing",
+        "ast.md#structural-identity"
       ],
       "description": "equal numbers of different types are kept, decimal before float before int",
       "given": {
@@ -270,7 +272,9 @@
     {
       "id": "format/conditions/in-same-node-first-kept",
       "spec": [
-        "json-format.md#writing"
+        "json-format.md#writing",
+        "errors.md#which-error-comes-first",
+        "ast.md#structural-identity"
       ],
       "description": "of two values that are the same node, the first is kept",
       "given": {
@@ -351,7 +355,8 @@
     {
       "id": "format/conditions/in-mixed-groups",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "in values from two groups",
       "given": {
@@ -383,7 +388,8 @@
     {
       "id": "format/conditions/in-null",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "a null in values",
       "given": {
@@ -467,7 +473,8 @@
     {
       "id": "format/conditions/between-bound-groups",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "constant bounds from two groups",
       "given": {
@@ -504,7 +511,8 @@
     {
       "id": "format/conditions/condition-as-operand",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#node-kinds"
       ],
       "description": "a condition as an operand of eq",
       "given": {
@@ -543,7 +551,8 @@
     {
       "id": "format/conditions/value-as-condition",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#node-kinds"
       ],
       "description": "a value as the document's condition",
       "given": {
@@ -566,7 +575,8 @@
     {
       "id": "format/conditions/null-in-compare",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "a null constant in a comparison",
       "given": {
@@ -598,7 +608,8 @@
     {
       "id": "format/conditions/null-under-not",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "a null constant under not",
       "given": {
@@ -624,7 +635,8 @@
     {
       "id": "format/conditions/null-under-is-null",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "a null constant under is_null",
       "given": {
@@ -656,7 +668,8 @@
     {
       "id": "format/conditions/arithmetic-string",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "arithmetic with a string constant",
       "given": {
@@ -693,7 +706,8 @@
     {
       "id": "format/conditions/regex-invalid",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "a pattern that does not parse",
       "given": {
@@ -722,7 +736,8 @@
     {
       "id": "format/conditions/regex-lookahead",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "lookaround is not in the syntax",
       "given": {
@@ -751,7 +766,8 @@
     {
       "id": "format/conditions/regex-backreference",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "backreferences are not in the syntax",
       "given": {
@@ -780,7 +796,8 @@
     {
       "id": "format/conditions/path-negative-index",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "a negative index",
       "given": {
@@ -813,7 +830,8 @@
     {
       "id": "format/conditions/path-empty",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "an empty path",
       "given": {
@@ -843,7 +861,8 @@
     {
       "id": "format/conditions/path-empty-segment",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "an empty string segment",
       "given": {
@@ -886,7 +905,8 @@
     {
       "id": "format/conditions/unknown-op",
       "spec": [
-        "json-format.md#conditions"
+        "json-format.md#conditions",
+        "ast.md#catalogue"
       ],
       "description": "an unknown op",
       "given": {
@@ -976,7 +996,8 @@
     {
       "id": "format/conditions/shape-before-construction",
       "spec": [
-        "json-format.md#errors-and-limits"
+        "json-format.md#errors-and-limits",
+        "errors.md#which-error-comes-first"
       ],
       "description": "shape errors come before construction errors",
       "given": {
@@ -1014,7 +1035,8 @@
     {
       "id": "format/conditions/keys-in-table-order",
       "spec": [
-        "json-format.md#errors-and-limits"
+        "json-format.md#errors-and-limits",
+        "errors.md#which-error-comes-first"
       ],
       "description": "shape errors follow the table's key order, not the text's",
       "given": {
@@ -1031,7 +1053,8 @@
     {
       "id": "format/conditions/post-order",
       "spec": [
-        "json-format.md#errors-and-limits"
+        "json-format.md#errors-and-limits",
+        "errors.md#which-error-comes-first"
       ],
       "description": "construction errors in post-order",
       "given": {
@@ -1079,7 +1102,9 @@
     {
       "id": "format/conditions/canonical-key-order",
       "spec": [
-        "json-format.md#writing"
+        "json-format.md#writing",
+        "errors.md#which-error-comes-first",
+        "ast.md#catalogue"
       ],
       "description": "keys are written in table order",
       "given": {
@@ -1108,7 +1133,8 @@
     {
       "id": "format/conditions/in-aware-by-instant",
       "spec": [
-        "json-format.md#writing"
+        "json-format.md#writing",
+        "ast.md#structural-identity"
       ],
       "description": "aware datetimes sort by instant; of equal instants the first is kept",
       "given": {
@@ -1260,7 +1286,8 @@
     {
       "id": "format/conditions/in-naive-and-aware",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "naive and aware datetimes are two groups",
       "given": {
@@ -1296,7 +1323,8 @@
     {
       "id": "format/conditions/value-under-and",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#node-kinds"
       ],
       "description": "a value as an operand of and",
       "given": {
@@ -1339,7 +1367,8 @@
     {
       "id": "format/conditions/between-boolean-bounds",
       "spec": [
-        "json-format.md#reading"
+        "json-format.md#reading",
+        "ast.md#construction-rules"
       ],
       "description": "booleans are not orderable bounds",
       "given": {
@@ -1456,7 +1485,8 @@
     {
       "id": "format/conditions/known-keys-before-unknown",
       "spec": [
-        "json-format.md#errors-and-limits"
+        "json-format.md#errors-and-limits",
+        "errors.md#which-error-comes-first"
       ],
       "description": "an object's known keys are checked before its unknown keys",
       "given": {
@@ -1473,7 +1503,8 @@
     {
       "id": "format/conditions/missing-before-bad-sibling",
       "spec": [
-        "json-format.md#errors-and-limits"
+        "json-format.md#errors-and-limits",
+        "errors.md#which-error-comes-first"
       ],
       "description": "a missing key is reported at its place in the table",
       "given": {

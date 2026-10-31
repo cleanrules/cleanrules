@@ -98,10 +98,13 @@ output, never stopping at the first one.
 
 ## Coverage
 
-Every heading of a normative spec document is cited by at least one vector,
-except informative sections: those marked *Informative*, and every
-*Differences from the Python v1* section. A script in `tools/` checks this,
-and CI runs it.
+Every section of a normative spec document is cited by at least one vector,
+directly or through one of its subsections. Exempt are the *Differences from
+the Python v1* sections and those whose first line is marked *Informative* or
+*Not checked by vectors* with the reason (binding tests, the core's snapshot
+tests, a later phase); the exemption covers their subsections. `check.py`
+checks this, and CI runs it together with the export, which must leave the
+vectors unchanged.
 
 ## Tools
 

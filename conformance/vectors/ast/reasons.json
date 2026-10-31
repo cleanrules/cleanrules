@@ -5,7 +5,9 @@
     {
       "id": "ast/reasons/repeated-field",
       "spec": [
-        "ast.md#results-and-reasons"
+        "ast.md#results-and-reasons",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "a reason keeps duplicate paths",
       "given": {
@@ -70,7 +72,9 @@
     {
       "id": "ast/reasons/first-unknown",
       "spec": [
-        "ast.md#results-and-reasons"
+        "ast.md#results-and-reasons",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "an unknown and takes the reason of its first unknown operand",
       "given": {

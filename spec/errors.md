@@ -10,6 +10,8 @@ marked as compared below, never the message or the hint.
 
 ## Hierarchy
 
+*Not checked by vectors: each binding's tests check its error types.*
+
 ```text
 CleanRulesError
 ├── FormatError                 format_error, unsupported_version, limit_exceeded, decision_mismatch
@@ -31,6 +33,8 @@ another one (a `read_error` in strict mode, an action that raised) keeps it as
 its cause.
 
 ## In each language
+
+*Not checked by vectors: each binding's tests check its error types.*
 
 | Language | Form |
 |---|---|

@@ -84,6 +84,70 @@ def run(case: Case) -> tuple[dict[str, Any], dict[str, Any]]:
     return given, expect
 
 
+# Spec sections each group of vectors also checks (task A.3d), by id pattern.
+EXTRA_SPEC: list[tuple[str, tuple[str, ...]]] = [
+    (
+        r"^(ast/|generated/(conditions|strict|values)/)",
+        ("ast.md#evaluating-one-node", "json-format.md#result-trees"),
+    ),
+    (r"^generated/conditions/", ("ast.md#catalogue",)),
+    (
+        r"^(generated/strict/|ast/.*/strict|rules/(strict|batch|policies/(unique|any)-|aggregates/sum-not))",
+        ("errors.md#comparing-errors",),
+    ),
+    (
+        r"^(rules/strict/conditions-first|rules/batch/row|format/.*(order|before|first))",
+        ("errors.md#which-error-comes-first",),
+    ),
+    (r"^rules/payloads/", ("rules.md#rules", "data-model.md#lists-and-maps")),
+    (r"^(rules/aggregates/|rules/policies/(collect|priority))", ("rules.md#deviations-from-dmn",)),
+    (r"^rules/policies/any-agree", ("data-model.md#equality",)),
+    (
+        r"^format/conditions/(and-one|in-mixed|in-null|in-naive|between-bound|between-boolean|null-|arithmetic|regex|path-(negative|empty))",
+        ("ast.md#construction-rules",),
+    ),
+    (
+        r"^format/(conditions/(condition-as|value-as|value-under)|rules/value-as-when)",
+        ("ast.md#node-kinds",),
+    ),
+    (r"^format/conditions/(unknown-op|canonical-key-order)", ("ast.md#catalogue",)),
+    (r"^format/conditions/in-(same-node|number-types|aware)", ("ast.md#structural-identity",)),
+    (r"^format/values/decimal-", ("data-model.md#decimals",)),
+    (r"^format/values/float-", ("data-model.md#floats",)),
+    (r"^format/values/datetime-", ("data-model.md#datetimes",)),
+    (
+        r"^format/values/(int-overflow|int-underflow|decimal-39|decimal-1e38|float-nan)",
+        ("data-model.md#constants",),
+    ),
+]
+
+
+def with_extra_spec(vector: dict[str, Any]) -> dict[str, Any]:
+    """Add the sections of EXTRA_SPEC that match the vector's id, keeping order."""
+    refs = list(vector["spec"])
+    for pattern, extra in EXTRA_SPEC:
+        if re.search(pattern, vector["id"]):
+            refs.extend(ref for ref in extra if ref not in refs)
+    return {**vector, "spec": refs}
+
+
+def decimal_overflow_vector(int_vector: dict[str, Any]) -> dict[str, Any]:
+    """The decimal twin of the int overflow vector, written from the spec.
+
+    The v1 has unbounded decimals, so it cannot produce it (`data-model.md`,
+    *Differences from the Python v1*); the result is the int vector's with the code
+    `decimal_overflow`.
+    """
+    text = json.dumps(int_vector).replace('"int_overflow"', '"decimal_overflow"')
+    vector = json.loads(text)
+    vector["id"] = "ast/reading/decimal-overflow-in-data"
+    vector["description"] = (
+        "a decimal that does not fit in the data is null with reason decimal_overflow"
+    )
+    vector["given"]["input"] = {"x": {"$decimal": "1" + "0" * 38}}
+    return vector
+
+
 def main() -> int:
     """Write every vector file and report what was written."""
     known = anchors()
@@ -125,6 +189,11 @@ def main() -> int:
         )
         area, topic, *_ = vector["id"].split("/")
         files[(area, topic)].append(vector)
+    for (area, topic), vectors in files.items():
+        for vector in list(vectors):
+            if vector["id"] == "ast/reading/int-overflow-in-data":
+                vectors.append(decimal_overflow_vector(vector))
+        files[(area, topic)] = [with_extra_spec(v) for v in vectors]
     if problems:
         print("\n".join(problems), file=sys.stderr)
         return 1

@@ -5,7 +5,8 @@
     {
       "id": "rules/aggregates/sum",
       "spec": [
-        "rules.md#collect-aggregates"
+        "rules.md#collect-aggregates",
+        "rules.md#deviations-from-dmn"
       ],
       "description": "collect with sum",
       "given": {
@@ -202,7 +203,8 @@
     {
       "id": "rules/aggregates/min",
       "spec": [
-        "rules.md#collect-aggregates"
+        "rules.md#collect-aggregates",
+        "rules.md#deviations-from-dmn"
       ],
       "description": "collect with min",
       "given": {
@@ -399,7 +401,8 @@
     {
       "id": "rules/aggregates/max",
       "spec": [
-        "rules.md#collect-aggregates"
+        "rules.md#collect-aggregates",
+        "rules.md#deviations-from-dmn"
       ],
       "description": "collect with max",
       "given": {
@@ -596,7 +599,8 @@
     {
       "id": "rules/aggregates/count",
       "spec": [
-        "rules.md#collect-aggregates"
+        "rules.md#collect-aggregates",
+        "rules.md#deviations-from-dmn"
       ],
       "description": "collect with count",
       "given": {
@@ -793,7 +797,8 @@
     {
       "id": "rules/aggregates/nothing-selected",
       "spec": [
-        "rules.md#collect-aggregates"
+        "rules.md#collect-aggregates",
+        "rules.md#deviations-from-dmn"
       ],
       "description": "an aggregate with nothing selected is null",
       "given": {
@@ -867,7 +872,8 @@
     {
       "id": "rules/aggregates/sum-overflow",
       "spec": [
-        "rules.md#collect-aggregates"
+        "rules.md#collect-aggregates",
+        "rules.md#deviations-from-dmn"
       ],
       "description": "an int sum outside 64 bits is null",
       "given": {
@@ -975,7 +981,9 @@
     {
       "id": "rules/aggregates/sum-not-number",
       "spec": [
-        "rules.md#collect-aggregates"
+        "rules.md#collect-aggregates",
+        "errors.md#comparing-errors",
+        "rules.md#deviations-from-dmn"
       ],
       "description": "sum of a string raises",
       "given": {
@@ -1014,7 +1022,8 @@
     {
       "id": "rules/aggregates/decimal-to-float",
       "spec": [
-        "rules.md#collect-aggregates"
+        "rules.md#collect-aggregates",
+        "rules.md#deviations-from-dmn"
       ],
       "description": "decimals are converted to float before sum",
       "given": {

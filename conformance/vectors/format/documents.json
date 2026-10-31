@@ -104,7 +104,8 @@
       "id": "format/documents/newer-version-first",
       "spec": [
         "json-format.md#documents",
-        "json-format.md#errors-and-limits"
+        "json-format.md#errors-and-limits",
+        "errors.md#which-error-comes-first"
       ],
       "description": "the version is checked before unknown keys",
       "given": {
@@ -248,7 +249,8 @@
       "id": "format/documents/byte-order-mark",
       "spec": [
         "json-format.md#documents",
-        "json-format.md#errors-and-limits"
+        "json-format.md#errors-and-limits",
+        "errors.md#which-error-comes-first"
       ],
       "description": "a byte order mark is rejected",
       "given": {

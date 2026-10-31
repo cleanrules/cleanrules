@@ -6,7 +6,8 @@
       "id": "rules/strict/unselected-payload",
       "spec": [
         "rules.md#strict-mode-and-errors",
-        "rules.md#when-payloads-are-evaluated"
+        "rules.md#when-payloads-are-evaluated",
+        "errors.md#comparing-errors"
       ],
       "description": "strict mode does not evaluate the payload of a rule that is not selected",
       "given": {
@@ -98,7 +99,8 @@
       "id": "rules/strict/selected-payload",
       "spec": [
         "rules.md#strict-mode-and-errors",
-        "rules.md#when-payloads-are-evaluated"
+        "rules.md#when-payloads-are-evaluated",
+        "errors.md#comparing-errors"
       ],
       "description": "strict mode raises on the payload of a selected rule",
       "given": {
@@ -140,7 +142,9 @@
     {
       "id": "rules/strict/conditions-first",
       "spec": [
-        "rules.md#strict-mode-and-errors"
+        "rules.md#strict-mode-and-errors",
+        "errors.md#comparing-errors",
+        "errors.md#which-error-comes-first"
       ],
       "description": "strict mode raises the first condition error in rule order",
       "given": {

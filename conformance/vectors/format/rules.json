@@ -172,7 +172,8 @@
     {
       "id": "format/rules/key-order",
       "spec": [
-        "json-format.md#rules"
+        "json-format.md#rules",
+        "errors.md#which-error-comes-first"
       ],
       "description": "rule keys are written in table order",
       "given": {
@@ -228,7 +229,8 @@
     {
       "id": "format/rules/payload-order",
       "spec": [
-        "json-format.md#rules"
+        "json-format.md#rules",
+        "errors.md#which-error-comes-first"
       ],
       "description": "payload members keep their order",
       "given": {
@@ -473,7 +475,8 @@
     {
       "id": "format/rules/value-as-when",
       "spec": [
-        "json-format.md#rules"
+        "json-format.md#rules",
+        "ast.md#node-kinds"
       ],
       "description": "a value as a rule's condition",
       "given": {
@@ -658,7 +661,8 @@
     {
       "id": "format/rules/construction-before-rule-rules",
       "spec": [
-        "json-format.md#errors-and-limits"
+        "json-format.md#errors-and-limits",
+        "errors.md#which-error-comes-first"
       ],
       "description": "a node's construction error comes before the rule's own rules",
       "given": {
@@ -684,7 +688,8 @@
     {
       "id": "format/rules/name-before-when",
       "spec": [
-        "json-format.md#errors-and-limits"
+        "json-format.md#errors-and-limits",
+        "errors.md#which-error-comes-first"
       ],
       "description": "the rule's own rules in order: the name first",
       "given": {
@@ -719,7 +724,8 @@
     {
       "id": "format/rules/tags-code-point-order",
       "spec": [
-        "json-format.md#rules"
+        "json-format.md#rules",
+        "errors.md#which-error-comes-first"
       ],
       "description": "tags sort by code point",
       "given": {

@@ -5,7 +5,9 @@
     {
       "id": "rules/batch/row",
       "spec": [
-        "rules.md#strict-mode-and-errors"
+        "rules.md#strict-mode-and-errors",
+        "errors.md#comparing-errors",
+        "errors.md#which-error-comes-first"
       ],
       "description": "an error in a batch carries the row",
       "given": {
@@ -57,7 +59,8 @@
     {
       "id": "rules/batch/decisions",
       "spec": [
-        "rules.md#evaluation"
+        "rules.md#evaluation",
+        "errors.md#comparing-errors"
       ],
       "description": "a batch gives one decision per input",
       "given": {

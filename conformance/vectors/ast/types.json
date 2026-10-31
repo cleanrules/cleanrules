@@ -5,7 +5,9 @@
     {
       "id": "ast/types/int-equals-float",
       "spec": [
-        "ast.md#types"
+        "ast.md#types",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "ints and floats compare by value",
       "given": {
@@ -50,7 +52,9 @@
     {
       "id": "ast/types/decimal-vs-float",
       "spec": [
-        "ast.md#types"
+        "ast.md#types",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "the decimal 0.1 does not equal the float 0.1",
       "given": {
@@ -99,7 +103,9 @@
     {
       "id": "ast/types/decimal-equals-int",
       "spec": [
-        "ast.md#types"
+        "ast.md#types",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "a decimal equals an int of the same value",
       "given": {
@@ -148,7 +154,9 @@
     {
       "id": "ast/types/big-int-vs-float",
       "spec": [
-        "ast.md#types"
+        "ast.md#types",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "2^53 + 1 does not equal the float 2^53",
       "given": {
@@ -197,7 +205,9 @@
     {
       "id": "ast/types/string-vs-number",
       "spec": [
-        "ast.md#types"
+        "ast.md#types",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "comparing a string with a number is a type mismatch",
       "given": {
@@ -254,7 +264,9 @@
     {
       "id": "ast/types/order-booleans",
       "spec": [
-        "ast.md#types"
+        "ast.md#types",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "ordering booleans is unorderable",
       "given": {
@@ -311,7 +323,9 @@
     {
       "id": "ast/types/string-code-point-order",
       "spec": [
-        "ast.md#types"
+        "ast.md#types",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "strings order by Unicode code point",
       "given": {
@@ -356,7 +370,9 @@
     {
       "id": "ast/types/string-non-ascii-order",
       "spec": [
-        "ast.md#types"
+        "ast.md#types",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "a non-ASCII letter orders after z",
       "given": {
@@ -401,7 +417,9 @@
     {
       "id": "ast/types/date-vs-datetime",
       "spec": [
-        "ast.md#types"
+        "ast.md#types",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "a date and a datetime are different groups",
       "given": {
@@ -466,7 +484,9 @@
     {
       "id": "ast/types/aware-by-instant",
       "spec": [
-        "ast.md#types"
+        "ast.md#types",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "aware datetimes compare by instant",
       "given": {
@@ -519,7 +539,9 @@
     {
       "id": "ast/types/naive-vs-aware",
       "spec": [
-        "ast.md#types"
+        "ast.md#types",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "naive and aware datetimes are different groups",
       "given": {
@@ -584,7 +606,9 @@
     {
       "id": "ast/types/list-is-other",
       "spec": [
-        "ast.md#types"
+        "ast.md#types",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "comparing a list is a type mismatch",
       "given": {
@@ -645,7 +669,10 @@
     {
       "id": "ast/types/strict-mismatch",
       "spec": [
-        "ast.md#types"
+        "ast.md#types",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees",
+        "errors.md#comparing-errors"
       ],
       "description": "strict mode raises on a type mismatch",
       "given": {

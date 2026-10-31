@@ -91,6 +91,8 @@ def input_value(v: object) -> Json:
         return {"$map": items} if any(k.startswith("$") for k in items) else items
     if isinstance(v, list | tuple) and not hasattr(v, "_fields"):
         return [input_value(x) for x in v]  # pyright: ignore[reportUnknownVariableType]
+    if isinstance(v, int) and not isinstance(v, bool) and not -(2**63) <= v < 2**63:
+        return v  # a bare literal: data reads it as null with reason int_overflow
     if v is None or isinstance(v, bool | int | float | str | Decimal | dt.date):
         return value(v)
     raise Unencodable(f"input of type {type(v).__name__}")

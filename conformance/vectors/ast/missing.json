@@ -5,7 +5,9 @@
     {
       "id": "ast/missing/missing-field",
       "spec": [
-        "ast.md#missing-values"
+        "ast.md#missing-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "a missing field makes a comparison unknown",
       "given": {
@@ -64,7 +66,9 @@
     {
       "id": "ast/missing/explicit-null",
       "spec": [
-        "ast.md#missing-values"
+        "ast.md#missing-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "an explicit null makes a comparison unknown",
       "given": {
@@ -125,7 +129,9 @@
     {
       "id": "ast/missing/null-in-the-middle",
       "spec": [
-        "ast.md#missing-values"
+        "ast.md#missing-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "a null in the middle of a path makes the field null",
       "given": {
@@ -188,7 +194,9 @@
     {
       "id": "ast/missing/null-input",
       "spec": [
-        "ast.md#missing-values"
+        "ast.md#missing-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "a null input is null at the empty path",
       "given": {
@@ -243,7 +251,9 @@
     {
       "id": "ast/missing/is-null-missing",
       "spec": [
-        "ast.md#missing-values"
+        "ast.md#missing-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "is_null is true for a missing field",
       "given": {
@@ -286,7 +296,9 @@
     {
       "id": "ast/missing/is-null-value",
       "spec": [
-        "ast.md#missing-values"
+        "ast.md#missing-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "is_null is false for a present value",
       "given": {
@@ -323,7 +335,9 @@
     {
       "id": "ast/missing/null-before-types",
       "spec": [
-        "ast.md#missing-values"
+        "ast.md#missing-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "null is checked before types",
       "given": {
@@ -384,7 +398,10 @@
     {
       "id": "ast/missing/strict-missing",
       "spec": [
-        "ast.md#missing-values"
+        "ast.md#missing-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees",
+        "errors.md#comparing-errors"
       ],
       "description": "strict mode raises on a missing field",
       "given": {
@@ -417,7 +434,10 @@
     {
       "id": "ast/missing/strict-missing-under-is-null",
       "spec": [
-        "ast.md#missing-values"
+        "ast.md#missing-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees",
+        "errors.md#comparing-errors"
       ],
       "description": "strict mode raises on a missing field even under is_null",
       "given": {
@@ -446,7 +466,10 @@
     {
       "id": "ast/missing/strict-null-in-the-middle",
       "spec": [
-        "ast.md#missing-values"
+        "ast.md#missing-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees",
+        "errors.md#comparing-errors"
       ],
       "description": "strict mode accepts a null in the middle of a path",
       "given": {
@@ -510,7 +533,9 @@
     {
       "id": "ast/missing/field-as-condition-not-boolean",
       "spec": [
-        "ast.md#missing-values"
+        "ast.md#missing-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "a non-boolean field used as a condition is a type mismatch",
       "given": {
@@ -559,7 +584,10 @@
     {
       "id": "ast/missing/strict-missing-nested",
       "spec": [
-        "ast.md#missing-values"
+        "ast.md#missing-values",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees",
+        "errors.md#comparing-errors"
       ],
       "description": "the missing_field error carries the field's full path",
       "given": {

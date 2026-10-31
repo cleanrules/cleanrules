@@ -94,6 +94,9 @@ only that element opaque, never the whole value.
 
 ### Opaque values
 
+*Not checked by vectors: opaque values only come from native data, so each
+binding's tests check them.*
+
 A native value with no equivalent is **opaque**: bytes, a time of day without a
 date, a duration, a complex number, a set (it has no order), a string with a
 lone surrogate (possible in Python, JavaScript and Java), and anything else the
@@ -142,11 +145,16 @@ the null constant.
 
 ### Fuzzy degrees
 
+*Not checked by vectors yet: graded logics arrive in phase J.*
+
 Under a graded logic (phase J), a number in `[0, 1]` (int, float or decimal) in
 the data is a degree (`ast.md`, *Truth values*). Data never carries intervals;
 if it ever must, that will be a new kind of value.
 
 ## Reading native data
+
+*Not checked by vectors: each binding's own tests and its native conformance
+run check it.*
 
 The core reads a path through a value as `ast.md` (*Reading data*) says. Values
 built directly (in Rust, through the C ABI, or from JSON) are read that way.
@@ -316,6 +324,8 @@ crates serialize dates and decimals as strings. A Rust `f64::NAN` is null, and
 `i128` or `u128` outside 64 bits is null with `int_overflow`.
 
 ## Batches
+
+*Not checked by vectors yet: the vectorised mode arrives in phase I.*
 
 In the vectorised mode (phase I), a batch is an Arrow record batch. Its columns
 map to values as above: `Decimal128` to decimal, `Date32` to date, `Timestamp`

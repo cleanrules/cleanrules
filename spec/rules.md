@@ -128,6 +128,9 @@ a mapping, a data frame instead of its rows) is an error raised immediately.
 
 ## Actions
 
+*Not checked by vectors: actions are code of the host language, so each
+binding's tests check `run`.*
+
 `evaluate` is pure: it never runs actions. A decision can be computed any number
 of times, for explanations, validation or model predictions, without side
 effects. `run` evaluates and then calls the actions of the **selected** rules, in

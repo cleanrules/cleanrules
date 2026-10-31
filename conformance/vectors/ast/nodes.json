@@ -5,7 +5,9 @@
     {
       "id": "ast/nodes/in-true",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "in is true when the operand is one of the values",
       "given": {
@@ -46,7 +48,9 @@
     {
       "id": "ast/nodes/in-false",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "in is false otherwise",
       "given": {
@@ -87,7 +91,9 @@
     {
       "id": "ast/nodes/in-other-group",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "in with an operand of another group is a type mismatch",
       "given": {
@@ -140,7 +146,9 @@
     {
       "id": "ast/nodes/in-int-and-float",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "an int operand matches equal float values in in",
       "given": {
@@ -182,7 +190,9 @@
     {
       "id": "ast/nodes/between-both-18",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "between closed=both with x=18",
       "given": {
@@ -255,7 +265,9 @@
     {
       "id": "ast/nodes/between-left-65",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "between closed=left with x=65",
       "given": {
@@ -328,7 +340,9 @@
     {
       "id": "ast/nodes/between-right-18",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "between closed=right with x=18",
       "given": {
@@ -401,7 +415,9 @@
     {
       "id": "ast/nodes/between-none-30",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "between closed=none with x=30",
       "given": {
@@ -474,7 +490,9 @@
     {
       "id": "ast/nodes/between-field-bounds",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "between takes fields as bounds",
       "given": {
@@ -559,7 +577,9 @@
     {
       "id": "ast/nodes/matches-search",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "matches searches anywhere in the string",
       "given": {
@@ -597,7 +617,9 @@
     {
       "id": "ast/nodes/matches-case",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "matches is case-sensitive",
       "given": {
@@ -635,7 +657,9 @@
     {
       "id": "ast/nodes/matches-inline-flag",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "the (?i) flag makes matches case-insensitive",
       "given": {
@@ -673,7 +697,9 @@
     {
       "id": "ast/nodes/contains-literal",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "contains takes literal text",
       "given": {
@@ -711,7 +737,9 @@
     {
       "id": "ast/nodes/starts-with",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "starts_with",
       "given": {
@@ -749,7 +777,9 @@
     {
       "id": "ast/nodes/ends-with-mismatch",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "a string test on a number is a type mismatch",
       "given": {
@@ -799,7 +829,9 @@
     {
       "id": "ast/nodes/div-int",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "div returns a float",
       "given": {
@@ -850,7 +882,9 @@
     {
       "id": "ast/nodes/div-by-zero",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "division by zero is null",
       "given": {
@@ -912,7 +946,9 @@
     {
       "id": "ast/nodes/int-overflow",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "an int result outside 64 bits is null",
       "given": {
@@ -978,7 +1014,9 @@
     {
       "id": "ast/nodes/decimal-to-float",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "decimal operands are converted to float",
       "given": {
@@ -1027,7 +1065,9 @@
     {
       "id": "ast/nodes/inf-kept",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "inf results are kept",
       "given": {
@@ -1078,7 +1118,9 @@
     {
       "id": "ast/nodes/nan-result",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "a NaN result is null",
       "given": {
@@ -1148,7 +1190,9 @@
     {
       "id": "ast/nodes/abs-neg",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "abs and neg",
       "given": {
@@ -1194,7 +1238,9 @@
     {
       "id": "ast/nodes/arith-not-number",
       "spec": [
-        "ast.md#node-semantics"
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
       ],
       "description": "arithmetic on a string is null with a type mismatch",
       "given": {

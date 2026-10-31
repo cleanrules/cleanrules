@@ -181,7 +181,7 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
         - `type_mismatch` cubre también el grupo `other`.
         - Las constantes nulas se admiten bajo `is_null`, y las fechas con hora más finas que el microsegundo se rechazan.
         - Los namedtuples y las filas de pandas son **registros**: mapas con posiciones, indexables por entero como en la v1. La sección "Reading data" de `ast.md` (mapas, registros, atributos **públicos**, nunca privados ni de módulos o clases) pasa a ser una obligación de cada binding.
-- [ ] A.3 Exportador temporal en Python (`conformance/tools/`) que, con la implementación de la v1, genera **vectores de conformidad**: árboles y errores de construcción, evaluaciones con motivos, modo estricto, decisiones de las 6 políticas, agregados, explicaciones y resúmenes. Las propiedades de hypothesis se convierten en miles de casos fijados.
+- [x] A.3 Exportador temporal en Python (`conformance/tools/`) que, con la implementación de la v1, genera **vectores de conformidad**: árboles y errores de construcción, evaluaciones con motivos, modo estricto, decisiones de las 6 políticas, agregados, explicaciones y resúmenes. Las propiedades de hypothesis se convierten en miles de casos fijados.
   - Se divide en:
   - [x] A.3a Formato de los vectores (`conformance/README.md` y `conformance/vectors.schema.json`), catálogo de errores (`spec/errors.md`) y exportador (`conformance/tools/`), con los codificadores de la v1 al formato JSON y una primera tanda de 122 vectores elegidos a mano: tablas de Kleene, lectura, ausentes, tipos, nodos, motivos, políticas, agregados, payloads, modo estricto, lotes, explicaciones y resúmenes.
     - Hecho el 2026-10-31. El exportador es determinista: ejecutarlo dos veces deja los vectores igual. `conformance/tools/check.py` valida cada documento contra los esquemas de la especificación y comprueba que las secciones citadas existen. Las herramientas de `conformance/tools/` no pasan por pyright estricto, porque son temporales y se borran en A.4.
@@ -214,7 +214,13 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - Los ficheros generados llevan un vector por línea y ocupan 3 MB.
       - Cubren 24 tipos de nodo, las 6 políticas y los motivos `missing_field`, `null`, `type_mismatch`, `unorderable` y `division_by_zero`. `int_overflow`, `nan_result` y `decimal_overflow` los cubren vectores escritos a mano.
       - Regenerar con otra versión de hypothesis cambia los vectores generados, así que solo se regeneran durante la fase A, con la versión fijada en `uv.lock`.
-  - [ ] A.3d Script de cobertura: cada sección normativa citada por al menos un vector, y CI.
+  - [x] A.3d Script de cobertura: cada sección normativa citada por al menos un vector, y CI.
+    - Hecho el 2026-10-31.
+      - `check.py` exige que cada sección normativa esté citada por al menos un vector, ella o una subsección.
+      - Las secciones que los vectores no pueden comprobar llevan la marca *Not checked by vectors* con el motivo: datos nativos, jerarquía de excepciones, texto de `explain()`, escritura con acciones, YAML, lógica difusa y lotes Arrow. Las diferencias con la v1 también quedan exentas.
+      - Las citas que faltaban se asignan en `export.py` por patrones de id.
+      - Hay dos vectores nuevos de datos fuera de rango: `int_overflow` y `decimal_overflow`; este último está escrito desde la especificación, porque la v1 no lo detecta.
+      - El CI tiene un trabajo `conformance` que regenera los vectores, exige que no cambien y ejecuta las comprobaciones.
   - Vectores de lectura que hacen falta aunque la v1 no los pueda generar:
     - números: `-0`, `9223372036854775808`, `-9223372036854775809`, `18446744073709551616`, `{"$int": 1.0}`, `{"$int": 1e2}` y flotantes difíciles de redondear;
     - claves duplicadas en nodos, en mapas de datos y en `$map`;

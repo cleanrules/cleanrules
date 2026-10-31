@@ -48,6 +48,22 @@ jobs:
       - run: uv sync
       - run: uv run pytest --cov
 
+  conformance:
+    name: Spec schemas and conformance vectors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync
+      # The vectors are generated from the Python v1 until task A.4: they must be current.
+      - run: uv run python conformance/tools/export.py
+      - name: Vectors are up to date
+        run: test -z "$(git status --porcelain conformance/vectors)" || (git status --porcelain conformance/vectors; exit 1)
+      - run: uv run --no-project --with jsonschema python spec/schemas/check.py
+      - run: uv run --no-project --with jsonschema python conformance/tools/check.py
+
   docs:
     name: Build documentation
     runs-on: ubuntu-latest

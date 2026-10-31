@@ -175,7 +175,8 @@
       "id": "rules/policies/priority",
       "spec": [
         "rules.md#evaluation",
-        "json-format.md#decisions"
+        "json-format.md#decisions",
+        "rules.md#deviations-from-dmn"
       ],
       "description": "priority with two matching rules and a default",
       "given": {
@@ -531,7 +532,8 @@
       "id": "rules/policies/collect",
       "spec": [
         "rules.md#evaluation",
-        "json-format.md#decisions"
+        "json-format.md#decisions",
+        "rules.md#deviations-from-dmn"
       ],
       "description": "collect with two matching rules and a default",
       "given": {
@@ -717,7 +719,8 @@
     {
       "id": "rules/policies/unique-one",
       "spec": [
-        "rules.md#evaluation"
+        "rules.md#evaluation",
+        "errors.md#comparing-errors"
       ],
       "description": "unique with exactly one rule firing",
       "given": {
@@ -823,7 +826,8 @@
       "id": "rules/policies/unique-several",
       "spec": [
         "rules.md#evaluation",
-        "rules.md#strict-mode-and-errors"
+        "rules.md#strict-mode-and-errors",
+        "errors.md#comparing-errors"
       ],
       "description": "unique raises when several rules fire",
       "given": {
@@ -924,7 +928,9 @@
       "id": "rules/policies/any-agree",
       "spec": [
         "rules.md#evaluation",
-        "rules.md#when-payloads-are-evaluated"
+        "rules.md#when-payloads-are-evaluated",
+        "errors.md#comparing-errors",
+        "data-model.md#equality"
       ],
       "description": "any with agreeing outputs reports the first",
       "given": {
@@ -1053,7 +1059,8 @@
       "id": "rules/policies/any-disagree",
       "spec": [
         "rules.md#evaluation",
-        "rules.md#strict-mode-and-errors"
+        "rules.md#strict-mode-and-errors",
+        "errors.md#comparing-errors"
       ],
       "description": "any raises when outputs differ",
       "given": {
@@ -1153,7 +1160,8 @@
     {
       "id": "rules/policies/priority-tie",
       "spec": [
-        "rules.md#evaluation"
+        "rules.md#evaluation",
+        "rules.md#deviations-from-dmn"
       ],
       "description": "priority ties go to rule order",
       "given": {
@@ -1388,7 +1396,8 @@
       "id": "rules/policies/priority-later-rule-wins",
       "spec": [
         "rules.md#evaluation",
-        "json-format.md#decisions"
+        "json-format.md#decisions",
+        "rules.md#deviations-from-dmn"
       ],
       "description": "priority selects a later rule with a higher priority",
       "given": {

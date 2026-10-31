@@ -847,3 +847,11 @@ explain(
     ),
     {"t": dt.datetime(2026, 10, 25, 1, tzinfo=ZoneInfo("Europe/Madrid"))},
 )
+
+cond(
+    "ast/reading/int-overflow-in-data",
+    "data-model.md#nulls-with-a-reason",
+    "an integer outside 64 bits in the data is null with reason int_overflow",
+    F.x > 1,
+    {"x": 2**70},
+)

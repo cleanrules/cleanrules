@@ -128,7 +128,8 @@
     {
       "id": "format/values/int-overflow",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#constants"
       ],
       "description": "an int constant outside 64 bits",
       "given": {
@@ -145,7 +146,8 @@
     {
       "id": "format/values/int-underflow",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#constants"
       ],
       "description": "an int constant below -2^63",
       "given": {
@@ -320,7 +322,8 @@
       "id": "format/values/float-tagged-integer",
       "spec": [
         "json-format.md#numbers",
-        "json-format.md#values"
+        "json-format.md#values",
+        "data-model.md#floats"
       ],
       "description": "$float with an integer literal is a float",
       "given": {
@@ -349,7 +352,8 @@
     {
       "id": "format/values/float-tagged-negative-zero",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#floats"
       ],
       "description": "$float -0 is -0.0",
       "given": {
@@ -378,7 +382,8 @@
     {
       "id": "format/values/float-negative-zero",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#floats"
       ],
       "description": "-0.0 is kept",
       "given": {
@@ -407,7 +412,8 @@
     {
       "id": "format/values/float-exponent",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#floats"
       ],
       "description": "1e2 is the float 100",
       "given": {
@@ -436,7 +442,8 @@
     {
       "id": "format/values/float-overflow",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#floats"
       ],
       "description": "a finite literal too large for a float",
       "given": {
@@ -453,7 +460,8 @@
     {
       "id": "format/values/float-infinity",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#floats"
       ],
       "description": "infinities are typed values",
       "given": {
@@ -501,7 +509,8 @@
     {
       "id": "format/values/float-rounding",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#floats"
       ],
       "description": "a literal is rounded to the nearest float, ties to even",
       "given": {
@@ -530,7 +539,8 @@
     {
       "id": "format/values/decimal-leading-zeros",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals"
       ],
       "description": "the decimal 007.50 is written 7.50",
       "given": {
@@ -578,7 +588,8 @@
     {
       "id": "format/values/decimal-negative-exponent",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals"
       ],
       "description": "the decimal 1.5e-3 is written 0.0015",
       "given": {
@@ -626,7 +637,8 @@
     {
       "id": "format/values/decimal-positive-exponent",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals"
       ],
       "description": "the decimal 1e2 is written 100",
       "given": {
@@ -674,7 +686,8 @@
     {
       "id": "format/values/decimal-positive-exponent-with-fraction",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals"
       ],
       "description": "the decimal 1.5e3 is written 1500",
       "given": {
@@ -722,7 +735,8 @@
     {
       "id": "format/values/decimal-negative-zero",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals"
       ],
       "description": "the decimal -0.00 is written 0.00",
       "given": {
@@ -770,7 +784,8 @@
     {
       "id": "format/values/decimal-scale-kept",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals"
       ],
       "description": "the decimal 1.00 is written 1.00",
       "given": {
@@ -818,7 +833,8 @@
     {
       "id": "format/values/decimal-negative-infinity",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals"
       ],
       "description": "the decimal -inf is written -inf",
       "given": {
@@ -866,7 +882,8 @@
     {
       "id": "format/values/decimal-38-digits",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals"
       ],
       "description": "38 significant digits fit",
       "given": {
@@ -914,7 +931,9 @@
     {
       "id": "format/values/decimal-39-digits",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals",
+        "data-model.md#constants"
       ],
       "description": "39 significant digits do not fit",
       "given": {
@@ -948,7 +967,8 @@
     {
       "id": "format/values/decimal-1e37",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals"
       ],
       "description": "1e37 fits",
       "given": {
@@ -996,7 +1016,9 @@
     {
       "id": "format/values/decimal-1e38",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals",
+        "data-model.md#constants"
       ],
       "description": "1e38 does not fit",
       "given": {
@@ -1030,7 +1052,8 @@
     {
       "id": "format/values/decimal-scale-39",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals"
       ],
       "description": "a scale of 39 does not fit",
       "given": {
@@ -1064,7 +1087,8 @@
     {
       "id": "format/values/decimal-trailing-zeros",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals"
       ],
       "description": "trailing zeros are dropped only as far as needed: 1 fits with scale 37",
       "given": {
@@ -1112,7 +1136,8 @@
     {
       "id": "format/values/decimal-comma",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals"
       ],
       "description": "a decimal comma is malformed",
       "given": {
@@ -1146,7 +1171,8 @@
     {
       "id": "format/values/decimal-leading-point",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals"
       ],
       "description": "a decimal needs a digit before the point",
       "given": {
@@ -1344,7 +1370,8 @@
     {
       "id": "format/values/datetime-naive",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "a naive datetime",
       "given": {
@@ -1392,7 +1419,8 @@
     {
       "id": "format/values/datetime-zero-fraction",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "a zero fraction is omitted",
       "given": {
@@ -1440,7 +1468,8 @@
     {
       "id": "format/values/datetime-fraction-six-digits",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "a fraction is written with six digits",
       "given": {
@@ -1488,7 +1517,8 @@
     {
       "id": "format/values/datetime-zero-offset",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "a zero offset is written Z",
       "given": {
@@ -1536,7 +1566,8 @@
     {
       "id": "format/values/datetime-negative-zero-offset",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "-00:00 is read as Z",
       "given": {
@@ -1584,7 +1615,8 @@
     {
       "id": "format/values/datetime-fixed-offset",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "a fixed offset is kept",
       "given": {
@@ -1632,7 +1664,8 @@
     {
       "id": "format/values/datetime-offset-seconds",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "an offset with seconds",
       "given": {
@@ -1680,7 +1713,8 @@
     {
       "id": "format/values/datetime-named-zone",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "a datetime in a named zone",
       "given": {
@@ -1728,7 +1762,9 @@
     {
       "id": "format/values/datetime-repeated-hour-first",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "errors.md#which-error-comes-first",
+        "data-model.md#datetimes"
       ],
       "description": "the first 02:30 of a repeated hour",
       "given": {
@@ -1776,7 +1812,8 @@
     {
       "id": "format/values/datetime-repeated-hour-second",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "the second 02:30 of a repeated hour",
       "given": {
@@ -1824,7 +1861,8 @@
     {
       "id": "format/values/datetime-zero-offset-in-named-zone",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "a zero offset in a named zone is not Z",
       "given": {
@@ -1872,7 +1910,8 @@
     {
       "id": "format/values/datetime-invalid-offset-beyond-18-hours",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "an offset beyond 18 hours",
       "given": {
@@ -1906,7 +1945,8 @@
     {
       "id": "format/values/datetime-invalid-offset-18-hours-and-a-second",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "an offset of 18 hours and a second",
       "given": {
@@ -1940,7 +1980,8 @@
     {
       "id": "format/values/datetime-invalid-leap-second",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "a leap second",
       "given": {
@@ -1974,7 +2015,8 @@
     {
       "id": "format/values/datetime-invalid-seven-fraction-digits",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "seven fraction digits",
       "given": {
@@ -2008,7 +2050,8 @@
     {
       "id": "format/values/datetime-invalid-offset-not-the-zones",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "an offset that does not match the zone",
       "given": {
@@ -2042,7 +2085,8 @@
     {
       "id": "format/values/datetime-invalid-skipped-hour",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "a time skipped by a clock change",
       "given": {
@@ -2076,7 +2120,8 @@
     {
       "id": "format/values/datetime-invalid-unknown-zone",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "an unknown zone",
       "given": {
@@ -2110,7 +2155,8 @@
     {
       "id": "format/values/datetime-invalid-zone-case",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "zone names are case-sensitive",
       "given": {
@@ -2144,7 +2190,8 @@
     {
       "id": "format/values/datetime-invalid-zone-after-z",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "a zone after Z",
       "given": {
@@ -2178,7 +2225,8 @@
     {
       "id": "format/values/datetime-invalid-zone-without-offset",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "a zone without an offset",
       "given": {
@@ -2212,7 +2260,8 @@
     {
       "id": "format/values/datetime-invalid-critical-flag",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "a critical flag",
       "given": {
@@ -2246,7 +2295,8 @@
     {
       "id": "format/values/datetime-invalid-suffix-tag",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "a suffix tag",
       "given": {
@@ -2280,7 +2330,8 @@
     {
       "id": "format/values/datetime-invalid-space-separator",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "a space instead of T",
       "given": {
@@ -2314,7 +2365,9 @@
     {
       "id": "format/values/datetime-invalid-instant-before-year-1",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "errors.md#which-error-comes-first",
+        "data-model.md#datetimes"
       ],
       "description": "an instant before year 1",
       "given": {
@@ -2348,7 +2401,8 @@
     {
       "id": "format/values/datetime-invalid-instant-after-year-9999",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "an instant after year 9999",
       "given": {
@@ -2520,7 +2574,9 @@
     {
       "id": "format/values/float-nan-text",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#floats",
+        "data-model.md#constants"
       ],
       "description": "NaN has no encoding",
       "given": {
@@ -2554,7 +2610,8 @@
     {
       "id": "format/values/float-tagged-string",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#floats"
       ],
       "description": "$float text other than inf",
       "given": {
@@ -2588,7 +2645,8 @@
     {
       "id": "format/values/float-underflow",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#floats"
       ],
       "description": "a literal too small reads as 0.0",
       "given": {
@@ -2617,7 +2675,8 @@
     {
       "id": "format/values/float-largest",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#floats"
       ],
       "description": "a literal that rounds to the largest float",
       "given": {
@@ -2646,7 +2705,8 @@
     {
       "id": "format/values/float-rounds-to-infinity",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#floats"
       ],
       "description": "a literal that rounds to infinity",
       "given": {
@@ -2763,7 +2823,8 @@
     {
       "id": "format/values/decimal-plus-infinity",
       "spec": [
-        "json-format.md#numbers"
+        "json-format.md#numbers",
+        "data-model.md#decimals"
       ],
       "description": "a decimal written +inf",
       "given": {
@@ -2797,7 +2858,8 @@
     {
       "id": "format/values/datetime-offset-18-hours",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "an offset of exactly 18 hours",
       "given": {
@@ -2845,7 +2907,8 @@
     {
       "id": "format/values/datetime-alias-kept",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "zone aliases are kept as written",
       "given": {
@@ -2893,7 +2956,8 @@
     {
       "id": "format/values/datetime-zone-utc",
       "spec": [
-        "json-format.md#dates-and-datetimes"
+        "json-format.md#dates-and-datetimes",
+        "data-model.md#datetimes"
       ],
       "description": "the named zone UTC is not written Z",
       "given": {

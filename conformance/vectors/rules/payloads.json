@@ -6,7 +6,9 @@
       "id": "rules/payloads/passthrough",
       "spec": [
         "rules.md#when-payloads-are-evaluated",
-        "rules.md#outputs"
+        "rules.md#outputs",
+        "rules.md#rules",
+        "data-model.md#lists-and-maps"
       ],
       "description": "a field in a payload passes a list and a map through",
       "given": {
@@ -133,7 +135,9 @@
     {
       "id": "rules/payloads/null-payload-value",
       "spec": [
-        "rules.md#when-payloads-are-evaluated"
+        "rules.md#when-payloads-are-evaluated",
+        "rules.md#rules",
+        "data-model.md#lists-and-maps"
       ],
       "description": "a null payload value keeps its reason",
       "given": {
@@ -208,7 +212,9 @@
       "id": "rules/payloads/order-kept",
       "spec": [
         "rules.md#when-payloads-are-evaluated",
-        "rules.md#outputs"
+        "rules.md#outputs",
+        "rules.md#rules",
+        "data-model.md#lists-and-maps"
       ],
       "description": "payload keys keep their order",
       "given": {

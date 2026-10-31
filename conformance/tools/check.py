@@ -28,6 +28,51 @@ def anchors() -> set[str]:
     return found
 
 
+EXEMPT_MARKS = ("*Informative", "*Not checked by vectors")
+
+
+def uncovered(cited: set[str]) -> list[str]:
+    """Normative spec sections that no vector cites (`conformance/README.md`, *Coverage*).
+
+    A section is covered when a vector cites it or one of its subsections. It is
+    exempt when it, or a section containing it, is a *Differences from the Python v1*
+    section or starts with a line marked *Informative* or *Not checked by vectors*.
+    Document titles (level 1) are not sections.
+    """
+    missing: list[str] = []
+    for path in sorted((ROOT / "spec").glob("*.md")):
+        if path.name == "README.md":
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        headings: list[tuple[int, str, bool]] = []  # level, anchor, exempt
+        for i, line in enumerate(lines):
+            if heading := re.match(r"^(#{1,6}) (.+)$", line):
+                following = next((x for x in lines[i + 1 :] if x.strip()), "")
+                exempt = heading[2] == "Differences from the Python v1" or following.startswith(
+                    EXEMPT_MARKS
+                )
+                anchor = re.sub(r"[^\w\- ]", "", heading[2].lower()).replace(" ", "-")
+                headings.append((len(heading[1]), f"{path.name}#{anchor}", exempt))
+        for i, (level, ref, exempt) in enumerate(headings):
+            if level == 1:
+                continue
+            # Ancestors: the nearest earlier heading of each lower level.
+            inherited = exempt
+            current = level
+            for prior_level, _, prior_exempt in reversed(headings[:i]):
+                if prior_level < current:
+                    inherited = inherited or (prior_exempt and prior_level > 1)
+                    current = prior_level
+            descendants = []
+            for later_level, later_ref, _ in headings[i + 1 :]:
+                if later_level <= level:
+                    break
+                descendants.append(later_ref)
+            if not inherited and ref not in cited and not cited.intersection(descendants):
+                missing.append(ref)
+    return missing
+
+
 def resolves(document: Any, pointer: str) -> bool:
     """Whether a JSON Pointer reaches a value, or a missing member of an existing object."""
     if pointer == "":
@@ -109,6 +154,13 @@ def main() -> int:
                 for ref in vector.get("spec", [])
                 if ref not in known
             )
+    cited = {
+        ref
+        for path in (ROOT / "conformance/vectors").rglob("*.json")
+        for vector in json.loads(path.read_text(encoding="utf-8"))["vectors"]
+        for ref in vector["spec"]
+    }
+    problems.extend(f"spec section cited by no vector: {ref}" for ref in uncovered(cited))
     print("\n".join(problems), file=sys.stderr)
     print(f"{count} vectors, {len(problems)} problems")
     return 1 if problems or not count else 0
