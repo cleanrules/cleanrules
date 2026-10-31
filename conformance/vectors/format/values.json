@@ -1,0 +1,2942 @@
+{
+  "version": 1,
+  "area": "format",
+  "vectors": [
+    {
+      "id": "format/values/int-negative-zero",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "-0 is the int 0",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":-0}}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/int-max",
+      "spec": [
+        "json-format.md#numbers",
+        "json-format.md#values"
+      ],
+      "description": "the largest int is written as $int text",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":9223372036854775807}}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$int": "9223372036854775807"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/int-safe",
+      "spec": [
+        "json-format.md#numbers",
+        "json-format.md#values"
+      ],
+      "description": "2^53 - 1 stays bare",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":9007199254740991}}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 9007199254740991
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/int-above-safe",
+      "spec": [
+        "json-format.md#numbers",
+        "json-format.md#values"
+      ],
+      "description": "2^53 is written as $int text",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":9007199254740992}}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$int": "9007199254740992"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/int-overflow",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "an int constant outside 64 bits",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":9223372036854775808}}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value"
+        }
+      }
+    },
+    {
+      "id": "format/values/int-underflow",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "an int constant below -2^63",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":-9223372036854775809}}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value"
+        }
+      }
+    },
+    {
+      "id": "format/values/int-min",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "-2^63 is an int",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":-9223372036854775808}}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$int": "-9223372036854775808"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/int-tagged-leading-zeros",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "$int text may have leading zeros",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$int": "007"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 7
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/int-tagged-number",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "$int with a number",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$int": 42
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 42
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/int-tagged-float-literal",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "$int with 1.0 is not an integer literal",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":{\"$int\":1.0}}}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$int"
+        }
+      }
+    },
+    {
+      "id": "format/values/int-tagged-exponent",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "$int with 1e2 is not an integer literal",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":{\"$int\":1e2}}}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$int"
+        }
+      }
+    },
+    {
+      "id": "format/values/float-tagged-integer",
+      "spec": [
+        "json-format.md#numbers",
+        "json-format.md#values"
+      ],
+      "description": "$float with an integer literal is a float",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":{\"$float\":1}}}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 1.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/float-tagged-negative-zero",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "$float -0 is -0.0",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":{\"$float\":-0}}}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": -0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/float-negative-zero",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "-0.0 is kept",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":-0.0}}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": -0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/float-exponent",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "1e2 is the float 100",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":1e2}}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 100.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/float-overflow",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "a finite literal too large for a float",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":1e400}}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value"
+        }
+      }
+    },
+    {
+      "id": "format/values/float-infinity",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "infinities are typed values",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$float": "-inf"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$float": "-inf"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/float-rounding",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "a literal is rounded to the nearest float, ties to even",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":9007199254740993.0}}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 9007199254740992.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-leading-zeros",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "the decimal 007.50 is written 7.50",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "007.50"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "7.50"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-negative-exponent",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "the decimal 1.5e-3 is written 0.0015",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "1.5e-3"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "0.0015"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-positive-exponent",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "the decimal 1e2 is written 100",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "1e2"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "100"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-positive-exponent-with-fraction",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "the decimal 1.5e3 is written 1500",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "1.5e3"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "1500"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-negative-zero",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "the decimal -0.00 is written 0.00",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "-0.00"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "0.00"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-scale-kept",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "the decimal 1.00 is written 1.00",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "1.00"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "1.00"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-negative-infinity",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "the decimal -inf is written -inf",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "-inf"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "-inf"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-38-digits",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "38 significant digits fit",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "99999999999999999999999999999999999999"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "99999999999999999999999999999999999999"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-39-digits",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "39 significant digits do not fit",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "100000000000000000000000000000000000000"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$decimal"
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-1e37",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "1e37 fits",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "1e37"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "10000000000000000000000000000000000000"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-1e38",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "1e38 does not fit",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "1e38"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$decimal"
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-scale-39",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "a scale of 39 does not fit",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "0.000000000000000000000000000000000000001"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$decimal"
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-trailing-zeros",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "trailing zeros are dropped only as far as needed: 1 fits with scale 37",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "1.0000000000000000000000000000000000000000"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "1.0000000000000000000000000000000000000"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-comma",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "a decimal comma is malformed",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "1,5"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$decimal"
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-leading-point",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "a decimal needs a digit before the point",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": ".5"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$decimal"
+        }
+      }
+    },
+    {
+      "id": "format/values/date",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a date",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$date": "2026-10-31"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$date": "2026-10-31"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/date-february-30",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a day that does not exist",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$date": "2026-02-30"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$date"
+        }
+      }
+    },
+    {
+      "id": "format/values/date-leap-day",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "29 February in a leap year",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$date": "2028-02-29"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$date": "2028-02-29"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/date-year-zero",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "year 0000 is out of range",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$date": "0000-01-01"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$date"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-naive",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a naive datetime",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-zero-fraction",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a zero fraction is omitted",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00.000000"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-fraction-six-digits",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a fraction is written with six digits",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00.5"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00.500000"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-zero-offset",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a zero offset is written Z",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+00:00"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00Z"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-negative-zero-offset",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "-00:00 is read as Z",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00-00:00"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00Z"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-fixed-offset",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a fixed offset is kept",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+05:30"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+05:30"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-offset-seconds",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "an offset with seconds",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "1900-01-01T00:00:00-00:14:44"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "1900-01-01T00:00:00-00:14:44"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-named-zone",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a datetime in a named zone",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+01:00[Europe/Madrid]"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+01:00[Europe/Madrid]"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-repeated-hour-first",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "the first 02:30 of a repeated hour",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-25T02:30:00+02:00[Europe/Madrid]"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-25T02:30:00+02:00[Europe/Madrid]"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-repeated-hour-second",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "the second 02:30 of a repeated hour",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-25T02:30:00+01:00[Europe/Madrid]"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-25T02:30:00+01:00[Europe/Madrid]"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-zero-offset-in-named-zone",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a zero offset in a named zone is not Z",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+00:00[Europe/London]"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+00:00[Europe/London]"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-offset-beyond-18-hours",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "an offset beyond 18 hours",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+19:00"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-offset-18-hours-and-a-second",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "an offset of 18 hours and a second",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+18:00:01"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-leap-second",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a leap second",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T23:59:60"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-seven-fraction-digits",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "seven fraction digits",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00.1234567"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-offset-not-the-zones",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "an offset that does not match the zone",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-07-01T12:00:00+01:00[Europe/Madrid]"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-skipped-hour",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a time skipped by a clock change",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-03-29T02:30:00+01:00[Europe/Madrid]"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-unknown-zone",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "an unknown zone",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+01:00[Mars/Olympus]"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-zone-case",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "zone names are case-sensitive",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+01:00[europe/madrid]"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-zone-after-z",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a zone after Z",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00Z[Europe/Madrid]"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-zone-without-offset",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a zone without an offset",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00[Europe/Madrid]"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-critical-flag",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a critical flag",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+01:00[!Europe/Madrid]"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-suffix-tag",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a suffix tag",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+01:00[Europe/Madrid][u-ca=japanese]"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-space-separator",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a space instead of T",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31 09:30:00"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-instant-before-year-1",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "an instant before year 1",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "0001-01-01T00:30:00+01:00"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-invalid-instant-after-year-9999",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "an instant after year 9999",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "9999-12-31T23:30:00-01:00"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/unknown-typed-value",
+      "spec": [
+        "json-format.md#lists-and-maps"
+      ],
+      "description": "an unknown $-key points to that key",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$time": "09:30"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$time"
+        }
+      }
+    },
+    {
+      "id": "format/values/opaque-in-constant",
+      "spec": [
+        "json-format.md#values"
+      ],
+      "description": "an opaque value is never a constant",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$opaque": "bytes"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value"
+        }
+      }
+    },
+    {
+      "id": "format/values/list-constant",
+      "spec": [
+        "json-format.md#conditions"
+      ],
+      "description": "a list is not a scalar constant",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": [
+                1,
+                2
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value"
+        }
+      }
+    },
+    {
+      "id": "format/values/typed-with-extra-key",
+      "spec": [
+        "json-format.md#lists-and-maps"
+      ],
+      "description": "a typed value has a single key; the extra key is located",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$date": "2026-10-31",
+                "zone": "UTC"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/zone"
+        }
+      }
+    },
+    {
+      "id": "format/values/float-nan-text",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "NaN has no encoding",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$float": "nan"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$float"
+        }
+      }
+    },
+    {
+      "id": "format/values/float-tagged-string",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "$float text other than inf",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$float": "1.5"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$float"
+        }
+      }
+    },
+    {
+      "id": "format/values/float-underflow",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "a literal too small reads as 0.0",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":1e-400}}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/float-largest",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "a literal that rounds to the largest float",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":1.7976931348623158e308}}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 1.7976931348623157e+308
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/float-rounds-to-infinity",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "a literal that rounds to infinity",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":1.7976931348623159e308}}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value"
+        }
+      }
+    },
+    {
+      "id": "format/values/int-negative-safe-edge",
+      "spec": [
+        "json-format.md#numbers",
+        "json-format.md#values"
+      ],
+      "description": "-2^53 is written as $int text",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":-9007199254740992}}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$int": "-9007199254740992"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/int-tagged-overflow",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "$int text outside 64 bits",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$int": "9223372036854775808"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$int"
+        }
+      }
+    },
+    {
+      "id": "format/values/int-tagged-plus-sign",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "$int text with a plus sign",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$int": "+5"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$int"
+        }
+      }
+    },
+    {
+      "id": "format/values/decimal-plus-infinity",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "a decimal written +inf",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "+inf"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$decimal"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-offset-18-hours",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "an offset of exactly 18 hours",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00-18:00"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00-18:00"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-alias-kept",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "zone aliases are kept as written",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+05:30[Asia/Calcutta]"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+05:30[Asia/Calcutta]"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-zone-utc",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "the named zone UTC is not written Z",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+00:00[UTC]"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+00:00[UTC]"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

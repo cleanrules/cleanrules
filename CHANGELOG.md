@@ -29,7 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Error catalogue (`spec/errors.md`): stable codes, the hierarchy under
   `CleanRulesError`, and the context fields that conformance vectors compare.
 - Conformance vectors (`conformance/`): the vector format and its JSON Schema,
-  a checker, and a first set of 122 vectors exported from the Python v1.
+  a checker, 125 vectors exported from the Python v1 and 187 vectors for
+  reading documents, written from the spec.
 - Data model (`spec/data-model.md`): values, decimals of 38 digits (as Arrow
   `Decimal128`), microsecond datetimes, opaque values for native data with no
   equivalent, nulls with a reason (`int_overflow`, the new `decimal_overflow`,

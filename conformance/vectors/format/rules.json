@@ -1,0 +1,784 @@
+{
+  "version": 1,
+  "area": "format",
+  "vectors": [
+    {
+      "id": "format/rules/defaults-omitted",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "optional keys at their default are omitted",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {},
+            "priority": 0,
+            "tags": [],
+            "metadata": {}
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rules/tags-are-a-set",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "tags are deduplicated and sorted",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "tags": [
+              "b",
+              "a",
+              "b"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "tags": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rules/priority-typed",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "a priority as $int",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "priority": {
+              "$int": "-5"
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "priority": -5
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rules/key-order",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "rule keys are written in table order",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "tags": [
+              "t"
+            ],
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "name": "r"
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "tags": [
+              "t"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rules/payload-order",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "payload members keep their order",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {
+              "b": {
+                "op": "const",
+                "value": 1
+              },
+              "a": {
+                "op": "const",
+                "value": 2
+              },
+              "10": {
+                "op": "const",
+                "value": 3
+              },
+              "2": {
+                "op": "const",
+                "value": 4
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {
+              "b": {
+                "op": "const",
+                "value": 1
+              },
+              "a": {
+                "op": "const",
+                "value": 2
+              },
+              "10": {
+                "op": "const",
+                "value": 3
+              },
+              "2": {
+                "op": "const",
+                "value": 4
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rules/payload-null",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "a null constant as a payload value",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {
+              "v": {
+                "op": "const",
+                "value": null
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {
+              "v": {
+                "op": "const",
+                "value": null
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rules/metadata-literal-keys",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "metadata keys starting with $ are ordinary",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "metadata": {
+              "$owner": "sales",
+              "since": {
+                "$date": "2026-01-01"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "metadata": {
+              "$owner": "sales",
+              "since": {
+                "$date": "2026-01-01"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rules/empty-name",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "an empty rule name",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/rule/name"
+        }
+      }
+    },
+    {
+      "id": "format/rules/value-as-when",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "a value as a rule's condition",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "add",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/rule/when"
+        }
+      }
+    },
+    {
+      "id": "format/rules/null-as-when",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "a null constant as a rule's condition",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "const",
+              "value": null
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/rule/when"
+        }
+      }
+    },
+    {
+      "id": "format/rules/condition-in-payload",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "a condition as a payload value",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {
+              "a/b": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/rule/then/a~1b"
+        }
+      }
+    },
+    {
+      "id": "format/rules/action-key",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "actions are not part of the format",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "do": "notify"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/do"
+        }
+      }
+    },
+    {
+      "id": "format/rules/bare-payload-scalar",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "a payload value must be a node",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {
+              "d": 0.1
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/then/d"
+        }
+      }
+    },
+    {
+      "id": "format/rules/construction-before-rule-rules",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a node's construction error comes before the rule's own rules",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "",
+            "when": {
+              "op": "const",
+              "value": null
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/rule/when"
+        }
+      }
+    },
+    {
+      "id": "format/rules/name-before-when",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "the rule's own rules in order: the name first",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "",
+            "when": {
+              "op": "add",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/rule/name"
+        }
+      }
+    },
+    {
+      "id": "format/rules/tags-code-point-order",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "tags sort by code point",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "tags": [
+              "é",
+              "z",
+              "Z",
+              "😀",
+              "ｚ"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "tags": [
+              "Z",
+              "z",
+              "é",
+              "ｚ",
+              "😀"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

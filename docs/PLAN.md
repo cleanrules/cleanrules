@@ -191,7 +191,22 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - Los vectores de explicación incluyen su decisión.
       - `spec/errors.md` define cómo se comparan los errores, la ruta completa en `missing_field` y la forma idiomática en cada lenguaje: `*Exception` en Java, un solo `*Error` con código en Go, un `enum` en C y `Error` en Rust. Python conserva las bases de la v1.
       - Quedaron definidos en la especificación la API para evaluar un nodo (`evaluate_tree`), la escala de las distancias decimales, el resultado de `min`/`max` y qué no lanza el modo estricto.
-  - [ ] A.3b Vectores de lectura de documentos (léxicos, errores con su puntero y orden, límites), escritos desde la especificación, porque la v1 no tiene lector.
+  - [x] A.3b Vectores de lectura de documentos (léxicos, errores con su puntero y orden, límites), escritos desde la especificación, porque la v1 no tiene lector.
+    - Hecho el 2026-10-31: 148 vectores en `conformance/vectors/format/`, generados por `conformance/tools/read_cases.py`.
+      - Cubren documentos, números y sus bordes, decimales, fechas y zonas, valores con tipo, condiciones, reglas, rule sets, decisiones leídas con su rule set y límites.
+      - `check.py` comprueba que cada puntero de error existe en el documento dado y que cada línea y columna cae dentro del texto.
+      - La especificación precisa a qué carácter apunta un error de sintaxis, que un documento sin clave de contenido o con varias da error en la raíz, a qué nodo apunta un `expression_error` y que `registry_error` lleva puntero.
+      - Revisado por `api-reviewer`, con dos hallazgos graves corregidos:
+        - Un decimal con ceros finales cabe con escala 37, no 38; el ejemplo de `data-model.md` estaba mal.
+        - La comprobación 4 de una decisión usa `selected` y `fired` tal como están escritos.
+      - Tras la revisión hay 187 vectores de lectura con ids descriptivos. La especificación fija además:
+        - los punteros de claves ausentes y desconocidas;
+        - que el signo del cero se compara;
+        - el final de texto y CRLF;
+        - la profundidad de nodos en preorden, durante la pasada de forma;
+        - las claves desconocidas, después de las conocidas;
+        - el anidamiento JSON, que cuenta la cima como 1;
+        - los floats que se redondean a infinito o a cero.
   - [ ] A.3c Vectores generados con las propiedades de hypothesis (miles, con semilla fija).
   - [ ] A.3d Script de cobertura: cada sección normativa citada por al menos un vector, y CI.
   - Vectores de lectura que hacen falta aunque la v1 no los pueda generar:

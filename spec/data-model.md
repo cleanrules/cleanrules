@@ -37,9 +37,10 @@ kept for display and JSON. The two infinities are separate values.
 
 A native decimal **fits** when some `(c, s)` in that range has the same value.
 Its scale is then the native one, lowered only as far as needed by dropping
-trailing zeros; a native negative exponent (`1E+3` in Python or Java) gives
+trailing zeros; a native positive exponent (`1E+3` in Python or Java) gives
 `s = 0` and `c = 1000`. So `1E+37` fits, `1E+38` does not, and `1.` followed by
-40 zeros fits as `1` with scale 38. A decimal that does not fit is **never
+40 zeros fits as `1` with scale 37 (with scale 38 its coefficient would be
+10³⁸). A decimal that does not fit is **never
 rounded**:
 
 - in a constant, it is an `ExpressionError` (`format_error` in JSON);

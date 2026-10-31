@@ -53,7 +53,7 @@ its cause.
 | `expression_error` | a condition node breaks a construction rule (`ast.md`) | `rule`, `node`; **`pointer`** when read from JSON |
 | `rule_definition_error` | a rule or rule set breaks a construction rule (`rules.md`, `json-format.md`) | **`rule`** when known; **`pointer`** when read from JSON |
 | `rule_syntax_error` | the text DSL cannot be parsed (phase D) | **`line`**, **`column`** |
-| `registry_error` | a name is not registered (a logic; later, an action) | **`name`**, `available` |
+| `registry_error` | a name is not registered (a logic; later, an action) | **`name`**, `available`; **`pointer`** when read from JSON |
 | `rule_not_found` | a rule is looked up by a name the rule set does not have | **`name`**, `available` |
 | `evaluation_error` | strict mode met a value it cannot read (`read_error`), or a batch was given something that is not a collection of inputs (`rules.md`) | **`rule`**, **`path`**, `node`, **`row`** |
 | `missing_field` | strict mode met a field whose path cannot be resolved | **`rule`**, **`path`**, `node`, **`row`**, `available` |

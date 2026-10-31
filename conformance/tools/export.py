@@ -17,6 +17,7 @@ from typing import Any
 
 import encode
 from cases import CASES, Case
+from read_cases import VECTORS as READ_VECTORS
 
 from rulepy.core.evaluate import evaluate_tree, evaluate_value_tree
 from rulepy.errors import RulePyError
@@ -106,6 +107,17 @@ def main() -> int:
                 "expect": expect,
             }
         )
+    for vector in READ_VECTORS:
+        if vector["id"] in seen:
+            problems.append(f"{vector['id']}: duplicate id")
+        seen.add(vector["id"])
+        problems.extend(
+            f"{vector['id']}: unknown spec section {ref}"
+            for ref in vector["spec"]
+            if ref not in known
+        )
+        area, topic, *_ = vector["id"].split("/")
+        files[(area, topic)].append(vector)
     if problems:
         print("\n".join(problems), file=sys.stderr)
         return 1
@@ -119,7 +131,8 @@ def main() -> int:
         )
     for line in skipped:
         print(f"skipped {line}", file=sys.stderr)
-    print(f"{len(CASES) - len(skipped)} vectors in {len(files)} files, {len(skipped)} skipped")
+    total = len(CASES) - len(skipped) + len(READ_VECTORS)
+    print(f"{total} vectors in {len(files)} files, {len(skipped)} skipped")
     return 0
 
 

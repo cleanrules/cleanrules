@@ -15,7 +15,8 @@ and which error each problem gives.
 ## Documents
 
 A document is a JSON text ([RFC 8259](https://www.rfc-editor.org/rfc/rfc8259))
-encoded as UTF-8 without a byte order mark. Its top level is an object with:
+encoded as UTF-8 without a byte order mark. Its top level is an object (any
+other value is a `format_error` at the root) with:
 
 - `"version"`: the format version, the integer literal `1`;
 - exactly one **content key**, which says what the document holds:
@@ -41,6 +42,8 @@ Writers put `version` first and the content key second.
 
 Readers are strict:
 
+- A document with no content key, or with more than one, is a `format_error`
+  at the root (the pointer `""`).
 - A key they do not know, anywhere, is a `format_error`. Ignoring it could
   silently change what a rule means.
 - An object with a **duplicate key** is a `format_error`. JSON parsers disagree
@@ -88,8 +91,9 @@ already read, and metadata are written by the caller.
 
 An **opaque** value (`data-model.md`, *Opaque values*) is a native value read
 from the input that has no equivalent. It appears only in decisions and
-explanations, written with its type name, which is informative; it is never
-accepted in a condition, a rule or an evaluation input.
+explanations, written with its type name, which is informative; anywhere else
+(a condition, a rule, an evaluation input) it is a `format_error` pointing to
+the typed value.
 
 Writers always use the canonical form. The other forms exist for writers that
 cannot produce it. JavaScript and Go's default decoder lose integers beyond
@@ -107,7 +111,8 @@ structural identity (`ast.md`).
   integer literal (not `1.0` or `1e2`) or a string matching `-?[0-9]+`, leading
   zeros allowed (`"007"` is 7).
 - **float** is an IEEE 754 binary64. A literal is rounded to the nearest float,
-  ties to even. A finite literal too large to represent, such as `1e400`, is a
+  ties to even, so a literal too small to represent, such as `1e-400`, reads
+  as `0.0`. A literal that rounds to infinity, such as `1e400`, is a
   `format_error`: write `{"$float": "inf"}`. In `{"$float": ...}` any number
   literal is accepted, and `{"$float": -0}` is `-0.0`. NaN has no encoding:
   conditions reject it and data treats it as null (`ast.md`). Writers produce
@@ -119,7 +124,7 @@ structural identity (`ast.md`).
   The value is never rounded. One outside the 38 digits of `data-model.md`
   (*Decimals*) is a `format_error` in a constant, and reads as null with reason
   `decimal_overflow` in data. The **canonical text** is in
-  plain notation, `-?(0|[1-9][0-9]*)(\.[0-9]+)?`, with no exponent and no
+  plain notation, `-?(0|[1-9][0-9]*)(\.[0-9]+)?` (or `inf` and `-inf`), with no exponent and no
   leading zeros, and with as many fraction digits as the value's scale (the
   number of digits after the point, never negative). So `"1.00"` stays
   `"1.00"`, `"007.50"` becomes `"7.50"`, `"1.5e-3"` becomes `"0.0015"`, and
@@ -226,6 +231,10 @@ a tree that the API could not build. Breaking any of these rules is an
 - `between` bounds, when both are constants, belong to one orderable group;
 - a `matches` pattern is a valid regular expression (`ast.md`, *`matches`*).
 
+The error points to the node whose construction fails: for a wrong operand,
+the node that takes it (`{"op": "eq", ...}` with a condition as `left` points
+to the `eq`, not to the condition), and otherwise the node itself.
+
 The JSON Schemas check most of these rules too, so editors can flag them. That
 does not change their code, which is always `expression_error`. Messages come
 from the core and are worded the same in every language.
@@ -248,8 +257,9 @@ Writers produce the **canonical form**:
 **Comparing documents.** Conformance vectors compare documents as parsed JSON
 trees, never as text. Object members compare in order. Numbers compare by
 lexical class (integer literal, or literal with a fraction or exponent) and
-exact value, so `1` and `1.0` differ and `100.0` equals `1e2`. Whitespace and
-number layout are not part of the contract.
+exact value, so `1` and `1.0` differ and `100.0` equals `1e2`; the sign of a
+float zero is compared too, so `-0.0` and `0.0` differ. Whitespace and number
+layout are not part of the contract.
 
 ## Rules
 
@@ -546,7 +556,8 @@ a `decision_mismatch`, with a pointer to the offending value:
    given above, `between` halves whose ops agree with `closed`, `const` values
    equal to the rule's constants, and both copies of a `between` operand equal;
 4. `then` has exactly the payload's keys, in order, and is present exactly
-   where *When payloads are evaluated* requires;
+   where *When payloads are evaluated* requires, judged from `selected` and
+   `fired` as written (checks 6 and 7 verify those);
 5. each node's `truth` or `value`, and its `reason`, are what evaluation gives
    from its children's (leaves, which hold what was read from the input, are
    taken as they are);
@@ -707,10 +718,16 @@ no tags, and mapping order kept.
 ## Errors and limits
 
 Every error carries a stable code and a location. A syntax error gives a 1-based
-line and column. Every other error gives a JSON Pointer
+line and column, counted in Unicode code points: that of the first character
+that cannot be accepted, of the opening quote of a duplicate key's second
+occurrence, or of the backslash of a lone surrogate escape. An unexpected end
+of the text is one past its last character. Lines end at `\n`, and `\r\n` is
+one line ending. Every other error gives a JSON Pointer
 ([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)) into the document as
 written, before any sorting or flattening, such as
-`/condition/operands/1/right/value`.
+`/condition/operands/1/right/value`. A missing key is located by the pointer
+it would have (`/condition/right`), and an unknown or extra key by its own
+(`/condition/note`, `/condition/right/value/zone`).
 
 | Code | Meaning |
 |---|---|
@@ -728,12 +745,14 @@ A reader reports **one** error, the first it finds in this order:
 1. size, JSON nesting and syntax (duplicate keys included), in text order;
 2. `version`, before any other key, so a document from a newer format version
    gets `unsupported_version` even if it uses new keys;
-3. shape (`format_error`), depth first, with an object's keys in the order of
-   that object's table (*Conditions*, *Rules*, *Rule sets*, *Decisions*,
-   *Result trees*), whatever their order in the text. A document whose content
+3. shape (`format_error`) and node depth (`limit_exceeded`), depth first in
+   pre-order: an object's known keys in the order of that object's table
+   (*Conditions*, *Rules*, *Rule sets*, *Decisions*, *Result trees*), whatever
+   their order in the text, then its unknown keys in text order. The node too
+   deep is the first node at depth limit + 1 met this way. A document whose content
    key is `explanation` or `summary` is rejected with `unsupported` after the
    top-level keys are checked and before its content;
-4. construction rules and node depth, in depth-first post-order: children
+4. construction rules, in depth-first post-order: children
    before their parent, operands in order. In a rule, the condition comes
    first, then the payload values in order (`expression_error`), then the
    rule's own rules. In a rule set, the rules come first, in order, then the
@@ -744,8 +763,8 @@ Readers enforce three limits, so a hostile file cannot exhaust memory or the
 stack (`CLAUDE.md`, invariant 9):
 
 - **document size**: at most **16 MiB** of JSON text;
-- **JSON nesting**: arrays and objects at most **1024** deep, checked while
-  parsing, before any tree is built. This also bounds lists and maps in data;
+- **JSON nesting**: arrays and objects at most **1024** deep, counting the
+  top-level object as 1, checked while parsing, before any tree is built. This also bounds lists and maps in data;
 - **node depth**: a condition or payload value at most **256** nodes deep,
   counting the root as depth 1 and counting before `and`/`or` flattening. A
   result tree may be one level deeper, for the `between` halves.

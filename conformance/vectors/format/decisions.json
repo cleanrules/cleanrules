@@ -1,0 +1,1146 @@
+{
+  "version": 1,
+  "area": "format",
+  "vectors": [
+    {
+      "id": "format/decisions/valid",
+      "spec": [
+        "json-format.md#reading-a-decision"
+      ],
+      "description": "a decision the core could produce",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ]
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/decisions/other-policy",
+      "spec": [
+        "json-format.md#reading-a-decision"
+      ],
+      "description": "a decision with another policy",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ]
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/hit_policy"
+        }
+      }
+    },
+    {
+      "id": "format/decisions/other-rule",
+      "spec": [
+        "json-format.md#reading-a-decision"
+      ],
+      "description": "a decision naming another rule",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "c",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ]
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/results/1/rule"
+        }
+      }
+    },
+    {
+      "id": "format/decisions/other-constant",
+      "spec": [
+        "json-format.md#reading-a-decision"
+      ],
+      "description": "a tree with another constant",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 2
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ]
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/results/0/when/children/1/value"
+        }
+      }
+    },
+    {
+      "id": "format/decisions/wrong-truth",
+      "spec": [
+        "json-format.md#reading-a-decision"
+      ],
+      "description": "a truth value evaluation would not give",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ]
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/results/1/when/truth"
+        }
+      }
+    },
+    {
+      "id": "format/decisions/wrong-fired",
+      "spec": [
+        "json-format.md#reading-a-decision"
+      ],
+      "description": "fired disagrees with the truth value",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ]
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/results/1/fired"
+        }
+      }
+    },
+    {
+      "id": "format/decisions/missing-then",
+      "spec": [
+        "json-format.md#reading-a-decision"
+      ],
+      "description": "the selected rule's payload is missing",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ]
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/results/0/then"
+        }
+      }
+    },
+    {
+      "id": "format/decisions/unselected-with-then",
+      "spec": [
+        "json-format.md#reading-a-decision"
+      ],
+      "description": "then is judged from selected as written: an unselected rule must not have it",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": []
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/results/0/then"
+        }
+      }
+    },
+    {
+      "id": "format/decisions/wrong-selection",
+      "spec": [
+        "json-format.md#reading-a-decision"
+      ],
+      "description": "a selection the policy would not make",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "any",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 0
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "b"
+            ]
+          }
+        },
+        "ruleset": {
+          "hit_policy": "any",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/selected"
+        }
+      }
+    }
+  ]
+}

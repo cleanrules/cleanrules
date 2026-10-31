@@ -1,0 +1,1499 @@
+{
+  "version": 1,
+  "area": "format",
+  "vectors": [
+    {
+      "id": "format/conditions/and-flattened",
+      "spec": [
+        "json-format.md#reading",
+        "json-format.md#writing"
+      ],
+      "description": "a nested and is flattened",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  {
+                    "op": "field",
+                    "path": [
+                      "b"
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "field",
+                "path": [
+                  "c"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              {
+                "op": "field",
+                "path": [
+                  "b"
+                ]
+              },
+              {
+                "op": "field",
+                "path": [
+                  "c"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/conditions/and-one-operand-as-written",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "and needs two operands as written, before flattening",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  {
+                    "op": "field",
+                    "path": [
+                      "b"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/or-not-flattened-into-and",
+      "spec": [
+        "json-format.md#reading",
+        "json-format.md#writing"
+      ],
+      "description": "an or inside an and is kept",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "or",
+                "operands": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  {
+                    "op": "field",
+                    "path": [
+                      "b"
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "field",
+                "path": [
+                  "c"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "or",
+                "operands": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  {
+                    "op": "field",
+                    "path": [
+                      "b"
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "field",
+                "path": [
+                  "c"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/conditions/in-sorted",
+      "spec": [
+        "json-format.md#reading",
+        "json-format.md#writing"
+      ],
+      "description": "in values are sorted and deduplicated",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              "b",
+              "a",
+              "b"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/conditions/in-number-types",
+      "spec": [
+        "json-format.md#writing"
+      ],
+      "description": "equal numbers of different types are kept, decimal before float before int",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"in\",\"operand\":{\"op\":\"field\",\"path\":[\"a\"]},\"values\":[2,1,1.0,{\"$decimal\":\"1\"}]}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              {
+                "$decimal": "1"
+              },
+              1.0,
+              1,
+              2
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/conditions/in-same-node-first-kept",
+      "spec": [
+        "json-format.md#writing"
+      ],
+      "description": "of two values that are the same node, the first is kept",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"in\",\"operand\":{\"op\":\"field\",\"path\":[\"a\"]},\"values\":[-0.0,0.0,{\"$decimal\":\"1.00\"},{\"$decimal\":\"1.0\"}]}}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              -0.0,
+              {
+                "$decimal": "1.00"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/conditions/in-strings-code-point",
+      "spec": [
+        "json-format.md#writing"
+      ],
+      "description": "strings sort by code point",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              "é",
+              "z",
+              "Z",
+              "😀",
+              "ｚ"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              "Z",
+              "z",
+              "é",
+              "ｚ",
+              "😀"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/conditions/in-mixed-groups",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "in values from two groups",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              1,
+              "1"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/in-null",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "a null in values",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              null
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/between-default-closed",
+      "spec": [
+        "json-format.md#writing"
+      ],
+      "description": "closed is written even when omitted",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "between",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "low": {
+              "op": "const",
+              "value": 1
+            },
+            "high": {
+              "op": "const",
+              "value": 2
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "between",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "low": {
+              "op": "const",
+              "value": 1
+            },
+            "high": {
+              "op": "const",
+              "value": 2
+            },
+            "closed": "both"
+          }
+        }
+      }
+    },
+    {
+      "id": "format/conditions/between-bound-groups",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "constant bounds from two groups",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "between",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "low": {
+              "op": "const",
+              "value": "a"
+            },
+            "high": {
+              "op": "const",
+              "value": 2
+            },
+            "closed": "both"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/condition-as-operand",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "a condition as an operand of eq",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "right": {
+              "op": "const",
+              "value": true
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/value-as-condition",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "a value as the document's condition",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "const",
+            "value": 5
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/null-in-compare",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "a null constant in a comparison",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": null
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/null-under-not",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "a null constant under not",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "not",
+            "operand": {
+              "op": "const",
+              "value": null
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/null-under-is-null",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "a null constant under is_null",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "is_null",
+            "operand": {
+              "op": "const",
+              "value": null
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "is_null",
+            "operand": {
+              "op": "const",
+              "value": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/conditions/arithmetic-string",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "arithmetic with a string constant",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "add",
+              "left": {
+                "op": "const",
+                "value": "a"
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "right": {
+              "op": "const",
+              "value": 0
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition/left"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/regex-invalid",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "a pattern that does not parse",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "matches",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "pattern": "("
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/regex-lookahead",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "lookaround is not in the syntax",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "matches",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "pattern": "a(?=b)"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/regex-backreference",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "backreferences are not in the syntax",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "matches",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "pattern": "(a)\\1"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/path-negative-index",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "a negative index",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a",
+                -1
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition/left"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/path-empty",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "an empty path",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": []
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition/left"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/path-empty-segment",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "an empty string segment",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "field",
+            "path": [
+              "a",
+              ""
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/path-float-index",
+      "spec": [
+        "json-format.md#conditions"
+      ],
+      "description": "an index written 1.0 is not an integer literal",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"field\",\"path\":[\"a\",1.0]}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/path/1"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/unknown-op",
+      "spec": [
+        "json-format.md#conditions"
+      ],
+      "description": "an unknown op",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "xor",
+            "operands": [
+              {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              {
+                "op": "field",
+                "path": [
+                  "b"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/op"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/missing-key",
+      "spec": [
+        "json-format.md#conditions"
+      ],
+      "description": "a missing key",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/unknown-key",
+      "spec": [
+        "json-format.md#conditions"
+      ],
+      "description": "an unknown key in a node",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "field",
+            "path": [
+              "a"
+            ],
+            "note": "x"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/note"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/shape-before-construction",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "shape errors come before construction errors",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "bad"
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/operands/1/op"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/keys-in-table-order",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "shape errors follow the table's key order, not the text's",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"right\":{\"op\":\"bad\"},\"left\":{\"op\":\"bad\"}}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/left/op"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/post-order",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "construction errors in post-order",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "or",
+            "operands": [
+              {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "in",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ]
+                },
+                "values": [
+                  1,
+                  "1"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition/operands/0"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/canonical-key-order",
+      "spec": [
+        "json-format.md#writing"
+      ],
+      "description": "keys are written in table order",
+      "given": {
+        "kind": "read",
+        "text": "{\"condition\":{\"right\":{\"value\":1,\"op\":\"const\"},\"left\":{\"path\":[\"a\"],\"op\":\"field\"},\"op\":\"eq\"},\"version\":1}"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/conditions/in-aware-by-instant",
+      "spec": [
+        "json-format.md#writing"
+      ],
+      "description": "aware datetimes sort by instant; of equal instants the first is kept",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              {
+                "$datetime": "2026-10-31T10:30:00+01:00[Europe/Madrid]"
+              },
+              {
+                "$datetime": "2026-10-31T09:30:00Z"
+              },
+              {
+                "$datetime": "2026-10-31T09:00:00Z"
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              {
+                "$datetime": "2026-10-31T09:00:00Z"
+              },
+              {
+                "$datetime": "2026-10-31T10:30:00+01:00[Europe/Madrid]"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/conditions/in-booleans",
+      "spec": [
+        "json-format.md#writing"
+      ],
+      "description": "false before true",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              true,
+              false,
+              true
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              false,
+              true
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/conditions/in-dates",
+      "spec": [
+        "json-format.md#writing"
+      ],
+      "description": "dates in time order",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              {
+                "$date": "2026-10-31"
+              },
+              {
+                "$date": "2026-01-01"
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              {
+                "$date": "2026-01-01"
+              },
+              {
+                "$date": "2026-10-31"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/conditions/in-naive-and-aware",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "naive and aware datetimes are two groups",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "values": [
+              {
+                "$datetime": "2026-10-31T09:30:00"
+              },
+              {
+                "$datetime": "2026-10-31T09:30:00Z"
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/value-under-and",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "a value as an operand of and",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              {
+                "op": "add",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/between-boolean-bounds",
+      "spec": [
+        "json-format.md#reading"
+      ],
+      "description": "booleans are not orderable bounds",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "between",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "low": {
+              "op": "const",
+              "value": false
+            },
+            "high": {
+              "op": "const",
+              "value": true
+            },
+            "closed": "both"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/between-invalid-closed",
+      "spec": [
+        "json-format.md#conditions"
+      ],
+      "description": "an invalid closed",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "between",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "low": {
+              "op": "const",
+              "value": 1
+            },
+            "high": {
+              "op": "const",
+              "value": 2
+            },
+            "closed": "open"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/closed"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/path-index-out-of-range",
+      "spec": [
+        "json-format.md#conditions"
+      ],
+      "description": "a path index outside the int range",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"field\",\"path\":[\"a\",9223372036854775808]}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/path/1"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/path-boolean-segment",
+      "spec": [
+        "json-format.md#conditions"
+      ],
+      "description": "a boolean path segment",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "field",
+            "path": [
+              "a",
+              true
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/path/1"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/known-keys-before-unknown",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "an object's known keys are checked before its unknown keys",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"note\":1,\"op\":\"field\",\"path\":[\"a\",1.0]}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/path/1"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/missing-before-bad-sibling",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a missing key is reported at its place in the table",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "right": {
+              "op": "bad"
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/left"
+        }
+      }
+    }
+  ]
+}

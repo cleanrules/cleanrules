@@ -28,6 +28,52 @@ def anchors() -> set[str]:
     return found
 
 
+def resolves(document: Any, pointer: str) -> bool:
+    """Whether a JSON Pointer reaches a value, or a missing member of an existing object."""
+    if pointer == "":
+        return True
+    node = document
+    parts = [p.replace("~1", "/").replace("~0", "~") for p in pointer[1:].split("/")]
+    for i, part in enumerate(parts):
+        last = i == len(parts) - 1
+        if isinstance(node, dict):
+            if part not in node:
+                return last
+            node = node[part]
+        elif isinstance(node, list) and part.isdigit() and int(part) < len(node):
+            node = node[int(part)]
+        else:
+            return False
+    return True
+
+
+def check_read(vector: dict[str, Any]) -> list[str]:
+    """Sanity checks of a hand-written `read` vector's expected error location."""
+    given, error = vector["given"], vector["expect"].get("error")
+    if not error:
+        return []
+    found: list[str] = []
+    source = given.get("text")
+    document = given.get("document")
+    if source is not None:
+        try:
+            document = json.loads(source)
+        except ValueError:
+            document = None
+    if "pointer" in error and document is not None and not resolves(document, error["pointer"]):
+        found.append(f"{vector['id']}: pointer {error['pointer']} does not resolve")
+    if "line" in error:
+        lines = (source or "").split("\n")
+        if not (
+            source
+            and 1 <= error["line"] <= len(lines)
+            # One past the last character marks an unexpected end of the text.
+            and 1 <= error["column"] <= len(lines[error["line"] - 1].rstrip("\r")) + 1
+        ):
+            found.append(f"{vector['id']}: line/column outside the text")
+    return found
+
+
 def main() -> int:
     """Validate every vector file; print a summary and return the exit code."""
     schemas: list[Any] = [
@@ -56,6 +102,8 @@ def main() -> int:
             ids.add(vid)
             if not vid.startswith(f"{document.get('area')}/{path.stem}/"):
                 problems.append(f"{name}: {vid} is not in <area>/{path.stem}/")
+            if vector.get("given", {}).get("kind") == "read":
+                problems.extend(check_read(vector))
             problems.extend(
                 f"{name}: {vid}: unknown section {ref}"
                 for ref in vector.get("spec", [])

@@ -1,0 +1,453 @@
+{
+  "version": 1,
+  "area": "format",
+  "vectors": [
+    {
+      "id": "format/rulesets/defaults-written",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "hit_policy and logic are always written",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": []
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": []
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/strict-false-omitted",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "strict false is omitted",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "strict": false,
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/collect-aggregate",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "an aggregate with collect",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ],
+            "aggregate": "sum",
+            "hit_policy": "collect",
+            "strict": true
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/duplicate-names",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "duplicate rule names point to the second",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "name": "r",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/ruleset/rules/1/name"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/aggregate-without-collect",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "an aggregate without collect",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "aggregate": "sum",
+            "rules": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/ruleset/aggregate"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/duplicates-before-aggregate",
+      "spec": [
+        "json-format.md#rule-sets",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "duplicate names are checked before the aggregate",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "aggregate": "sum",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "name": "r",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/ruleset/rules/1/name"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/unknown-logic",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "an unknown logic name",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "logic": "magic",
+            "rules": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "registry_error",
+          "name": "magic",
+          "pointer": "/ruleset/logic"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/uppercase-policy",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "policy names are lowercase",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "FIRST",
+            "rules": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset/hit_policy"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/logic-object-reserved",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "the object form of logic is reserved",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "logic": {
+              "name": "boolean"
+            },
+            "rules": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset/logic"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/alpha-reserved",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "alpha is reserved",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "alpha": 0.5,
+            "rules": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset/alpha"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/rule-errors-first",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a rule's errors come before the rule set's",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "aggregate": "sum",
+            "rules": [
+              {
+                "name": "",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/ruleset/rules/0/name"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/aggregate-before-logic",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "the aggregate is checked before the logic",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "aggregate": "sum",
+            "logic": "magic",
+            "rules": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/ruleset/aggregate"
+        }
+      }
+    }
+  ]
+}

@@ -64,7 +64,8 @@ runners compare errors as `spec/errors.md` (*Comparing errors*) says.
 
 Runners compare the actual output with `expect` as parsed JSON trees, as
 `spec/json-format.md` (*Comparing documents*) defines: object members in
-order, numbers by lexical class and exact value. Some parts are not compared,
+order, numbers by lexical class and exact value, and the sign of a float zero
+(use `copysign` or its equivalent: `-0.0 == 0.0` in most languages). Some parts are not compared,
 because the spec says that they are informative:
 
 - `detail` in reasons is removed from both sides before comparing;

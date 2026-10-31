@@ -1,0 +1,464 @@
+{
+  "version": 1,
+  "area": "format",
+  "vectors": [
+    {
+      "id": "format/documents/schema-key-ignored",
+      "spec": [
+        "json-format.md#documents"
+      ],
+      "description": "readers ignore $schema",
+      "given": {
+        "kind": "read",
+        "document": {
+          "$schema": "https://example.com/s.json",
+          "version": 1,
+          "condition": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/documents/missing-version",
+      "spec": [
+        "json-format.md#documents",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a missing version",
+      "given": {
+        "kind": "read",
+        "document": {
+          "condition": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported_version",
+          "pointer": "/version"
+        }
+      }
+    },
+    {
+      "id": "format/documents/version-string",
+      "spec": [
+        "json-format.md#documents"
+      ],
+      "description": "a version that is a string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": "1",
+          "condition": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported_version",
+          "pointer": "/version"
+        }
+      }
+    },
+    {
+      "id": "format/documents/version-float",
+      "spec": [
+        "json-format.md#documents"
+      ],
+      "description": "a version written 1.0 is not an integer literal",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1.0,\"condition\":{\"op\":\"field\",\"path\":[\"a\"]}}"
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported_version",
+          "pointer": "/version"
+        }
+      }
+    },
+    {
+      "id": "format/documents/newer-version-first",
+      "spec": [
+        "json-format.md#documents",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "the version is checked before unknown keys",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 2,
+          "condition": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "news": 1
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported_version",
+          "pointer": "/version"
+        }
+      }
+    },
+    {
+      "id": "format/documents/unknown-key",
+      "spec": [
+        "json-format.md#documents"
+      ],
+      "description": "an unknown top-level key",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "comment": "x"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/comment"
+        }
+      }
+    },
+    {
+      "id": "format/documents/no-content-key",
+      "spec": [
+        "json-format.md#documents"
+      ],
+      "description": "a document without a content key",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": ""
+        }
+      }
+    },
+    {
+      "id": "format/documents/two-content-keys",
+      "spec": [
+        "json-format.md#documents"
+      ],
+      "description": "a document with two content keys",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": ""
+        }
+      }
+    },
+    {
+      "id": "format/documents/duplicate-key",
+      "spec": [
+        "json-format.md#documents",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a duplicate key points to its second occurrence",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"version\":1,\"condition\":{\"op\":\"field\",\"path\":[\"a\"]}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 1,
+          "column": 14
+        }
+      }
+    },
+    {
+      "id": "format/documents/duplicate-key-in-node",
+      "spec": [
+        "json-format.md#documents",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a duplicate key inside a node",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"field\",\"path\":[\"a\"],\"path\":[\"b\"]}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 1,
+          "column": 53
+        }
+      }
+    },
+    {
+      "id": "format/documents/byte-order-mark",
+      "spec": [
+        "json-format.md#documents",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a byte order mark is rejected",
+      "given": {
+        "kind": "read",
+        "text": "﻿{\"version\":1,\"condition\":{\"op\":\"field\",\"path\":[\"a\"]}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/documents/trailing-garbage",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "text after the document is a syntax error",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"field\",\"path\":[\"a\"]}} x"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 1,
+          "column": 55
+        }
+      }
+    },
+    {
+      "id": "format/documents/syntax-error-line",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a syntax error on the third line",
+      "given": {
+        "kind": "read",
+        "text": "{\n  \"version\": 1,\n  \"condition\": {\"op\": \"field\", \"path\": [\"a\"],}\n}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 3,
+          "column": 46
+        }
+      }
+    },
+    {
+      "id": "format/documents/explanation-is-output-only",
+      "spec": [
+        "json-format.md#documents"
+      ],
+      "description": "explanations are output only",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "explanation": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "selected": [],
+            "rules": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
+      "id": "format/documents/summary-is-output-only",
+      "spec": [
+        "json-format.md#documents"
+      ],
+      "description": "summaries are output only",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "summary": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [],
+            "fields": [],
+            "outputs": [],
+            "tags": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
+      "id": "format/documents/lone-surrogate",
+      "spec": [
+        "json-format.md#documents",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a lone surrogate escape is rejected",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"eq\",\"left\":{\"op\":\"field\",\"path\":[\"a\"]},\"right\":{\"op\":\"const\",\"value\":\"x\\ud800\"}}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 1,
+          "column": 104
+        }
+      }
+    },
+    {
+      "id": "format/documents/column-in-code-points",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "columns count code points, not bytes or UTF-16 units",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,\"condition\":{\"op\":\"field\",\"path\":[\"😀é\",]}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 1,
+          "column": 53
+        }
+      }
+    },
+    {
+      "id": "format/documents/unexpected-end",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "an unexpected end is one past the last character",
+      "given": {
+        "kind": "read",
+        "text": "{\"version\":1,"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 1,
+          "column": 14
+        }
+      }
+    },
+    {
+      "id": "format/documents/crlf-lines",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a CRLF is one line ending",
+      "given": {
+        "kind": "read",
+        "text": "{\r\n\"version\":1,\r\n\"condition\":{\"op\":\"field\",\"path\":[\"a\"],}\r\n}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 3,
+          "column": 40
+        }
+      }
+    },
+    {
+      "id": "format/documents/top-level-array",
+      "spec": [
+        "json-format.md#documents"
+      ],
+      "description": "a top level that is not an object",
+      "given": {
+        "kind": "read",
+        "text": "[1]"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": ""
+        }
+      }
+    },
+    {
+      "id": "format/documents/explanation-content-not-checked",
+      "spec": [
+        "json-format.md#documents"
+      ],
+      "description": "an output-only document is rejected before its content is read",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "explanation": {
+            "nonsense": true
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    }
+  ]
+}
