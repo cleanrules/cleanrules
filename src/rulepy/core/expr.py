@@ -165,6 +165,19 @@ class Expr:
             yield node
             stack.extend(reversed(node.children()))
 
+    def field_paths(self) -> tuple[tuple[str | int, ...], ...]:
+        """Return the paths of every field this node reads, in first-appearance order.
+
+        Paths appear once each. A path may be a prefix of another:
+        `F.customer.is_null() | (F.customer.age > 3)` reads `customer` and
+        `customer.age`.
+        """
+        paths: list[tuple[str | int, ...]] = []
+        for node in self.walk():
+            if isinstance(node, Field) and node.path not in paths:
+                paths.append(node.path)
+        return tuple(paths)
+
     def structural_key(self) -> tuple[object, ...]:
         """Return a hashable key such that equal keys mean `same_as` is true."""
         return (self.tag, *(_key_of(v) for v in self._field_values()))

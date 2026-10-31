@@ -51,7 +51,7 @@ from rulepy.core.expr import (
     format_scalar,
 )
 from rulepy.core.logic import Truth
-from rulepy.errors import RuleNotFoundError, UnsupportedOperation, format_path
+from rulepy.errors import RuleNotFoundError, UnsupportedOperation, format_name, format_path
 
 if TYPE_CHECKING:
     from rulepy.core.ruleset import Decision, RuleResult
@@ -224,7 +224,7 @@ class RuleExplanation(Generic[TruthT]):
     def __str__(self) -> str:
         rule = self.result.rule
         lines = [
-            f"{_MARK[self.status]} {_format_name(rule.name)} ({_LABEL[self.status]}): {rule.when!r}"
+            f"{_MARK[self.status]} {format_name(rule.name)} ({_LABEL[self.status]}): {rule.when!r}"
         ]
         if rule.description:
             lines.extend(f"    {line}" for line in rule.description.splitlines() or [""])
@@ -573,10 +573,6 @@ def _format_value(value: object) -> str:
     if value is None or isinstance(value, bool | int | float | Decimal | str | dt.date):
         return _SHORT.repr(value) if isinstance(value, str) else format_scalar(value)
     return _ADDRESS.sub("", _SHORT.repr(value))
-
-
-def _format_name(name: str) -> str:
-    return name if name.isascii() and name.isidentifier() else repr(name)
 
 
 def _render(requirement: Requirement, indent: str, *, top: bool, fired: bool) -> list[str]:

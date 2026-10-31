@@ -31,6 +31,7 @@ __all__ = [
     "RuleSyntaxError",
     "TypeMismatchError",
     "UnsupportedOperation",
+    "format_name",
     "format_path",
 ]
 
@@ -252,6 +253,15 @@ def format_path(path: tuple[str | int, ...]) -> str:
         else:
             out += f"[{segment!r}]"
     return out
+
+
+def format_name(name: str) -> str:
+    """Render a rule name, tag or output key for reports.
+
+    Plain if it is a simple identifier, else quoted with `repr()`, so separators,
+    spaces and control characters cannot break a report's layout.
+    """
+    return name if name.isascii() and name.isidentifier() else repr(name)
 
 
 class TypeMismatchError(EvaluationError):

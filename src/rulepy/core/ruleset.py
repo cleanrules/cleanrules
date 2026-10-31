@@ -35,6 +35,7 @@ from rulepy.errors import EvaluationError, HitPolicyError, RuleDefinitionError, 
 if TYPE_CHECKING:
     from rulepy.core.evaluate import NodeResult
     from rulepy.core.explain import Explanation, RuleExplanation
+    from rulepy.core.summary import RuleSetSummary
 
 __all__ = ["Aggregate", "Decision", "HitPolicy", "RuleResult", "RuleSet"]
 
@@ -327,6 +328,18 @@ class RuleSet(Sequence[Rule]):
             except EvaluationError as err:
                 err.row = index
                 raise
+
+    def summary(self) -> RuleSetSummary:
+        """Describe the rule set without evaluating it.
+
+        Returns:
+            A `RuleSetSummary`: `print()` it for a readable report (configuration,
+            one line per rule, the fields read and where, the outputs, the tags),
+            or use its structure (`fields`, `outputs`, `tags`).
+        """
+        from rulepy.core.summary import summarize  # deferred: summary imports this module
+
+        return summarize(self)
 
     # --- Sequence protocol and lookup by name ----------------------------------------
 

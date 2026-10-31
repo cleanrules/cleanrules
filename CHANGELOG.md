@@ -81,6 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   conditions are reported as such (`achievable`). `Decision.why_not(name)`
   explains one rule; `Decision.logic` records
   the logic used. `rulepy.core.expr.format_scalar` renders constants.
+- `RuleSet.summary()`: a static overview of a rule set (configuration, one line
+  per rule, the fields it reads and where, including which outputs depend on
+  them, its outputs and tags).
+- `Expr.field_paths()`: the fields a condition or value reads, in order.
+- `rulepy.errors.format_name`: quotes rule names, tags and keys for reports.
 - `rulepy.errors.format_path` renders field paths unambiguously
   (`orders[0].total`, `['x y']`).
 - Errors for evaluation and registries: `TypeMismatchError`,

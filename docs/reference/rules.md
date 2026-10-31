@@ -5,3 +5,5 @@
 ::: rulepy.core.ruleset
 
 ::: rulepy.engines.sequential
+
+::: rulepy.core.summary

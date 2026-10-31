@@ -418,3 +418,13 @@ def test_decimals_are_numbers_for_arithmetic_and_ranges() -> None:
     assert Arith("mul", Field("x"), Const(Decimal("0.1"))).kind == "value"
     assert Between(Field("x"), Const(Decimal("1")), Const(2)).tag == "between"
     assert In(Field("x"), [Decimal("1"), 2, 3.5]).values == (Decimal("1"), 2, 3.5)
+
+
+def test_field_paths_in_first_appearance_order_without_duplicates() -> None:
+    tree = And(
+        Compare("gt", Field("b"), Const(1)),
+        Between(Field("a"), Field("lo"), Arith("add", Field("hi"), Const(1))),
+        Compare("lt", Field("b"), Field("orders", 0, "total")),
+    )
+    assert tree.field_paths() == (("b",), ("a",), ("lo",), ("hi",), ("orders", 0, "total"))
+    assert Const(1).field_paths() == ()

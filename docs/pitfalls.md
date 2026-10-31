@@ -82,7 +82,8 @@ by default. Use `matches` for patterns.
 ## Field names that clash with node attributes
 
 Any public attribute of a `Field` keeps its meaning after a dot: `path`, `tag`,
-`kind`, `TAGS`, `children`, `walk`, `same_as`, `structural_key`, and the methods
+`kind`, `TAGS`, `children`, `walk`, `same_as`, `structural_key`, `field_paths`,
+and the methods
 `is_in`, `between`, `is_null`, `matches`, `starts_with`, `ends_with`,
 `contains` and `abs`. So `F.customer.kind` is the node's kind (`"any"`), not a
 field called `kind`. A comparison on it is plain Python:
