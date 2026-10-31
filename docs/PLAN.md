@@ -55,7 +55,7 @@ Lo que nos diferencia es la combinación: **condiciones como AST serializable** 
 - [x] **Nombre del proyecto**: `cleanrules`. La implementación Python de la v1 conserva `rulepy` hasta su retirada en la fase A.
 - [ ] Java: FFM (Java 22+, sin código nativo propio) frente a JNI (Java 8+). Propuesto: FFM, con JNI solo si hace falta soportar Java antiguo.
 - [ ] JavaScript: napi-rs (Node, más rápido) y wasm (navegador, Deno). Propuesto: los dos, con la misma API TypeScript.
-- [ ] MSRV de Rust y edición (propuesto: edición 2024, MSRV = estable actual menos 2).
+- [x] MSRV de Rust y edición: edición 2024 y MSRV 1.95, la estable menos dos (decidido el 2026-10-31).
 - [ ] UNKNOWN en lógica difusa como intervalo `[0, 1]` (propuesta de la v1, ver `spec/ast.md`).
 - [x] Organización de GitHub: `cleanrules` (la crea el autor el 2026-10-31). La necesitan el groupId de Maven y la ruta del módulo Go.
 
@@ -254,7 +254,15 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
 
 **Objetivo**: toda la funcionalidad de la fase P, en Rust, superando los vectores de conformidad.
 
-- [ ] B.1 Andamiaje: workspace, edición y MSRV, `clippy` pedante, `rustfmt`, `cargo-deny`, `cargo-nextest`, CI (Linux, macOS, Windows), `miri` en las partes con `unsafe` (idealmente ninguna en `core`).
+- [x] B.1 Andamiaje: workspace, edición y MSRV, `clippy` pedante, `rustfmt`, `cargo-deny`, `cargo-nextest`, CI (Linux, macOS, Windows), `miri` en las partes con `unsafe` (idealmente ninguna en `core`).
+  - Hecho el 2026-10-31.
+    - Workspace con `crates/core` (crate `cleanrules`, aún sin dependencias), edición 2024 y MSRV 1.95.
+    - Lints del workspace: `unsafe_code` prohibido, clippy pedante, y `unwrap`, `expect`, `panic`, `print*` y `dbg` vetados fuera de los tests (`clippy.toml`); se comprobó que rompen la compilación.
+    - Configuración en `rustfmt.toml` (estilo 2024, 100 columnas) y `deny.toml` (licencias permisivas, solo crates.io).
+    - CI de Rust: fmt, clippy y nextest en Linux, macOS y Windows; `cargo check` con 1.95; documentación con `-D warnings`; cargo-deny. Dependabot vigila también Cargo.
+    - Desviaciones:
+      - No hay trabajo de `miri`, porque el núcleo no tiene `unsafe`; llegará con `crates/ffi` (fase E).
+      - nextest, cargo-deny, cargo-llvm-cov y la toolchain 1.95 no están instalados en local: el CI los usa, y en local basta `cargo test`.
 - [ ] B.2 Modelo de valores (`Value`, `Decimal` exacto propio de 38 dígitos según `spec/data-model.md`, fechas con `jiff` o `chrono`), normalización y grupos de tipo. Base de datos de zonas horarias **empaquetada** y fijada por versión (no la del sistema), con su versión expuesta en la API. Lector JSON propio o `serde_json` configurado: enteros exactos, `float_roundtrip`, detección de claves duplicadas y límite de anidamiento sin depender de la recursión por defecto.
 - [ ] B.3 AST con serde: los 14 tipos de nodo y sus validaciones al construir, identidad estructural, `field_paths`, `Display` legible.
 - [ ] B.4 API de construcción idiomática en Rust (constructores y sobrecarga de operadores donde tenga sentido; macros solo si aportan).

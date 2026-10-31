@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- Rust workspace with the core crate `cleanrules` (edition 2024, MSRV 1.95):
+  strict lints (no `unsafe`, clippy pedantic, no `unwrap` or printing in
+  library code), rustfmt, cargo-deny, and CI on Linux, macOS and Windows.
 - Repository skeleton: README, MIT license, changelog, `.gitignore`.
 - Development roadmap (`docs/PLAN.md`) and Claude Code project configuration
   (`CLAUDE.md`, `.claude/`).
