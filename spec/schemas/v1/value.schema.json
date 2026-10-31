@@ -208,6 +208,9 @@
         },
         {
           "$ref": "#/$defs/map"
+        },
+        {
+          "$ref": "#/$defs/opaque"
         }
       ]
     },
@@ -224,8 +227,25 @@
         },
         {
           "$ref": "#/$defs/map"
+        },
+        {
+          "$ref": "#/$defs/opaque"
         }
       ]
+    },
+    "opaque": {
+      "description": "A native value with no equivalent; only in decisions and explanations (spec/json-format.md). The type name is informative.",
+      "type": "object",
+      "properties": {
+        "$opaque": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "$opaque"
+      ],
+      "additionalProperties": false
     }
   }
 }

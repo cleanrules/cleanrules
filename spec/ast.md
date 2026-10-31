@@ -311,6 +311,7 @@ human-readable text may differ.
 | `unorderable` | booleans were ordered with `<`, `<=`, `>` or `>=` |
 | `division_by_zero` | a division by zero |
 | `int_overflow` | an integer outside the signed 64-bit range |
+| `decimal_overflow` | a decimal in the data that does not fit (`data-model.md`, *Decimals*) |
 | `nan_result` | an arithmetic result is NaN |
 | `read_error` | reading the data raised an exception |
 

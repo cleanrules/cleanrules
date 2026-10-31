@@ -78,8 +78,18 @@ single key that starts with `$`.
 | decimal | `{"$decimal": "0.10"}` | exponent forms such as `{"$decimal": "1.5e-3"}` |
 | date | `{"$date": "2026-10-31"}` | |
 | datetime | `{"$datetime": "2026-10-31T09:30:00+01:00"}` | |
+| opaque (decisions and explanations only) | `{"$opaque": "bytes"}` | |
 | list (data only) | `[1, 2]` | |
 | map (data only) | `{"a": 1}` | `{"$map": {"a": 1}}` |
+
+**Data** here means the input of an evaluation, the only place where a value
+can be out of range: values recorded in a decision or an explanation were
+already read, and metadata are written by the caller.
+
+An **opaque** value (`data-model.md`, *Opaque values*) is a native value read
+from the input that has no equivalent. It appears only in decisions and
+explanations, written with its type name, which is informative; it is never
+accepted in a condition, a rule or an evaluation input.
 
 Writers always use the canonical form. The other forms exist for writers that
 cannot produce it. JavaScript and Go's default decoder lose integers beyond
@@ -91,8 +101,9 @@ structural identity (`ast.md`).
 ### Numbers
 
 - **int** is a signed 64-bit integer. A bare integer literal is read
-  **exactly**, never through a float, and one outside the signed 64-bit range is
-  a `format_error`. `-0` is the int `0`. In `{"$int": ...}` the value is an
+  **exactly**, never through a float. One outside the signed 64-bit range is a
+  `format_error` in a constant, and reads as null with reason `int_overflow` in
+  data (`data-model.md`), so one bad value never rejects a whole input. `-0` is the int `0`. In `{"$int": ...}` the value is an
   integer literal (not `1.0` or `1e2`) or a string matching `-?[0-9]+`, leading
   zeros allowed (`"007"` is 7).
 - **float** is an IEEE 754 binary64. A literal is rounded to the nearest float,
@@ -105,8 +116,9 @@ structural identity (`ast.md`).
   part of the contract.
 - **decimal** is exact: a sign, a coefficient and an exponent. A reader accepts
   text matching `-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?`, or `inf` or `-inf`.
-  The value is never rounded: one outside the precision and range set in
-  `data-model.md` (task A.2) is a `format_error`. The **canonical text** is in
+  The value is never rounded. One outside the 38 digits of `data-model.md`
+  (*Decimals*) is a `format_error` in a constant, and reads as null with reason
+  `decimal_overflow` in data. The **canonical text** is in
   plain notation, `-?(0|[1-9][0-9]*)(\.[0-9]+)?`, with no exponent and no
   leading zeros, and with as many fraction digits as the value's scale (the
   number of digits after the point, never negative). So `"1.00"` stays
@@ -509,7 +521,7 @@ and appears only then (`ast.md`, *Results and reasons*):
 | `detail` | no | string, human-readable |
 
 Type groups are written `number`, `string`, `boolean`, `date`,
-`naive_datetime`, `aware_datetime` and `other` (data that is a list or a map).
+`naive_datetime`, `aware_datetime` and `other` (lists, maps and opaque values).
 The order of `paths` and `types`, and the duplicates they keep, are defined in
 `ast.md` (*Results and reasons*). Implementations are compared on `code`,
 `paths` and `types`, never on `detail`, whose wording may change between
@@ -664,14 +676,10 @@ would have been written:
 - a metadata value that is not a data value, or a float NaN in metadata, which
   would otherwise silently become null;
 - a logic that is not one of the core's named logics, or one configured with
-  parameters;
-- in a decision, a value read from the input that is not a data value (bytes,
-  a duration, a map with non-string keys, a NaN inside a list...), pointing to
-  where it would be written, such as
-  `/decision/results/0/when/children/0/value`. Bindings normally reject such
-  data when converting the input (`data-model.md`), so this is a last check.
+  parameters.
 
-Problems are reported in document order.
+Decisions and explanations can always be written: a native value with no
+equivalent is recorded as an opaque value (*Values*).
 
 ## Differences from the Python v1
 

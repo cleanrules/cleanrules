@@ -155,12 +155,31 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - Cada causa guarda su condición y un puntero `at` al nodo de la decisión del que sale.
       - La aritmética del hueco es propia y exacta: enteros comprobados en 64 bits, decimales exactos e instantes UTC.
       - Quedan reservados los campos de las explicaciones graduadas.
-- [ ] A.2 `spec/data-model.md`: `Value` y cómo convierte cada binding sus tipos nativos; precisión y rango de `Decimal` (lo que admita `rust_decimal`, o un tipo propio si se quieren conservar los infinitos y más de 28 dígitos); reescribir `ast.md` en términos neutros (quedan clases Python, la columna de tareas de la v1 y notas de polars). La sección "Reading data" de `ast.md` (mapas, registros, atributos **públicos**, nunca privados ni de módulos o clases) pasa a ser una obligación de cada binding.
+- [ ] A.2 `spec/data-model.md`: `Value` y cómo convierte cada binding sus tipos nativos; precisión y rango de `Decimal`; reescribir `ast.md` en términos neutros. Se divide en:
+  - [x] A.2a `spec/data-model.md`.
+    - Hecho el 2026-10-31. Decisiones tomadas:
+      - Decimales de 38 dígitos con un tipo propio en el núcleo: coeficiente i128 y escala de 0 a 38, como Arrow `Decimal128`, con infinitos. Lo eligió el autor frente a `rust_decimal`, que llega a 28 dígitos, y a la precisión arbitraria.
+      - Los valores sin equivalente pasan a ser **opacos**, del grupo `other`: se comportan como en la v1 y la salida devuelve el objeto nativo.
+      - Los datos fuera de rango dan un nulo con motivo: `int_overflow` y el nuevo `decimal_overflow`.
+      - Las fechas con hora se truncan al microsegundo.
+      - Los mapas sin orden definido se ordenan por clave.
+      - Cada binding lee **solo las rutas que usa el rule set**, con las reglas de seguridad de `ast.md`.
+      - Revisado por `api-reviewer`, con dos hallazgos graves corregidos:
+        - Las listas y los mapas al final de una ruta siguen siendo el objeto nativo, que se devuelve tal cual en las salidas, y solo se convierten cuando hace falta.
+        - La igualdad bajo `ANY` queda definida: listas elemento a elemento, mapas sin importar el orden y opacos por identidad.
+      - El binding de Python lee exactamente como la v1; lo que no se puede conservar está en *Differences from the Python v1*.
+      - Las zonas horarias se resuelven con la base de datos del núcleo, con un desfase fijo como alternativa.
+      - Los opacos se escriben como `{"$opaque": "<tipo>"}`, y solo en decisiones y explicaciones.
+  - [ ] A.2b Reescribir `ast.md` en términos neutros: quedan clases Python, la columna de tareas de la v1 y notas de polars. La sección "Reading data" de `ast.md` (mapas, registros, atributos **públicos**, nunca privados ni de módulos o clases) pasa a ser una obligación de cada binding.
 - [ ] A.3 Exportador temporal en Python (`conformance/tools/`) que, con la implementación de la v1, genera **vectores de conformidad**: árboles y errores de construcción, evaluaciones con motivos, modo estricto, decisiones de las 6 políticas, agregados, explicaciones y resúmenes. Las propiedades de hypothesis se convierten en miles de casos fijados.
   - Vectores de lectura que hacen falta aunque la v1 no los pueda generar:
     - números: `-0`, `9223372036854775808`, `-9223372036854775809`, `18446744073709551616`, `{"$int": 1.0}`, `{"$int": 1e2}` y flotantes difíciles de redondear;
     - claves duplicadas en nodos, en mapas de datos y en `$map`;
     - claves de payload `"b"`, `"a"`, `"10"` y `"2"`, en ese orden, para comprobar que se conserva el orden;
+    - bordes de los decimales: 38 y 39 dígitos, `1E+37` y `1E+38`, escala 39 y ceros finales;
+    - enteros fuera de rango en los datos de entrada, que dan nulo con `int_overflow`;
+    - truncado al microsegundo antes de 1970;
+    - orden de mapas con claves fuera del plano básico de Unicode (punto de código frente a UTF-16);
     - surrogates sueltos;
     - el orden de errores;
     - los límites, exactamente en el borde.
@@ -180,7 +199,7 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
 **Objetivo**: toda la funcionalidad de la fase P, en Rust, superando los vectores de conformidad.
 
 - [ ] B.1 Andamiaje: workspace, edición y MSRV, `clippy` pedante, `rustfmt`, `cargo-deny`, `cargo-nextest`, CI (Linux, macOS, Windows), `miri` en las partes con `unsafe` (idealmente ninguna en `core`).
-- [ ] B.2 Modelo de valores (`Value`, `Decimal` exacto con `rust_decimal`, fechas con `jiff` o `chrono`), normalización y grupos de tipo. Base de datos de zonas horarias **empaquetada** y fijada por versión (no la del sistema), con su versión expuesta en la API. Lector JSON propio o `serde_json` configurado: enteros exactos, `float_roundtrip`, detección de claves duplicadas y límite de anidamiento sin depender de la recursión por defecto.
+- [ ] B.2 Modelo de valores (`Value`, `Decimal` exacto propio de 38 dígitos según `spec/data-model.md`, fechas con `jiff` o `chrono`), normalización y grupos de tipo. Base de datos de zonas horarias **empaquetada** y fijada por versión (no la del sistema), con su versión expuesta en la API. Lector JSON propio o `serde_json` configurado: enteros exactos, `float_roundtrip`, detección de claves duplicadas y límite de anidamiento sin depender de la recursión por defecto.
 - [ ] B.3 AST con serde: los 14 tipos de nodo y sus validaciones al construir, identidad estructural, `field_paths`, `Display` legible.
 - [ ] B.4 API de construcción idiomática en Rust (constructores y sobrecarga de operadores donde tenga sentido; macros solo si aportan).
 - [ ] B.5 Lógicas: `Logic` (trait), Kleene, registro por nombre y capacidad `Graded`.

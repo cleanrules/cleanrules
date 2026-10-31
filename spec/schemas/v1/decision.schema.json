@@ -275,6 +275,7 @@
             "unorderable",
             "division_by_zero",
             "int_overflow",
+            "decimal_overflow",
             "nan_result",
             "read_error"
           ]

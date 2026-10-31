@@ -64,8 +64,9 @@ equal:
   equal `0.1`;
 - aware datetimes compare by instant, whatever their time zone;
 - unlike in conditions, null equals null here, whatever the reason;
-- values of the `other` group (lists, dictionaries...) compare with their own
-  equality; values that cannot be compared count as different.
+- values of the `other` group (lists, maps and opaque values) compare as
+  `data-model.md` (*Equality*) says: lists element by element, maps key by key
+  whatever their order, and opaque values by identity.
 
 ### Outputs
 
