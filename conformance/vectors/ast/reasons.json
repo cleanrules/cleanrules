@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "area": "ast",
+  "vectors": [
+    {
+      "id": "ast/reasons/repeated-field",
+      "spec": [
+        "ast.md#results-and-reasons"
+      ],
+      "description": "a reason keeps duplicate paths",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "gt",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": true
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "gt",
+          "truth": null,
+          "reason": {
+            "code": "unorderable",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "a"
+              ]
+            ],
+            "types": [
+              "boolean",
+              "boolean"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": true
+            },
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/reasons/first-unknown",
+      "spec": [
+        "ast.md#results-and-reasons"
+      ],
+      "description": "an unknown and takes the reason of its first unknown operand",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "b"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            }
+          ]
+        },
+        "input": {
+          "b": "x"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": null,
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "a"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "gt",
+              "truth": null,
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "a"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "a"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "op": "const",
+                  "value": 1
+                }
+              ]
+            },
+            {
+              "op": "gt",
+              "truth": null,
+              "reason": {
+                "code": "type_mismatch",
+                "paths": [
+                  [
+                    "b"
+                  ]
+                ],
+                "types": [
+                  "string",
+                  "number"
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": "x"
+                },
+                {
+                  "op": "const",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

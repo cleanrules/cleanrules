@@ -151,7 +151,8 @@ whenever it can be:
 - two ints: their difference, checked in 64 bits;
 - a float and an int or a float: the difference in float64;
 - two decimals, or a decimal and an int: the exact difference, as a decimal
-  of `data-model.md` (38 digits);
+  of `data-model.md` (38 digits), with the larger of the two scales (an int has
+  scale 0), so `10.05 − 9.9` is `0.15`;
 - a decimal and a float: no gap;
 - two dates: a whole number of days;
 - two naive datetimes: the difference of their wall-clock times, in

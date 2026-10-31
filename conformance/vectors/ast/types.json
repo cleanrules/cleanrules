@@ -1,0 +1,685 @@
+{
+  "version": 1,
+  "area": "ast",
+  "vectors": [
+    {
+      "id": "ast/types/int-equals-float",
+      "spec": [
+        "ast.md#types"
+      ],
+      "description": "ints and floats compare by value",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "eq",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 1.0
+          }
+        },
+        "input": {
+          "x": 1
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "eq",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": 1
+            },
+            {
+              "op": "const",
+              "value": 1.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/types/decimal-vs-float",
+      "spec": [
+        "ast.md#types"
+      ],
+      "description": "the decimal 0.1 does not equal the float 0.1",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "eq",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 0.1
+          }
+        },
+        "input": {
+          "x": {
+            "$decimal": "0.1"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "eq",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": {
+                "$decimal": "0.1"
+              }
+            },
+            {
+              "op": "const",
+              "value": 0.1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/types/decimal-equals-int",
+      "spec": [
+        "ast.md#types"
+      ],
+      "description": "a decimal equals an int of the same value",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "eq",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 2
+          }
+        },
+        "input": {
+          "x": {
+            "$decimal": "2.00"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "eq",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": {
+                "$decimal": "2.00"
+              }
+            },
+            {
+              "op": "const",
+              "value": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/types/big-int-vs-float",
+      "spec": [
+        "ast.md#types"
+      ],
+      "description": "2^53 + 1 does not equal the float 2^53",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "eq",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 9007199254740992.0
+          }
+        },
+        "input": {
+          "x": {
+            "$int": "9007199254740993"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "eq",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": {
+                "$int": "9007199254740993"
+              }
+            },
+            {
+              "op": "const",
+              "value": 9007199254740992.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/types/string-vs-number",
+      "spec": [
+        "ast.md#types"
+      ],
+      "description": "comparing a string with a number is a type mismatch",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "gt",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 1
+          }
+        },
+        "input": {
+          "x": "2"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "gt",
+          "truth": null,
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "x"
+              ]
+            ],
+            "types": [
+              "string",
+              "number"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": "2"
+            },
+            {
+              "op": "const",
+              "value": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/types/order-booleans",
+      "spec": [
+        "ast.md#types"
+      ],
+      "description": "ordering booleans is unorderable",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "gt",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": false
+          }
+        },
+        "input": {
+          "x": true
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "gt",
+          "truth": null,
+          "reason": {
+            "code": "unorderable",
+            "paths": [
+              [
+                "x"
+              ]
+            ],
+            "types": [
+              "boolean",
+              "boolean"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": true
+            },
+            {
+              "op": "const",
+              "value": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/types/string-code-point-order",
+      "spec": [
+        "ast.md#types"
+      ],
+      "description": "strings order by Unicode code point",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "lt",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": "a"
+          }
+        },
+        "input": {
+          "x": "Z"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "lt",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": "Z"
+            },
+            {
+              "op": "const",
+              "value": "a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/types/string-non-ascii-order",
+      "spec": [
+        "ast.md#types"
+      ],
+      "description": "a non-ASCII letter orders after z",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "gt",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": "z"
+          }
+        },
+        "input": {
+          "x": "é"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "gt",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": "é"
+            },
+            {
+              "op": "const",
+              "value": "z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/types/date-vs-datetime",
+      "spec": [
+        "ast.md#types"
+      ],
+      "description": "a date and a datetime are different groups",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "eq",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": {
+              "$date": "2026-10-31"
+            }
+          }
+        },
+        "input": {
+          "x": {
+            "$datetime": "2026-10-31T00:00:00"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "eq",
+          "truth": null,
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "x"
+              ]
+            ],
+            "types": [
+              "naive_datetime",
+              "date"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": {
+                "$datetime": "2026-10-31T00:00:00"
+              }
+            },
+            {
+              "op": "const",
+              "value": {
+                "$date": "2026-10-31"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/types/aware-by-instant",
+      "spec": [
+        "ast.md#types"
+      ],
+      "description": "aware datetimes compare by instant",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "eq",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": {
+              "$datetime": "2026-10-31T08:30:00Z"
+            }
+          }
+        },
+        "input": {
+          "x": {
+            "$datetime": "2026-10-31T09:30:00+01:00[Europe/Madrid]"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "eq",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": {
+                "$datetime": "2026-10-31T09:30:00+01:00[Europe/Madrid]"
+              }
+            },
+            {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-10-31T08:30:00Z"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/types/naive-vs-aware",
+      "spec": [
+        "ast.md#types"
+      ],
+      "description": "naive and aware datetimes are different groups",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "lt",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": {
+              "$datetime": "2026-01-01T00:00:00Z"
+            }
+          }
+        },
+        "input": {
+          "x": {
+            "$datetime": "2025-01-01T00:00:00"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "lt",
+          "truth": null,
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "x"
+              ]
+            ],
+            "types": [
+              "naive_datetime",
+              "aware_datetime"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": {
+                "$datetime": "2025-01-01T00:00:00"
+              }
+            },
+            {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-01-01T00:00:00Z"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/types/list-is-other",
+      "spec": [
+        "ast.md#types"
+      ],
+      "description": "comparing a list is a type mismatch",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "eq",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 1
+          }
+        },
+        "input": {
+          "x": [
+            1
+          ]
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "eq",
+          "truth": null,
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "x"
+              ]
+            ],
+            "types": [
+              "other",
+              "number"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": [
+                1
+              ]
+            },
+            {
+              "op": "const",
+              "value": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/types/strict-mismatch",
+      "spec": [
+        "ast.md#types"
+      ],
+      "description": "strict mode raises on a type mismatch",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "gt",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 1
+          }
+        },
+        "input": {
+          "x": "2"
+        },
+        "strict": true
+      },
+      "expect": {
+        "error": {
+          "code": "type_mismatch",
+          "path": [
+            "x"
+          ],
+          "types": [
+            "string",
+            "number"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,1558 @@
+{
+  "version": 1,
+  "area": "rules",
+  "vectors": [
+    {
+      "id": "rules/policies/first",
+      "spec": [
+        "rules.md#evaluation",
+        "json-format.md#decisions"
+      ],
+      "description": "first with two matching rules and a default",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "vip",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "customer",
+                    "years"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "big",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "order",
+                    "total"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1000
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.10"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "base",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.00"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "customer": {
+            "years": 7
+          },
+          "order": {
+            "total": 1500
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "vip",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ],
+                    "value": 7
+                  },
+                  {
+                    "op": "const",
+                    "value": 5
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "big",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ],
+                    "value": 1500
+                  },
+                  {
+                    "op": "const",
+                    "value": 1000
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "base",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": [
+            "vip"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/policies/priority",
+      "spec": [
+        "rules.md#evaluation",
+        "json-format.md#decisions"
+      ],
+      "description": "priority with two matching rules and a default",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "vip",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "customer",
+                    "years"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "big",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "order",
+                    "total"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1000
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.10"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "base",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.00"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "customer": {
+            "years": 7
+          },
+          "order": {
+            "total": 1500
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "vip",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ],
+                    "value": 7
+                  },
+                  {
+                    "op": "const",
+                    "value": 5
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "big",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ],
+                    "value": 1500
+                  },
+                  {
+                    "op": "const",
+                    "value": 1000
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "base",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": [
+            "vip"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/policies/rule-order",
+      "spec": [
+        "rules.md#evaluation",
+        "json-format.md#decisions"
+      ],
+      "description": "rule_order with two matching rules and a default",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "rule_order",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "vip",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "customer",
+                    "years"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "big",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "order",
+                    "total"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1000
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.10"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "base",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.00"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "customer": {
+            "years": 7
+          },
+          "order": {
+            "total": 1500
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "rule_order",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "vip",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ],
+                    "value": 7
+                  },
+                  {
+                    "op": "const",
+                    "value": 5
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "big",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ],
+                    "value": 1500
+                  },
+                  {
+                    "op": "const",
+                    "value": 1000
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.10"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "base",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.00"
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "vip",
+            "big",
+            "base"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/policies/collect",
+      "spec": [
+        "rules.md#evaluation",
+        "json-format.md#decisions"
+      ],
+      "description": "collect with two matching rules and a default",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "vip",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "customer",
+                    "years"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "big",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "order",
+                    "total"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1000
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.10"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "base",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.00"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "customer": {
+            "years": 7
+          },
+          "order": {
+            "total": 1500
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "vip",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ],
+                    "value": 7
+                  },
+                  {
+                    "op": "const",
+                    "value": 5
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "big",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ],
+                    "value": 1500
+                  },
+                  {
+                    "op": "const",
+                    "value": 1000
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.10"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "base",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.00"
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "vip",
+            "big",
+            "base"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/policies/unique-one",
+      "spec": [
+        "rules.md#evaluation"
+      ],
+      "description": "unique with exactly one rule firing",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "lt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": 2
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 2
+                  },
+                  {
+                    "op": "const",
+                    "value": 1
+                  }
+                ]
+              },
+              "then": {}
+            },
+            {
+              "rule": "b",
+              "fired": false,
+              "when": {
+                "op": "lt",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 2
+                  },
+                  {
+                    "op": "const",
+                    "value": 0
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": [
+            "a"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/policies/unique-several",
+      "spec": [
+        "rules.md#evaluation",
+        "rules.md#strict-mode-and-errors"
+      ],
+      "description": "unique raises when several rules fire",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "vip",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "customer",
+                    "years"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "big",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "order",
+                    "total"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1000
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.10"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "base",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.00"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "customer": {
+            "years": 7
+          },
+          "order": {
+            "total": 100
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "hit_policy_error",
+          "rules": [
+            "vip",
+            "base"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/policies/any-agree",
+      "spec": [
+        "rules.md#evaluation",
+        "rules.md#when-payloads-are-evaluated"
+      ],
+      "description": "any with agreeing outputs reports the first",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "any",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1.0
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": 2
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "any",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 2
+                  },
+                  {
+                    "op": "const",
+                    "value": 1
+                  }
+                ]
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "rule": "b",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 2
+                  },
+                  {
+                    "op": "const",
+                    "value": 0
+                  }
+                ]
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1.0
+                }
+              }
+            }
+          ],
+          "selected": [
+            "a"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/policies/any-disagree",
+      "spec": [
+        "rules.md#evaluation",
+        "rules.md#strict-mode-and-errors"
+      ],
+      "description": "any raises when outputs differ",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "any",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "vip",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "customer",
+                    "years"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "big",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "order",
+                    "total"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1000
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.10"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "base",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.00"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "customer": {
+            "years": 7
+          },
+          "order": {
+            "total": 100
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "hit_policy_error",
+          "rules": [
+            "vip",
+            "base"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/policies/priority-tie",
+      "spec": [
+        "rules.md#evaluation"
+      ],
+      "description": "priority ties go to rule order",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "vip",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "customer",
+                    "years"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "big",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "order",
+                    "total"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1000
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.10"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "base",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.00"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "customer": {
+            "years": 7
+          },
+          "order": {
+            "total": 1500
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "vip",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ],
+                    "value": 7
+                  },
+                  {
+                    "op": "const",
+                    "value": 5
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "big",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ],
+                    "value": 1500
+                  },
+                  {
+                    "op": "const",
+                    "value": 1000
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "base",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": [
+            "vip"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/policies/nothing-fires",
+      "spec": [
+        "rules.md#evaluation",
+        "rules.md#outputs"
+      ],
+      "description": "first with no rule firing selects nothing",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": 0
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": false,
+              "when": {
+                "op": "gt",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 0
+                  },
+                  {
+                    "op": "const",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": []
+        }
+      }
+    },
+    {
+      "id": "rules/policies/priority-later-rule-wins",
+      "spec": [
+        "rules.md#evaluation",
+        "json-format.md#decisions"
+      ],
+      "description": "priority selects a later rule with a higher priority",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "vip",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "customer",
+                    "years"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "big",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "order",
+                    "total"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1000
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.10"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "base",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.00"
+                  }
+                }
+              },
+              "priority": 20
+            }
+          ]
+        },
+        "input": {
+          "customer": {
+            "years": 7
+          },
+          "order": {
+            "total": 1500
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "vip",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ],
+                    "value": 7
+                  },
+                  {
+                    "op": "const",
+                    "value": 5
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "big",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ],
+                    "value": 1500
+                  },
+                  {
+                    "op": "const",
+                    "value": 1000
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "base",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.00"
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "base"
+          ]
+        }
+      }
+    }
+  ]
+}

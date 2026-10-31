@@ -1,0 +1,595 @@
+{
+  "version": 1,
+  "area": "ast",
+  "vectors": [
+    {
+      "id": "ast/missing/missing-field",
+      "spec": [
+        "ast.md#missing-values"
+      ],
+      "description": "a missing field makes a comparison unknown",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "ge",
+          "left": {
+            "op": "field",
+            "path": [
+              "age"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 18
+          }
+        },
+        "input": {}
+      },
+      "expect": {
+        "result": {
+          "op": "ge",
+          "truth": null,
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "age"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "age"
+              ],
+              "value": null,
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "age"
+                  ]
+                ]
+              }
+            },
+            {
+              "op": "const",
+              "value": 18
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/missing/explicit-null",
+      "spec": [
+        "ast.md#missing-values"
+      ],
+      "description": "an explicit null makes a comparison unknown",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "ge",
+          "left": {
+            "op": "field",
+            "path": [
+              "age"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 18
+          }
+        },
+        "input": {
+          "age": null
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "ge",
+          "truth": null,
+          "reason": {
+            "code": "null",
+            "paths": [
+              [
+                "age"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "age"
+              ],
+              "value": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "age"
+                  ]
+                ]
+              }
+            },
+            {
+              "op": "const",
+              "value": 18
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/missing/null-in-the-middle",
+      "spec": [
+        "ast.md#missing-values"
+      ],
+      "description": "a null in the middle of a path makes the field null",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "ge",
+          "left": {
+            "op": "field",
+            "path": [
+              "customer",
+              "age"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 18
+          }
+        },
+        "input": {
+          "customer": null
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "ge",
+          "truth": null,
+          "reason": {
+            "code": "null",
+            "paths": [
+              [
+                "customer"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "customer",
+                "age"
+              ],
+              "value": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "customer"
+                  ]
+                ]
+              }
+            },
+            {
+              "op": "const",
+              "value": 18
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/missing/null-input",
+      "spec": [
+        "ast.md#missing-values"
+      ],
+      "description": "a null input is null at the empty path",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "ge",
+          "left": {
+            "op": "field",
+            "path": [
+              "age"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 18
+          }
+        },
+        "input": null
+      },
+      "expect": {
+        "result": {
+          "op": "ge",
+          "truth": null,
+          "reason": {
+            "code": "null",
+            "paths": [
+              []
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "age"
+              ],
+              "value": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  []
+                ]
+              }
+            },
+            {
+              "op": "const",
+              "value": 18
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/missing/is-null-missing",
+      "spec": [
+        "ast.md#missing-values"
+      ],
+      "description": "is_null is true for a missing field",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "is_null",
+          "operand": {
+            "op": "field",
+            "path": [
+              "age"
+            ]
+          }
+        },
+        "input": {}
+      },
+      "expect": {
+        "result": {
+          "op": "is_null",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "age"
+              ],
+              "value": null,
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "age"
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/missing/is-null-value",
+      "spec": [
+        "ast.md#missing-values"
+      ],
+      "description": "is_null is false for a present value",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "is_null",
+          "operand": {
+            "op": "field",
+            "path": [
+              "age"
+            ]
+          }
+        },
+        "input": {
+          "age": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "is_null",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "age"
+              ],
+              "value": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/missing/null-before-types",
+      "spec": [
+        "ast.md#missing-values"
+      ],
+      "description": "null is checked before types",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "gt",
+          "left": {
+            "op": "field",
+            "path": [
+              "age"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": "x"
+          }
+        },
+        "input": {
+          "age": null
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "gt",
+          "truth": null,
+          "reason": {
+            "code": "null",
+            "paths": [
+              [
+                "age"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "age"
+              ],
+              "value": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "age"
+                  ]
+                ]
+              }
+            },
+            {
+              "op": "const",
+              "value": "x"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/missing/strict-missing",
+      "spec": [
+        "ast.md#missing-values"
+      ],
+      "description": "strict mode raises on a missing field",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "ge",
+          "left": {
+            "op": "field",
+            "path": [
+              "age"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 18
+          }
+        },
+        "input": {},
+        "strict": true
+      },
+      "expect": {
+        "error": {
+          "code": "missing_field",
+          "path": [
+            "age"
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/missing/strict-missing-under-is-null",
+      "spec": [
+        "ast.md#missing-values"
+      ],
+      "description": "strict mode raises on a missing field even under is_null",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "is_null",
+          "operand": {
+            "op": "field",
+            "path": [
+              "age"
+            ]
+          }
+        },
+        "input": {},
+        "strict": true
+      },
+      "expect": {
+        "error": {
+          "code": "missing_field",
+          "path": [
+            "age"
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/missing/strict-null-in-the-middle",
+      "spec": [
+        "ast.md#missing-values"
+      ],
+      "description": "strict mode accepts a null in the middle of a path",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "ge",
+          "left": {
+            "op": "field",
+            "path": [
+              "customer",
+              "age"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 18
+          }
+        },
+        "input": {
+          "customer": null
+        },
+        "strict": true
+      },
+      "expect": {
+        "result": {
+          "op": "ge",
+          "truth": null,
+          "reason": {
+            "code": "null",
+            "paths": [
+              [
+                "customer"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "customer",
+                "age"
+              ],
+              "value": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "customer"
+                  ]
+                ]
+              }
+            },
+            {
+              "op": "const",
+              "value": 18
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/missing/field-as-condition-not-boolean",
+      "spec": [
+        "ast.md#missing-values"
+      ],
+      "description": "a non-boolean field used as a condition is a type mismatch",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "age"
+          ]
+        },
+        "input": {
+          "age": 3
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "field",
+          "path": [
+            "age"
+          ],
+          "truth": null,
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "age"
+              ]
+            ],
+            "types": [
+              "number",
+              "boolean"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "age"
+              ],
+              "value": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/missing/strict-missing-nested",
+      "spec": [
+        "ast.md#missing-values"
+      ],
+      "description": "the missing_field error carries the field's full path",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "ge",
+          "left": {
+            "op": "field",
+            "path": [
+              "customer",
+              "age"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 18
+          }
+        },
+        "input": {},
+        "strict": true
+      },
+      "expect": {
+        "error": {
+          "code": "missing_field",
+          "path": [
+            "customer",
+            "age"
+          ]
+        }
+      }
+    }
+  ]
+}

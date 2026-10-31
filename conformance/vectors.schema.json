@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanrules.github.io/schemas/conformance/vectors.schema.json",
+  "title": "cleanrules conformance vector file, version 1",
+  "description": "See conformance/README.md. Documents inside the vectors use the JSON format v1 (spec/json-format.md).",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "area": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/vector"
+      }
+    }
+  },
+  "required": [
+    "version",
+    "area",
+    "vectors"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "vector": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+(/[a-z0-9-]+){2,}$"
+        },
+        "spec": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z-]+\\.md#[a-z0-9_-]+$"
+          }
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "given": {
+          "$ref": "#/$defs/given"
+        },
+        "expect": {
+          "$ref": "#/$defs/expect"
+        }
+      },
+      "required": [
+        "id",
+        "spec",
+        "description",
+        "given",
+        "expect"
+      ],
+      "additionalProperties": false
+    },
+    "given": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "read"
+            },
+            "text": {
+              "type": "string"
+            },
+            "document": {
+              "type": "object"
+            },
+            "ruleset": {
+              "$ref": "https://cleanrules.github.io/schemas/v1/ruleset.schema.json#/$defs/ruleset"
+            },
+            "limits": {
+              "type": "object",
+              "propertyNames": {
+                "enum": [
+                  "max_size",
+                  "max_nesting",
+                  "max_depth"
+                ]
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "text"
+              ]
+            },
+            {
+              "required": [
+                "document"
+              ]
+            }
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "condition"
+            },
+            "condition": {
+              "$ref": "https://cleanrules.github.io/schemas/v1/condition.schema.json#/$defs/condition"
+            },
+            "input": {
+              "$ref": "https://cleanrules.github.io/schemas/v1/value.schema.json#/$defs/value"
+            },
+            "logic": {
+              "type": "string"
+            },
+            "strict": {
+              "const": true
+            }
+          },
+          "required": [
+            "kind",
+            "condition",
+            "input"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "value"
+            },
+            "value": {
+              "$ref": "https://cleanrules.github.io/schemas/v1/rule.schema.json#/$defs/payloadValue"
+            },
+            "input": {
+              "$ref": "https://cleanrules.github.io/schemas/v1/value.schema.json#/$defs/value"
+            },
+            "strict": {
+              "const": true
+            }
+          },
+          "required": [
+            "kind",
+            "value",
+            "input"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "evaluate"
+            },
+            "ruleset": {
+              "$ref": "https://cleanrules.github.io/schemas/v1/ruleset.schema.json#/$defs/ruleset"
+            },
+            "input": {
+              "$ref": "https://cleanrules.github.io/schemas/v1/value.schema.json#/$defs/value"
+            },
+            "inputs": {
+              "type": "array",
+              "items": {
+                "$ref": "https://cleanrules.github.io/schemas/v1/value.schema.json#/$defs/value"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "ruleset"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "input"
+              ]
+            },
+            {
+              "required": [
+                "inputs"
+              ]
+            }
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "explain"
+            },
+            "ruleset": {
+              "$ref": "https://cleanrules.github.io/schemas/v1/ruleset.schema.json#/$defs/ruleset"
+            },
+            "input": {
+              "$ref": "https://cleanrules.github.io/schemas/v1/value.schema.json#/$defs/value"
+            }
+          },
+          "required": [
+            "kind",
+            "ruleset",
+            "input"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "summary"
+            },
+            "ruleset": {
+              "$ref": "https://cleanrules.github.io/schemas/v1/ruleset.schema.json#/$defs/ruleset"
+            }
+          },
+          "required": [
+            "kind",
+            "ruleset"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "expect": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "document": {
+          "type": "object"
+        },
+        "result": {
+          "$ref": "https://cleanrules.github.io/schemas/v1/decision.schema.json#/$defs/result"
+        },
+        "decision": {
+          "$ref": "https://cleanrules.github.io/schemas/v1/decision.schema.json#/$defs/decision"
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "$ref": "https://cleanrules.github.io/schemas/v1/decision.schema.json#/$defs/decision"
+          }
+        },
+        "explanation": {
+          "$ref": "https://cleanrules.github.io/schemas/v1/explanation.schema.json#/$defs/explanation"
+        },
+        "summary": {
+          "$ref": "https://cleanrules.github.io/schemas/v1/summary.schema.json#/$defs/summary"
+        },
+        "text": {
+          "type": "string"
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "format_error",
+                "unsupported_version",
+                "limit_exceeded",
+                "decision_mismatch",
+                "expression_error",
+                "rule_definition_error",
+                "rule_syntax_error",
+                "registry_error",
+                "rule_not_found",
+                "evaluation_error",
+                "missing_field",
+                "type_mismatch",
+                "hit_policy_error",
+                "action_error",
+                "unsupported"
+              ]
+            },
+            "pointer": {
+              "type": "string"
+            },
+            "line": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "column": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "rule": {
+              "type": "string"
+            },
+            "rules": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "executed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "path": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                ]
+              }
+            },
+            "types": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "row": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

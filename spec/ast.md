@@ -315,7 +315,18 @@ which bound failed.
 **Strict mode** raises the first error found in depth-first, left-to-right
 post-order: children before their parent, operands in order. Every engine mode
 raises the same error; in a batch, it is the first failing input in order
-(`errors.md`).
+(`errors.md`). Strict mode raises only for missing fields, type mismatches
+(`unorderable` included) and read errors: nulls, division by zero, overflows
+and NaN results stay nulls with their reasons.
+
+## Evaluating one node
+
+Besides rules, every language can evaluate one node on an input and return its
+result tree (`json-format.md`, *Result trees*): `evaluate_tree` for a condition,
+with the options `logic` and `strict`, and `evaluate_value_tree` for a value,
+with `strict` (Python names; `evaluateTree` and `evaluateValueTree` where
+camel case is the idiom). The conformance vectors of kinds `condition` and
+`value` use them.
 
 ## Differences from the Python v1
 

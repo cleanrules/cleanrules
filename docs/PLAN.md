@@ -182,6 +182,18 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
         - Las constantes nulas se admiten bajo `is_null`, y las fechas con hora más finas que el microsegundo se rechazan.
         - Los namedtuples y las filas de pandas son **registros**: mapas con posiciones, indexables por entero como en la v1. La sección "Reading data" de `ast.md` (mapas, registros, atributos **públicos**, nunca privados ni de módulos o clases) pasa a ser una obligación de cada binding.
 - [ ] A.3 Exportador temporal en Python (`conformance/tools/`) que, con la implementación de la v1, genera **vectores de conformidad**: árboles y errores de construcción, evaluaciones con motivos, modo estricto, decisiones de las 6 políticas, agregados, explicaciones y resúmenes. Las propiedades de hypothesis se convierten en miles de casos fijados.
+  - Se divide en:
+  - [x] A.3a Formato de los vectores (`conformance/README.md` y `conformance/vectors.schema.json`), catálogo de errores (`spec/errors.md`) y exportador (`conformance/tools/`), con los codificadores de la v1 al formato JSON y una primera tanda de 122 vectores elegidos a mano: tablas de Kleene, lectura, ausentes, tipos, nodos, motivos, políticas, agregados, payloads, modo estricto, lotes, explicaciones y resúmenes.
+    - Hecho el 2026-10-31. El exportador es determinista: ejecutarlo dos veces deja los vectores igual. `conformance/tools/check.py` valida cada documento contra los esquemas de la especificación y comprueba que las secciones citadas existen. Las herramientas de `conformance/tools/` no pasan por pyright estricto, porque son temporales y se borran en A.4.
+    - Revisado por `api-reviewer`, con un hallazgo grave corregido: la distancia entre fechas con hora se codificaba en días cuando era de días enteros.
+      - El exportador recalcula cada distancia con la aritmética de la especificación y salta los casos en que la v1 discrepa, como el cambio de hora.
+      - Las entradas se codifican de forma estricta.
+      - Los vectores de explicación incluyen su decisión.
+      - `spec/errors.md` define cómo se comparan los errores, la ruta completa en `missing_field` y la forma idiomática en cada lenguaje: `*Exception` en Java, un solo `*Error` con código en Go, un `enum` en C y `Error` en Rust. Python conserva las bases de la v1.
+      - Quedaron definidos en la especificación la API para evaluar un nodo (`evaluate_tree`), la escala de las distancias decimales, el resultado de `min`/`max` y qué no lanza el modo estricto.
+  - [ ] A.3b Vectores de lectura de documentos (léxicos, errores con su puntero y orden, límites), escritos desde la especificación, porque la v1 no tiene lector.
+  - [ ] A.3c Vectores generados con las propiedades de hypothesis (miles, con semilla fija).
+  - [ ] A.3d Script de cobertura: cada sección normativa citada por al menos un vector, y CI.
   - Vectores de lectura que hacen falta aunque la v1 no los pueda generar:
     - números: `-0`, `9223372036854775808`, `-9223372036854775809`, `18446744073709551616`, `{"$int": 1.0}`, `{"$int": 1e2}` y flotantes difíciles de redondear;
     - claves duplicadas en nodos, en mapas de datos y en `$map`;

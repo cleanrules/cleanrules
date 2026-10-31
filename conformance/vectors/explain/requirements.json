@@ -1,0 +1,1750 @@
+{
+  "version": 1,
+  "area": "explain",
+  "vectors": [
+    {
+      "id": "explain/requirements/priority-example",
+      "spec": [
+        "explain.md#requirements",
+        "explain.md#causes",
+        "json-format.md#explanations",
+        "explain.md#counterfactuals",
+        "explain.md#notes-for-rules-that-fired-but-were-not-selected",
+        "explain.md#keeping-only-the-changes-that-work"
+      ],
+      "description": "the worked example of explain.md",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 10
+                    }
+                  },
+                  {
+                    "op": "not",
+                    "operand": {
+                      "op": "le",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "y"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 3
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "between",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "low": {
+                  "op": "const",
+                  "value": 0
+                },
+                "high": {
+                  "op": "const",
+                  "value": 5
+                },
+                "closed": "both"
+              }
+            },
+            {
+              "name": "c",
+              "when": {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  {
+                    "op": "not",
+                    "operand": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "d",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "priority": 1
+            },
+            {
+              "name": "e",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              },
+              "priority": 5
+            }
+          ]
+        },
+        "input": {
+          "x": 8,
+          "y": 2
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": false,
+              "when": {
+                "op": "and",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "gt",
+                    "truth": false,
+                    "children": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ],
+                        "value": 8
+                      },
+                      {
+                        "op": "const",
+                        "value": 10
+                      }
+                    ]
+                  },
+                  {
+                    "op": "not",
+                    "truth": false,
+                    "children": [
+                      {
+                        "op": "le",
+                        "truth": true,
+                        "children": [
+                          {
+                            "op": "field",
+                            "path": [
+                              "y"
+                            ],
+                            "value": 2
+                          },
+                          {
+                            "op": "const",
+                            "value": 3
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "b",
+              "fired": false,
+              "when": {
+                "op": "between",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "ge",
+                    "truth": true,
+                    "children": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ],
+                        "value": 8
+                      },
+                      {
+                        "op": "const",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  {
+                    "op": "le",
+                    "truth": false,
+                    "children": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ],
+                        "value": 8
+                      },
+                      {
+                        "op": "const",
+                        "value": 5
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "c",
+              "fired": false,
+              "when": {
+                "op": "and",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "gt",
+                    "truth": true,
+                    "children": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ],
+                        "value": 8
+                      },
+                      {
+                        "op": "const",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "op": "not",
+                    "truth": false,
+                    "children": [
+                      {
+                        "op": "gt",
+                        "truth": true,
+                        "children": [
+                          {
+                            "op": "field",
+                            "path": [
+                              "x"
+                            ],
+                            "value": 8
+                          },
+                          {
+                            "op": "const",
+                            "value": 1
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "d",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 8
+                  },
+                  {
+                    "op": "const",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "e",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 8
+                  },
+                  {
+                    "op": "const",
+                    "value": 0
+                  }
+                ]
+              },
+              "then": {}
+            }
+          ],
+          "selected": [
+            "e"
+          ]
+        },
+        "explanation": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "selected": [
+            "e"
+          ],
+          "rules": [
+            {
+              "rule": "a",
+              "status": "not_fired",
+              "achievable": true,
+              "requirement": {
+                "all": [
+                  {
+                    "condition": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 10
+                      }
+                    },
+                    "at": "/decision/results/0/when/children/0",
+                    "truth": false,
+                    "negated": false,
+                    "values": [
+                      {
+                        "path": [
+                          "x"
+                        ],
+                        "value": 8
+                      }
+                    ],
+                    "counterfactual": {
+                      "path": [
+                        "x"
+                      ],
+                      "op": "gt",
+                      "target": 10,
+                      "gap": 2
+                    }
+                  },
+                  {
+                    "condition": {
+                      "op": "le",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "y"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 3
+                      }
+                    },
+                    "at": "/decision/results/0/when/children/1/children/0",
+                    "truth": true,
+                    "negated": true,
+                    "values": [
+                      {
+                        "path": [
+                          "y"
+                        ],
+                        "value": 2
+                      }
+                    ],
+                    "counterfactual": {
+                      "path": [
+                        "y"
+                      ],
+                      "op": "gt",
+                      "target": 3,
+                      "gap": 1
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "b",
+              "status": "not_fired",
+              "achievable": true,
+              "requirement": {
+                "condition": {
+                  "op": "le",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "at": "/decision/results/1/when/children/1",
+                "truth": false,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "x"
+                    ],
+                    "value": 8
+                  }
+                ],
+                "counterfactual": {
+                  "path": [
+                    "x"
+                  ],
+                  "op": "le",
+                  "target": 5,
+                  "gap": 3
+                }
+              }
+            },
+            {
+              "rule": "c",
+              "status": "not_fired",
+              "achievable": false,
+              "requirement": {
+                "condition": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "at": "/decision/results/2/when/children/1/children/0",
+                "truth": true,
+                "negated": true,
+                "values": [
+                  {
+                    "path": [
+                      "x"
+                    ],
+                    "value": 8
+                  }
+                ],
+                "counterfactual": {
+                  "path": [
+                    "x"
+                  ],
+                  "op": "le",
+                  "target": 1,
+                  "gap": 7
+                }
+              }
+            },
+            {
+              "rule": "d",
+              "status": "fired",
+              "note": {
+                "kind": "lower_priority",
+                "winner": "e",
+                "priority": 1,
+                "winner_priority": 5
+              },
+              "requirement": {
+                "condition": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "at": "/decision/results/3/when",
+                "truth": true,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "x"
+                    ],
+                    "value": 8
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "e",
+              "status": "selected",
+              "requirement": {
+                "condition": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "at": "/decision/results/4/when",
+                "truth": true,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "x"
+                    ],
+                    "value": 8
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/requirements/unknown-and-dates",
+      "spec": [
+        "explain.md#requirements",
+        "explain.md#causes",
+        "json-format.md#explanations",
+        "explain.md#rule-status",
+        "explain.md#counterfactuals"
+      ],
+      "description": "unknown rules and a gap in days",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "late",
+              "when": {
+                "op": "lt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "due"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$date": "2026-10-01"
+                  }
+                }
+              },
+              "then": {
+                "fee": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "5.00"
+                  }
+                }
+              }
+            },
+            {
+              "name": "vip",
+              "when": {
+                "op": "or",
+                "operands": [
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "customer",
+                        "years"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 5
+                    }
+                  },
+                  {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "vip"
+                    ]
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": 0.1
+                }
+              }
+            },
+            {
+              "name": "none",
+              "when": {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "missing",
+                    "code"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": "X"
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "due": {
+            "$date": "2026-10-31"
+          },
+          "customer": {
+            "years": 3,
+            "vip": null
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "late",
+              "fired": false,
+              "when": {
+                "op": "lt",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "due"
+                    ],
+                    "value": {
+                      "$date": "2026-10-31"
+                    }
+                  },
+                  {
+                    "op": "const",
+                    "value": {
+                      "$date": "2026-10-01"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "vip",
+              "fired": false,
+              "when": {
+                "op": "or",
+                "truth": null,
+                "reason": {
+                  "code": "null",
+                  "paths": [
+                    [
+                      "customer",
+                      "vip"
+                    ]
+                  ]
+                },
+                "children": [
+                  {
+                    "op": "gt",
+                    "truth": false,
+                    "children": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ],
+                        "value": 3
+                      },
+                      {
+                        "op": "const",
+                        "value": 5
+                      }
+                    ]
+                  },
+                  {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "vip"
+                    ],
+                    "truth": null,
+                    "reason": {
+                      "code": "null",
+                      "paths": [
+                        [
+                          "customer",
+                          "vip"
+                        ]
+                      ]
+                    },
+                    "children": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "vip"
+                        ],
+                        "value": null,
+                        "reason": {
+                          "code": "null",
+                          "paths": [
+                            [
+                              "customer",
+                              "vip"
+                            ]
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "none",
+              "fired": false,
+              "when": {
+                "op": "eq",
+                "truth": null,
+                "reason": {
+                  "code": "missing_field",
+                  "paths": [
+                    [
+                      "missing"
+                    ]
+                  ]
+                },
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "missing",
+                      "code"
+                    ],
+                    "value": null,
+                    "reason": {
+                      "code": "missing_field",
+                      "paths": [
+                        [
+                          "missing"
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "op": "const",
+                    "value": "X"
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": [],
+          "aggregated": null
+        },
+        "explanation": {
+          "hit_policy": "collect",
+          "logic": "boolean",
+          "selected": [],
+          "rules": [
+            {
+              "rule": "late",
+              "status": "not_fired",
+              "achievable": true,
+              "requirement": {
+                "condition": {
+                  "op": "lt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "due"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": {
+                      "$date": "2026-10-01"
+                    }
+                  }
+                },
+                "at": "/decision/results/0/when",
+                "truth": false,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "due"
+                    ],
+                    "value": {
+                      "$date": "2026-10-31"
+                    }
+                  }
+                ],
+                "counterfactual": {
+                  "path": [
+                    "due"
+                  ],
+                  "op": "lt",
+                  "target": {
+                    "$date": "2026-10-01"
+                  },
+                  "gap": {
+                    "days": 30
+                  }
+                }
+              }
+            },
+            {
+              "rule": "vip",
+              "status": "unknown",
+              "achievable": true,
+              "requirement": {
+                "condition": {
+                  "op": "field",
+                  "path": [
+                    "customer",
+                    "vip"
+                  ]
+                },
+                "at": "/decision/results/1/when/children/1",
+                "truth": null,
+                "negated": false,
+                "values": [],
+                "reason": {
+                  "code": "null",
+                  "paths": [
+                    [
+                      "customer",
+                      "vip"
+                    ]
+                  ]
+                }
+              }
+            },
+            {
+              "rule": "none",
+              "status": "unknown",
+              "achievable": true,
+              "requirement": {
+                "condition": {
+                  "op": "eq",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "missing",
+                      "code"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": "X"
+                  }
+                },
+                "at": "/decision/results/2/when",
+                "truth": null,
+                "negated": false,
+                "values": [],
+                "reason": {
+                  "code": "missing_field",
+                  "paths": [
+                    [
+                      "missing"
+                    ]
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/requirements/de-morgan",
+      "spec": [
+        "explain.md#requirements",
+        "explain.md#causes",
+        "json-format.md#explanations",
+        "explain.md#building-the-requirement"
+      ],
+      "description": "not over and becomes any of the negated operands",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "not",
+                "operand": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "a"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "b"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "a": 5,
+          "b": 5
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": false,
+              "when": {
+                "op": "not",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "and",
+                    "truth": true,
+                    "children": [
+                      {
+                        "op": "gt",
+                        "truth": true,
+                        "children": [
+                          {
+                            "op": "field",
+                            "path": [
+                              "a"
+                            ],
+                            "value": 5
+                          },
+                          {
+                            "op": "const",
+                            "value": 1
+                          }
+                        ]
+                      },
+                      {
+                        "op": "gt",
+                        "truth": true,
+                        "children": [
+                          {
+                            "op": "field",
+                            "path": [
+                              "b"
+                            ],
+                            "value": 5
+                          },
+                          {
+                            "op": "const",
+                            "value": 1
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": []
+        },
+        "explanation": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "selected": [],
+          "rules": [
+            {
+              "rule": "r",
+              "status": "not_fired",
+              "achievable": true,
+              "requirement": {
+                "any": [
+                  {
+                    "condition": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "a"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    "at": "/decision/results/0/when/children/0/children/0",
+                    "truth": true,
+                    "negated": true,
+                    "values": [
+                      {
+                        "path": [
+                          "a"
+                        ],
+                        "value": 5
+                      }
+                    ],
+                    "counterfactual": {
+                      "path": [
+                        "a"
+                      ],
+                      "op": "le",
+                      "target": 1,
+                      "gap": 4
+                    }
+                  },
+                  {
+                    "condition": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "b"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    "at": "/decision/results/0/when/children/0/children/1",
+                    "truth": true,
+                    "negated": true,
+                    "values": [
+                      {
+                        "path": [
+                          "b"
+                        ],
+                        "value": 5
+                      }
+                    ],
+                    "counterfactual": {
+                      "path": [
+                        "b"
+                      ],
+                      "op": "le",
+                      "target": 1,
+                      "gap": 4
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/requirements/absorption",
+      "spec": [
+        "explain.md#requirements",
+        "explain.md#causes",
+        "json-format.md#explanations",
+        "explain.md#simplifying"
+      ],
+      "description": "a and (a or b) needs only a",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "a"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  {
+                    "op": "or",
+                    "operands": [
+                      {
+                        "op": "gt",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "a"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 1
+                        }
+                      },
+                      {
+                        "op": "gt",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "b"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 1
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "input": {
+          "a": 0,
+          "b": 0
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": false,
+              "when": {
+                "op": "and",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "gt",
+                    "truth": false,
+                    "children": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "a"
+                        ],
+                        "value": 0
+                      },
+                      {
+                        "op": "const",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "op": "or",
+                    "truth": false,
+                    "children": [
+                      {
+                        "op": "gt",
+                        "truth": false,
+                        "children": [
+                          {
+                            "op": "field",
+                            "path": [
+                              "a"
+                            ],
+                            "value": 0
+                          },
+                          {
+                            "op": "const",
+                            "value": 1
+                          }
+                        ]
+                      },
+                      {
+                        "op": "gt",
+                        "truth": false,
+                        "children": [
+                          {
+                            "op": "field",
+                            "path": [
+                              "b"
+                            ],
+                            "value": 0
+                          },
+                          {
+                            "op": "const",
+                            "value": 1
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": []
+        },
+        "explanation": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "selected": [],
+          "rules": [
+            {
+              "rule": "r",
+              "status": "not_fired",
+              "achievable": true,
+              "requirement": {
+                "condition": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "at": "/decision/results/0/when/children/0",
+                "truth": false,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "a"
+                    ],
+                    "value": 0
+                  }
+                ],
+                "counterfactual": {
+                  "path": [
+                    "a"
+                  ],
+                  "op": "gt",
+                  "target": 1,
+                  "gap": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/requirements/fired-all",
+      "spec": [
+        "explain.md#requirements",
+        "explain.md#causes",
+        "json-format.md#explanations"
+      ],
+      "description": "a rule that fired lists every cause",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "a"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "b"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "input": {
+          "a": 5,
+          "b": 5
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": true,
+              "when": {
+                "op": "and",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "gt",
+                    "truth": true,
+                    "children": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "a"
+                        ],
+                        "value": 5
+                      },
+                      {
+                        "op": "const",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "op": "gt",
+                    "truth": true,
+                    "children": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "b"
+                        ],
+                        "value": 5
+                      },
+                      {
+                        "op": "const",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              },
+              "then": {}
+            }
+          ],
+          "selected": [
+            "r"
+          ]
+        },
+        "explanation": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "selected": [
+            "r"
+          ],
+          "rules": [
+            {
+              "rule": "r",
+              "status": "selected",
+              "requirement": {
+                "all": [
+                  {
+                    "condition": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "a"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    "at": "/decision/results/0/when/children/0",
+                    "truth": true,
+                    "negated": false,
+                    "values": [
+                      {
+                        "path": [
+                          "a"
+                        ],
+                        "value": 5
+                      }
+                    ]
+                  },
+                  {
+                    "condition": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "b"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    "at": "/decision/results/0/when/children/1",
+                    "truth": true,
+                    "negated": false,
+                    "values": [
+                      {
+                        "path": [
+                          "b"
+                        ],
+                        "value": 5
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/requirements/or-fired",
+      "spec": [
+        "explain.md#requirements",
+        "explain.md#causes",
+        "json-format.md#explanations"
+      ],
+      "description": "an or that fired lists the true operands",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "or",
+                "operands": [
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "a"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "b"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "c"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "input": {
+          "a": 5,
+          "b": 0,
+          "c": 5
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": true,
+              "when": {
+                "op": "or",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "gt",
+                    "truth": true,
+                    "children": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "a"
+                        ],
+                        "value": 5
+                      },
+                      {
+                        "op": "const",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "op": "gt",
+                    "truth": false,
+                    "children": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "b"
+                        ],
+                        "value": 0
+                      },
+                      {
+                        "op": "const",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "op": "gt",
+                    "truth": true,
+                    "children": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "c"
+                        ],
+                        "value": 5
+                      },
+                      {
+                        "op": "const",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              },
+              "then": {}
+            }
+          ],
+          "selected": [
+            "r"
+          ]
+        },
+        "explanation": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "selected": [
+            "r"
+          ],
+          "rules": [
+            {
+              "rule": "r",
+              "status": "selected",
+              "requirement": {
+                "any": [
+                  {
+                    "condition": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "a"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    "at": "/decision/results/0/when/children/0",
+                    "truth": true,
+                    "negated": false,
+                    "values": [
+                      {
+                        "path": [
+                          "a"
+                        ],
+                        "value": 5
+                      }
+                    ]
+                  },
+                  {
+                    "condition": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "c"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    "at": "/decision/results/0/when/children/2",
+                    "truth": true,
+                    "negated": false,
+                    "values": [
+                      {
+                        "path": [
+                          "c"
+                        ],
+                        "value": 5
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

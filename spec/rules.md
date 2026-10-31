@@ -43,7 +43,8 @@ The **hit policy** then selects rules among those that fired:
 | `RULE_ORDER` | every fired rule, in rule order | — |
 | `COLLECT` | every fired rule, in rule order | — |
 
-Errors are `HitPolicyError` and list the rules involved, in rule order.
+Errors are `HitPolicyError` and list the rules involved, in rule order
+(`errors.md`, *Codes*).
 
 ### When payloads are evaluated
 
@@ -86,7 +87,10 @@ the selected payloads. Within a key:
 - null values are skipped, as in SQL. `count` counts the non-null values; `sum`,
   `min` and `max` of no values are null;
 - `sum`, `min` and `max` need numbers (not booleans) and raise `HitPolicyError`
-  otherwise;
+  otherwise, naming the rules whose payloads hold such a value (`errors.md`);
+- `min` and `max` return the smallest or largest value unchanged (after
+  decimals are converted to float), so the minimum of `2` and `3.5` is the int
+  `2`; between equal values, the first in rule order is returned;
 - decimal values are converted to float64 before `sum`, `min` and `max`, as
   arithmetic does with decimal operands;
 - the result follows the arithmetic rules: an integer `sum` outside the signed

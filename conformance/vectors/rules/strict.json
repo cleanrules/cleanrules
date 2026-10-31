@@ -1,0 +1,206 @@
+{
+  "version": 1,
+  "area": "rules",
+  "vectors": [
+    {
+      "id": "rules/strict/unselected-payload",
+      "spec": [
+        "rules.md#strict-mode-and-errors",
+        "rules.md#when-payloads-are-evaluated"
+      ],
+      "description": "strict mode does not evaluate the payload of a rule that is not selected",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "strict": true,
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "v": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "v": {
+                  "op": "field",
+                  "path": [
+                    "missing"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "v": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "rule": "b",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": [
+            "a"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/strict/selected-payload",
+      "spec": [
+        "rules.md#strict-mode-and-errors",
+        "rules.md#when-payloads-are-evaluated"
+      ],
+      "description": "strict mode raises on the payload of a selected rule",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "strict": true,
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "v": {
+                  "op": "field",
+                  "path": [
+                    "missing"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "error": {
+          "code": "missing_field",
+          "rule": "a",
+          "path": [
+            "missing"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/strict/conditions-first",
+      "spec": [
+        "rules.md#strict-mode-and-errors"
+      ],
+      "description": "strict mode raises the first condition error in rule order",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "strict": true,
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "y"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": "s"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "type_mismatch",
+          "rule": "a",
+          "path": [
+            "x"
+          ],
+          "types": [
+            "string",
+            "number"
+          ]
+        }
+      }
+    }
+  ]
+}

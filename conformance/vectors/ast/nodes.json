@@ -1,0 +1,1252 @@
+{
+  "version": 1,
+  "area": "ast",
+  "vectors": [
+    {
+      "id": "ast/nodes/in-true",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "in is true when the operand is one of the values",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "in",
+          "operand": {
+            "op": "field",
+            "path": [
+              "c"
+            ]
+          },
+          "values": [
+            "ES",
+            "FR"
+          ]
+        },
+        "input": {
+          "c": "ES"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "in",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "c"
+              ],
+              "value": "ES"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/in-false",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "in is false otherwise",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "in",
+          "operand": {
+            "op": "field",
+            "path": [
+              "c"
+            ]
+          },
+          "values": [
+            "ES",
+            "FR"
+          ]
+        },
+        "input": {
+          "c": "PT"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "in",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "c"
+              ],
+              "value": "PT"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/in-other-group",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "in with an operand of another group is a type mismatch",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "in",
+          "operand": {
+            "op": "field",
+            "path": [
+              "c"
+            ]
+          },
+          "values": [
+            1,
+            2
+          ]
+        },
+        "input": {
+          "c": "1"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "in",
+          "truth": null,
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "c"
+              ]
+            ],
+            "types": [
+              "string",
+              "number"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "c"
+              ],
+              "value": "1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/in-int-and-float",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "an int operand matches equal float values in in",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "in",
+          "operand": {
+            "op": "field",
+            "path": [
+              "c"
+            ]
+          },
+          "values": [
+            1.0,
+            1,
+            2
+          ]
+        },
+        "input": {
+          "c": 1
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "in",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "c"
+              ],
+              "value": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/between-both-18",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "between closed=both with x=18",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "between",
+          "operand": {
+            "op": "field",
+            "path": [
+              "age"
+            ]
+          },
+          "low": {
+            "op": "const",
+            "value": 18
+          },
+          "high": {
+            "op": "const",
+            "value": 65
+          },
+          "closed": "both"
+        },
+        "input": {
+          "age": 18
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "between",
+          "truth": true,
+          "children": [
+            {
+              "op": "ge",
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "age"
+                  ],
+                  "value": 18
+                },
+                {
+                  "op": "const",
+                  "value": 18
+                }
+              ]
+            },
+            {
+              "op": "le",
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "age"
+                  ],
+                  "value": 18
+                },
+                {
+                  "op": "const",
+                  "value": 65
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/between-left-65",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "between closed=left with x=65",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "between",
+          "operand": {
+            "op": "field",
+            "path": [
+              "age"
+            ]
+          },
+          "low": {
+            "op": "const",
+            "value": 18
+          },
+          "high": {
+            "op": "const",
+            "value": 65
+          },
+          "closed": "left"
+        },
+        "input": {
+          "age": 65
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "between",
+          "truth": false,
+          "children": [
+            {
+              "op": "ge",
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "age"
+                  ],
+                  "value": 65
+                },
+                {
+                  "op": "const",
+                  "value": 18
+                }
+              ]
+            },
+            {
+              "op": "lt",
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "age"
+                  ],
+                  "value": 65
+                },
+                {
+                  "op": "const",
+                  "value": 65
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/between-right-18",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "between closed=right with x=18",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "between",
+          "operand": {
+            "op": "field",
+            "path": [
+              "age"
+            ]
+          },
+          "low": {
+            "op": "const",
+            "value": 18
+          },
+          "high": {
+            "op": "const",
+            "value": 65
+          },
+          "closed": "right"
+        },
+        "input": {
+          "age": 18
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "between",
+          "truth": false,
+          "children": [
+            {
+              "op": "gt",
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "age"
+                  ],
+                  "value": 18
+                },
+                {
+                  "op": "const",
+                  "value": 18
+                }
+              ]
+            },
+            {
+              "op": "le",
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "age"
+                  ],
+                  "value": 18
+                },
+                {
+                  "op": "const",
+                  "value": 65
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/between-none-30",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "between closed=none with x=30",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "between",
+          "operand": {
+            "op": "field",
+            "path": [
+              "age"
+            ]
+          },
+          "low": {
+            "op": "const",
+            "value": 18
+          },
+          "high": {
+            "op": "const",
+            "value": 65
+          },
+          "closed": "none"
+        },
+        "input": {
+          "age": 30
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "between",
+          "truth": true,
+          "children": [
+            {
+              "op": "gt",
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "age"
+                  ],
+                  "value": 30
+                },
+                {
+                  "op": "const",
+                  "value": 18
+                }
+              ]
+            },
+            {
+              "op": "lt",
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "age"
+                  ],
+                  "value": 30
+                },
+                {
+                  "op": "const",
+                  "value": 65
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/between-field-bounds",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "between takes fields as bounds",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "between",
+          "operand": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "low": {
+            "op": "field",
+            "path": [
+              "lo"
+            ]
+          },
+          "high": {
+            "op": "field",
+            "path": [
+              "hi"
+            ]
+          },
+          "closed": "both"
+        },
+        "input": {
+          "x": 5,
+          "lo": 1,
+          "hi": 4
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "between",
+          "truth": false,
+          "children": [
+            {
+              "op": "ge",
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ],
+                  "value": 5
+                },
+                {
+                  "op": "field",
+                  "path": [
+                    "lo"
+                  ],
+                  "value": 1
+                }
+              ]
+            },
+            {
+              "op": "le",
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ],
+                  "value": 5
+                },
+                {
+                  "op": "field",
+                  "path": [
+                    "hi"
+                  ],
+                  "value": 4
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/matches-search",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "matches searches anywhere in the string",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "matches",
+          "operand": {
+            "op": "field",
+            "path": [
+              "email"
+            ]
+          },
+          "pattern": "@example\\.com"
+        },
+        "input": {
+          "email": "ana@example.com"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "matches",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "email"
+              ],
+              "value": "ana@example.com"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/matches-case",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "matches is case-sensitive",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "matches",
+          "operand": {
+            "op": "field",
+            "path": [
+              "email"
+            ]
+          },
+          "pattern": "EXAMPLE"
+        },
+        "input": {
+          "email": "ana@example.com"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "matches",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "email"
+              ],
+              "value": "ana@example.com"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/matches-inline-flag",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "the (?i) flag makes matches case-insensitive",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "matches",
+          "operand": {
+            "op": "field",
+            "path": [
+              "email"
+            ]
+          },
+          "pattern": "(?i)EXAMPLE"
+        },
+        "input": {
+          "email": "ana@example.com"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "matches",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "email"
+              ],
+              "value": "ana@example.com"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/contains-literal",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "contains takes literal text",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "contains",
+          "operand": {
+            "op": "field",
+            "path": [
+              "code"
+            ]
+          },
+          "text": "a.c"
+        },
+        "input": {
+          "code": "xabcx"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "contains",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "code"
+              ],
+              "value": "xabcx"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/starts-with",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "starts_with",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "starts_with",
+          "operand": {
+            "op": "field",
+            "path": [
+              "code"
+            ]
+          },
+          "text": "ES-"
+        },
+        "input": {
+          "code": "ES-001"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "starts_with",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "code"
+              ],
+              "value": "ES-001"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/ends-with-mismatch",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "a string test on a number is a type mismatch",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "ends_with",
+          "operand": {
+            "op": "field",
+            "path": [
+              "code"
+            ]
+          },
+          "text": "1"
+        },
+        "input": {
+          "code": 1
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "ends_with",
+          "truth": null,
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "code"
+              ]
+            ],
+            "types": [
+              "number",
+              "string"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "code"
+              ],
+              "value": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/div-int",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "div returns a float",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": 7,
+          "b": 2
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": 3.5,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 7
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/div-by-zero",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "division by zero is null",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": 7,
+          "b": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": null,
+          "reason": {
+            "code": "division_by_zero",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 7
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/int-overflow",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "an int result outside 64 bits is null",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$int": "4611686018427387904"
+          },
+          "b": 4
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": null,
+          "reason": {
+            "code": "int_overflow",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$int": "4611686018427387904"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 4
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/decimal-to-float",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "decimal operands are converted to float",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 1
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "0.5"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": 1.5,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "0.5"
+              }
+            },
+            {
+              "op": "const",
+              "value": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/inf-kept",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "inf results are kept",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 2
+          }
+        },
+        "input": {
+          "a": {
+            "$float": "inf"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": {
+            "$float": "inf"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$float": "inf"
+              }
+            },
+            {
+              "op": "const",
+              "value": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/nan-result",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "a NaN result is null",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "sub",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$float": "inf"
+          },
+          "b": {
+            "$float": "inf"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "sub",
+          "value": null,
+          "reason": {
+            "code": "nan_result",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$float": "inf"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$float": "inf"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/abs-neg",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "abs and neg",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "abs",
+          "operand": {
+            "op": "neg",
+            "operand": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            }
+          }
+        },
+        "input": {
+          "a": 3
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "abs",
+          "value": 3,
+          "children": [
+            {
+              "op": "neg",
+              "value": -3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 3
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/arith-not-number",
+      "spec": [
+        "ast.md#node-semantics"
+      ],
+      "description": "arithmetic on a string is null with a type mismatch",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 1
+          }
+        },
+        "input": {
+          "a": "x"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": null,
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "a"
+              ]
+            ],
+            "types": [
+              "string",
+              "number"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": "x"
+            },
+            {
+              "op": "const",
+              "value": 1
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

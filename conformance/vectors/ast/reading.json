@@ -1,0 +1,431 @@
+{
+  "version": 1,
+  "area": "ast",
+  "vectors": [
+    {
+      "id": "ast/reading/nested-path",
+      "spec": [
+        "ast.md#reading-data"
+      ],
+      "description": "a nested path reads through maps",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "eq",
+          "left": {
+            "op": "field",
+            "path": [
+              "customer",
+              "address",
+              "city"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": "Madrid"
+          }
+        },
+        "input": {
+          "customer": {
+            "address": {
+              "city": "Madrid"
+            }
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "eq",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "customer",
+                "address",
+                "city"
+              ],
+              "value": "Madrid"
+            },
+            {
+              "op": "const",
+              "value": "Madrid"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/reading/list-index",
+      "spec": [
+        "ast.md#reading-data"
+      ],
+      "description": "an integer segment indexes a list",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "gt",
+          "left": {
+            "op": "field",
+            "path": [
+              "items",
+              1,
+              "price"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 10
+          }
+        },
+        "input": {
+          "items": [
+            {
+              "price": 5
+            },
+            {
+              "price": 20
+            }
+          ]
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "gt",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "items",
+                1,
+                "price"
+              ],
+              "value": 20
+            },
+            {
+              "op": "const",
+              "value": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/reading/index-out-of-range",
+      "spec": [
+        "ast.md#reading-data"
+      ],
+      "description": "an index out of range is missing",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "gt",
+          "left": {
+            "op": "field",
+            "path": [
+              "items",
+              2,
+              "price"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 10
+          }
+        },
+        "input": {
+          "items": [
+            {
+              "price": 5
+            }
+          ]
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "gt",
+          "truth": null,
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "items",
+                2
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "items",
+                2,
+                "price"
+              ],
+              "value": null,
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "items",
+                    2
+                  ]
+                ]
+              }
+            },
+            {
+              "op": "const",
+              "value": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/reading/integer-on-map",
+      "spec": [
+        "ast.md#reading-data"
+      ],
+      "description": "an integer segment never looks up a map key",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "eq",
+          "left": {
+            "op": "field",
+            "path": [
+              "items",
+              0
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": "x"
+          }
+        },
+        "input": {
+          "items": {
+            "0": "x"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "eq",
+          "truth": null,
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "items",
+                0
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "items",
+                0
+              ],
+              "value": null,
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "items",
+                    0
+                  ]
+                ]
+              }
+            },
+            {
+              "op": "const",
+              "value": "x"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/reading/string-on-list",
+      "spec": [
+        "ast.md#reading-data"
+      ],
+      "description": "a string segment on a list is missing",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "gt",
+          "left": {
+            "op": "field",
+            "path": [
+              "items",
+              "price"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 1
+          }
+        },
+        "input": {
+          "items": [
+            1,
+            2
+          ]
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "gt",
+          "truth": null,
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "items",
+                "price"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "items",
+                "price"
+              ],
+              "value": null,
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "items",
+                    "price"
+                  ]
+                ]
+              }
+            },
+            {
+              "op": "const",
+              "value": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/reading/underscore-key",
+      "spec": [
+        "ast.md#reading-data"
+      ],
+      "description": "keys starting with an underscore are ordinary keys",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "eq",
+          "left": {
+            "op": "field",
+            "path": [
+              "_id"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 7
+          }
+        },
+        "input": {
+          "_id": 7
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "eq",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "_id"
+              ],
+              "value": 7
+            },
+            {
+              "op": "const",
+              "value": 7
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/reading/attribute-of-scalar",
+      "spec": [
+        "ast.md#reading-data"
+      ],
+      "description": "a segment on a scalar is missing",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "gt",
+          "left": {
+            "op": "field",
+            "path": [
+              "name",
+              "length"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 1
+          }
+        },
+        "input": {
+          "name": "abc"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "gt",
+          "truth": null,
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "name",
+                "length"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "name",
+                "length"
+              ],
+              "value": null,
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "name",
+                    "length"
+                  ]
+                ]
+              }
+            },
+            {
+              "op": "const",
+              "value": 1
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

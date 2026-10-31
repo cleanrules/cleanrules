@@ -1,0 +1,127 @@
+# Conformance vectors
+
+The vectors in this directory are the executable form of the specification
+(`spec/`). The Rust core and every binding run all of them, and must produce
+exactly the expected output (`CLAUDE.md`, invariant 5). When a vector and an
+implementation disagree, the spec decides which one is wrong.
+
+```text
+conformance/
+  vectors/<area>/<topic>.json   the vectors, grouped by spec area
+  tools/                        the temporary exporter from the Python v1 (phase A)
+```
+
+## Vector files
+
+A vector file is a JSON document:
+
+```json
+{
+  "version": 1,
+  "area": "ast",
+  "vectors": [
+    {
+      "id": "ast/truth/and-false-unknown",
+      "spec": ["ast.md#truth-values"],
+      "description": "FALSE and UNKNOWN is FALSE, without a reason",
+      "given": { "kind": "condition", "condition": { "...": "..." }, "input": { "a": false } },
+      "expect": { "result": { "...": "..." } }
+    }
+  ]
+}
+```
+
+- `version`: the version of this vector format, `1`. It is independent of the
+  JSON format version, which appears in the documents inside the vectors.
+- `id`: unique across all files, `<area>/<topic>/<name>`, lowercase with
+  hyphens. An id never changes meaning; a vector that becomes wrong is fixed or
+  removed, and its id is not reused.
+- `spec`: the spec sections the vector checks, as `<file>#<heading anchor>`
+  (GitHub's anchors: lowercase, spaces as hyphens, punctuation dropped).
+- `description`: one sentence saying what the vector shows.
+- `given` and `expect`: below. All values inside them use the JSON format's
+  encoding (`spec/json-format.md`, *Values*).
+
+## What is given
+
+`given.kind` says what the runner does:
+
+| Kind | Given | Runner calls | Expected |
+|---|---|---|---|
+| `read` | `text` (a JSON text, for lexical cases) or `document`; `ruleset` when reading a decision; optional `limits` (`max_size` in bytes, `max_nesting`, `max_depth`) | the document reader | `document`: the canonical form that is read back, or `error` |
+| `condition` | `condition` (a condition node), `input` (a data value), optional `logic` and `strict` | `evaluate_tree` (`spec/ast.md`, *Evaluating one node*) | `result`: its result tree, or `error` |
+| `value` | `value` (a value node), `input`, optional `strict` | `evaluate_value_tree` | `result`: its result tree, or `error` |
+| `evaluate` | `ruleset` (a rule set document's content), and `input` or `inputs` (a batch) | `evaluate`, or its batch form | `decision`, or `decisions` for a batch, or `error` |
+| `explain` | `ruleset`, `input` | `evaluate`, then `explain` | `decision` (which `at` pointers refer to) and `explanation`, optionally `text` (the exact text of `explain()`), or `error` |
+| `summary` | `ruleset` | `summary` | `summary`, and optionally `text` |
+
+Optional flags such as `strict` are omitted when false. An `error` holds the
+error's `code` and the compared context fields that apply, such as
+`{"code": "missing_field", "rule": "vip", "path": ["customer", "age"]}`;
+runners compare errors as `spec/errors.md` (*Comparing errors*) says.
+
+## Comparing
+
+Runners compare the actual output with `expect` as parsed JSON trees, as
+`spec/json-format.md` (*Comparing documents*) defines: object members in
+order, numbers by lexical class and exact value. Some parts are not compared,
+because the spec says that they are informative:
+
+- `detail` in reasons is removed from both sides before comparing;
+- any two opaque values (`{"$opaque": ...}`) are equal, whatever their type
+  name;
+- errors are compared by code and compared fields only (`spec/errors.md`).
+
+Runners must parse the vectors without losing what is compared. A generic
+parser that turns `1.0` into `1`, reads integers through floats, or reorders
+object members cannot be used as is: JavaScript needs a lossless parser (or
+`JSON.parse` with access to the source text) and an ordered representation of
+objects, because plain objects move integer-like keys such as `"10"` first; Go
+needs a token-stream decoder with `UseNumber`, because `map[string]any` loses
+member order.
+
+A runner reports every failing vector with its id, the expected and the actual
+output, never stopping at the first one.
+
+## Runners
+
+- **Core**: `cargo test -p cleanrules --test conformance` reads the documents
+  and data with the core's own JSON reader.
+- **Each binding** runs every vector twice: once through its JSON entry points,
+  and once converting `input` into the language's native data (with the
+  conversions of `spec/data-model.md`: floats as floats, with `cr.float` in
+  JavaScript, decimals as the language's decimal, maps as an ordered map) and
+  calling the idiomatic API. The second run tests the binding's own code, its
+  data conversion. In a language whose maps have no order (Go), maps passed
+  through to outputs are compared without regard to member order in that run.
+
+## Coverage
+
+Every heading of a normative spec document is cited by at least one vector,
+except informative sections: those marked *Informative*, and every
+*Differences from the Python v1* section. A script in `tools/` checks this,
+and CI runs it.
+
+## Tools
+
+```bash
+uv run python conformance/tools/export.py                                  # regenerate (phase A)
+uv run --no-project --with jsonschema python conformance/tools/check.py   # validate
+```
+
+`check.py` validates every vector file against `vectors.schema.json` and the
+spec's JSON Schemas, and checks that ids are unique and that every cited spec
+section exists.
+
+## Phase A: the exporter
+
+Until the Python v1 is retired (task A.4), `tools/` holds an exporter that
+builds vectors by running the v1 on chosen cases and on the cases its
+hypothesis properties generate, fixed with a seed. Where the spec deviates from
+the v1 on purpose, the exporter skips those cases or writes the vector by hand
+from the spec (`docs/PLAN.md`, task A.3, lists them). Inputs are encoded
+strictly (plain maps, lists and scalars only), and counterfactual gaps are
+recomputed with the spec's arithmetic; a case the format cannot hold, or where
+the v1 disagrees with the spec, is skipped with a message. After A.4 the vectors are
+maintained by hand and by the core's property tests: a counterexample that
+`proptest` finds becomes a new vector.

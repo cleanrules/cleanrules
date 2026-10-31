@@ -1,0 +1,948 @@
+{
+  "version": 1,
+  "area": "explain",
+  "vectors": [
+    {
+      "id": "explain/counterfactuals/at-the-limit",
+      "spec": [
+        "explain.md#counterfactuals"
+      ],
+      "description": "a strict comparison exactly at its limit has a gap of zero",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 10
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": 10
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": false,
+              "when": {
+                "op": "gt",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 10
+                  },
+                  {
+                    "op": "const",
+                    "value": 10
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": []
+        },
+        "explanation": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "selected": [],
+          "rules": [
+            {
+              "rule": "r",
+              "status": "not_fired",
+              "achievable": true,
+              "requirement": {
+                "condition": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 10
+                  }
+                },
+                "at": "/decision/results/0/when",
+                "truth": false,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "x"
+                    ],
+                    "value": 10
+                  }
+                ],
+                "counterfactual": {
+                  "path": [
+                    "x"
+                  ],
+                  "op": "gt",
+                  "target": 10,
+                  "gap": 0
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/counterfactuals/constant-on-the-left",
+      "spec": [
+        "explain.md#counterfactuals"
+      ],
+      "description": "a constant on the left is flipped",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "lt",
+                "left": {
+                  "op": "const",
+                  "value": 10
+                },
+                "right": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": 4
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": false,
+              "when": {
+                "op": "lt",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": 10
+                  },
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 4
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": []
+        },
+        "explanation": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "selected": [],
+          "rules": [
+            {
+              "rule": "r",
+              "status": "not_fired",
+              "achievable": true,
+              "requirement": {
+                "condition": {
+                  "op": "lt",
+                  "left": {
+                    "op": "const",
+                    "value": 10
+                  },
+                  "right": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  }
+                },
+                "at": "/decision/results/0/when",
+                "truth": false,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "x"
+                    ],
+                    "value": 4
+                  }
+                ],
+                "counterfactual": {
+                  "path": [
+                    "x"
+                  ],
+                  "op": "gt",
+                  "target": 10,
+                  "gap": 6
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/counterfactuals/negated-eq",
+      "spec": [
+        "explain.md#counterfactuals"
+      ],
+      "description": "a negated equality has a counterfactual without a gap",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "not",
+                "operand": {
+                  "op": "eq",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 3
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": 3
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": false,
+              "when": {
+                "op": "not",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "eq",
+                    "truth": true,
+                    "children": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ],
+                        "value": 3
+                      },
+                      {
+                        "op": "const",
+                        "value": 3
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": []
+        },
+        "explanation": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "selected": [],
+          "rules": [
+            {
+              "rule": "r",
+              "status": "not_fired",
+              "achievable": true,
+              "requirement": {
+                "condition": {
+                  "op": "eq",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 3
+                  }
+                },
+                "at": "/decision/results/0/when/children/0",
+                "truth": true,
+                "negated": true,
+                "values": [
+                  {
+                    "path": [
+                      "x"
+                    ],
+                    "value": 3
+                  }
+                ],
+                "counterfactual": {
+                  "path": [
+                    "x"
+                  ],
+                  "op": "ne",
+                  "target": 3
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/counterfactuals/decimal-gap",
+      "spec": [
+        "explain.md#counterfactuals"
+      ],
+      "description": "a decimal gap is exact",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "ge",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "10.05"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": {
+            "$decimal": "9.9"
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": false,
+              "when": {
+                "op": "ge",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": {
+                      "$decimal": "9.9"
+                    }
+                  },
+                  {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "10.05"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": []
+        },
+        "explanation": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "selected": [],
+          "rules": [
+            {
+              "rule": "r",
+              "status": "not_fired",
+              "achievable": true,
+              "requirement": {
+                "condition": {
+                  "op": "ge",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "10.05"
+                    }
+                  }
+                },
+                "at": "/decision/results/0/when",
+                "truth": false,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "x"
+                    ],
+                    "value": {
+                      "$decimal": "9.9"
+                    }
+                  }
+                ],
+                "counterfactual": {
+                  "path": [
+                    "x"
+                  ],
+                  "op": "ge",
+                  "target": {
+                    "$decimal": "10.05"
+                  },
+                  "gap": {
+                    "$decimal": "0.15"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/counterfactuals/float-gap",
+      "spec": [
+        "explain.md#counterfactuals"
+      ],
+      "description": "a float gap",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "le",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 2.5
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": 3.75
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": false,
+              "when": {
+                "op": "le",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 3.75
+                  },
+                  {
+                    "op": "const",
+                    "value": 2.5
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": []
+        },
+        "explanation": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "selected": [],
+          "rules": [
+            {
+              "rule": "r",
+              "status": "not_fired",
+              "achievable": true,
+              "requirement": {
+                "condition": {
+                  "op": "le",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2.5
+                  }
+                },
+                "at": "/decision/results/0/when",
+                "truth": false,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "x"
+                    ],
+                    "value": 3.75
+                  }
+                ],
+                "counterfactual": {
+                  "path": [
+                    "x"
+                  ],
+                  "op": "le",
+                  "target": 2.5,
+                  "gap": 1.25
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/counterfactuals/datetime-gap",
+      "spec": [
+        "explain.md#counterfactuals"
+      ],
+      "description": "a datetime gap in microseconds",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "ge",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "t"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$datetime": "2026-10-31T12:00:00"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "t": {
+            "$datetime": "2026-10-31T09:30:00"
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": false,
+              "when": {
+                "op": "ge",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "t"
+                    ],
+                    "value": {
+                      "$datetime": "2026-10-31T09:30:00"
+                    }
+                  },
+                  {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-10-31T12:00:00"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": []
+        },
+        "explanation": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "selected": [],
+          "rules": [
+            {
+              "rule": "r",
+              "status": "not_fired",
+              "achievable": true,
+              "requirement": {
+                "condition": {
+                  "op": "ge",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "t"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-10-31T12:00:00"
+                    }
+                  }
+                },
+                "at": "/decision/results/0/when",
+                "truth": false,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "t"
+                    ],
+                    "value": {
+                      "$datetime": "2026-10-31T09:30:00"
+                    }
+                  }
+                ],
+                "counterfactual": {
+                  "path": [
+                    "t"
+                  ],
+                  "op": "ge",
+                  "target": {
+                    "$datetime": "2026-10-31T12:00:00"
+                  },
+                  "gap": {
+                    "microseconds": 9000000000
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/counterfactuals/decimal-and-float",
+      "spec": [
+        "explain.md#counterfactuals"
+      ],
+      "description": "a decimal and a float have no gap",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1.5
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": {
+            "$decimal": "1"
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": false,
+              "when": {
+                "op": "gt",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": {
+                      "$decimal": "1"
+                    }
+                  },
+                  {
+                    "op": "const",
+                    "value": 1.5
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": []
+        },
+        "explanation": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "selected": [],
+          "rules": [
+            {
+              "rule": "r",
+              "status": "not_fired",
+              "achievable": true,
+              "requirement": {
+                "condition": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1.5
+                  }
+                },
+                "at": "/decision/results/0/when",
+                "truth": false,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "x"
+                    ],
+                    "value": {
+                      "$decimal": "1"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/counterfactuals/datetime-gap-whole-days",
+      "spec": [
+        "explain.md#counterfactuals"
+      ],
+      "description": "a datetime gap of whole days is still in microseconds",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "t"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$datetime": "2026-11-01T09:30:00"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "t": {
+            "$datetime": "2026-10-31T09:30:00"
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": false,
+              "when": {
+                "op": "gt",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "t"
+                    ],
+                    "value": {
+                      "$datetime": "2026-10-31T09:30:00"
+                    }
+                  },
+                  {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-11-01T09:30:00"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": []
+        },
+        "explanation": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "selected": [],
+          "rules": [
+            {
+              "rule": "r",
+              "status": "not_fired",
+              "achievable": true,
+              "requirement": {
+                "condition": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "t"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-11-01T09:30:00"
+                    }
+                  }
+                },
+                "at": "/decision/results/0/when",
+                "truth": false,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "t"
+                    ],
+                    "value": {
+                      "$datetime": "2026-10-31T09:30:00"
+                    }
+                  }
+                ],
+                "counterfactual": {
+                  "path": [
+                    "t"
+                  ],
+                  "op": "gt",
+                  "target": {
+                    "$datetime": "2026-11-01T09:30:00"
+                  },
+                  "gap": {
+                    "microseconds": 86400000000
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

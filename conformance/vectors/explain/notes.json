@@ -1,0 +1,737 @@
+{
+  "version": 1,
+  "area": "explain",
+  "vectors": [
+    {
+      "id": "explain/notes/same-priority",
+      "spec": [
+        "explain.md#notes-for-rules-that-fired-but-were-not-selected"
+      ],
+      "description": "same priority, earlier rule wins",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "vip",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "customer",
+                    "years"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "big",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "order",
+                    "total"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1000
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.10"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "base",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.00"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "customer": {
+            "years": 7
+          },
+          "order": {
+            "total": 1500
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "vip",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ],
+                    "value": 7
+                  },
+                  {
+                    "op": "const",
+                    "value": 5
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "big",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ],
+                    "value": 1500
+                  },
+                  {
+                    "op": "const",
+                    "value": 1000
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "base",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": [
+            "vip"
+          ]
+        },
+        "explanation": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "selected": [
+            "vip"
+          ],
+          "rules": [
+            {
+              "rule": "vip",
+              "status": "selected",
+              "requirement": {
+                "condition": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "at": "/decision/results/0/when",
+                "truth": true,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "customer",
+                      "years"
+                    ],
+                    "value": 7
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "big",
+              "status": "fired",
+              "note": {
+                "kind": "same_priority",
+                "winner": "vip",
+                "priority": 10,
+                "winner_priority": 10
+              },
+              "requirement": {
+                "condition": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1000
+                  }
+                },
+                "at": "/decision/results/1/when",
+                "truth": true,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "order",
+                      "total"
+                    ],
+                    "value": 1500
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "base",
+              "status": "fired",
+              "note": {
+                "kind": "lower_priority",
+                "winner": "vip",
+                "priority": 0,
+                "winner_priority": 10
+              },
+              "requirement": {
+                "condition": {
+                  "op": "const",
+                  "value": true
+                },
+                "at": "/decision/results/2/when",
+                "truth": true,
+                "negated": false,
+                "values": []
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/notes/earlier-rule",
+      "spec": [
+        "explain.md#notes-for-rules-that-fired-but-were-not-selected"
+      ],
+      "description": "first: the earlier rule wins",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "vip",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "customer",
+                    "years"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "big",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "order",
+                    "total"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1000
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.10"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "base",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.00"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "customer": {
+            "years": 7
+          },
+          "order": {
+            "total": 1500
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "vip",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ],
+                    "value": 7
+                  },
+                  {
+                    "op": "const",
+                    "value": 5
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "big",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ],
+                    "value": 1500
+                  },
+                  {
+                    "op": "const",
+                    "value": 1000
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "base",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": [
+            "vip"
+          ]
+        },
+        "explanation": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "selected": [
+            "vip"
+          ],
+          "rules": [
+            {
+              "rule": "vip",
+              "status": "selected",
+              "requirement": {
+                "condition": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "at": "/decision/results/0/when",
+                "truth": true,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "customer",
+                      "years"
+                    ],
+                    "value": 7
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "big",
+              "status": "fired",
+              "note": {
+                "kind": "earlier_rule",
+                "winner": "vip"
+              },
+              "requirement": {
+                "condition": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1000
+                  }
+                },
+                "at": "/decision/results/1/when",
+                "truth": true,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "order",
+                      "total"
+                    ],
+                    "value": 1500
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "base",
+              "status": "fired",
+              "note": {
+                "kind": "earlier_rule",
+                "winner": "vip"
+              },
+              "requirement": {
+                "condition": {
+                  "op": "const",
+                  "value": true
+                },
+                "at": "/decision/results/2/when",
+                "truth": true,
+                "negated": false,
+                "values": []
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/notes/any-agrees",
+      "spec": [
+        "explain.md#notes-for-rules-that-fired-but-were-not-selected"
+      ],
+      "description": "any: the outputs agree",
+      "given": {
+        "kind": "explain",
+        "ruleset": {
+          "hit_policy": "any",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": 2
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "any",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 2
+                  },
+                  {
+                    "op": "const",
+                    "value": 1
+                  }
+                ]
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "rule": "b",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 2
+                  },
+                  {
+                    "op": "const",
+                    "value": 0
+                  }
+                ]
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ],
+          "selected": [
+            "a"
+          ]
+        },
+        "explanation": {
+          "hit_policy": "any",
+          "logic": "boolean",
+          "selected": [
+            "a"
+          ],
+          "rules": [
+            {
+              "rule": "a",
+              "status": "selected",
+              "requirement": {
+                "condition": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "at": "/decision/results/0/when",
+                "truth": true,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "x"
+                    ],
+                    "value": 2
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "b",
+              "status": "fired",
+              "note": {
+                "kind": "any_agrees",
+                "winner": "a"
+              },
+              "requirement": {
+                "condition": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "at": "/decision/results/1/when",
+                "truth": true,
+                "negated": false,
+                "values": [
+                  {
+                    "path": [
+                      "x"
+                    ],
+                    "value": 2
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

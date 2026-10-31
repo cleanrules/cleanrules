@@ -1,0 +1,1123 @@
+{
+  "version": 1,
+  "area": "rules",
+  "vectors": [
+    {
+      "id": "rules/aggregates/sum",
+      "spec": [
+        "rules.md#collect-aggregates"
+      ],
+      "description": "collect with sum",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2
+                },
+                "m": {
+                  "op": "const",
+                  "value": null
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 3.5
+                },
+                "m": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "c",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 9
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 100
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": 5
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 5
+                  },
+                  {
+                    "op": "const",
+                    "value": 0
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2
+                },
+                "m": {
+                  "op": "const",
+                  "value": null,
+                  "reason": {
+                    "code": "null"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "b",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 5
+                  },
+                  {
+                    "op": "const",
+                    "value": 1
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 3.5
+                },
+                "m": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "rule": "c",
+              "fired": false,
+              "when": {
+                "op": "gt",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 5
+                  },
+                  {
+                    "op": "const",
+                    "value": 9
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": [
+            "a",
+            "b"
+          ],
+          "aggregated": {
+            "n": 5.5,
+            "m": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/min",
+      "spec": [
+        "rules.md#collect-aggregates"
+      ],
+      "description": "collect with min",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "min",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2
+                },
+                "m": {
+                  "op": "const",
+                  "value": null
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 3.5
+                },
+                "m": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "c",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 9
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 100
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": 5
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "min",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 5
+                  },
+                  {
+                    "op": "const",
+                    "value": 0
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2
+                },
+                "m": {
+                  "op": "const",
+                  "value": null,
+                  "reason": {
+                    "code": "null"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "b",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 5
+                  },
+                  {
+                    "op": "const",
+                    "value": 1
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 3.5
+                },
+                "m": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "rule": "c",
+              "fired": false,
+              "when": {
+                "op": "gt",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 5
+                  },
+                  {
+                    "op": "const",
+                    "value": 9
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": [
+            "a",
+            "b"
+          ],
+          "aggregated": {
+            "n": 2,
+            "m": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/max",
+      "spec": [
+        "rules.md#collect-aggregates"
+      ],
+      "description": "collect with max",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "max",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2
+                },
+                "m": {
+                  "op": "const",
+                  "value": null
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 3.5
+                },
+                "m": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "c",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 9
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 100
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": 5
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "max",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 5
+                  },
+                  {
+                    "op": "const",
+                    "value": 0
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2
+                },
+                "m": {
+                  "op": "const",
+                  "value": null,
+                  "reason": {
+                    "code": "null"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "b",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 5
+                  },
+                  {
+                    "op": "const",
+                    "value": 1
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 3.5
+                },
+                "m": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "rule": "c",
+              "fired": false,
+              "when": {
+                "op": "gt",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 5
+                  },
+                  {
+                    "op": "const",
+                    "value": 9
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": [
+            "a",
+            "b"
+          ],
+          "aggregated": {
+            "n": 3.5,
+            "m": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/count",
+      "spec": [
+        "rules.md#collect-aggregates"
+      ],
+      "description": "collect with count",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "count",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2
+                },
+                "m": {
+                  "op": "const",
+                  "value": null
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 3.5
+                },
+                "m": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "c",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 9
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 100
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": 5
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "count",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 5
+                  },
+                  {
+                    "op": "const",
+                    "value": 0
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2
+                },
+                "m": {
+                  "op": "const",
+                  "value": null,
+                  "reason": {
+                    "code": "null"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "b",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 5
+                  },
+                  {
+                    "op": "const",
+                    "value": 1
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 3.5
+                },
+                "m": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "rule": "c",
+              "fired": false,
+              "when": {
+                "op": "gt",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 5
+                  },
+                  {
+                    "op": "const",
+                    "value": 9
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": [
+            "a",
+            "b"
+          ],
+          "aggregated": {
+            "n": 2,
+            "m": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/nothing-selected",
+      "spec": [
+        "rules.md#collect-aggregates"
+      ],
+      "description": "an aggregate with nothing selected is null",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 9
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "x": 0
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": false,
+              "when": {
+                "op": "gt",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 0
+                  },
+                  {
+                    "op": "const",
+                    "value": 9
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": [],
+          "aggregated": null
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/sum-overflow",
+      "spec": [
+        "rules.md#collect-aggregates"
+      ],
+      "description": "an int sum outside 64 bits is null",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$int": "4611686018427387904"
+                  }
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$int": "4611686018427387904"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$int": "4611686018427387904"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "b",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$int": "4611686018427387904"
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "a",
+            "b"
+          ],
+          "aggregated": {
+            "n": null
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/sum-not-number",
+      "spec": [
+        "rules.md#collect-aggregates"
+      ],
+      "description": "sum of a string raises",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": "x"
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "error": {
+          "code": "hit_policy_error",
+          "rules": [
+            "a"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/decimal-to-float",
+      "spec": [
+        "rules.md#collect-aggregates"
+      ],
+      "description": "decimals are converted to float before sum",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.1"
+                  }
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.2"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.1"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "b",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.2"
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "a",
+            "b"
+          ],
+          "aggregated": {
+            "n": 0.30000000000000004
+          }
+        }
+      }
+    }
+  ]
+}

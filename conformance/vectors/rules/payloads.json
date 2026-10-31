@@ -1,0 +1,294 @@
+{
+  "version": 1,
+  "area": "rules",
+  "vectors": [
+    {
+      "id": "rules/payloads/passthrough",
+      "spec": [
+        "rules.md#when-payloads-are-evaluated",
+        "rules.md#outputs"
+      ],
+      "description": "a field in a payload passes a list and a map through",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "items": {
+                  "op": "field",
+                  "path": [
+                    "items"
+                  ]
+                },
+                "who": {
+                  "op": "field",
+                  "path": [
+                    "customer"
+                  ]
+                },
+                "total": {
+                  "op": "mul",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0.9
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "items": [
+            1,
+            "x"
+          ],
+          "customer": {
+            "name": "Ana"
+          },
+          "order": {
+            "total": 100
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "items": {
+                  "op": "field",
+                  "path": [
+                    "items"
+                  ],
+                  "value": [
+                    1,
+                    "x"
+                  ]
+                },
+                "who": {
+                  "op": "field",
+                  "path": [
+                    "customer"
+                  ],
+                  "value": {
+                    "name": "Ana"
+                  }
+                },
+                "total": {
+                  "op": "mul",
+                  "value": 90.0,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "order",
+                        "total"
+                      ],
+                      "value": 100
+                    },
+                    {
+                      "op": "const",
+                      "value": 0.9
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "selected": [
+            "a"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/payloads/null-payload-value",
+      "spec": [
+        "rules.md#when-payloads-are-evaluated"
+      ],
+      "description": "a null payload value keeps its reason",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "v": {
+                  "op": "field",
+                  "path": [
+                    "missing"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "v": {
+                  "op": "field",
+                  "path": [
+                    "missing"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "missing"
+                      ]
+                    ]
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "a"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/payloads/order-kept",
+      "spec": [
+        "rules.md#when-payloads-are-evaluated",
+        "rules.md#outputs"
+      ],
+      "description": "payload keys keep their order",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "b": {
+                  "op": "const",
+                  "value": 1
+                },
+                "a": {
+                  "op": "const",
+                  "value": 2
+                },
+                "10": {
+                  "op": "const",
+                  "value": 3
+                },
+                "2": {
+                  "op": "const",
+                  "value": 4
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "b": {
+                  "op": "const",
+                  "value": 1
+                },
+                "a": {
+                  "op": "const",
+                  "value": 2
+                },
+                "10": {
+                  "op": "const",
+                  "value": 3
+                },
+                "2": {
+                  "op": "const",
+                  "value": 4
+                }
+              }
+            }
+          ],
+          "selected": [
+            "a"
+          ]
+        }
+      }
+    }
+  ]
+}

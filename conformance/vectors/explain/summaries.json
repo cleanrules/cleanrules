@@ -1,0 +1,348 @@
+{
+  "version": 1,
+  "area": "explain",
+  "vectors": [
+    {
+      "id": "explain/summaries/pricing",
+      "spec": [
+        "explain.md#summaries",
+        "json-format.md#summaries"
+      ],
+      "description": "fields, outputs and tags of a rule set",
+      "given": {
+        "kind": "summary",
+        "ruleset": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "strict": true,
+          "rules": [
+            {
+              "name": "vip",
+              "when": {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "customer",
+                        "years"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 5
+                    }
+                  },
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "order",
+                        "total"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1000
+                    }
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": 0.15
+                },
+                "total": {
+                  "op": "mul",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0.85
+                  }
+                }
+              },
+              "tags": [
+                "loyalty",
+                "pricing"
+              ]
+            },
+            {
+              "name": "blocked",
+              "when": {
+                "op": "or",
+                "operands": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "blocked"
+                    ]
+                  },
+                  {
+                    "op": "is_null",
+                    "operand": {
+                      "op": "field",
+                      "path": [
+                        "customer"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": 0
+                }
+              },
+              "priority": 10,
+              "tags": [
+                "risk"
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "summary": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "strict": true,
+          "rules": [
+            {
+              "name": "vip",
+              "priority": 0,
+              "outputs": [
+                "discount",
+                "total"
+              ]
+            },
+            {
+              "name": "blocked",
+              "priority": 10,
+              "outputs": [
+                "discount"
+              ]
+            }
+          ],
+          "fields": [
+            {
+              "path": [
+                "customer",
+                "years"
+              ],
+              "conditions": [
+                "vip"
+              ],
+              "payloads": []
+            },
+            {
+              "path": [
+                "order",
+                "total"
+              ],
+              "conditions": [
+                "vip"
+              ],
+              "payloads": [
+                {
+                  "rule": "vip",
+                  "key": "total"
+                }
+              ]
+            },
+            {
+              "path": [
+                "customer",
+                "blocked"
+              ],
+              "conditions": [
+                "blocked"
+              ],
+              "payloads": []
+            },
+            {
+              "path": [
+                "customer"
+              ],
+              "conditions": [
+                "blocked"
+              ],
+              "payloads": []
+            }
+          ],
+          "outputs": [
+            "discount",
+            "total"
+          ],
+          "tags": [
+            {
+              "tag": "loyalty",
+              "rules": [
+                "vip"
+              ]
+            },
+            {
+              "tag": "pricing",
+              "rules": [
+                "vip"
+              ]
+            },
+            {
+              "tag": "risk",
+              "rules": [
+                "blocked"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "explain/summaries/empty",
+      "spec": [
+        "explain.md#summaries"
+      ],
+      "description": "an empty rule set",
+      "given": {
+        "kind": "summary",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": []
+        }
+      },
+      "expect": {
+        "summary": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [],
+          "fields": [],
+          "outputs": [],
+          "tags": []
+        }
+      }
+    },
+    {
+      "id": "explain/summaries/between-order",
+      "spec": [
+        "explain.md#summaries"
+      ],
+      "description": "between visits operand, low and high",
+      "given": {
+        "kind": "summary",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "count",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "between",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "low": {
+                  "op": "field",
+                  "path": [
+                    "lo"
+                  ]
+                },
+                "high": {
+                  "op": "field",
+                  "path": [
+                    "hi"
+                  ]
+                },
+                "closed": "both"
+              },
+              "then": {
+                "v": {
+                  "op": "field",
+                  "path": [
+                    "y"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "summary": {
+          "hit_policy": "collect",
+          "aggregate": "count",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "priority": 0,
+              "outputs": [
+                "v"
+              ]
+            }
+          ],
+          "fields": [
+            {
+              "path": [
+                "x"
+              ],
+              "conditions": [
+                "r"
+              ],
+              "payloads": []
+            },
+            {
+              "path": [
+                "lo"
+              ],
+              "conditions": [
+                "r"
+              ],
+              "payloads": []
+            },
+            {
+              "path": [
+                "hi"
+              ],
+              "conditions": [
+                "r"
+              ],
+              "payloads": []
+            },
+            {
+              "path": [
+                "y"
+              ],
+              "conditions": [],
+              "payloads": [
+                {
+                  "rule": "r",
+                  "key": "v"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            "v"
+          ],
+          "tags": []
+        }
+      }
+    }
+  ]
+}

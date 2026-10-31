@@ -1,0 +1,217 @@
+{
+  "version": 1,
+  "area": "rules",
+  "vectors": [
+    {
+      "id": "rules/batch/row",
+      "spec": [
+        "rules.md#strict-mode-and-errors"
+      ],
+      "description": "an error in a batch carries the row",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "strict": true,
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        },
+        "inputs": [
+          {
+            "x": 2
+          },
+          {
+            "x": 0
+          },
+          {}
+        ]
+      },
+      "expect": {
+        "error": {
+          "code": "missing_field",
+          "rule": "a",
+          "path": [
+            "x"
+          ],
+          "row": 2
+        }
+      }
+    },
+    {
+      "id": "rules/batch/decisions",
+      "spec": [
+        "rules.md#evaluation"
+      ],
+      "description": "a batch gives one decision per input",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "ok": {
+                  "op": "const",
+                  "value": true
+                }
+              }
+            }
+          ]
+        },
+        "inputs": [
+          {
+            "x": 2
+          },
+          {
+            "x": 0
+          },
+          {}
+        ]
+      },
+      "expect": {
+        "decisions": [
+          {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "ok": {
+                    "op": "const",
+                    "value": true
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ]
+          },
+          {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 0
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": []
+          },
+          {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": null,
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "x"
+                      ]
+                    ]
+                  },
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": null,
+                      "reason": {
+                        "code": "missing_field",
+                        "paths": [
+                          [
+                            "x"
+                          ]
+                        ]
+                      }
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": []
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,1686 @@
+{
+  "version": 1,
+  "area": "ast",
+  "vectors": [
+    {
+      "id": "ast/truth/and-true-true",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "true and true",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": true,
+          "b": true
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": true
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/or-true-true",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "true or true",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": true,
+          "b": true
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": true
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/and-true-false",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "true and false",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": true,
+          "b": false
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": true
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": false
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/or-true-false",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "true or false",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": true,
+          "b": false
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": true
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": false
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/and-true-unknown",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "true and unknown",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": true,
+          "b": null
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": null,
+          "reason": {
+            "code": "null",
+            "paths": [
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": true
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "b"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "null",
+                    "paths": [
+                      [
+                        "b"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/or-true-unknown",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "true or unknown",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": true,
+          "b": null
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": true
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "b"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "null",
+                    "paths": [
+                      [
+                        "b"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/not-true",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "not true",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": true
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/and-false-true",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "false and true",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": false,
+          "b": true
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": false
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/or-false-true",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "false or true",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": false,
+          "b": true
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": false
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/and-false-false",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "false and false",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": false,
+          "b": false
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": false
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": false
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/or-false-false",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "false or false",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": false,
+          "b": false
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": false
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": false
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/and-false-unknown",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "false and unknown",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": false,
+          "b": null
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": false
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "b"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "null",
+                    "paths": [
+                      [
+                        "b"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/or-false-unknown",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "false or unknown",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": false,
+          "b": null
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": null,
+          "reason": {
+            "code": "null",
+            "paths": [
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": false
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "b"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "null",
+                    "paths": [
+                      [
+                        "b"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/not-false",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "not false",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": false
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": false
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/and-unknown-true",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "unknown and true",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": null,
+          "b": true
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": null,
+          "reason": {
+            "code": "null",
+            "paths": [
+              [
+                "a"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "a"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "null",
+                    "paths": [
+                      [
+                        "a"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/or-unknown-true",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "unknown or true",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": null,
+          "b": true
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "a"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "null",
+                    "paths": [
+                      [
+                        "a"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/and-unknown-false",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "unknown and false",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": null,
+          "b": false
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "a"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "null",
+                    "paths": [
+                      [
+                        "a"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": false
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/or-unknown-false",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "unknown or false",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": null,
+          "b": false
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": null,
+          "reason": {
+            "code": "null",
+            "paths": [
+              [
+                "a"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "a"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "null",
+                    "paths": [
+                      [
+                        "a"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": false
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/and-unknown-unknown",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "unknown and unknown",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": null,
+          "b": null
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": null,
+          "reason": {
+            "code": "null",
+            "paths": [
+              [
+                "a"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "a"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "null",
+                    "paths": [
+                      [
+                        "a"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "b"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "null",
+                    "paths": [
+                      [
+                        "b"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/or-unknown-unknown",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "unknown or unknown",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": null,
+          "b": null
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": null,
+          "reason": {
+            "code": "null",
+            "paths": [
+              [
+                "a"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "a"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "null",
+                    "paths": [
+                      [
+                        "a"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "b"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "null",
+                    "paths": [
+                      [
+                        "b"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/truth/not-unknown",
+      "spec": [
+        "ast.md#truth-values"
+      ],
+      "description": "not unknown",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": null
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": null,
+          "reason": {
+            "code": "null",
+            "paths": [
+              [
+                "a"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "a"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "null",
+                    "paths": [
+                      [
+                        "a"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
