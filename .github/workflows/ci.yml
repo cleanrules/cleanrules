@@ -13,40 +13,16 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  UV_LOCKED: "1"            # fail if uv.lock is out of date with pyproject.toml
-  HYPOTHESIS_PROFILE: ci    # 500 examples per property (see tests/conftest.py)
-
+# The Rust workspace and the bindings add their own jobs from task B.1 on.
 jobs:
   lint:
-    name: Lint and type-check
+    name: Lint the Python tools
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: true
-      - run: uv sync
-      - run: uv run ruff check --output-format=github .
-      - run: uv run ruff format --check .
-      - run: uv run pyright
-
-  test:
-    name: Test (Python ${{ matrix.python }}, ${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python: ["3.11", "3.12", "3.13", "3.14"]
-    steps:
-      - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v6
-        with:
-          python-version: ${{ matrix.python }}
-          enable-cache: true
-      - run: uv sync
-      - run: uv run pytest --cov
+      - run: uvx ruff check --output-format=github .
+      - run: uvx ruff format --check .
 
   conformance:
     name: Spec schemas and conformance vectors
@@ -54,42 +30,5 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: true
-      - run: uv sync
-      # The vectors are generated from the Python v1 until task A.4: they must be current.
-      - run: uv run python conformance/tools/export.py
-      - name: Vectors are up to date
-        run: test -z "$(git status --porcelain conformance/vectors)" || (git status --porcelain conformance/vectors; exit 1)
       - run: uv run --no-project --with jsonschema python spec/schemas/check.py
       - run: uv run --no-project --with jsonschema python conformance/tools/check.py
-
-  docs:
-    name: Build documentation
-    runs-on: ubuntu-latest
-    env:
-      NO_MKDOCS_2_WARNING: "1"  # Material EOL notice, tracked in docs/PLAN.md task 9.1
-    steps:
-      - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: true
-      # --strict turns broken links and unresolved API references into failures.
-      - run: uv run --group docs mkdocs build --strict
-
-  build:
-    name: Build and smoke-test the wheel
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v6
-      - run: uv build
-      # Install the wheel alone in a throwaway environment: catches files missing
-      # from the wheel and accidental runtime dependencies.
-      - run: |
-          uv run --isolated --no-project --with dist/*.whl \
-            python -c "import rulepy; print(rulepy.__version__)"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/

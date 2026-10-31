@@ -1,0 +1,11 @@
+# Python tooling: scripts/ and conformance/tools/. The bindings bring their own
+# configuration (bindings/python from phase C).
+line-length = 100
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "D"]
+ignore = ["D105", "D107"]
+
+[lint.pydocstyle]
+convention = "google"

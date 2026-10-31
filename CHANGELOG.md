@@ -44,6 +44,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
 - Repository skeleton: README, MIT license, changelog, `.gitignore`.
+- Development roadmap (`docs/PLAN.md`) and Claude Code project configuration
+  (`CLAUDE.md`, `.claude/`).
+
+### Removed
+
+- The Python v1 (`rulepy`), its tests, its documentation site and the
+  temporary vector exporter (task A.4). Its semantics live on in `spec/` and
+  `conformance/`, and the code in the git tag `python-reference`; the section
+  below lists what it contained. The Python package comes back as a binding of
+  the Rust core in phase C, under the name `cleanrules`.
+
+## [python-reference] - not released
+
+The Python v1, kept in the git tag `python-reference`.
+
+### Added
+
 - Package metadata (`pyproject.toml`, hatchling, `src/` layout): Python >= 3.11,
   no runtime dependencies, optional extras `fuzzy`, `polars`, `pandas`, `yaml`,
   `audit`, `ml`, `fast` and `bench` reserved for upcoming features.
@@ -124,7 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`orders[0].total`, `['x y']`).
 - Errors for evaluation and registries: `TypeMismatchError`,
   `MissingFieldError` (both name the field path) and `RegistryError`.
-- Condition AST specification (`docs/spec/ast.md`, draft): node catalogue,
+- Condition AST specification (`spec/ast.md`, draft): node catalogue,
   Kleene three-valued semantics, null and type-mismatch rules.
 - The package ships a `py.typed` marker.
 - Documentation site skeleton (MkDocs Material + mkdocstrings) with the API
@@ -133,5 +150,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Development tooling: `dev` dependency group (pytest, pytest-cov, hypothesis,
   ruff, pyright) with strict pytest, branch coverage (>= 90%), strict pyright
   and ruff (Google docstrings) configured in `pyproject.toml`.
-- Development roadmap (`docs/PLAN.md`) and Claude Code project configuration
-  (`CLAUDE.md`, `.claude/`).

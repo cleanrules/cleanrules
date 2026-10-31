@@ -1,3 +1,0 @@
-# Evaluation
-
-::: rulepy.core.evaluate

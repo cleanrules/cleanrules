@@ -1,3 +1,0 @@
-# Explanations
-
-::: rulepy.core.explain

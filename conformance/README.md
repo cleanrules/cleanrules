@@ -109,27 +109,21 @@ vectors unchanged.
 ## Tools
 
 ```bash
-uv run python conformance/tools/export.py                                  # regenerate (phase A)
-uv run --no-project --with jsonschema python conformance/tools/check.py   # validate
+uv run --no-project --with jsonschema python conformance/tools/check.py
 ```
 
-The generated vectors (`vectors/generated/`) come from hypothesis strategies
-run derandomized, so the same hypothesis version (pinned in `uv.lock`) always
-gives the same vectors; their files hold one vector per line.
-
 `check.py` validates every vector file against `vectors.schema.json` and the
-spec's JSON Schemas, and checks that ids are unique and that every cited spec
-section exists.
+spec's JSON Schemas, checks that ids are unique, that every cited spec section
+exists and that every normative section is cited, and sanity-checks the error
+locations of `read` vectors.
 
-## Phase A: the exporter
+## Where the vectors come from
 
-Until the Python v1 is retired (task A.4), `tools/` holds an exporter that
-builds vectors by running the v1 on chosen cases and on the cases its
-hypothesis properties generate, fixed with a seed. Where the spec deviates from
-the v1 on purpose, the exporter skips those cases or writes the vector by hand
-from the spec (`docs/PLAN.md`, task A.3, lists them). Inputs are encoded
-strictly (plain maps, lists and scalars only), and counterfactual gaps are
-recomputed with the spec's arithmetic; a case the format cannot hold, or where
-the v1 disagrees with the spec, is skipped with a message. After A.4 the vectors are
-maintained by hand and by the core's property tests: a counterexample that
-`proptest` finds becomes a new vector.
+In phase A, an exporter ran the Python v1 on hand-picked cases and on cases
+generated with hypothesis (`vectors/generated/`, one vector per line), skipping
+the cases where the spec deviates from the v1 on purpose; the `read` vectors
+(`vectors/format/`) were written from the spec, because the v1 had no reader.
+The v1 and the exporter were retired in task A.4; both remain in the git tag
+`python-reference`. From now on, vectors are added by hand, from the spec, and
+from the core's property tests: a counterexample that `proptest` finds becomes
+a new vector.

@@ -237,7 +237,14 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
     - patrones regex que Python acepta y `regex` no, y `$` antes de un salto de línea final;
     - la deduplicación de `in` con dos instantes distintos en la misma zona durante un cambio de hora, que la v1 fusiona porque Python compara horas locales cuando comparten `tzinfo`;
     - los huecos de contrafactuales que la v1 calculaba distinto (`explain.md`, *Differences from the Python v1*): enteros de más de 64 bits, decimales redondeados a 28 dígitos y fechas con hora restadas como hora local durante un cambio de hora.
-- [ ] A.4 Retirada: tag `python-reference` y eliminación de `src/rulepy` y de sus tests. Se conservan `spec/`, `docs/pitfalls.md` (pasa a la documentación del binding de Python) y los vectores.
+- [x] A.4 Retirada: tag `python-reference` y eliminación de `src/rulepy` y de sus tests. Se conservan `spec/`, `docs/pitfalls.md` (pasa a la documentación del binding de Python) y los vectores.
+  - Hecho el 2026-10-31.
+    - El autor crea el tag `python-reference` sobre `09001aa`, el último commit con la v1, porque crear tags está denegado para Claude.
+    - Se borran `src/rulepy`, `tests/`, la web de documentación (`mkdocs.yml`, `docs/index.md`, `docs/reference/`), `pyproject.toml`, `uv.lock` y el exportador de `conformance/tools/`. Se conserva `check.py`.
+    - La configuración de ruff pasa a `ruff.toml`.
+    - El CI se queda con el lint de las herramientas en Python y la comprobación de esquemas y vectores; el de Rust llega en B.1.
+    - En el CHANGELOG, lo de la v1 pasa a una sección `python-reference`.
+    - `docs/pitfalls.md` se queda en `docs/` hasta el binding de Python (fase C).
 
 **Aceptación**: el conjunto de vectores cubre cada sección de la especificación; un script comprueba que cada regla normativa de `spec/` cita al menos un vector.
 

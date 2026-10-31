@@ -4,7 +4,7 @@ Motor de reglas con **un único núcleo en Rust** y bindings para Rust, C/C++, P
 
 - **Hoja de ruta y estado**: [docs/PLAN.md](docs/PLAN.md) es la fuente de verdad. Antes de empezar cualquier tarea, léela y localiza la fase y la tarea.
 - **Contratos**: la especificación ([spec/](spec/)) y la batería de conformidad (`conformance/`) definen la semántica. Si cambia el comportamiento, primero se actualizan la especificación y los vectores.
-- **Fase actual**: P (implementación Python v1, paquete `rulepy`) completada y congelada; 0' en curso. Siguiente: fase A (formato JSON, modelo de datos, vectores de conformidad y retirada de Python), después B (núcleo Rust).
+- **Fase actual**: A completada (especificación, formato JSON v1 y vectores de conformidad). La implementación Python v1 (`rulepy`) se retiró en A.4 y queda en el tag `python-reference` como referencia secundaria. Siguiente: fase B (núcleo Rust).
 
 ## Estructura
 
@@ -13,8 +13,9 @@ crates/core      el motor: valores, AST, lógicas, evaluador, reglas, políticas
 crates/ffi       C ABI (cbindgen) que usan C/C++, Go y la JVM (crate `cleanrules-ffi`)
 bindings/<lang>  python (PyO3), c, cpp, js (napi-rs + wasm), jvm (Java FFM + Scala), go (cgo)
 spec/            especificación normativa y JSON Schemas
-conformance/     vectores JSON + un runner por lenguaje
-src/rulepy       implementación Python v1: solo se toca para generar vectores (fase A); se borra en A.4
+conformance/     vectores JSON, su comprobador (tools/check.py) y un runner por lenguaje
+scripts/         utilidades del repositorio (progress.py: barra de progreso del plan)
+docs/            PLAN.md y pitfalls.md (pasa a la documentación del binding de Python en la fase C)
 ```
 
 Las carpetas aparecen a medida que avanzan las fases; no existe ninguna antes de su tarea.
@@ -40,8 +41,11 @@ npm --prefix bindings/js test
 (cd bindings/jvm && ./gradlew test)
 (cd bindings/go && go test ./...)
 
-# Implementación Python v1 (hasta A.4)
-uv run pytest -m "not slow" && uv run ruff check . && uv run pyright
+# Especificación y vectores
+uv run --no-project --with jsonschema python spec/schemas/check.py
+uv run --no-project --with jsonschema python conformance/tools/check.py
+uvx ruff check . && uvx ruff format --check .   # herramientas en Python (ruff.toml)
+python3 scripts/progress.py                     # progreso del plan
 ```
 
 Un hook (`.claude/hooks/format.sh`) formatea tras cada edición los `.rs` (rustfmt), `.py` (ruff), `.go` (gofmt) y, si hay herramienta instalada, C/C++ (clang-format) y JS/TS (prettier del proyecto), así que no hace falta formatear a mano.

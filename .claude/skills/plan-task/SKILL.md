@@ -35,7 +35,7 @@ cargo nextest run --workspace          # o cargo test --workspace
 cargo test -p cleanrules --test conformance
 ```
 - Los tests, linters y runner de conformidad de cada binding afectado (ver "Comandos" en `CLAUDE.md`).
-- Mientras exista `src/rulepy` (hasta A.4), si se tocó: `uv run pytest -m "not slow" && uv run ruff check . && uv run pyright`.
+- Si se tocó `spec/` o `conformance/`: `uv run --no-project --with jsonschema python spec/schemas/check.py` y `uv run --no-project --with jsonschema python conformance/tools/check.py`.
 - Si cambió la API pública de cualquier lenguaje o el formato JSON, lanza el subagente `api-reviewer` y aplica los hallazgos de nivel *blocker* y *should-fix*.
 
 ## 6. Cerrar

@@ -9,8 +9,9 @@ runs. When the engine and a spec disagree, the spec wins, and the disagreement
 is a bug in the engine or in the spec. It is never acceptable
 language-specific behaviour.
 
-The semantics come from the Python v1 (`rulepy`). Where the spec departs from
-it on purpose, each document lists the differences.
+The semantics come from the Python v1 (`rulepy`, kept in the git tag
+`python-reference`). Where the spec departs from it on purpose, each document
+lists the differences.
 
 ## Documents
 

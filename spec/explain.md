@@ -1,8 +1,8 @@
 # Explanations and summaries
 
 **Status:** draft, normative for every implementation. It is derived from the
-Python v1 (`rulepy.core.explain` and `rulepy.core.summary`), which defines the
-semantics until the Rust core replaces it. The JSON form of both is in
+Python v1 (`rulepy.core.explain` and `rulepy.core.summary`, in the git tag
+`python-reference`). The JSON form of both is in
 [`json-format.md`](json-format.md) (*Explanations*, *Summaries*).
 
 Every decision explains itself (`CLAUDE.md`, invariant 8). An explanation is

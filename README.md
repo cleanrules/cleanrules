@@ -9,23 +9,41 @@ fuzzy logic share the same engine (fuzzy norms follow
 
 Website: <https://cleanrules.github.io>
 
-> **Status:** pre-alpha, nothing is published yet. This repository currently
-> holds the **Python reference implementation** (package `rulepy`), which
-> defines the semantics. Its knowledge is being turned into a written
-> specification and cross-language conformance vectors; the Rust core and the
-> bindings are built against them, and the Python prototype is then retired.
-> See the [roadmap](docs/PLAN.md) (in Spanish).
+> **Status:** pre-alpha, nothing is published yet. The semantics are written
+> down as a **specification** and checked by **conformance vectors**; the Rust
+> core and the bindings are built against them next. See the
+> [roadmap](docs/PLAN.md) (in Spanish).
 
-```python
-from rulepy import F, Rule, RuleSet
+## What is here
 
-vip = Rule("vip", when=(F.customer.years > 5) & (F.order.total > 1000), then={"discount": 0.15})
+| Path | Contents |
+|---|---|
+| [`spec/`](spec/) | The normative specification: condition AST, rules and hit policies, the data model, explanations, errors, and the JSON format (version 1) with its JSON Schemas |
+| [`conformance/`](conformance/) | 2,000+ language-neutral test vectors that every implementation must pass, and their checker |
+| [`docs/PLAN.md`](docs/PLAN.md) | The roadmap and its decisions (in Spanish) |
 
-data = {"customer": {"years": 7}, "order": {"total": 1500}}
-decision = RuleSet([vip]).evaluate(data)
-print(decision.output)  # {'discount': 0.15}
-print(decision.explain())  # which rules fired, which did not, and why
+A rule as the engine reads it, in the JSON format:
+
+```json
+{
+  "version": 1,
+  "rule": {
+    "name": "vip",
+    "when": {
+      "op": "and",
+      "operands": [
+        { "op": "gt", "left": { "op": "field", "path": ["customer", "years"] }, "right": { "op": "const", "value": 5 } },
+        { "op": "gt", "left": { "op": "field", "path": ["order", "total"] }, "right": { "op": "const", "value": 1000 } }
+      ]
+    },
+    "then": { "discount": { "op": "const", "value": { "$decimal": "0.15" } } }
+  }
+}
 ```
+
+Each language will build such rules idiomatically, as the Python prototype did
+with `(F.customer.years > 5) & (F.order.total > 1000)`. That prototype, which
+defined the semantics, is kept in the git tag `python-reference`.
 
 ## Citing
 
