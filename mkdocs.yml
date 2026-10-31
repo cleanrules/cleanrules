@@ -36,7 +36,9 @@ nav:
   - Specification:
       - Overview: spec/README.md
       - Condition AST: spec/ast.md
+      - Rules and decisions: spec/rules.md
   - API reference:
+      - Rules and rule sets: reference/rules.md
       - Condition AST: reference/expr.md
       - Logic and truth values: reference/logic.md
       - Evaluation: reference/evaluate.md

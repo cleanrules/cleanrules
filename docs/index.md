@@ -14,8 +14,8 @@ dead rules, and run by an optional Rust core. Crisp and fuzzy logic share the
 engine; fuzzy support comes from [fuzzytool](https://fuzzytool.github.io).
 
 !!! warning "Pre-alpha"
-    Nothing is published yet and the API below is the planned one. It will
-    change.
+    Conditions, evaluation and rule sets work, but nothing is published yet and
+    the API may still change.
 
 ```python
 from rulepy import F, Rule, RuleSet
@@ -23,15 +23,19 @@ from rulepy import F, Rule, RuleSet
 vip = Rule(
     "vip",
     when=(F.customer.years > 5) & (F.order.total > 1000),
-    then={"discount": 0.15},
+    then={"discount": F.order.total * 0.1},
 )
 
-decision = RuleSet([vip]).evaluate(data)
-print(decision.explain())  # which rules fired, which did not, and why
+decision = RuleSet([vip]).evaluate({"customer": {"years": 7}, "order": {"total": 1500}})
+decision.output  # {'discount': 150.0}
+decision.fired  # ('vip',)
 ```
 
 ## What exists today
 
-- The [exception hierarchy](reference/errors.md) every component reports through.
-- The [specification](spec/README.md) conventions that the Python, polars and
-  Rust backends share.
+- [Conditions](reference/expr.md), written with `F` (see the
+  [common pitfalls](pitfalls.md)).
+- The [reference evaluator](reference/evaluate.md), which reports *why* a value
+  is unknown.
+- [Rules and rule sets](reference/rules.md) with DMN-style hit policies.
+- The [specification](spec/README.md) that every backend shares.

@@ -62,6 +62,8 @@ __all__ = [
     "evaluate",
     "evaluate_tree",
     "evaluate_value",
+    "evaluate_value_tree",
+    "type_group",
 ]
 
 TruthT = TypeVar("TruthT")
@@ -254,10 +256,40 @@ def evaluate_value(
         ExpressionError: If `expr` is not a node or is a condition.
         EvaluationError: In strict mode (see `evaluate`).
     """
+    return evaluate_value_tree(expr, data, strict=strict, rule=rule).value
+
+
+def evaluate_value_tree(
+    expr: Expr, data: object, *, strict: bool = False, rule: str | None = None
+) -> NodeResult:
+    """Like `evaluate_value`, but return the result tree (why a value is null).
+
+    Args:
+        expr: A value node.
+        data: The input.
+        strict: Raise instead of returning `None` for missing or mismatched data.
+        rule: Rule name added to error messages.
+
+    Returns:
+        The root `NodeResult`; `value` is the scalar or `None`, `reason` says why.
+
+    Raises:
+        ExpressionError: If `expr` is not a node or is a condition.
+        EvaluationError: In strict mode (see `evaluate`).
+    """
     _require_expr(expr)
     if expr.kind == "condition":
         raise ExpressionError(f"{expr!r} is a condition; use evaluate for conditions")
-    return _Evaluator(get_logic("boolean"), strict, rule, data).value(expr).value
+    return _Evaluator(get_logic("boolean"), strict, rule, data).value(expr)
+
+
+def type_group(value: object) -> str:
+    """Return the comparison group of a normalized value (see `docs/spec/ast.md`).
+
+    One of `"number"`, `"string"`, `"boolean"`, `"date"`, `"naive datetime"`,
+    `"aware datetime"` or `"other"`.
+    """
+    return _group(value)
 
 
 def _require_expr(node: object) -> None:

@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import math
+from decimal import Decimal
 from typing import Any
+
+I64_MIN, I64_MAX = -(2**63), 2**63 - 1
+"""Bounds of the signed 64-bit integers every backend (polars, Rust, JSON) can hold."""
 
 
 def is_numpy_bool(value: object) -> bool:
@@ -27,6 +31,8 @@ def is_null(value: object) -> bool:
         return True
     if isinstance(value, float):
         return math.isnan(value)
+    if isinstance(value, Decimal):
+        return value.is_nan()  # quiet and signaling NaN (sNaN cannot even be compared)
     if isinstance(value, _PLAIN):
         return False
     cls = type(value)

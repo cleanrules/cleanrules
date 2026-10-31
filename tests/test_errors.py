@@ -5,10 +5,14 @@ import pytest
 
 import rulepy
 from rulepy.errors import (
+    ActionError,
     EvaluationError,
     ExpressionError,
+    HitPolicyError,
     MissingFieldError,
     RegistryError,
+    RuleDefinitionError,
+    RuleNotFoundError,
     RulePyError,
     RuleSyntaxError,
     TypeMismatchError,
@@ -26,6 +30,10 @@ SAMPLES: list[RulePyError] = [
     TypeMismatchError("cannot compare", types=("str", "int"), path=("code",), rule="r"),
     MissingFieldError(("customer", "age"), rule="adult"),
     RegistryError("unknown logic 'x'", hint="use one of: boolean"),
+    RuleDefinitionError("duplicate rule name 'a'", rule="a"),
+    HitPolicyError("2 rules fired", rules=("a", "b")),
+    ActionError("the action failed", rule="notify", executed=("a",)),
+    RuleNotFoundError("c", ("a", "b")),
 ]
 
 
@@ -50,6 +58,30 @@ def test_missing_field_error_names_the_path() -> None:
     assert isinstance(err, EvaluationError)
     assert err.path == ("orders", 0, "total")
     assert str(err) == "rule 'big': missing field orders[0].total\nhint: check the input"
+
+
+def test_rule_errors_render_their_context() -> None:
+    assert str(RuleDefinitionError("bad priority", rule="r")) == "rule 'r': bad priority"
+    assert str(HitPolicyError("2 rules fired", rules=("a", "b"))) == "2 rules fired (rules: a, b)"
+    assert str(HitPolicyError("nothing")) == "nothing"
+    assert str(ActionError("failed", rule="n")) == "rule 'n': failed"
+    assert issubclass(HitPolicyError, EvaluationError)
+    assert issubclass(RuleDefinitionError, ValueError)
+
+
+def test_evaluation_errors_can_name_the_batch_row() -> None:
+    err = MissingFieldError(("x",), rule="r")
+    assert err.row is None
+    err.row = 3
+    assert str(err) == "row 3: rule 'r': missing field x"
+    assert pickle.loads(pickle.dumps(err)).row == 3
+
+
+def test_rule_not_found_is_a_key_error_listing_names() -> None:
+    err = RuleNotFoundError("c", ("a", "b"))
+    assert isinstance(err, KeyError)
+    assert str(err) == "no rule named 'c'\nhint: rules in this set: 'a', 'b'"
+    assert str(RuleNotFoundError("c", ())).endswith("rules in this set: none")
 
 
 def test_registry_error_is_a_lookup_error() -> None:
@@ -86,6 +118,10 @@ def test_errors_are_exported_at_top_level() -> None:
         "TypeMismatchError",
         "MissingFieldError",
         "RegistryError",
+        "RuleDefinitionError",
+        "HitPolicyError",
+        "ActionError",
+        "RuleNotFoundError",
     ):
         assert name in rulepy.__all__
         assert getattr(rulepy, name) is getattr(rulepy.errors, name)
@@ -208,3 +244,9 @@ def test_errors_survive_pickling(err: RulePyError) -> None:
 
 def test_package_ships_py_typed_marker() -> None:
     assert files("rulepy").joinpath("py.typed").is_file()
+
+
+def test_rule_not_found_lists_at_most_twenty_names() -> None:
+    err = RuleNotFoundError("c", tuple(f"r{i}" for i in range(30)))
+    assert "'r19'" in (err.hint or "")
+    assert "'r20'" not in (err.hint or "")

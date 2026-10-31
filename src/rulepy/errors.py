@@ -19,10 +19,14 @@ from __future__ import annotations
 from typing import Any
 
 __all__ = [
+    "ActionError",
     "EvaluationError",
     "ExpressionError",
+    "HitPolicyError",
     "MissingFieldError",
     "RegistryError",
+    "RuleDefinitionError",
+    "RuleNotFoundError",
     "RulePyError",
     "RuleSyntaxError",
     "TypeMismatchError",
@@ -206,6 +210,10 @@ class EvaluationError(RulePyError):
         node: The failing condition: the AST node in the Python evaluator, or its
             rendered text in other backends. Only `str(node)` is relied upon.
         hint: Optional suggestion on how to fix the rule or the data.
+
+    Attributes:
+        row: Position of the input in a batch (`RuleSet.evaluate_many`), if any;
+            set by the batch loop and shown first in the message.
     """
 
     def __init__(
@@ -219,9 +227,14 @@ class EvaluationError(RulePyError):
         super().__init__(message, hint=hint)
         self.rule = rule
         self.node = node
+        self.row: int | None = None
 
     def _body(self) -> str:
         return _with_context(self.message, self.rule, self.node)
+
+    def __str__(self) -> str:
+        text = super().__str__()
+        return text if self.row is None else f"row {self.row}: {text}"
 
 
 def format_path(path: tuple[str | int, ...]) -> str:
@@ -306,3 +319,89 @@ class RegistryError(RulePyError, LookupError):
         message: What was looked up or registered.
         hint: Optional suggestion, usually the available names.
     """
+
+
+class RuleDefinitionError(RulePyError, ValueError):
+    """A rule or rule set is defined incorrectly (bad name, condition, payload, policy...).
+
+    Raised when the rule or rule set is built, never during evaluation.
+
+    Args:
+        message: What is wrong.
+        rule: Name of the rule concerned, if any.
+        hint: Optional suggestion on how to fix the definition.
+    """
+
+    def __init__(self, message: str, *, rule: str | None = None, hint: str | None = None) -> None:
+        super().__init__(message, hint=hint)
+        self.rule = rule
+
+    def _body(self) -> str:
+        return _with_context(self.message, self.rule, None)
+
+
+class HitPolicyError(EvaluationError):
+    """The rules that fired break the rule set's hit policy (e.g. two under `UNIQUE`).
+
+    Args:
+        message: What the policy forbids.
+        rules: Names of the rules involved, in rule order.
+        hint: Optional suggestion, e.g. another hit policy.
+    """
+
+    def __init__(
+        self, message: str, *, rules: tuple[str, ...] = (), hint: str | None = None
+    ) -> None:
+        super().__init__(message, hint=hint)
+        self.rules = rules
+
+    def _body(self) -> str:
+        if not self.rules:
+            return self.message
+        return f"{self.message} (rules: {', '.join(self.rules)})"
+
+
+class ActionError(RulePyError):
+    """A rule's action (a user callable) raised; the original error is the `__cause__`.
+
+    Actions run in rule order and stop at the first failure.
+
+    Args:
+        message: What failed.
+        rule: Name of the rule whose action failed.
+        decision: The decision whose actions were running.
+        executed: Names of the rules whose actions had already run successfully.
+        hint: Optional suggestion.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        rule: str | None = None,
+        decision: object = None,
+        executed: tuple[str, ...] = (),
+        hint: str | None = None,
+    ) -> None:
+        super().__init__(message, hint=hint)
+        self.rule = rule
+        self.decision = decision
+        self.executed = executed
+
+    def _body(self) -> str:
+        return _with_context(self.message, self.rule, None)
+
+
+class RuleNotFoundError(RulePyError, KeyError):
+    """No rule with that name in the rule set (also a `KeyError`).
+
+    Args:
+        name: The name looked up.
+        available: The rule set's rule names.
+    """
+
+    def __init__(self, name: str, available: tuple[str, ...]) -> None:
+        shown = ", ".join(repr(n) for n in available[:20]) or "none"
+        super().__init__(f"no rule named {name!r}", hint=f"rules in this set: {shown}")
+        self.name = name
+        self.available = available

@@ -18,6 +18,7 @@ acceptable backend-specific behaviour.
 | Document | Status | Defines |
 |---|---|---|
 | [`ast.md`](ast.md) | draft, format version 0 (serialized form in task 3.1) | Every condition node: operator tag, kind, construction rules, typing and null semantics |
+| [`rules.md`](rules.md) | draft | Rules, hit policies, payloads, outputs, aggregates and actions |
 | `ast-schema.json` | planned (task 3.1) | JSON Schema for serialized rules and rule sets |
 
 ## Conventions that apply to every spec

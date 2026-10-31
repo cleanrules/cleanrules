@@ -15,7 +15,15 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from rulepy import F
-from rulepy.core.evaluate import NodeResult, Reason, evaluate, evaluate_tree, evaluate_value
+from rulepy.core.evaluate import (
+    NodeResult,
+    Reason,
+    evaluate,
+    evaluate_tree,
+    evaluate_value,
+    evaluate_value_tree,
+    type_group,
+)
 from rulepy.core.expr import And, Const, Expr, Field, Not, Or
 from rulepy.core.logic import BooleanLogic, Truth
 from rulepy.errors import EvaluationError, ExpressionError, MissingFieldError, TypeMismatchError
@@ -618,3 +626,36 @@ def test_a_present_field_reads_back_its_value(path: list[str], value: object) ->
         data = {segment: data}
     result = evaluate_tree(Field(*path).is_null(), data)
     assert result.value is (T if value is None else FALSE)
+
+
+@pytest.mark.parametrize(
+    ("value", "group"),
+    [
+        (1, "number"),
+        (1.5, "number"),
+        (Decimal("1"), "number"),
+        (True, "boolean"),
+        ("a", "string"),
+        (dt.date(2020, 1, 1), "date"),
+        (dt.datetime(2020, 1, 1), "naive datetime"),
+        (dt.datetime(2020, 1, 1, tzinfo=dt.UTC), "aware datetime"),
+        (object(), "other"),
+        ([1], "other"),
+    ],
+    ids=repr,
+)
+def test_type_group(value: object, group: str) -> None:
+    assert type_group(value) == group
+
+
+def test_evaluate_value_tree_reports_why_and_names_the_rule() -> None:
+    result = evaluate_value_tree(F.a * 2, {})
+    assert result.value is None
+    assert str(result.reason) == "missing field a"
+    with pytest.raises(MissingFieldError) as info:
+        evaluate_value_tree(F.a * 2, {}, strict=True, rule="r")
+    assert info.value.rule == "r"
+
+
+def test_signaling_decimal_nan_is_null() -> None:
+    assert ev(F.x.is_null(), {"x": Decimal("sNaN")}) is T

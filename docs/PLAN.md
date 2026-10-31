@@ -230,12 +230,35 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
   - Las notas de la especificación sobre polars recogen `Float32` y `Decimal`.  - *Nota de 1.4*:
     - restringir la anotación de `node` en `EvaluationError` y `UnsupportedOperation` a `Expr | str | None` (Python pasa el nodo; los demás backends pasan su texto);
     - errores nuevos previstos: campo ausente en modo estricto (2.5), `HitPolicyError(EvaluationError)` con `rules: tuple[str, ...]` para `UNIQUE` (2.8), y un índice de fila para `evaluate_many`.
-- [ ] 2.7 `Rule(name, when, then, priority=0, tags=(), description=None, metadata={})`. `then` puede ser un dict (payload de decisión), una función `(ctx) -> None` o una lista de acciones declarativas (`Set`, `Append`, `Emit`).
+- [x] 2.7 `Rule(name, when, then, priority=0, tags=(), description=None, metadata={})`. `then` puede ser un dict (payload de decisión), una función `(ctx) -> None` o una lista de acciones declarativas (`Set`, `Append`, `Emit`).
   - *Nota de 2.2*: `Rule` necesita `eq=False` o su propio `__eq__`, porque comparar dos reglas compararía sus `when` y lanzaría un error. En 2.6 y 2.7, nunca usar duck typing (`hasattr`/`getattr`), `==` ni `if x:` sobre algo que pueda ser un nodo: comprobar antes `isinstance(x, Expr)`.
-- [ ] 2.8 `RuleSet` con políticas de acierto al estilo DMN:
+- [x] 2.8 `RuleSet` con políticas de acierto al estilo DMN:
   - `FIRST`, `PRIORITY`, `UNIQUE`, `ANY`, `COLLECT` (con agregadores `sum`, `min`, `max`, `count` y `list`), `RULE_ORDER`;
   - la política `UNIQUE` lanza un error si se disparan dos reglas.
-- [ ] 2.9 `engines/sequential.py`: `ruleset.evaluate(data) -> Decision` y `evaluate_many(iterable)`.
+- [x] 2.9 `engines/sequential.py`: `ruleset.evaluate(data) -> Decision` y `evaluate_many(iterable)`.
+  - Hechas juntas 2.7, 2.8 y 2.9. La semántica normativa está en `docs/spec/rules.md`.
+  - Desviaciones respecto al plan (tras la revisión de `api-reviewer`):
+    - `then=` es **solo el payload**: sus valores se normalizan a nodos (constantes como `Const`, más expresiones de valor). La acción va aparte en `do=`, así que una regla puede tener ambos. Las acciones declarativas (`Set`, `Append`, `Emit`) quedan para la fase 6.
+    - `evaluate()` es **puro**: las acciones solo se ejecutan con `RuleSet.run(data)`. `ActionError` lleva la `Decision` y las acciones ya ejecutadas.
+    - Sin agregador `list`: `COLLECT` sin agregado ya da la lista (`Decision.outputs`). Los agregados son **por clave**, `count` cuenta valores no nulos, y sobre cero reglas el agregado es nulo (como en DMN).
+    - `logic` y `strict` viven en el `RuleSet`. `PRIORITY` usa `Rule.priority` (las tablas de decisión de la 3.5 compilarán la prioridad de los valores de salida a prioridades de regla).
+    - Los payloads se evalúan solo para las reglas elegidas (todas las disparadas con `ANY`), y guardan su árbol (`output_trees`).
+    - `Decision.outputs` (tupla) y `Decision.output` (uno, o el agregado; error con varios sin agregado).
+  - Extras:
+    - `RuleSet` de solo lectura, con `in` por nombre, `get()` y `RuleNotFoundError` (también `KeyError`);
+    - reglas y rule sets admiten pickle y deepcopy (`FrozenMap` en lugar de `MappingProxyType`);
+    - `EvaluationError.row` en `evaluate_many`;
+    - el ejemplo del README se ejecuta en un test.
+  - **Verificación adversarial con un workflow** (5 perspectivas y 2 escépticos por hallazgo; 87 agentes): 28 hallazgos confirmados, 5 discutidos y 8 rechazados. Aplicados todos los confirmados y discutidos:
+    - `ANY` compara los payloads por pares, sin hashear (antes, una lista leída de los datos daba un `TypeError` sin envolver);
+    - los agregados siguen las reglas de la aritmética: `Decimal` pasa a float64, un entero de más de 64 bits es nulo y NaN es nulo;
+    - las salidas de la `Decision` son de solo lectura (`FrozenMap`), y una acción ya no puede reescribirlas;
+    - validación completa de los argumentos de `Rule` y `RuleSet` (prioridad en 64 bits, metadatos y descripción, `strict` booleano, `logic` válida);
+    - `evaluate_many` rechaza de inmediato cadenas, mapas y DataFrames;
+    - `Rule` se reconstruye por pickle a través del constructor (pickles estables entre versiones);
+    - `is_null` reconoce `Decimal('sNaN')`;
+    - especificación: orden de claves y de errores, igualdad en `ANY` (nulo igual a nulo, valores `other`) y requisitos de las reglas;
+    - unos 25 tests nuevos, varios procedentes de mutantes que sobrevivían a la suite.
 
 **Explicación (`core/trace.py`)**
 - [ ] 2.10 Árbol de traza con el valor de verdad de cada nodo y los valores de campo resueltos.

@@ -55,6 +55,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `UNKNOWN` or null; `evaluate_value` evaluates fields and arithmetic. It reads
   mappings, sequences, records, pandas rows, dataclasses, Pydantic models and
   numpy arrays, never private attributes, and supports a `strict` mode.
+- Rules and rule sets (`rulepy.Rule`, `rulepy.RuleSet`): a rule has a condition
+  (`when`), a payload (`then`, constants or value expressions computed from the
+  data) and an optional action (`do`). Rule sets apply DMN-style hit policies
+  (`HitPolicy`: `FIRST`, `PRIORITY`, `UNIQUE`, `ANY`, `RULE_ORDER`, `COLLECT`
+  with per-key `sum`/`min`/`max`/`count`) and return a `Decision` with every
+  rule's result and tree, the selected rules, `outputs` and `output`.
+  `evaluate()` and `evaluate_many()` are pure; `run()` also calls the actions.
+  Rules and rule sets pickle and deep-copy. Decision outputs and aggregates are
+  read-only, and aggregates follow the arithmetic rules (Decimal as float64,
+  64-bit integer overflow and NaN are null). Semantics: `docs/spec/rules.md`.
+- Errors: `RuleDefinitionError`, `HitPolicyError`, `ActionError` (with the
+  decision and the actions already run), `RuleNotFoundError` (a `KeyError`);
+  `EvaluationError.row` names the input in batches.
+- `rulepy.core.evaluate.evaluate_value_tree` and `type_group`.
 - `rulepy.errors.format_path` renders field paths unambiguously
   (`orders[0].total`, `['x y']`).
 - Errors for evaluation and registries: `TypeMismatchError`,
