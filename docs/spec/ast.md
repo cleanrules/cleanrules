@@ -118,6 +118,44 @@ Nodes keep identity hashing and support weak references.
 The reference evaluator (tasks 2.5–2.6) implements these rules, and every other
 backend must match it.
 
+### Reading data
+
+A `Field` path is followed one segment at a time:
+
+- A **string** segment:
+  - on a **mapping**, the value under that key, if the key is present (`in` is
+    checked first, so `__missing__` is never triggered and dict subclasses are
+    read through their own `__getitem__`); underscore keys such as `"_id"` are
+    allowed;
+  - on an object with `keys()` and `__getitem__`, such as a pandas row, the value
+    under that key, if `key in obj.keys()`;
+  - on a **namedtuple-like record** (a sequence with `_fields`, such as SQLAlchemy
+    rows or `itertuples()`), the attribute;
+  - on any other object, the attribute, if it is a **public data attribute**.
+
+  Names starting with `_` are never looked up as attributes. The lookup never
+  returns methods, classes or modules, and never reads attributes of scalars
+  (`bool`, numbers, strings, bytes, `Decimal`, dates and times). So a rule loaded
+  from a file cannot reach into the process (`__class__`, `__globals__`,
+  `os.environ`, ...), and `F.d.year` on a date is missing in every backend.
+- An **integer** segment indexes a sequence-like value with a length (lists,
+  tuples, numpy arrays), if `0 <= i < len`. It never looks up a mapping key.
+- Anything else is **missing**.
+- Pydantic models are read by **field name**, not alias. Extra and computed
+  fields are readable.
+- If reading raises an exception (for example, a property that fails), the value
+  is null with reason `read_error`; strict mode raises `EvaluationError`, chained
+  to the original exception. An `AttributeError` counts as missing.
+
+Values are normalized once, when read:
+
+- missing values become `None` (see *Missing values*);
+- `numpy.bool_` becomes `bool`;
+- integer-likes become `int`, and an integer outside the signed 64-bit range is
+  null with reason `int_overflow`;
+- other real numbers (except `float` and `Decimal`) become `float`;
+- `numpy.datetime64` becomes a naive `datetime` (microseconds).
+
 ### Truth values
 
 Crisp logic is Kleene three-valued: `TRUE`, `FALSE` and `UNKNOWN`. A rule fires
@@ -166,7 +204,11 @@ result into an error that another order would not raise (see *Types*).
 
 - A `Field` whose path cannot be resolved (missing key, missing attribute,
   index out of range) evaluates to **null**, the same as an explicit `None`.
-  Strict mode (task 2.6) raises `MissingFieldError` instead.
+  Strict mode (task 2.6) raises `MissingFieldError` instead, even under
+  `is_null`.
+- A null met **in the middle** of a path (`F.customer.age` with `customer`
+  null) makes the field null, even in strict mode: the path exists up to a
+  null. A null input (`data=None`) is null at the empty path ("the input").
 - **NaN read from the data is null**: Python, numpy and `Decimal` NaN, as well
   as `pandas.NA` and `NaT` (`rulepy.core._compat.is_null`). This keeps Python, whose
   comparisons with NaN are `False`, and polars, which orders NaN above every
@@ -185,8 +227,8 @@ result into an error that another order would not raise (see *Types*).
 
 Values belong to one of these comparison groups:
 
-- **number**: `numbers.Real` except `bool` and `numpy.bool_`, so `np.int64` is a
-  number;
+- **number**: `numbers.Real` except `bool` and `numpy.bool_` (so `np.int64` is a
+  number), plus finite `Decimal`, which databases return for NUMERIC columns;
 - **string**: including polars `Categorical`/`Enum` columns;
 - **boolean**;
 - **date**;
@@ -198,12 +240,12 @@ Values belong to one of these comparison groups:
 - Comparing values from different groups, or ordering booleans, is a **type
   mismatch**:
   - **Default:** the comparison is `UNKNOWN`, and the trace records the reason
-    (for example, "type mismatch: str vs int") so `explain()` shows it. It is
+    (for example, "type mismatch: string vs number") so `explain()` shows it. It is
     never a silent `FALSE`, and one bad row never aborts a whole batch.
   - **Strict mode:** it raises `TypeMismatchError` (a subclass of
     `EvaluationError`, task 2.5) with the field path and both types.
-- `int` vs `float` compares **exactly**, as Python does. polars casts both to
-  float, which differs above 2⁵³; its backend must handle that case.
+- `int`, `float` and `Decimal` compare **exactly**, as Python does. polars casts
+  to float, which differs above 2⁵³; its backend must handle that case.
 
 ### Nodes of task 2.1b
 
@@ -229,10 +271,42 @@ Values belong to one of these comparison groups:
   call `str.contains(..., literal=True)`.
 - **Arithmetic** (`add`, `sub`, `mul`, `div`, `abs`, `neg`) is defined on
   numbers:
-  - `div` is true division and always returns a float;
+  - `div` converts both operands to float64 **first**, then divides (what
+    polars and Rust do), so it always returns a float;
+  - `Decimal` operands are converted to float64 for every operation;
   - **division by zero yields null**, for int and float alike;
   - an integer result outside the signed 64-bit range yields null;
-  - a NaN result is null.
+  - a NaN result is null, while `inf` and `-inf` results are kept;
+  - an operand that is not a number makes the result null with reason
+    `type_mismatch` (strict mode raises `TypeMismatchError`).
+
+## Results and reasons
+
+Every node evaluates to a truth value (conditions) or a scalar or null (values).
+When a truth value is `UNKNOWN` or a value is null, a **reason** says why, and
+only then: a `TRUE` or `FALSE` never carries one. Backends are compared on the
+reason's **code**, the **field paths** involved and the type **groups**; the
+human-readable text may differ.
+
+| Code | Meaning |
+|---|---|
+| `missing_field` | the path cannot be resolved |
+| `null` | a null value (or NaN) was met; the path says where |
+| `type_mismatch` | values of incompatible groups met, or a non-boolean used as a condition |
+| `unorderable` | booleans were ordered with `<`, `<=`, `>` or `>=` |
+| `division_by_zero` | a division by zero |
+| `int_overflow` | an integer outside the signed 64-bit range |
+| `nan_result` | an arithmetic result is NaN |
+| `read_error` | reading the data raised an exception |
+
+A condition that is `UNKNOWN` takes the reason of its first `UNKNOWN` operand.
+A `Between` is reported as its two half comparisons, so explanations can say
+which bound failed.
+
+**Strict mode** raises the first error found in depth-first, left-to-right
+post-order: children before their parent, operands in order. The Rust backend
+follows the same order. polars checks schemas up front, so its parity tests
+only assert that some `EvaluationError` is raised.
 
 ## Notes for the polars backend (task 4.3)
 
@@ -246,6 +320,10 @@ spec does not:
 To match the spec, the backend:
 
 - applies `fill_nan(None)` to float columns only;
+- casts `Float32` columns to `Float64` and never downcasts literals
+  (`np.float32(0.1) == 0.1` is `FALSE` in the reference evaluator);
+- compares `Decimal` columns exactly with literals, and converts them to
+  `Float64` for arithmetic;
 - maps division by zero, which polars turns into `inf` or `NaN`, with
   `when(den == 0)`;
 - turns type mismatches into `UNKNOWN` per row, with the reason recorded.

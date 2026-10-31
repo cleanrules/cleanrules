@@ -49,6 +49,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GradedLogic` protocol, and `BooleanLogic` (Kleene three-valued logic), with
   a registry (`get_logic(name, **params)`, `register_logic`,
   `unregister_logic`, `logic_names`).
+- `rulepy.core.evaluate`: the reference evaluator. `evaluate(condition, data)`
+  returns a truth value; `evaluate_tree` returns a `NodeResult` tree with a
+  structured `Reason` (code, field paths, type groups) wherever a value is
+  `UNKNOWN` or null; `evaluate_value` evaluates fields and arithmetic. It reads
+  mappings, sequences, records, pandas rows, dataclasses, Pydantic models and
+  numpy arrays, never private attributes, and supports a `strict` mode.
+- `rulepy.errors.format_path` renders field paths unambiguously
+  (`orders[0].total`, `['x y']`).
 - Errors for evaluation and registries: `TypeMismatchError`,
   `MissingFieldError` (both name the field path) and `RegistryError`.
 - Condition AST specification (`docs/spec/ast.md`, draft): node catalogue,

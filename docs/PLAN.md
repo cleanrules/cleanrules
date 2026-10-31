@@ -209,8 +209,25 @@ Cada fase termina en una versión publicable (0.x). Los tamaños son relativos (
   - *Nota de 2.1a*: los tipos incompatibles dan `UNKNOWN` con el motivo en la traza. En modo `strict`, `TypeMismatchError(EvaluationError)` con la ruta del campo y los dos tipos. Grupos de comparación según `docs/spec/ast.md` (número = `numbers.Real` sin `bool`).
 
 **Evaluación y reglas**
-- [ ] 2.6 Evaluador de referencia `core/evaluate.py`, sobre `Mapping`, dataclasses, objetos con atributos y modelos Pydantic (por duck typing, sin depender de Pydantic).
-  - *Nota de 1.4*:
+- [x] 2.6 Evaluador de referencia `core/evaluate.py`, sobre `Mapping`, dataclasses, objetos con atributos y modelos Pydantic (por duck typing, sin depender de Pydantic).
+  - `evaluate` (con sobrecargas de tipo), `evaluate_tree` y `evaluate_value`. Devuelven un árbol `NodeResult` (`node`, `value`, `reason`, `children`) que será la base de la traza (2.10). Un `Between` se representa con sus dos medias comparaciones.
+  - Motivos **estructurados**: `Reason(code, paths, types, detail)` con 8 códigos normativos para todos los backends (`docs/spec/ast.md`, "Results and reasons"). Solo aparecen en UNKNOWN o nulo.
+  - Sin cortocircuito. El modo `strict` lanza el primer error en postorden de izquierda a derecha.
+  - Lectura de datos especificada (nueva sección "Reading data"):
+    - mapas por clave (sin `__missing__`);
+    - filas con `keys()`;
+    - registros tipo namedtuple;
+    - atributos **públicos de datos**;
+    - índices sobre secuencias con longitud, incluidos arrays de numpy.
+  - Tras la revisión de `api-reviewer`:
+    - **fallo de seguridad corregido**: una ruta como `F.o.__class__.__init__.__globals__.os.environ` leía variables de entorno; ahora no se leen atributos con `_` ni de clases, módulos o escalares;
+    - `Decimal` cuenta como número;
+    - `div` convierte antes a float64, como polars y Rust;
+    - los enteros de los datos fuera de 64 bits son nulos;
+    - `datetime64` se convierte a `datetime`;
+    - una propiedad que lanza da `read_error`;
+    - `format_path` ya no es ambigua.
+  - Las notas de la especificación sobre polars recogen `Float32` y `Decimal`.  - *Nota de 1.4*:
     - restringir la anotación de `node` en `EvaluationError` y `UnsupportedOperation` a `Expr | str | None` (Python pasa el nodo; los demás backends pasan su texto);
     - errores nuevos previstos: campo ausente en modo estricto (2.5), `HitPolicyError(EvaluationError)` con `rules: tuple[str, ...]` para `UNIQUE` (2.8), y un índice de fila para `evaluate_many`.
 - [ ] 2.7 `Rule(name, when, then, priority=0, tags=(), description=None, metadata={})`. `then` puede ser un dict (payload de decisión), una función `(ctx) -> None` o una lista de acciones declarativas (`Set`, `Append`, `Emit`).

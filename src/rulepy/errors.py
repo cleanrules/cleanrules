@@ -27,6 +27,7 @@ __all__ = [
     "RuleSyntaxError",
     "TypeMismatchError",
     "UnsupportedOperation",
+    "format_path",
 ]
 
 
@@ -223,11 +224,20 @@ class EvaluationError(RulePyError):
         return _with_context(self.message, self.rule, self.node)
 
 
-def _format_path(path: tuple[str | int, ...]) -> str:
-    """Render a field path for messages, e.g. `orders[0].total`."""
+def format_path(path: tuple[str | int, ...]) -> str:
+    """Render a field path for messages, e.g. `("orders", 0, "total")` as `orders[0].total`.
+
+    Segments that are not plain identifiers are quoted, so the rendering is
+    unambiguous: `("a.b",)` is `['a.b']` and `("x y", 0)` is `['x y'][0]`.
+    """
     out = ""
     for segment in path:
-        out += f"[{segment}]" if isinstance(segment, int) else f".{segment}" if out else segment
+        if isinstance(segment, int):
+            out += f"[{segment}]"
+        elif segment.isascii() and segment.isidentifier():
+            out += f".{segment}" if out else segment
+        else:
+            out += f"[{segment!r}]"
     return out
 
 
@@ -263,7 +273,7 @@ class TypeMismatchError(EvaluationError):
     def _body(self) -> str:
         message = self.message
         if self.path is not None:
-            message = f"{message} (field {_format_path(self.path)})"
+            message = f"{message} (field {format_path(self.path)})"
         return _with_context(message, self.rule, self.node)
 
 
@@ -285,7 +295,7 @@ class MissingFieldError(EvaluationError):
         node: object = None,
         hint: str | None = None,
     ) -> None:
-        super().__init__(f"missing field {_format_path(path)}", rule=rule, node=node, hint=hint)
+        super().__init__(f"missing field {format_path(path)}", rule=rule, node=node, hint=hint)
         self.path = path
 
 
