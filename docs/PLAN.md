@@ -114,7 +114,7 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
 
 **Objetivo**: que la especificación y los vectores contengan todo el conocimiento de la v1 antes de borrar el código.
 
-- [ ] A.1 Mover `docs/spec/` a `spec/` y escribir `spec/json-format.md` y los JSON Schemas (antes tarea 3.1): AST con `"version": 1`, reglas y rule sets, valores (`Decimal` como texto, `inf`/`-inf`, fechas ISO 8601, zonas horarias), decisiones, motivos (`Reason`), explicaciones (requisitos, `Counterfactual`) y resúmenes.
+- [x] A.1 Mover `docs/spec/` a `spec/` y escribir `spec/json-format.md` y los JSON Schemas (antes tarea 3.1): AST con `"version": 1`, reglas y rule sets, valores (`Decimal` como texto, `inf`/`-inf`, fechas ISO 8601, zonas horarias), decisiones, motivos (`Reason`), explicaciones (requisitos, `Counterfactual`) y resúmenes.
   - La v1 no serializaba nada: el formato se diseña aquí, a partir de sus estructuras. Se divide en:
   - [x] A.1a Mover `docs/spec/` a `spec/`; `spec/json-format.md` con el documento (`"version": 1`), los valores y las condiciones, y sus JSON Schemas.
     - Hecho el 2026-10-31 y revisado por `api-reviewer`. Decisiones tomadas:
@@ -147,7 +147,14 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - `ruleset_digest` y `metadata` quedan reservados.
       - El orden y los duplicados de `paths` y `types` en los motivos quedan fijados en `ast.md`.
       - Los grupos de tipo se escriben en *snake case*.
-  - [ ] A.1d Explicaciones (requisitos, `Counterfactual`) y resúmenes; `spec/explain.md`, que aún no existe.
+  - [x] A.1d Explicaciones (requisitos, `Counterfactual`) y resúmenes; `spec/explain.md`, que aún no existe.
+    - Hecho el 2026-10-31 y revisado por `api-reviewer`, que confirmó que los algoritmos coinciden con la v1 línea a línea. Decisiones tomadas:
+      - `spec/explain.md` especifica los estados, los requisitos `all`/`any`, la simplificación, la comprobación de opciones (con tope de 64), los contrafactuales y las notas.
+      - El texto de `explain()` no es normativo: lo fijan los *snapshots* del núcleo, y la sintaxis de las condiciones en el texto se decide en B.3 y D.2.
+      - Explicaciones y resúmenes son documentos JSON solo de salida.
+      - Cada causa guarda su condición y un puntero `at` al nodo de la decisión del que sale.
+      - La aritmética del hueco es propia y exacta: enteros comprobados en 64 bits, decimales exactos e instantes UTC.
+      - Quedan reservados los campos de las explicaciones graduadas.
 - [ ] A.2 `spec/data-model.md`: `Value` y cómo convierte cada binding sus tipos nativos; precisión y rango de `Decimal` (lo que admita `rust_decimal`, o un tipo propio si se quieren conservar los infinitos y más de 28 dígitos); reescribir `ast.md` en términos neutros (quedan clases Python, la columna de tareas de la v1 y notas de polars). La sección "Reading data" de `ast.md` (mapas, registros, atributos **públicos**, nunca privados ni de módulos o clases) pasa a ser una obligación de cada binding.
 - [ ] A.3 Exportador temporal en Python (`conformance/tools/`) que, con la implementación de la v1, genera **vectores de conformidad**: árboles y errores de construcción, evaluaciones con motivos, modo estricto, decisiones de las 6 políticas, agregados, explicaciones y resúmenes. Las propiedades de hypothesis se convierten en miles de casos fijados.
   - Vectores de lectura que hacen falta aunque la v1 no los pueda generar:
@@ -160,7 +167,8 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
   - Casos de la v1 que **no** se toman como vectores:
     - `Const(None)` bajo `and`, `or` y `not`;
     - patrones regex que Python acepta y `regex` no, y `$` antes de un salto de línea final;
-    - la deduplicación de `in` con dos instantes distintos en la misma zona durante un cambio de hora, que la v1 fusiona porque Python compara horas locales cuando comparten `tzinfo`.
+    - la deduplicación de `in` con dos instantes distintos en la misma zona durante un cambio de hora, que la v1 fusiona porque Python compara horas locales cuando comparten `tzinfo`;
+    - los huecos de contrafactuales que la v1 calculaba distinto (`explain.md`, *Differences from the Python v1*): enteros de más de 64 bits, decimales redondeados a 28 dígitos y fechas con hora restadas como hora local durante un cambio de hora.
 - [ ] A.4 Retirada: tag `python-reference` y eliminación de `src/rulepy` y de sus tests. Se conservan `spec/`, `docs/pitfalls.md` (pasa a la documentación del binding de Python) y los vectores.
 
 **Aceptación**: el conjunto de vectores cubre cada sección de la especificación; un script comprueba que cada regla normativa de `spec/` cita al menos un vector.

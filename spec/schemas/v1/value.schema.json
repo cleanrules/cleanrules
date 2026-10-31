@@ -210,6 +210,22 @@
           "$ref": "#/$defs/map"
         }
       ]
+    },
+    "nonNullValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/nonNullScalar"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/value"
+          }
+        },
+        {
+          "$ref": "#/$defs/map"
+        }
+      ]
     }
   }
 }

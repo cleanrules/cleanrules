@@ -1,0 +1,234 @@
+{
+  "version": 1,
+  "explanation": {
+    "hit_policy": "priority",
+    "logic": "boolean",
+    "selected": [
+      "e"
+    ],
+    "rules": [
+      {
+        "rule": "a",
+        "status": "not_fired",
+        "achievable": true,
+        "requirement": {
+          "all": [
+            {
+              "condition": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 10
+                }
+              },
+              "at": "/decision/results/0/when/children/0",
+              "truth": false,
+              "negated": false,
+              "values": [
+                {
+                  "path": [
+                    "x"
+                  ],
+                  "value": 8
+                }
+              ],
+              "counterfactual": {
+                "path": [
+                  "x"
+                ],
+                "op": "gt",
+                "target": 10,
+                "gap": 2
+              }
+            },
+            {
+              "condition": {
+                "op": "le",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "y"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 3
+                }
+              },
+              "at": "/decision/results/0/when/children/1/children/0",
+              "truth": true,
+              "negated": true,
+              "values": [
+                {
+                  "path": [
+                    "y"
+                  ],
+                  "value": 2
+                }
+              ],
+              "counterfactual": {
+                "path": [
+                  "y"
+                ],
+                "op": "gt",
+                "target": 3,
+                "gap": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "rule": "b",
+        "status": "not_fired",
+        "achievable": true,
+        "requirement": {
+          "condition": {
+            "op": "le",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 5
+            }
+          },
+          "at": "/decision/results/1/when/children/1",
+          "truth": false,
+          "negated": false,
+          "values": [
+            {
+              "path": [
+                "x"
+              ],
+              "value": 8
+            }
+          ],
+          "counterfactual": {
+            "path": [
+              "x"
+            ],
+            "op": "le",
+            "target": 5,
+            "gap": 3
+          }
+        }
+      },
+      {
+        "rule": "c",
+        "status": "not_fired",
+        "achievable": false,
+        "requirement": {
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          },
+          "at": "/decision/results/2/when/children/1/children/0",
+          "truth": true,
+          "negated": true,
+          "values": [
+            {
+              "path": [
+                "x"
+              ],
+              "value": 8
+            }
+          ],
+          "counterfactual": {
+            "path": [
+              "x"
+            ],
+            "op": "le",
+            "target": 1,
+            "gap": 7
+          }
+        }
+      },
+      {
+        "rule": "d",
+        "status": "fired",
+        "note": {
+          "kind": "lower_priority",
+          "winner": "e",
+          "priority": 1,
+          "winner_priority": 5
+        },
+        "requirement": {
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          },
+          "at": "/decision/results/3/when",
+          "truth": true,
+          "negated": false,
+          "values": [
+            {
+              "path": [
+                "x"
+              ],
+              "value": 8
+            }
+          ]
+        }
+      },
+      {
+        "rule": "e",
+        "status": "selected",
+        "requirement": {
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 0
+            }
+          },
+          "at": "/decision/results/4/when",
+          "truth": true,
+          "negated": false,
+          "values": [
+            {
+              "path": [
+                "x"
+              ],
+              "value": 8
+            }
+          ]
+        },
+        "achievable": true
+      }
+    ]
+  }
+}

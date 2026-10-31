@@ -1,8 +1,8 @@
 # JSON format
 
 **Status:** draft, format version `1`. This document covers documents, values
-and conditions (task A.1a), rules and rule sets (A.1b), and decisions and
-reasons (A.1c). Explanations and summaries (A.1d) are added in a later task.
+and conditions (task A.1a), rules and rule sets (A.1b), decisions and reasons
+(A.1c), and explanations and summaries (A.1d).
 
 The JSON format is the contract between languages and with users' files
 (`CLAUDE.md`, invariant 6). A condition written in Java and read in Go is the
@@ -19,7 +19,8 @@ encoded as UTF-8 without a byte order mark. Its top level is an object with:
 
 - `"version"`: the format version, the integer literal `1`;
 - exactly one **content key**, which says what the document holds:
-  `"condition"`, `"rule"`, `"ruleset"` or `"decision"`;
+  `"condition"`, `"rule"`, `"ruleset"`, `"decision"`, `"explanation"` or
+  `"summary"`;
 - optionally `"$schema"`, a string that readers ignore, so editors can find the
   schema. Writers do not emit it.
 
@@ -495,7 +496,7 @@ The `between` halves let explanations say which bound failed (`ast.md`,
 
 **Truth values.** Under Kleene logic, `truth` is `true`, `false`, or `null` for
 unknown. Graded logics will add a number in `[0, 1]` and an interval form in
-phase I, as new JSON forms of this key (*Versioning*).
+phase J, as new JSON forms of this key (*Versioning*).
 
 **Reasons.** A `reason` says why a truth value is unknown or a value is null,
 and appears only then (`ast.md`, *Results and reasons*):
@@ -543,6 +544,113 @@ a `decision_mismatch`, with a pointer to the offending value:
 
 So a decision that a reader accepts is exactly one the core could have
 produced for some input.
+
+## Explanations
+
+An explanation document is the JSON form of `explain()` (`explain.md`). It is
+**output only**: the core writes it, and readers reject it with `unsupported`,
+because it follows deterministically from a decision and its rule set, which
+are the documents to store. Its schema is for consumers, such as user
+interfaces.
+
+What an explanation contains (the option cap, simplification, the
+counterfactual rules of `explain.md`) is behaviour of the core, governed by
+SemVer, the changelog and the conformance vectors, not by the format version.
+To reproduce a past explanation, store the decision, the rule set and the core
+version, not the explanation. The *Versioning* rules apply to output-only
+documents too, so consumers should expect new optional keys.
+
+| Key | Required | JSON type |
+|---|---|---|
+| `hit_policy` | yes | the decision's policy |
+| `logic` | yes | the decision's logic, in the same form |
+| `selected` | yes | the decision's `selected` |
+| `rules` | yes | array of rule explanations, one per rule, in rule order |
+
+A **rule explanation** is an object with:
+
+| Key | Required | JSON type |
+|---|---|---|
+| `rule` | yes | the rule's name |
+| `status` | yes | `"selected"`, `"fired"`, `"not_fired"` or `"unknown"` |
+| `note` | for `"fired"` | object: `kind` (`"lower_priority"`, `"same_priority"`, `"any_agrees"` or `"earlier_rule"`) and `winner` (a rule name); for the two priority kinds also `priority` and `winner_priority` (ints) |
+| `achievable` | for `"not_fired"` and `"unknown"` | boolean |
+| `requirement` | yes | requirement |
+
+A **requirement** is a cause, or a group written `{"all": [...]}` or
+`{"any": [...]}` with at least two requirements. A **cause** is an object with:
+
+| Key | Required | JSON type |
+|---|---|---|
+| `condition` | yes | the cause's node, as a condition node (*Conditions*); a `between` half is written as the comparison it is |
+| `at` | yes | JSON Pointer to the result node in the decision document that the cause was built from: always in this rule's `when` tree, and always a node with `truth`. When repeated causes merge (`explain.md`, *Simplifying*), it is that of the item kept |
+| `truth` | yes | truth value |
+| `negated` | yes | boolean |
+| `values` | yes | array of `{"path": ..., "value": ...}`, possibly empty |
+| `reason` | when `truth` is unknown | reason (*Result trees*) |
+| `counterfactual` | when there is one | counterfactual |
+
+Whether a cause holds is not stored: under Kleene logic it holds when `truth`
+is `true` and `negated` is `false`, or `truth` is `false` and `negated` is
+`true`. Graded logics will define it with their activation test.
+
+A **counterfactual** is an object with `path`, `op` (a comparison tag, already
+flipped and negated as `explain.md` says), `target` (a scalar value) and `gap`
+when there is one. Whether it is negated is the cause's `negated`. A `gap` is a
+number (*Values*), `{"days": n}` between dates, or `{"microseconds": n}`
+between datetimes, with `n` an int value (*Values*), so a large one is written
+`{"$int": "..."}`.
+
+```json
+{
+  "version": 1,
+  "explanation": {
+    "hit_policy": "first",
+    "logic": "boolean",
+    "selected": [],
+    "rules": [
+      {
+        "rule": "big",
+        "status": "not_fired",
+        "achievable": true,
+        "requirement": {
+          "condition": { "op": "gt", "left": { "op": "field", "path": ["x"] }, "right": { "op": "const", "value": 10 } },
+          "at": "/decision/results/0/when",
+          "truth": false,
+          "negated": false,
+          "values": [{ "path": ["x"], "value": 8 }],
+          "counterfactual": { "path": ["x"], "op": "gt", "target": 10, "gap": 2 }
+        }
+      }
+    ]
+  }
+}
+```
+
+The text of `explain()` is generated from the same structure (`explain.md`,
+*Text*); it is not part of the JSON document.
+
+**Reserved for later versions.** Graded explanations (phase J) will add the
+rule set's `alpha` to the explanation, a rule's degree, and graded fields on
+causes (such as the degree reached and the degree needed), as optional keys.
+
+## Summaries
+
+A summary document is the JSON form of `summary()` (`explain.md`,
+*Summaries*). Like an explanation, it is output only.
+
+| Key | Required | JSON type |
+|---|---|---|
+| `hit_policy` | yes | the rule set's policy |
+| `aggregate` | with an aggregate | the aggregate |
+| `logic` | yes | the rule set's logic |
+| `strict` | when `true` | `true` |
+| `rules` | yes | array of `{"name", "priority", "outputs"}` in rule order, plus `"action": true` for a rule with an action |
+| `fields` | yes | array of `{"path", "conditions", "payloads"}`: `conditions` is an array of rule names, and `payloads` an array of `{"rule", "key"}` |
+| `outputs` | yes | array of payload keys |
+| `tags` | yes | array of `{"tag", "rules"}`, sorted by tag |
+
+Every array is written even when it is empty.
 
 ## Writing errors
 
@@ -604,7 +712,7 @@ written, before any sorting or flattening, such as
 | `rule_definition_error` | the shape is valid, but a construction rule of a rule or rule set is broken |
 | `registry_error` | a name that should be registered (a logic) is not |
 | `decision_mismatch` | a decision does not belong to, or is not consistent with, the rule set it is read with |
-| `unsupported` | this build of the core, or this version of the format, cannot do the operation: a logic built out by a Cargo feature, or a writer given an action |
+| `unsupported` | this build of the core, or this version of the format, cannot do the operation: a logic built out by a Cargo feature, a writer given an action, reading an output-only document, or explaining a decision made with a graded logic |
 | `limit_exceeded` | the document is larger, or nested deeper, than the reader allows |
 
 A reader reports **one** error, the first it finds in this order:
@@ -614,7 +722,9 @@ A reader reports **one** error, the first it finds in this order:
    gets `unsupported_version` even if it uses new keys;
 3. shape (`format_error`), depth first, with an object's keys in the order of
    that object's table (*Conditions*, *Rules*, *Rule sets*, *Decisions*,
-   *Result trees*), whatever their order in the text;
+   *Result trees*), whatever their order in the text. A document whose content
+   key is `explanation` or `summary` is rejected with `unsupported` after the
+   top-level keys are checked and before its content;
 4. construction rules and node depth, in depth-first post-order: children
    before their parent, operands in order. In a rule, the condition comes
    first, then the payload values in order (`expression_error`), then the

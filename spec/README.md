@@ -19,8 +19,9 @@ during phase A.
 |---|---|---|
 | [`ast.md`](ast.md) | draft | Every condition node: operator tag, kind, construction rules, typing and null semantics |
 | [`rules.md`](rules.md) | draft | Rules, hit policies, payloads, outputs, aggregates and actions |
-| [`json-format.md`](json-format.md) | draft, format version 1 | Documents, values, conditions, rules, rule sets and decisions as JSON; explanations and summaries follow (task A.1d) |
-| [`schemas/v1/`](schemas/v1/) | draft | JSON Schemas (draft 2020-12) for values and for condition, rule, rule set and decision documents, with valid and invalid examples checked by `schemas/check.py` |
+| [`explain.md`](explain.md) | draft | Explanations (status, requirements, simplification, counterfactuals, notes) and summaries |
+| [`json-format.md`](json-format.md) | draft, format version 1 | Documents, values, conditions, rules, rule sets, decisions, explanations and summaries as JSON |
+| [`schemas/v1/`](schemas/v1/) | draft | JSON Schemas (draft 2020-12) for values and for every document (condition, rule, rule set, decision, explanation, summary), with valid and invalid examples checked by `schemas/check.py` |
 
 ## Conventions that apply to every spec
 

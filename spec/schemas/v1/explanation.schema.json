@@ -1,0 +1,363 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanrules.github.io/schemas/v1/explanation.schema.json",
+  "title": "cleanrules explanation document, format version 1",
+  "description": "The JSON form of explain(), output only. See spec/explain.md and spec/json-format.md, section Explanations, which are normative.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "explanation": {
+      "$ref": "#/$defs/explanation"
+    }
+  },
+  "required": [
+    "version",
+    "explanation"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "explanation": {
+      "type": "object",
+      "properties": {
+        "hit_policy": {
+          "$ref": "ruleset.schema.json#/$defs/ruleset/properties/hit_policy"
+        },
+        "logic": {
+          "$ref": "ruleset.schema.json#/$defs/ruleset/properties/logic"
+        },
+        "selected": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ruleExplanation"
+          }
+        }
+      },
+      "required": [
+        "hit_policy",
+        "logic",
+        "selected",
+        "rules"
+      ],
+      "additionalProperties": false
+    },
+    "ruleExplanation": {
+      "type": "object",
+      "properties": {
+        "rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "selected",
+            "fired",
+            "not_fired",
+            "unknown"
+          ]
+        },
+        "note": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "lower_priority",
+                "same_priority",
+                "any_agrees",
+                "earlier_rule"
+              ]
+            },
+            "winner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "priority": {
+              "$ref": "value.schema.json#/$defs/int"
+            },
+            "winner_priority": {
+              "$ref": "value.schema.json#/$defs/int"
+            }
+          },
+          "required": [
+            "kind",
+            "winner"
+          ],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "lower_priority",
+                  "same_priority"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "priority",
+              "winner_priority"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "priority"
+                  ]
+                },
+                {
+                  "required": [
+                    "winner_priority"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "achievable": {
+          "type": "boolean"
+        },
+        "requirement": {
+          "$ref": "#/$defs/requirement"
+        }
+      },
+      "required": [
+        "rule",
+        "status",
+        "requirement"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "fired"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "note"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "note"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "not_fired",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "achievable"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "achievable"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "requirement": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/cause"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "all": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "$ref": "#/$defs/requirement"
+              }
+            }
+          },
+          "required": [
+            "all"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "any": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "$ref": "#/$defs/requirement"
+              }
+            }
+          },
+          "required": [
+            "any"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "cause": {
+      "type": "object",
+      "properties": {
+        "condition": {
+          "$ref": "condition.schema.json#/$defs/condition"
+        },
+        "at": {
+          "type": "string",
+          "pattern": "^/decision/results/(0|[1-9][0-9]*)/when(/children/(0|[1-9][0-9]*))*$"
+        },
+        "truth": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "negated": {
+          "type": "boolean"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "$ref": "condition.schema.json#/$defs/field/properties/path"
+              },
+              "value": {
+                "$ref": "value.schema.json#/$defs/nonNullValue"
+              }
+            },
+            "required": [
+              "path",
+              "value"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "reason": {
+          "$ref": "decision.schema.json#/$defs/reason"
+        },
+        "counterfactual": {
+          "$ref": "#/$defs/counterfactual"
+        }
+      },
+      "required": [
+        "condition",
+        "at",
+        "truth",
+        "negated",
+        "values"
+      ],
+      "additionalProperties": false,
+      "if": {
+        "properties": {
+          "truth": {
+            "const": null
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "reason"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "reason"
+          ]
+        }
+      }
+    },
+    "counterfactual": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "$ref": "condition.schema.json#/$defs/field/properties/path"
+        },
+        "op": {
+          "enum": [
+            "eq",
+            "ne",
+            "lt",
+            "le",
+            "gt",
+            "ge"
+          ]
+        },
+        "target": {
+          "$ref": "value.schema.json#/$defs/nonNullScalar"
+        },
+        "gap": {
+          "anyOf": [
+            {
+              "$ref": "value.schema.json#/$defs/number"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "days": {
+                  "$ref": "value.schema.json#/$defs/int"
+                }
+              },
+              "required": [
+                "days"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "microseconds": {
+                  "$ref": "value.schema.json#/$defs/int"
+                }
+              },
+              "required": [
+                "microseconds"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "op",
+        "target"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

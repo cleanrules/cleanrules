@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   conditions, `value` for values), structured reasons and the selected rules;
   outputs are derived from the payload trees. A decision is read with its rule
   set and checked against it node by node (`decision_mismatch`).
+- Specification of explanations and summaries (`spec/explain.md`): rule
+  status, requirements with `all`/`any` groups, simplification, the check that
+  each way to fire really works, counterfactuals and notes. Their JSON forms
+  are output-only documents.
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).

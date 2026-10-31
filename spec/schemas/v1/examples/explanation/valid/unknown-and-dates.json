@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "explanation": {
+    "hit_policy": "collect",
+    "logic": "boolean",
+    "selected": [],
+    "rules": [
+      {
+        "rule": "late",
+        "status": "not_fired",
+        "achievable": true,
+        "requirement": {
+          "condition": {
+            "op": "lt",
+            "left": {
+              "op": "field",
+              "path": [
+                "due"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$date": "2026-10-01"
+              }
+            }
+          },
+          "at": "/decision/results/0/when",
+          "truth": false,
+          "negated": false,
+          "values": [
+            {
+              "path": [
+                "due"
+              ],
+              "value": {
+                "$date": "2026-10-31"
+              }
+            }
+          ],
+          "counterfactual": {
+            "path": [
+              "due"
+            ],
+            "op": "lt",
+            "target": {
+              "$date": "2026-10-01"
+            },
+            "gap": {
+              "days": 30
+            }
+          }
+        }
+      },
+      {
+        "rule": "vip",
+        "status": "unknown",
+        "achievable": true,
+        "requirement": {
+          "condition": {
+            "op": "field",
+            "path": [
+              "customer",
+              "vip"
+            ]
+          },
+          "at": "/decision/results/1/when/children/1",
+          "truth": null,
+          "negated": false,
+          "values": [],
+          "reason": {
+            "code": "null",
+            "paths": [
+              [
+                "customer",
+                "vip"
+              ]
+            ]
+          }
+        }
+      },
+      {
+        "rule": "none",
+        "status": "unknown",
+        "achievable": true,
+        "requirement": {
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "missing",
+                "code"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": "X"
+            }
+          },
+          "at": "/decision/results/2/when",
+          "truth": null,
+          "negated": false,
+          "values": [],
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "missing"
+              ]
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

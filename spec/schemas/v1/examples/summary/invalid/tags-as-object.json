@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "summary": {
+    "hit_policy": "priority",
+    "logic": "boolean",
+    "strict": true,
+    "rules": [
+      {
+        "name": "vip",
+        "priority": 0,
+        "outputs": [
+          "discount",
+          "total"
+        ]
+      },
+      {
+        "name": "blocked",
+        "priority": 10,
+        "outputs": [
+          "discount"
+        ]
+      },
+      {
+        "name": "do",
+        "priority": 0,
+        "outputs": [],
+        "action": true
+      }
+    ],
+    "fields": [
+      {
+        "path": [
+          "customer",
+          "years"
+        ],
+        "conditions": [
+          "vip"
+        ],
+        "payloads": []
+      },
+      {
+        "path": [
+          "order",
+          "total"
+        ],
+        "conditions": [
+          "vip"
+        ],
+        "payloads": [
+          {
+            "rule": "vip",
+            "key": "total"
+          }
+        ]
+      },
+      {
+        "path": [
+          "customer",
+          "blocked"
+        ],
+        "conditions": [
+          "blocked"
+        ],
+        "payloads": []
+      },
+      {
+        "path": [
+          "customer"
+        ],
+        "conditions": [
+          "blocked"
+        ],
+        "payloads": []
+      },
+      {
+        "path": [
+          "flag"
+        ],
+        "conditions": [
+          "do"
+        ],
+        "payloads": []
+      }
+    ],
+    "outputs": [
+      "discount",
+      "total"
+    ],
+    "tags": {
+      "pricing": [
+        "vip"
+      ]
+    }
+  }
+}

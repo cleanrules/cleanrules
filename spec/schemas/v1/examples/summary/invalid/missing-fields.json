@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "summary": {
+    "hit_policy": "priority",
+    "logic": "boolean",
+    "strict": true,
+    "rules": [
+      {
+        "name": "vip",
+        "priority": 0,
+        "outputs": [
+          "discount",
+          "total"
+        ]
+      },
+      {
+        "name": "blocked",
+        "priority": 10,
+        "outputs": [
+          "discount"
+        ]
+      },
+      {
+        "name": "do",
+        "priority": 0,
+        "outputs": [],
+        "action": true
+      }
+    ],
+    "outputs": [
+      "discount",
+      "total"
+    ],
+    "tags": [
+      {
+        "tag": "loyalty",
+        "rules": [
+          "vip"
+        ]
+      },
+      {
+        "tag": "pricing",
+        "rules": [
+          "vip"
+        ]
+      },
+      {
+        "tag": "risk",
+        "rules": [
+          "blocked"
+        ]
+      }
+    ]
+  }
+}
