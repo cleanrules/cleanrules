@@ -27,6 +27,22 @@ print(decision.output)  # {'discount': 0.15}
 print(decision.explain())  # which rules fired, which did not, and why
 ```
 
+## Citing
+
+If you use cleanrules in academic work, please cite it. GitHub's **"Cite this
+repository"** button (from [`CITATION.cff`](CITATION.cff)) produces ready-made
+APA and BibTeX entries. A Zenodo DOI will come with the first release; until
+then, cite the repository:
+
+```bibtex
+@software{salmeron_cleanrules,
+  author = {Salmeron, Jose L.},
+  title  = {{cleanrules}: An explainable rules engine with a Rust core},
+  year   = {2026},
+  url    = {https://github.com/cleanrules/cleanrules}
+}
+```
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

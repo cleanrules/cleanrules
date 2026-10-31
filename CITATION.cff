@@ -1,0 +1,33 @@
+# Citation metadata. GitHub reads this file to render the "Cite this repository"
+# button, and Zenodo uses it to fill in the archive record.
+#
+# There is no release yet. With the first one, add `version`, `date-released`
+# and the Zenodo concept DOI (`doi`), which always resolves to the latest
+# archived version (plan task M.3).
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "cleanrules: An explainable rules engine with a Rust core"
+abstract: >-
+  An explainable rules engine with one Rust core and the same semantics in Rust,
+  C/C++, Python, JavaScript, Java/Scala and Go. One engine for business rules,
+  expert systems (forward chaining), data validation and explaining machine
+  learning models, with crisp three-valued (Kleene) and fuzzy logic. Every
+  result explains which rules fired, which did not, and why.
+authors:
+  - family-names: "Salmeron"
+    given-names: "Jose L."
+    orcid: "https://orcid.org/0000-0001-7811-3716"
+    affiliation: "CUNEF Universidad"
+license: MIT
+repository-code: "https://github.com/cleanrules/cleanrules"
+url: "https://cleanrules.github.io/"
+keywords:
+  - rules engine
+  - business rules
+  - expert systems
+  - data validation
+  - explainable AI
+  - fuzzy logic
+  - three-valued logic
+  - rust

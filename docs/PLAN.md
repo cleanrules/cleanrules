@@ -231,6 +231,7 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
 - [ ] M.1 Guías por lenguaje con los mismos ejemplos, referencia de la especificación, matriz de funcionalidades y benchmarks reproducibles.
 - [ ] M.2 Publicación sincronizada (crates.io, PyPI, npm, Maven Central, módulo Go, Conan y vcpkg) con *trusted publishing* donde exista; política de estabilidad de la API y de la ABI.
 - [ ] M.3 Paper en JOSS, DOI en Zenodo y `CITATION.cff`.
+  - `CITATION.cff` añadido por adelantado el 2026-10-31, sin `version` ni `doi`. Falta añadirlos con la primera *release*, junto con el DOI de Zenodo y el paper.
 
 ## 4. Prácticas transversales
 
