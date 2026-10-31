@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "rule": {
+    "name": "x",
+    "when": {
+      "op": "add",
+      "left": {
+        "op": "field",
+        "path": [
+          "a"
+        ]
+      },
+      "right": {
+        "op": "const",
+        "value": 1
+      }
+    }
+  }
+}

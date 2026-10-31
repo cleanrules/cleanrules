@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "rule": {
+    "name": "adult",
+    "when": {
+      "op": "ge",
+      "left": {
+        "op": "field",
+        "path": [
+          "age"
+        ]
+      },
+      "right": {
+        "op": "const",
+        "value": 18
+      }
+    }
+  }
+}

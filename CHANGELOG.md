@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   zones, lists and maps), every condition node, canonical writing, error codes
   and limits. JSON Schemas in `spec/schemas/v1/`, checked against valid and
   invalid examples. The specification moved from `docs/spec/` to `spec/`.
+- JSON format: rules (`name`, `when`, payload `then`, `priority`, `tags`,
+  `description`, `metadata`) and rule sets (`hit_policy`, `aggregate`, `logic`,
+  `strict`, `rules`), with JSON Schemas and the error codes
+  `rule_definition_error`, `registry_error` and `unsupported`. Payload member
+  order is significant. Actions are not serialized yet (writers take
+  `omit_actions`), and rule metadata values must be data values.
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).

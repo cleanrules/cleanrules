@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "ruleset": {
+    "hit_policy": "collect",
+    "aggregate": "sum",
+    "logic": "boolean",
+    "strict": true,
+    "rules": [
+      {
+        "name": "vip",
+        "when": {
+          "op": "field",
+          "path": [
+            "vip"
+          ]
+        },
+        "then": {
+          "discount": {
+            "op": "const",
+            "value": 0.15
+          }
+        },
+        "priority": 10
+      },
+      {
+        "name": "default",
+        "when": {
+          "op": "const",
+          "value": true
+        },
+        "then": {
+          "discount": {
+            "op": "const",
+            "value": 0.0
+          }
+        }
+      }
+    ]
+  }
+}

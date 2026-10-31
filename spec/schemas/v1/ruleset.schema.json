@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanrules.github.io/schemas/v1/ruleset.schema.json",
+  "title": "cleanrules rule set document, format version 1",
+  "description": "A document holding one rule set. See spec/json-format.md, section Rule sets, and spec/rules.md, which are normative. Unique rule names and known logic names are checked by readers, not by the schema.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "ruleset": {
+      "$ref": "#/$defs/ruleset"
+    }
+  },
+  "required": [
+    "version",
+    "ruleset"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "ruleset": {
+      "type": "object",
+      "properties": {
+        "hit_policy": {
+          "enum": [
+            "first",
+            "priority",
+            "unique",
+            "any",
+            "rule_order",
+            "collect"
+          ],
+          "default": "first"
+        },
+        "aggregate": {
+          "enum": [
+            "sum",
+            "min",
+            "max",
+            "count"
+          ]
+        },
+        "logic": {
+          "type": "string",
+          "default": "boolean"
+        },
+        "strict": {
+          "type": "boolean",
+          "default": false
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "rule.schema.json#/$defs/rule"
+          }
+        }
+      },
+      "required": [
+        "rules"
+      ],
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "aggregate"
+        ]
+      },
+      "then": {
+        "properties": {
+          "hit_policy": {
+            "const": "collect"
+          }
+        },
+        "required": [
+          "hit_policy"
+        ]
+      }
+    }
+  }
+}

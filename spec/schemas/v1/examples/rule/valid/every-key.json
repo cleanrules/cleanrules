@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "rule": {
+    "name": "vip",
+    "when": {
+      "op": "gt",
+      "left": {
+        "op": "field",
+        "path": [
+          "customer",
+          "years"
+        ]
+      },
+      "right": {
+        "op": "const",
+        "value": 5
+      }
+    },
+    "then": {
+      "discount": {
+        "op": "const",
+        "value": {
+          "$decimal": "0.15"
+        }
+      },
+      "note": {
+        "op": "const",
+        "value": null
+      },
+      "total": {
+        "op": "mul",
+        "left": {
+          "op": "field",
+          "path": [
+            "order",
+            "total"
+          ]
+        },
+        "right": {
+          "op": "const",
+          "value": 0.9
+        }
+      },
+      "items": {
+        "op": "field",
+        "path": [
+          "order",
+          "items"
+        ]
+      },
+      "$ref": {
+        "op": "const",
+        "value": "literal key"
+      }
+    },
+    "priority": {
+      "$int": "-9223372036854775808"
+    },
+    "tags": [
+      "pricing",
+      "vip"
+    ],
+    "description": "Loyal customers",
+    "metadata": {
+      "owner": "sales",
+      "since": {
+        "$date": "2026-01-01"
+      },
+      "$version": [
+        1,
+        2
+      ]
+    }
+  }
+}

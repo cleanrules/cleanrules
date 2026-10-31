@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanrules.github.io/schemas/v1/rule.schema.json",
+  "title": "cleanrules rule document, format version 1",
+  "description": "A document holding one rule. See spec/json-format.md, section Rules, and spec/rules.md, which are normative. The schema checks shapes and node kinds; it does not decide error codes.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "rule": {
+      "$ref": "#/$defs/rule"
+    }
+  },
+  "required": [
+    "version",
+    "rule"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "when": {
+          "$ref": "condition.schema.json#/$defs/condition"
+        },
+        "then": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/payloadValue"
+          },
+          "default": {}
+        },
+        "priority": {
+          "$ref": "value.schema.json#/$defs/int",
+          "default": 0
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "description": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "value.schema.json#/$defs/value"
+          },
+          "default": {}
+        }
+      },
+      "required": [
+        "name",
+        "when"
+      ],
+      "additionalProperties": false
+    },
+    "payloadValue": {
+      "description": "A node of kind value or any; a const may hold null.",
+      "anyOf": [
+        {
+          "$ref": "condition.schema.json#/$defs/operand"
+        },
+        {
+          "$ref": "condition.schema.json#/$defs/constNull"
+        }
+      ]
+    }
+  }
+}

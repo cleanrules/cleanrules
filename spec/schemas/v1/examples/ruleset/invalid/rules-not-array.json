@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "ruleset": {
+    "rules": {
+      "vip": {
+        "name": "vip",
+        "when": {
+          "op": "const",
+          "value": true
+        }
+      }
+    }
+  }
+}

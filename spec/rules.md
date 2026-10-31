@@ -1,7 +1,7 @@
 # Rules, rule sets and decisions
 
 **Status:** draft, normative for every engine (Python reference, Rust). The
-serialized form arrives in task A.1b (`json-format.md`).
+serialized form is defined in `json-format.md` (*Rules*, *Rule sets*).
 
 ## Rules
 
@@ -20,7 +20,8 @@ A rule has:
 - an **action** (`do`, optional): a callable. Actions are not part of the
   decision (see *Actions*);
 - a **priority** (a signed 64-bit integer, default 0; not a boolean), **tags**
-  (strings), a **description** (a string) and **metadata** (string keys), none
+  (strings), a **description** (a string) and **metadata** (string keys mapped
+  to data values, so it can be serialized; `json-format.md`), none
   of which affects evaluation except the priority, through `PRIORITY`.
 
 ## Evaluation

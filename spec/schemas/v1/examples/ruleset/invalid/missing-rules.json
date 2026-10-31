@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "ruleset": {
+    "hit_policy": "first"
+  }
+}

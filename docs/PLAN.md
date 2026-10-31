@@ -129,7 +129,16 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - `Const(None)` solo se admite bajo `is_null`; la v1 lo aceptaba bajo `and`, `or` y `not`, y se considera un fallo de la v1.
       - Las regex usan la sintaxis del crate `regex` con sus opciones por defecto (D9).
       - Los esquemas están en `spec/schemas/v1/`, con ejemplos que comprueba `spec/schemas/check.py`.
-  - [ ] A.1b Reglas y rule sets (lógica, modo estricto, política, agregado, payloads).
+  - [x] A.1b Reglas y rule sets (lógica, modo estricto, política, agregado, payloads).
+    - Hecho el 2026-10-31 y revisado por `api-reviewer`, sin hallazgos graves. Decisiones tomadas:
+      - Los valores del payload son siempre nodos. El orden de sus claves es normativo, y ningún binding puede pasarlo por un mapa sin orden.
+      - Las etiquetas son un conjunto.
+      - Las acciones quedan fuera; un escritor las rechaza con `unsupported` salvo con la opción `omit_actions` (D.4).
+      - Los nombres de política, agregado y lógica se escriben en minúsculas y deben coincidir exactamente.
+      - Una lógica desconocida da `registry_error`. Una lógica que existe pero falta en esta compilación da `unsupported`.
+      - La forma de objeto de `logic`, con parámetros, y la clave `alpha` quedan reservadas para añadirlas sin cambiar de versión.
+      - Los metadatos deben ser valores de datos.
+      - Las diferencias con la v1 están en `json-format.md`, sección *Differences from the Python v1*.
   - [ ] A.1c Decisiones y motivos (`Reason`, árbol de resultados).
   - [ ] A.1d Explicaciones (requisitos, `Counterfactual`) y resúmenes; `spec/explain.md`, que aún no existe.
 - [ ] A.2 `spec/data-model.md`: `Value` y cómo convierte cada binding sus tipos nativos; precisión y rango de `Decimal` (lo que admita `rust_decimal`, o un tipo propio si se quieren conservar los infinitos y más de 28 dígitos); reescribir `ast.md` en términos neutros (quedan clases Python, la columna de tareas de la v1 y notas de polars). La sección "Reading data" de `ast.md` (mapas, registros, atributos **públicos**, nunca privados ni de módulos o clases) pasa a ser una obligación de cada binding.
@@ -137,6 +146,7 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
   - Vectores de lectura que hacen falta aunque la v1 no los pueda generar:
     - números: `-0`, `9223372036854775808`, `-9223372036854775809`, `18446744073709551616`, `{"$int": 1.0}`, `{"$int": 1e2}` y flotantes difíciles de redondear;
     - claves duplicadas en nodos, en mapas de datos y en `$map`;
+    - claves de payload `"b"`, `"a"`, `"10"` y `"2"`, en ese orden, para comprobar que se conserva el orden;
     - surrogates sueltos;
     - el orden de errores;
     - los límites, exactamente en el borde.

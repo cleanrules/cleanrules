@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "rule": {
+    "name": "flag",
+    "when": {
+      "op": "field",
+      "path": [
+        "a"
+      ]
+    },
+    "then": {
+      "approved": {
+        "op": "const",
+        "value": true
+      },
+      "source": {
+        "op": "field",
+        "path": [
+          "origin"
+        ]
+      }
+    }
+  }
+}

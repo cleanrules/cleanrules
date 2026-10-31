@@ -1,8 +1,9 @@
 # JSON format
 
 **Status:** draft, format version `1`. This document covers documents, values
-and conditions (task A.1a). Rules and rule sets (A.1b), decisions and reasons
-(A.1c), and explanations and summaries (A.1d) are added in later tasks.
+and conditions (task A.1a), and rules and rule sets (A.1b). Decisions and
+reasons (A.1c), and explanations and summaries (A.1d) are added in later
+tasks.
 
 The JSON format is the contract between languages and with users' files
 (`CLAUDE.md`, invariant 6). A condition written in Java and read in Go is the
@@ -18,8 +19,8 @@ A document is a JSON text ([RFC 8259](https://www.rfc-editor.org/rfc/rfc8259))
 encoded as UTF-8 without a byte order mark. Its top level is an object with:
 
 - `"version"`: the format version, the integer literal `1`;
-- exactly one **content key**, which says what the document holds. In this
-  version the only content key is `"condition"`;
+- exactly one **content key**, which says what the document holds:
+  `"condition"`, `"rule"` or `"ruleset"`;
 - optionally `"$schema"`, a string that readers ignore, so editors can find the
   schema. Writers do not emit it.
 
@@ -50,8 +51,9 @@ Readers are strict:
   Unicode-normalized: they are kept exactly as written.
 
 **Versioning.** Adding a node, a content key or an optional key keeps the
-version. Any other change (renaming, removing, or changing what an existing key
-means) increases it. Optional keys added after version 1 are omitted by writers
+version, and so does accepting a new JSON form for an existing key, as long as
+existing documents never use that form. Any other change (renaming, removing,
+or changing what an existing key or form means) increases it. Optional keys added after version 1 are omitted by writers
 when they hold their default, so documents that do not use a new feature stay
 readable by older readers. A reader that meets a node or key added after it was
 written rejects the document with `format_error`, and the message suggests that
@@ -198,8 +200,10 @@ a tree that the API could not build. Breaking any of these rules is an
 
 - the path rules: non-empty, no empty string segment, no negative index;
 - node kinds: a condition is not a value operand, and a value is not an
-  operand of `and`, `or` or `not`, nor a document's condition;
-- `const` with `null` only as the operand of `is_null`;
+  operand of `and`, `or` or `not`, nor the condition of a `condition` document
+  (for a rule's `when`, see *Rules*);
+- `const` with `null` only as the operand of `is_null`, or as a whole payload
+  value (*Rules*);
 - arithmetic only accepts number constants;
 - `and` and `or` need at least two operands **as written**. A nested `and`
   inside an `and` (or `or` inside `or`) is then flattened, so
@@ -235,6 +239,165 @@ lexical class (integer literal, or literal with a fraction or exponent) and
 exact value, so `1` and `1.0` differ and `100.0` equals `1e2`. Whitespace and
 number layout are not part of the contract.
 
+## Rules
+
+A rule is an object with these keys (`rules.md`, *Rules*):
+
+| Key | Required | JSON type | Default |
+|---|---|---|---|
+| `name` | yes | string | |
+| `when` | yes | condition node | |
+| `then` | no | object: payload key → value node | `{}` |
+| `priority` | no | int | `0` |
+| `tags` | no | array of strings | `[]` |
+| `description` | no | string | none |
+| `metadata` | no | object: key → data value | `{}` |
+
+```json
+{
+  "version": 1,
+  "rule": {
+    "name": "vip",
+    "when": { "op": "gt", "left": { "op": "field", "path": ["customer", "years"] }, "right": { "op": "const", "value": 5 } },
+    "then": { "discount": { "op": "const", "value": { "$decimal": "0.15" } } },
+    "priority": 10,
+    "tags": ["pricing"]
+  }
+}
+```
+
+- **`then`** is the payload. Each member value is a node of kind value or any,
+  written like a condition operand; a `const` may hold `null` here. Keys are
+  any strings, taken literally. Member order is significant: it is the order
+  of the outputs' keys, and the order in which payload values are evaluated
+  (`rules.md`, *When payloads are evaluated*). Readers keep it, and writers
+  write it.
+- **`priority`** is an int (*Values*), bare or as `$int`.
+- **`tags`** are a set: readers drop duplicates, and writers write them sorted
+  by Unicode code point.
+- **`metadata`** is an object whose keys are taken literally (a key starting
+  with `$` is an ordinary key here) and whose member values are data values
+  (*Values*). Member order is kept.
+- **Actions** (`do`) are code of the host language and are not part of this
+  version of the format. Actions referenced by a registered name are planned
+  as an optional key (task D.4).
+
+**Member order.** JSON objects are unordered for many tools: Go's
+`map[string]any`, PostgreSQL's `jsonb` and `jq -S` sort their keys, and
+JavaScript objects put integer-like keys such as `"10"` first. A tool that
+reorders the members of `then` changes the order of a decision's outputs and
+which payload error strict mode reports first. Readers and writers of this
+format, in every binding, must go through an order-preserving representation,
+never through an unordered map.
+
+Reading a rule checks its shape (`format_error`), builds its condition and
+payload values with the rules of *Reading* (`expression_error`), and then
+applies the rule's own construction rules, which give
+`rule_definition_error`, in this order:
+
+1. `name` is not empty (pointer to `…/name`);
+2. `when` is not a node of kind value (pointer to `…/when`; a `const` holding
+   `null` there is already an `expression_error`);
+3. no payload value is a node of kind condition (pointer to `…/then/<key>`,
+   with the key escaped as RFC 6901 requires, so `a/b` becomes `a~1b`), in
+   member order.
+
+Writers write the keys in the order of the table and omit every optional key
+that holds its default.
+
+## Rule sets
+
+A rule set is an object with these keys (`rules.md`, *Evaluation*):
+
+| Key | Required | JSON type | Default |
+|---|---|---|---|
+| `hit_policy` | no | one of `"first"`, `"priority"`, `"unique"`, `"any"`, `"rule_order"`, `"collect"` | `"first"` |
+| `aggregate` | no | one of `"sum"`, `"min"`, `"max"`, `"count"` | none |
+| `logic` | no | string: the name of a logic | `"boolean"` |
+| `strict` | no | boolean | `false` |
+| `rules` | yes | array of rules | |
+
+```json
+{
+  "version": 1,
+  "ruleset": {
+    "hit_policy": "priority",
+    "logic": "boolean",
+    "rules": [
+      { "name": "vip", "when": { "op": "field", "path": ["vip"] }, "then": { "discount": { "op": "const", "value": 0.15 } }, "priority": 10 },
+      { "name": "default", "when": { "op": "const", "value": true }, "then": { "discount": { "op": "const", "value": 0.0 } } }
+    ]
+  }
+}
+```
+
+- Policy and aggregate names are lowercase and matched exactly. Another string
+  is a `format_error`.
+- `logic` names a logic of the core. This version defines `"boolean"`, Kleene's
+  three-valued logic (`ast.md`, *Truth values*), and the fuzzy logics add their
+  names in phase I. A name the format does not define is a `registry_error`. A
+  name it defines but this build of the core lacks (built without the fuzzy
+  feature, for example) is `unsupported`, and the message names the Cargo
+  feature.
+- `rules` may be empty. Their order is the rule order of `rules.md`.
+
+**Reserved for later versions.** Fuzzy logics take parameters, and graded
+logics an activation threshold. Both will be added without changing the
+version (*Versioning*): `"logic": "boolean"` will remain the short form of an
+object `{"name": "boolean", ...parameters}`, and the threshold will be a
+separate optional key `alpha`. Readers of this version reject both with
+`format_error`.
+
+After reading every rule, the rule set's own construction rules give an error
+in this order:
+
+1. rule names are unique: `rule_definition_error`, pointing to the `name` of
+   the second rule with that name;
+2. `aggregate` is only given with `"collect"`: `rule_definition_error`,
+   pointing to `/ruleset/aggregate`;
+3. `logic` is known: `registry_error` or `unsupported`, pointing to
+   `/ruleset/logic`.
+
+Writers write the keys in the order of the table and omit `aggregate` when
+there is none and `strict` when it is `false`. They always write `hit_policy`
+and `logic`, although they have defaults, because together they say how the
+rule set decides, and a reader should not need to know the defaults.
+
+## Writing errors
+
+A writer fails with `unsupported` when it is given something this version of
+the format cannot hold. It reports the first problem found in rule order, and
+within a rule in the order of the table, with a JSON Pointer to where the value
+would have been written:
+
+- a rule with an action (pointer to `…/rules/<i>/do`), unless the caller passes
+  the option `omit_actions`, which every binding names the same way;
+- a metadata value that is not a data value, or a float NaN in metadata, which
+  would otherwise silently become null;
+- a logic that is not one of the core's named logics, or one configured with
+  parameters.
+
+## Differences from the Python v1
+
+The format is stricter than the v1 API in a few deliberate ways:
+
+- policy, aggregate and logic names are matched exactly, in lowercase (the v1
+  ignored case);
+- an unknown policy or aggregate is a `format_error`, not a
+  `RuleDefinitionError`;
+- an invalid constant in a payload is an `expression_error`; the v1 wrapped it
+  in a `RuleDefinitionError`;
+- metadata values must be data values; the v1 accepted any object;
+- a null constant is rejected as a rule's condition and under `and`, `or` and
+  `not` (`ast.md`).
+
+## YAML
+
+Rule files in YAML (task D.1) are read into exactly this model, with the YAML
+1.2 core schema restricted to JSON: no implicit timestamps (an unquoted
+`2026-10-31` is a string, never a date), no `yes`/`no` booleans, no anchors or aliases,
+no tags, and mapping order kept.
+
 ## Errors and limits
 
 Every error carries a stable code and a location. A syntax error gives a 1-based
@@ -245,9 +408,12 @@ written, before any sorting or flattening, such as
 
 | Code | Meaning |
 |---|---|
-| `format_error` | not valid JSON or UTF-8, a duplicate, unknown or missing key, a wrong JSON type, an unknown `op` or `$`-key, or a malformed value |
+| `format_error` | not valid JSON or UTF-8, a duplicate, unknown or missing key, a wrong JSON type, an unknown `op`, `$`-key or name, or a malformed value |
 | `unsupported_version` | `version` is missing, is not an integer literal, or is not a version the reader knows |
-| `expression_error` | the shape is valid, but a construction rule (see *Reading*) is broken |
+| `expression_error` | the shape is valid, but a construction rule of a node (see *Reading*) is broken |
+| `rule_definition_error` | the shape is valid, but a construction rule of a rule or rule set is broken |
+| `registry_error` | a name that should be registered (a logic) is not |
+| `unsupported` | this build of the core, or this version of the format, cannot do the operation: a logic built out by a Cargo feature, or a writer given an action |
 | `limit_exceeded` | the document is larger, or nested deeper, than the reader allows |
 
 A reader reports **one** error, the first it finds in this order:
@@ -256,9 +422,13 @@ A reader reports **one** error, the first it finds in this order:
 2. `version`, before any other key, so a document from a newer format version
    gets `unsupported_version` even if it uses new keys;
 3. shape (`format_error`), depth first, with an object's keys in the order of
-   the table above, whatever their order in the text;
-4. construction rules (`expression_error`) and node depth, in depth-first
-   post-order: children before their parent, operands in order.
+   that object's table (*Conditions*, *Rules*, *Rule sets*), whatever their
+   order in the text;
+4. construction rules and node depth, in depth-first post-order: children
+   before their parent, operands in order. In a rule, the condition comes
+   first, then the payload values in order (`expression_error`), then the
+   rule's own rules. In a rule set, the rules come first, in order, then the
+   rule set's own rules.
 
 Readers enforce three limits, so a hostile file cannot exhaust memory or the
 stack (`CLAUDE.md`, invariant 9):
@@ -266,8 +436,8 @@ stack (`CLAUDE.md`, invariant 9):
 - **document size**: at most **16 MiB** of JSON text;
 - **JSON nesting**: arrays and objects at most **1024** deep, checked while
   parsing, before any tree is built. This also bounds lists and maps in data;
-- **node depth**: a condition at most **256** nodes deep, counting the root as
-  depth 1 and counting before `and`/`or` flattening.
+- **node depth**: a condition or payload value at most **256** nodes deep,
+  counting the root as depth 1 and counting before `and`/`or` flattening.
 
 A condition 256 nodes deep needs well under 1024 levels of JSON nesting, so
 every condition within the node limit can be read. The caller can raise the
