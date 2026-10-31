@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "decision": {
+    "hit_policy": "collect",
+    "aggregate": "count",
+    "logic": "boolean",
+    "results": [
+      {
+        "rule": "adult",
+        "fired": false,
+        "when": {
+          "op": "between",
+          "truth": false,
+          "children": [
+            {
+              "op": "ge",
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "age"
+                  ],
+                  "value": 70
+                },
+                {
+                  "op": "const",
+                  "value": 18
+                }
+              ]
+            },
+            {
+              "op": "lt",
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "age"
+                  ],
+                  "value": 70
+                },
+                {
+                  "op": "const",
+                  "value": 65
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "selected": [],
+    "aggregated": null
+  }
+}

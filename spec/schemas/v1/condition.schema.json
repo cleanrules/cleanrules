@@ -457,6 +457,35 @@
         "operand"
       ],
       "additionalProperties": false
+    },
+    "tag": {
+      "description": "Every node tag (op). Shared by the decision schema.",
+      "enum": [
+        "field",
+        "const",
+        "eq",
+        "ne",
+        "lt",
+        "le",
+        "gt",
+        "ge",
+        "and",
+        "or",
+        "not",
+        "in",
+        "between",
+        "is_null",
+        "matches",
+        "starts_with",
+        "ends_with",
+        "contains",
+        "add",
+        "sub",
+        "mul",
+        "div",
+        "abs",
+        "neg"
+      ]
     }
   }
 }

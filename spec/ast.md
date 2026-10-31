@@ -314,6 +314,27 @@ human-readable text may differ.
 | `nan_result` | an arithmetic result is NaN |
 | `read_error` | reading the data raised an exception |
 
+A reason's **paths** and **types** are lists whose order and duplicates are
+part of the contract:
+
+- **paths**:
+  - for `missing_field` and `null` met while reading a field, the path read up
+    to the point where it failed or met the null;
+  - for `read_error`, the path being read;
+  - for a field used as a condition that is not a boolean, that field's path,
+    and none for a constant;
+  - otherwise, the paths of the fields among the node's direct children, in
+    field order, duplicates kept (`F.a > F.a` gives two paths).
+- **types**:
+  - for comparisons and arithmetic, the groups of the left and right values,
+    in that order, duplicates kept (`unorderable` is always `boolean`,
+    `boolean`);
+  - for `abs` and `neg`, the operand's group and `number`;
+  - for `in`, the operand's group and the values' group;
+  - for `matches` and the string tests, the operand's group and `string`;
+  - for a field or constant used as a condition, its group and `boolean`;
+  - empty for every other code.
+
 A condition that is `UNKNOWN` takes the reason of its first `UNKNOWN` operand.
 A `Between` is reported as its two half comparisons, so explanations can say
 which bound failed.

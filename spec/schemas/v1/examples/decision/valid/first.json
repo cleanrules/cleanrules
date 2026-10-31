@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "decision": {
+    "hit_policy": "first",
+    "logic": "boolean",
+    "results": [
+      {
+        "rule": "vip",
+        "fired": true,
+        "when": {
+          "op": "gt",
+          "truth": true,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "customer",
+                "years"
+              ],
+              "value": 7
+            },
+            {
+              "op": "const",
+              "value": 5
+            }
+          ]
+        },
+        "then": {
+          "discount": {
+            "op": "const",
+            "value": {
+              "$decimal": "0.15"
+            }
+          }
+        }
+      },
+      {
+        "rule": "blocked",
+        "fired": false,
+        "when": {
+          "op": "field",
+          "path": [
+            "customer",
+            "blocked"
+          ],
+          "truth": null,
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "customer",
+                "blocked"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "customer",
+                "blocked"
+              ],
+              "value": null,
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "customer",
+                    "blocked"
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "selected": [
+      "vip"
+    ]
+  }
+}

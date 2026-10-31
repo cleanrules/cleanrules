@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "decision": {
+    "hit_policy": "first",
+    "logic": "boolean",
+    "results": [
+      {
+        "rule": "code",
+        "fired": false,
+        "when": {
+          "op": "starts_with",
+          "truth": null,
+          "reason": {
+            "code": "type_mismatch",
+            "types": [
+              "naive datetime",
+              "date"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "code"
+              ],
+              "value": 7
+            }
+          ]
+        }
+      }
+    ],
+    "selected": []
+  }
+}

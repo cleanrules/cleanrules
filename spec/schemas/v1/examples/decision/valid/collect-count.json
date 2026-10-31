@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "decision": {
+    "hit_policy": "collect",
+    "aggregate": "count",
+    "logic": "boolean",
+    "results": [
+      {
+        "rule": "adult",
+        "fired": false,
+        "when": {
+          "op": "between",
+          "truth": false,
+          "children": [
+            {
+              "op": "ge",
+              "truth": true,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "age"
+                  ],
+                  "value": 70
+                },
+                {
+                  "op": "const",
+                  "value": 18
+                }
+              ]
+            },
+            {
+              "op": "lt",
+              "truth": false,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "age"
+                  ],
+                  "value": 70
+                },
+                {
+                  "op": "const",
+                  "value": 65
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "rule": "code",
+        "fired": false,
+        "when": {
+          "op": "starts_with",
+          "truth": null,
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "code"
+              ]
+            ],
+            "types": [
+              "number",
+              "string"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "code"
+              ],
+              "value": 7
+            }
+          ]
+        }
+      },
+      {
+        "rule": "base",
+        "fired": true,
+        "when": {
+          "op": "const",
+          "truth": true,
+          "children": [
+            {
+              "op": "const",
+              "value": true
+            }
+          ]
+        },
+        "then": {
+          "points": {
+            "op": "const",
+            "value": 1
+          },
+          "tags": {
+            "op": "field",
+            "path": [
+              "tags"
+            ],
+            "value": [
+              "a",
+              {
+                "$date": "2026-10-31"
+              }
+            ]
+          },
+          "ratio": {
+            "op": "div",
+            "value": null,
+            "reason": {
+              "code": "division_by_zero"
+            },
+            "children": [
+              {
+                "op": "field",
+                "path": [
+                  "a"
+                ],
+                "value": 1
+              },
+              {
+                "op": "field",
+                "path": [
+                  "b"
+                ],
+                "value": 0
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "selected": [
+      "base"
+    ],
+    "aggregated": {
+      "points": 1,
+      "tags": 1,
+      "ratio": 0
+    }
+  }
+}

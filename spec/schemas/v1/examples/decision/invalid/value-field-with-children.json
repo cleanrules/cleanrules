@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "decision": {
+    "hit_policy": "first",
+    "logic": "boolean",
+    "results": [
+      {
+        "rule": "x",
+        "fired": false,
+        "when": {
+          "op": "is_null",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 1,
+              "children": [
+                {
+                  "op": "const",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "selected": []
+  }
+}

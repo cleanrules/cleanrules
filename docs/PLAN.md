@@ -139,7 +139,14 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - La forma de objeto de `logic`, con parámetros, y la clave `alpha` quedan reservadas para añadirlas sin cambiar de versión.
       - Los metadatos deben ser valores de datos.
       - Las diferencias con la v1 están en `json-format.md`, sección *Differences from the Python v1*.
-  - [ ] A.1c Decisiones y motivos (`Reason`, árbol de resultados).
+  - [x] A.1c Decisiones y motivos (`Reason`, árbol de resultados).
+    - Hecho el 2026-10-31 y revisado por `api-reviewer`, con un hallazgo grave corregido: no estaba definido cómo se lee una decisión. Decisiones tomadas:
+      - La decisión guarda el árbol de resultados de cada regla, con `truth` para las condiciones y `value` para los valores, y los motivos estructurados.
+      - Las salidas no se guardan, porque se deducen de los árboles del payload. `fired` y `aggregated` sí se guardan, y el lector los recalcula.
+      - Una decisión se lee siempre con su rule set, y se comprueba nodo a nodo (`decision_mismatch`): solo se acepta lo que el núcleo pudo producir.
+      - `ruleset_digest` y `metadata` quedan reservados.
+      - El orden y los duplicados de `paths` y `types` en los motivos quedan fijados en `ast.md`.
+      - Los grupos de tipo se escriben en *snake case*.
   - [ ] A.1d Explicaciones (requisitos, `Counterfactual`) y resúmenes; `spec/explain.md`, que aún no existe.
 - [ ] A.2 `spec/data-model.md`: `Value` y cómo convierte cada binding sus tipos nativos; precisión y rango de `Decimal` (lo que admita `rust_decimal`, o un tipo propio si se quieren conservar los infinitos y más de 28 dígitos); reescribir `ast.md` en términos neutros (quedan clases Python, la columna de tareas de la v1 y notas de polars). La sección "Reading data" de `ast.md` (mapas, registros, atributos **públicos**, nunca privados ni de módulos o clases) pasa a ser una obligación de cada binding.
 - [ ] A.3 Exportador temporal en Python (`conformance/tools/`) que, con la implementación de la v1, genera **vectores de conformidad**: árboles y errores de construcción, evaluaciones con motivos, modo estricto, decisiones de las 6 políticas, agregados, explicaciones y resúmenes. Las propiedades de hypothesis se convierten en miles de casos fijados.

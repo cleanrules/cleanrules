@@ -1,9 +1,8 @@
 # JSON format
 
 **Status:** draft, format version `1`. This document covers documents, values
-and conditions (task A.1a), and rules and rule sets (A.1b). Decisions and
-reasons (A.1c), and explanations and summaries (A.1d) are added in later
-tasks.
+and conditions (task A.1a), rules and rule sets (A.1b), and decisions and
+reasons (A.1c). Explanations and summaries (A.1d) are added in a later task.
 
 The JSON format is the contract between languages and with users' files
 (`CLAUDE.md`, invariant 6). A condition written in Java and read in Go is the
@@ -20,7 +19,7 @@ encoded as UTF-8 without a byte order mark. Its top level is an object with:
 
 - `"version"`: the format version, the integer literal `1`;
 - exactly one **content key**, which says what the document holds:
-  `"condition"`, `"rule"` or `"ruleset"`;
+  `"condition"`, `"rule"`, `"ruleset"` or `"decision"`;
 - optionally `"$schema"`, a string that readers ignore, so editors can find the
   schema. Writers do not emit it.
 
@@ -363,6 +362,188 @@ there is none and `strict` when it is `false`. They always write `hit_policy`
 and `logic`, although they have defaults, because together they say how the
 rule set decides, and a reader should not need to know the defaults.
 
+## Decisions
+
+A decision is what evaluating a rule set on one input produces (`rules.md`).
+Its document records every rule's result tree, so it can be audited or
+explained later without evaluating again. It holds the values the conditions
+and payloads read from the input, which may include whole lists or maps and
+personal data, so audit logs that store decisions must be treated like the
+input. Rules are named, not copied: a decision is always read together with
+the rule set that produced it (*Reading a decision*).
+
+| Key | Required | JSON type |
+|---|---|---|
+| `hit_policy` | yes | the rule set's policy name |
+| `aggregate` | with an aggregate | the aggregate name |
+| `logic` | yes | the rule set's logic, in the same form |
+| `results` | yes | array of rule results, one per rule, in rule order |
+| `selected` | yes | array of the selected rules' names, in selection order (rule order for every policy of this version), without repetition |
+| `aggregated` | with an aggregate | object: payload key → data value, or `null` when nothing was selected |
+
+A **rule result** is an object with:
+
+| Key | Required | JSON type |
+|---|---|---|
+| `rule` | yes | the rule's name |
+| `fired` | yes | boolean: the truth value passed the logic's activation test |
+| `when` | yes | the result tree of the rule's condition |
+| `then` | when the payload was evaluated | object: payload key → result tree of that value, in the rule's member order |
+
+`then` is present exactly for the rules whose payload was evaluated: the
+selected rules, and under `"any"` every rule that fired (`rules.md`, *When
+payloads are evaluated*). A rule without a payload whose payload was evaluated
+has `"then": {}`.
+
+`logic`, and the `alpha` that rule sets reserve, take the rule set's forms, so
+graded logics extend decisions in the same way (*Rule sets*, *Reserved for
+later versions*). Two optional keys are reserved too: `ruleset_digest`, a
+digest of the rule set document that readers will verify, once a canonical
+byte form exists to hash; and `metadata`, data values supplied by the caller,
+such as a correlation id. The core never stamps times or ids itself, so
+decisions stay deterministic. Repeated firings in forward chaining (phase K),
+batches and the record of a `run` with its actions (task D.4) will use other
+content keys or optional keys, not new meanings of these.
+
+```json
+{
+  "version": 1,
+  "decision": {
+    "hit_policy": "first",
+    "logic": "boolean",
+    "results": [
+      {
+        "rule": "vip",
+        "fired": true,
+        "when": {
+          "op": "gt",
+          "truth": true,
+          "children": [
+            { "op": "field", "path": ["customer", "years"], "value": 7 },
+            { "op": "const", "value": 5 }
+          ]
+        },
+        "then": { "discount": { "op": "const", "value": { "$decimal": "0.15" } } }
+      },
+      {
+        "rule": "blocked",
+        "fired": false,
+        "when": {
+          "op": "field",
+          "path": ["customer", "blocked"],
+          "truth": null,
+          "reason": { "code": "missing_field", "paths": [["customer", "blocked"]] },
+          "children": [
+            {
+              "op": "field",
+              "path": ["customer", "blocked"],
+              "value": null,
+              "reason": { "code": "missing_field", "paths": [["customer", "blocked"]] }
+            }
+          ]
+        }
+      }
+    ],
+    "selected": ["vip"]
+  }
+}
+```
+
+The outputs are not stored, because they follow from the document: a
+rule's output maps each key of `then` to the `value` at the root of its tree;
+`outputs` are the outputs of the `selected` rules in order; and `output` is the
+winner's output for single-hit policies, or `aggregated` (`rules.md`,
+*Outputs*). `fired` and `aggregated` could also be recomputed, but are stored
+for consumers outside cleanrules: the aggregate's arithmetic (float
+conversion, overflow) is not trivial. Readers recompute both and reject a
+mismatch.
+
+### Result trees
+
+Every node of a result tree is an object with:
+
+| Key | Required | JSON type |
+|---|---|---|
+| `op` | yes | the tag of the node evaluated |
+| `path` | for `field` | the field's path, as in the condition |
+| `truth` | for a node that has a truth value | truth value |
+| `value` | for every other node | data value (*Values*) |
+| `reason` | when `truth` is unknown or `value` is null | reason |
+| `children` | when the node has children | array of result trees |
+
+A node has `truth` when it is of kind condition (`ast.md`, *Node kinds*),
+including the `between` halves, or when it is a field or constant in a
+**condition position**: a rule's `when`, or an operand of `and`, `or` or
+`not`. Every other node, including payload values, has `value`. A field or
+constant in a condition position has one child: the result of reading it as a
+value.
+
+The children follow the node's fields in the order of *Conditions*, with two
+exceptions, `between` and a field or constant in a condition position:
+
+| Node | Children |
+|---|---|
+| `and`, `or` | one per operand |
+| `not`, `in`, `is_null`, `matches`, `starts_with`, `ends_with`, `contains`, `abs`, `neg` | the operand |
+| `eq` … `ge`, `add` … `div` | `left`, `right` |
+| `between` | two half comparisons, `ge` or `gt` (operand, `low`) and `le` or `lt` (operand, `high`) according to `closed`, each with `truth` and its two children |
+| `field`, `const` in a condition position | the value result |
+| `field`, `const` in a value position | none |
+
+The `between` halves let explanations say which bound failed (`ast.md`,
+*Results and reasons*). The operand's result appears in both halves.
+
+**Truth values.** Under Kleene logic, `truth` is `true`, `false`, or `null` for
+unknown. Graded logics will add a number in `[0, 1]` and an interval form in
+phase I, as new JSON forms of this key (*Versioning*).
+
+**Reasons.** A `reason` says why a truth value is unknown or a value is null,
+and appears only then (`ast.md`, *Results and reasons*):
+
+| Key | Required | JSON type |
+|---|---|---|
+| `code` | yes | one of the reason codes of `ast.md` |
+| `paths` | no, default `[]` | array of field paths involved; `[]` as a path means the input itself |
+| `types` | no, default `[]` | array of type groups involved |
+| `detail` | no | string, human-readable |
+
+Type groups are written `number`, `string`, `boolean`, `date`,
+`naive_datetime`, `aware_datetime` and `other` (data that is a list or a map).
+The order of `paths` and `types`, and the duplicates they keep, are defined in
+`ast.md` (*Results and reasons*). Implementations are compared on `code`,
+`paths` and `types`, never on `detail`, whose wording may change between
+releases. Writers omit empty `paths` and
+`types`, and `detail` when there is none.
+
+Writers write every key in the order of its table, and omit `aggregate`,
+`aggregated`, `then`, `path`, `reason` and `children` when they do not apply.
+
+### Reading a decision
+
+A decision is read with the rule set that produced it, already read
+(`read_decision(text, ruleset)` or its idiom in each language). After its
+shape (`format_error`), the reader checks that the decision belongs to that
+rule set and is consistent with it. The first failed check, in this order, is
+a `decision_mismatch`, with a pointer to the offending value:
+
+1. `hit_policy`, `aggregate` and `logic` are the rule set's;
+2. `results` names exactly the rule set's rules, in rule order;
+3. each rule's `when` tree, and each `then` tree, matches the rule's node
+   by node, depth first: the same `op`, the same `path`, the number of children
+   given above, `between` halves whose ops agree with `closed`, `const` values
+   equal to the rule's constants, and both copies of a `between` operand equal;
+4. `then` has exactly the payload's keys, in order, and is present exactly
+   where *When payloads are evaluated* requires;
+5. each node's `truth` or `value`, and its `reason`, are what evaluation gives
+   from its children's (leaves, which hold what was read from the input, are
+   taken as they are);
+6. `fired` agrees with `when` under the logic's activation test;
+7. `selected` is what the hit policy selects from the fired rules;
+8. `aggregated` is what the aggregate gives from the selected outputs.
+
+So a decision that a reader accepts is exactly one the core could have
+produced for some input.
+
 ## Writing errors
 
 A writer fails with `unsupported` when it is given something this version of
@@ -375,7 +556,14 @@ would have been written:
 - a metadata value that is not a data value, or a float NaN in metadata, which
   would otherwise silently become null;
 - a logic that is not one of the core's named logics, or one configured with
-  parameters.
+  parameters;
+- in a decision, a value read from the input that is not a data value (bytes,
+  a duration, a map with non-string keys, a NaN inside a list...), pointing to
+  where it would be written, such as
+  `/decision/results/0/when/children/0/value`. Bindings normally reject such
+  data when converting the input (`data-model.md`), so this is a last check.
+
+Problems are reported in document order.
 
 ## Differences from the Python v1
 
@@ -389,7 +577,9 @@ The format is stricter than the v1 API in a few deliberate ways:
   in a `RuleDefinitionError`;
 - metadata values must be data values; the v1 accepted any object;
 - a null constant is rejected as a rule's condition and under `and`, `or` and
-  `not` (`ast.md`).
+  `not` (`ast.md`);
+- type groups in reasons are written in snake case (`naive_datetime`); the v1
+  wrote `naive datetime`.
 
 ## YAML
 
@@ -413,6 +603,7 @@ written, before any sorting or flattening, such as
 | `expression_error` | the shape is valid, but a construction rule of a node (see *Reading*) is broken |
 | `rule_definition_error` | the shape is valid, but a construction rule of a rule or rule set is broken |
 | `registry_error` | a name that should be registered (a logic) is not |
+| `decision_mismatch` | a decision does not belong to, or is not consistent with, the rule set it is read with |
 | `unsupported` | this build of the core, or this version of the format, cannot do the operation: a logic built out by a Cargo feature, or a writer given an action |
 | `limit_exceeded` | the document is larger, or nested deeper, than the reader allows |
 
@@ -422,13 +613,14 @@ A reader reports **one** error, the first it finds in this order:
 2. `version`, before any other key, so a document from a newer format version
    gets `unsupported_version` even if it uses new keys;
 3. shape (`format_error`), depth first, with an object's keys in the order of
-   that object's table (*Conditions*, *Rules*, *Rule sets*), whatever their
-   order in the text;
+   that object's table (*Conditions*, *Rules*, *Rule sets*, *Decisions*,
+   *Result trees*), whatever their order in the text;
 4. construction rules and node depth, in depth-first post-order: children
    before their parent, operands in order. In a rule, the condition comes
    first, then the payload values in order (`expression_error`), then the
    rule's own rules. In a rule set, the rules come first, in order, then the
-   rule set's own rules.
+   rule set's own rules. A decision has no construction rules; its checks
+   against the rule set come here, as listed in *Reading a decision*.
 
 Readers enforce three limits, so a hostile file cannot exhaust memory or the
 stack (`CLAUDE.md`, invariant 9):
@@ -437,9 +629,12 @@ stack (`CLAUDE.md`, invariant 9):
 - **JSON nesting**: arrays and objects at most **1024** deep, checked while
   parsing, before any tree is built. This also bounds lists and maps in data;
 - **node depth**: a condition or payload value at most **256** nodes deep,
-  counting the root as depth 1 and counting before `and`/`or` flattening.
+  counting the root as depth 1 and counting before `and`/`or` flattening. A
+  result tree may be one level deeper, for the `between` halves.
 
 A condition 256 nodes deep needs well under 1024 levels of JSON nesting, so
-every condition within the node limit can be read. The caller can raise the
-limits, but never disable them. A reader must not overflow its stack on any
+every condition within the node limit can be read. Data in a decision can
+nest deeper, and a decision can be larger than its rule set, so writers do not
+enforce these limits, and callers that read large decisions raise them. The
+caller can raise the limits, but never disable them. A reader must not overflow its stack on any
 input within its limits.

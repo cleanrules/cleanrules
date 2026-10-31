@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "decision": {
+    "hit_policy": "collect",
+    "aggregate": "sum",
+    "logic": "boolean",
+    "results": [],
+    "selected": []
+  }
+}

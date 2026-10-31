@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "decision": {
+    "hit_policy": "first",
+    "logic": "boolean",
+    "results": [
+      {
+        "rule": "x",
+        "fired": false,
+        "when": {
+          "op": "field",
+          "truth": false,
+          "children": [
+            {
+              "op": "field",
+              "value": false
+            }
+          ]
+        }
+      }
+    ],
+    "selected": []
+  }
+}

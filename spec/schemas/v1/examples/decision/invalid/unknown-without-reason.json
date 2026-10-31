@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "decision": {
+    "hit_policy": "first",
+    "logic": "boolean",
+    "results": [
+      {
+        "rule": "x",
+        "fired": false,
+        "when": {
+          "op": "gt",
+          "truth": null,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": null,
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "a"
+                  ]
+                ]
+              }
+            },
+            {
+              "op": "const",
+              "value": 1
+            }
+          ]
+        }
+      }
+    ],
+    "selected": []
+  }
+}
