@@ -110,6 +110,10 @@ uv run python conformance/tools/export.py                                  # reg
 uv run --no-project --with jsonschema python conformance/tools/check.py   # validate
 ```
 
+The generated vectors (`vectors/generated/`) come from hypothesis strategies
+run derandomized, so the same hypothesis version (pinned in `uv.lock`) always
+gives the same vectors; their files hold one vector per line.
+
 `check.py` validates every vector file against `vectors.schema.json` and the
 spec's JSON Schemas, and checks that ids are unique and that every cited spec
 section exists.

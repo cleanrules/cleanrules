@@ -17,6 +17,7 @@ from typing import Any
 
 import encode
 from cases import CASES, Case
+from generated import generated_cases
 from read_cases import VECTORS as READ_VECTORS
 
 from rulepy.core.evaluate import evaluate_tree, evaluate_value_tree
@@ -36,6 +37,11 @@ def anchors() -> set[str]:
                 text = re.sub(r"[^\w\- ]", "", heading[1].lower()).replace(" ", "-")
                 found.add(f"{path.name}#{text}")
     return found
+
+
+def dumps(data: Any, indent: int | None) -> str:
+    """JSON text as written in the vector files."""
+    return json.dumps(data, indent=indent, ensure_ascii=False, allow_nan=False)
 
 
 def run(case: Case) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -85,7 +91,8 @@ def main() -> int:
     seen: set[str] = set()
     problems: list[str] = []
     skipped: list[str] = []
-    for case in CASES:
+    all_cases = [*CASES, *generated_cases()]
+    for case in all_cases:
         if case.id in seen:
             problems.append(f"{case.id}: duplicate id")
         seen.add(case.id)
@@ -124,14 +131,16 @@ def main() -> int:
     for (area, topic), vectors in sorted(files.items()):
         path = VECTORS / area / f"{topic}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        document = {"version": 1, "area": area, "vectors": vectors}
-        path.write_text(
-            json.dumps(document, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
-            encoding="utf-8",
-        )
+        if area == "generated":
+            # Thousands of vectors: one per line keeps the files small and diffable.
+            lines = ",\n".join(dumps(v, indent=None) for v in vectors)
+            body = f'{{"version": 1, "area": "{area}", "vectors": [\n{lines}\n]}}\n'
+        else:
+            body = dumps({"version": 1, "area": area, "vectors": vectors}, indent=2) + "\n"
+        path.write_text(body, encoding="utf-8")
     for line in skipped:
         print(f"skipped {line}", file=sys.stderr)
-    total = len(CASES) - len(skipped) + len(READ_VECTORS)
+    total = len(all_cases) - len(skipped) + len(READ_VECTORS)
     print(f"{total} vectors in {len(files)} files, {len(skipped)} skipped")
     return 0
 

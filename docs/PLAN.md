@@ -207,7 +207,13 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
         - las claves desconocidas, después de las conocidas;
         - el anidamiento JSON, que cuenta la cima como 1;
         - los floats que se redondean a infinito o a cero.
-  - [ ] A.3c Vectores generados con las propiedades de hypothesis (miles, con semilla fija).
+  - [x] A.3c Vectores generados con las propiedades de hypothesis (miles, con semilla fija).
+    - Hecho el 2026-10-31: 1.821 vectores en `conformance/vectors/generated/`, producidos por `conformance/tools/generated.py`. Son 892 condiciones, 186 en modo estricto, 168 valores, 275 rule sets y 300 explicaciones.
+      - Las estrategias se centran en pocas claves (`a`, `b`, `c` y `n.*`) y están ponderadas, para que los datos coincidan con los campos.
+      - Hypothesis se ejecuta en modo determinista, sin base de datos ni reducción de casos, y los duplicados se eliminan.
+      - Los ficheros generados llevan un vector por línea y ocupan 3 MB.
+      - Cubren 24 tipos de nodo, las 6 políticas y los motivos `missing_field`, `null`, `type_mismatch`, `unorderable` y `division_by_zero`. `int_overflow`, `nan_result` y `decimal_overflow` los cubren vectores escritos a mano.
+      - Regenerar con otra versión de hypothesis cambia los vectores generados, así que solo se regeneran durante la fase A, con la versión fijada en `uv.lock`.
   - [ ] A.3d Script de cobertura: cada sección normativa citada por al menos un vector, y CI.
   - Vectores de lectura que hacen falta aunque la v1 no los pueda generar:
     - números: `-0`, `9223372036854775808`, `-9223372036854775809`, `18446744073709551616`, `{"$int": 1.0}`, `{"$int": 1e2}` y flotantes difíciles de redondear;
