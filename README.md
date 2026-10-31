@@ -1,14 +1,20 @@
-# RulePy
+# cleanrules
 
-A rules engine for Python with one core for four jobs: **business rules**,
-**expert systems** (forward chaining), **data validation** and **explaining ML
-models**. Crisp and fuzzy logic share the same engine (fuzzy support via
-[fuzzytool](https://fuzzytool.github.io)), every result explains itself, and
-rule sets can be audited for contradictions, dead rules and coverage gaps.
+An explainable rules engine with **one Rust core** and the same semantics in
+**Rust, C/C++, Python, JavaScript, Java/Scala and Go**. One engine for four
+jobs: **business rules**, **expert systems** (forward chaining), **data
+validation** and **explaining ML models**. Crisp (three-valued Kleene) and
+fuzzy logic share the same engine (fuzzy norms follow
+[fuzzytool](https://fuzzytool.github.io)), and every result explains itself.
 
-> **Status:** pre-alpha. Conditions, the reference evaluator and rule sets with
-> hit policies work; nothing is published yet and the API may still change. See
-> the [roadmap](docs/PLAN.md) (in Spanish).
+Website: <https://cleanrules.github.io>
+
+> **Status:** pre-alpha, nothing is published yet. This repository currently
+> holds the **Python reference implementation** (package `rulepy`), which
+> defines the semantics. Its knowledge is being turned into a written
+> specification and cross-language conformance vectors; the Rust core and the
+> bindings are built against them, and the Python prototype is then retired.
+> See the [roadmap](docs/PLAN.md) (in Spanish).
 
 ```python
 from rulepy import F, Rule, RuleSet
