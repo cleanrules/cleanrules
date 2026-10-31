@@ -1,0 +1,462 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanrules.github.io/schemas/v1/condition.schema.json",
+  "title": "cleanrules condition document, format version 1",
+  "description": "A document holding one condition tree. See spec/json-format.md, sections Documents and Conditions, and spec/ast.md, which are normative. The schema checks shapes, node kinds and most construction rules, so it is stricter than the format_error check; it does not decide error codes. It cannot check and/or flattening, regex validity, constant bounds of between, or the limits.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "condition": {
+      "$ref": "#/$defs/condition"
+    }
+  },
+  "required": [
+    "version",
+    "condition"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "condition": {
+      "description": "A node of kind condition or any: it can be an operand of and, or and not, and a rule's condition.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/field"
+        },
+        {
+          "$ref": "#/$defs/constBoolean"
+        },
+        {
+          "$ref": "#/$defs/compare"
+        },
+        {
+          "$ref": "#/$defs/andOr"
+        },
+        {
+          "$ref": "#/$defs/not"
+        },
+        {
+          "$ref": "#/$defs/in"
+        },
+        {
+          "$ref": "#/$defs/between"
+        },
+        {
+          "$ref": "#/$defs/isNull"
+        },
+        {
+          "$ref": "#/$defs/matches"
+        },
+        {
+          "$ref": "#/$defs/stringTest"
+        }
+      ]
+    },
+    "operand": {
+      "description": "A node of kind value or any: an operand of comparisons and value tests.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/field"
+        },
+        {
+          "$ref": "#/$defs/constNonNull"
+        },
+        {
+          "$ref": "#/$defs/arith"
+        },
+        {
+          "$ref": "#/$defs/unary"
+        }
+      ]
+    },
+    "numericOperand": {
+      "description": "An operand of arithmetic: like operand, but constants must be numbers.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/field"
+        },
+        {
+          "$ref": "#/$defs/constNumber"
+        },
+        {
+          "$ref": "#/$defs/arith"
+        },
+        {
+          "$ref": "#/$defs/unary"
+        }
+      ]
+    },
+    "field": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "field"
+        },
+        "path": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9223372036854775807
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "op",
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "constBoolean": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "const"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "op",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "constNonNull": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "const"
+        },
+        "value": {
+          "$ref": "value.schema.json#/$defs/nonNullScalar"
+        }
+      },
+      "required": [
+        "op",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "constNumber": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "const"
+        },
+        "value": {
+          "$ref": "value.schema.json#/$defs/number"
+        }
+      },
+      "required": [
+        "op",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "constNull": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "const"
+        },
+        "value": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "op",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "compare": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "enum": [
+            "eq",
+            "ne",
+            "lt",
+            "le",
+            "gt",
+            "ge"
+          ]
+        },
+        "left": {
+          "$ref": "#/$defs/operand"
+        },
+        "right": {
+          "$ref": "#/$defs/operand"
+        }
+      },
+      "required": [
+        "op",
+        "left",
+        "right"
+      ],
+      "additionalProperties": false
+    },
+    "andOr": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "enum": [
+            "and",
+            "or"
+          ]
+        },
+        "operands": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/condition"
+          }
+        }
+      },
+      "required": [
+        "op",
+        "operands"
+      ],
+      "additionalProperties": false
+    },
+    "not": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "not"
+        },
+        "operand": {
+          "$ref": "#/$defs/condition"
+        }
+      },
+      "required": [
+        "op",
+        "operand"
+      ],
+      "additionalProperties": false
+    },
+    "in": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "in"
+        },
+        "operand": {
+          "$ref": "#/$defs/operand"
+        },
+        "values": {
+          "description": "Non-empty, non-null, and all from one type group.",
+          "anyOf": [
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "value.schema.json#/$defs/number"
+              }
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "boolean"
+              }
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "value.schema.json#/$defs/date"
+              }
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "value.schema.json#/$defs/naiveDatetime"
+              }
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "value.schema.json#/$defs/awareDatetime"
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "op",
+        "operand",
+        "values"
+      ],
+      "additionalProperties": false
+    },
+    "between": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "between"
+        },
+        "operand": {
+          "$ref": "#/$defs/operand"
+        },
+        "low": {
+          "$ref": "#/$defs/operand"
+        },
+        "high": {
+          "$ref": "#/$defs/operand"
+        },
+        "closed": {
+          "enum": [
+            "both",
+            "left",
+            "right",
+            "none"
+          ],
+          "default": "both"
+        }
+      },
+      "required": [
+        "op",
+        "operand",
+        "low",
+        "high"
+      ],
+      "additionalProperties": false
+    },
+    "isNull": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "is_null"
+        },
+        "operand": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/operand"
+            },
+            {
+              "$ref": "#/$defs/constNull"
+            }
+          ]
+        }
+      },
+      "required": [
+        "op",
+        "operand"
+      ],
+      "additionalProperties": false
+    },
+    "matches": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "matches"
+        },
+        "operand": {
+          "$ref": "#/$defs/operand"
+        },
+        "pattern": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "operand",
+        "pattern"
+      ],
+      "additionalProperties": false
+    },
+    "stringTest": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "enum": [
+            "starts_with",
+            "ends_with",
+            "contains"
+          ]
+        },
+        "operand": {
+          "$ref": "#/$defs/operand"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "operand",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "arith": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "enum": [
+            "add",
+            "sub",
+            "mul",
+            "div"
+          ]
+        },
+        "left": {
+          "$ref": "#/$defs/numericOperand"
+        },
+        "right": {
+          "$ref": "#/$defs/numericOperand"
+        }
+      },
+      "required": [
+        "op",
+        "left",
+        "right"
+      ],
+      "additionalProperties": false
+    },
+    "unary": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "enum": [
+            "abs",
+            "neg"
+          ]
+        },
+        "operand": {
+          "$ref": "#/$defs/numericOperand"
+        }
+      },
+      "required": [
+        "op",
+        "operand"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

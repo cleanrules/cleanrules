@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "gt",
+    "left": {
+      "op": "neg",
+      "operand": {
+        "op": "const",
+        "value": true
+      }
+    },
+    "right": {
+      "op": "const",
+      "value": 0
+    }
+  }
+}

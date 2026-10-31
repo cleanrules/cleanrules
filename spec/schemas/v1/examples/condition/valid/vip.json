@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "and",
+    "operands": [
+      {
+        "op": "gt",
+        "left": {
+          "op": "field",
+          "path": [
+            "customer",
+            "years"
+          ]
+        },
+        "right": {
+          "op": "const",
+          "value": 5
+        }
+      },
+      {
+        "op": "gt",
+        "left": {
+          "op": "field",
+          "path": [
+            "order",
+            "total"
+          ]
+        },
+        "right": {
+          "op": "const",
+          "value": 1000
+        }
+      }
+    ]
+  }
+}

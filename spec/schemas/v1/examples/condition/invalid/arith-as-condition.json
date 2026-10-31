@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "add",
+    "left": {
+      "op": "field",
+      "path": [
+        "a"
+      ]
+    },
+    "right": {
+      "op": "const",
+      "value": 1
+    }
+  }
+}

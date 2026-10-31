@@ -115,8 +115,35 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
 **Objetivo**: que la especificación y los vectores contengan todo el conocimiento de la v1 antes de borrar el código.
 
 - [ ] A.1 Mover `docs/spec/` a `spec/` y escribir `spec/json-format.md` y los JSON Schemas (antes tarea 3.1): AST con `"version": 1`, reglas y rule sets, valores (`Decimal` como texto, `inf`/`-inf`, fechas ISO 8601, zonas horarias), decisiones, motivos (`Reason`), explicaciones (requisitos, `Counterfactual`) y resúmenes.
-- [ ] A.2 `spec/data-model.md`: `Value` y cómo convierte cada binding sus tipos nativos. La sección "Reading data" de `ast.md` (mapas, registros, atributos **públicos**, nunca privados ni de módulos o clases) pasa a ser una obligación de cada binding.
+  - La v1 no serializaba nada: el formato se diseña aquí, a partir de sus estructuras. Se divide en:
+  - [x] A.1a Mover `docs/spec/` a `spec/`; `spec/json-format.md` con el documento (`"version": 1`), los valores y las condiciones, y sus JSON Schemas.
+    - Hecho el 2026-10-31 y revisado por `api-reviewer`. Decisiones tomadas:
+      - Valores: JSON sin envolver donde no hay ambigüedad, y objetos `$int`, `$float`, `$decimal`, `$date`, `$datetime` y `$map` en el resto.
+      - Los enteros de más de 2⁵³ se escriben como `{"$int": "<dígitos>"}`, por JavaScript y Go.
+      - Los decimales tienen texto canónico en notación plana y conservan la escala.
+      - Fechas con hora con desfase fijo (`±HH:MM[:SS]`, hasta ±18:00) o con zona IANA (RFC 9557).
+      - Las claves duplicadas o desconocidas son error.
+      - `format_error` cubre la forma y `expression_error` las reglas de construcción, con un orden de errores fijado.
+      - Límites: 16 MiB, anidamiento JSON 1024 y profundidad de nodos 256.
+      - Los documentos se comparan como árboles tipados, no como texto.
+      - `Const(None)` solo se admite bajo `is_null`; la v1 lo aceptaba bajo `and`, `or` y `not`, y se considera un fallo de la v1.
+      - Las regex usan la sintaxis del crate `regex` con sus opciones por defecto (D9).
+      - Los esquemas están en `spec/schemas/v1/`, con ejemplos que comprueba `spec/schemas/check.py`.
+  - [ ] A.1b Reglas y rule sets (lógica, modo estricto, política, agregado, payloads).
+  - [ ] A.1c Decisiones y motivos (`Reason`, árbol de resultados).
+  - [ ] A.1d Explicaciones (requisitos, `Counterfactual`) y resúmenes; `spec/explain.md`, que aún no existe.
+- [ ] A.2 `spec/data-model.md`: `Value` y cómo convierte cada binding sus tipos nativos; precisión y rango de `Decimal` (lo que admita `rust_decimal`, o un tipo propio si se quieren conservar los infinitos y más de 28 dígitos); reescribir `ast.md` en términos neutros (quedan clases Python, la columna de tareas de la v1 y notas de polars). La sección "Reading data" de `ast.md` (mapas, registros, atributos **públicos**, nunca privados ni de módulos o clases) pasa a ser una obligación de cada binding.
 - [ ] A.3 Exportador temporal en Python (`conformance/tools/`) que, con la implementación de la v1, genera **vectores de conformidad**: árboles y errores de construcción, evaluaciones con motivos, modo estricto, decisiones de las 6 políticas, agregados, explicaciones y resúmenes. Las propiedades de hypothesis se convierten en miles de casos fijados.
+  - Vectores de lectura que hacen falta aunque la v1 no los pueda generar:
+    - números: `-0`, `9223372036854775808`, `-9223372036854775809`, `18446744073709551616`, `{"$int": 1.0}`, `{"$int": 1e2}` y flotantes difíciles de redondear;
+    - claves duplicadas en nodos, en mapas de datos y en `$map`;
+    - surrogates sueltos;
+    - el orden de errores;
+    - los límites, exactamente en el borde.
+  - Casos de la v1 que **no** se toman como vectores:
+    - `Const(None)` bajo `and`, `or` y `not`;
+    - patrones regex que Python acepta y `regex` no, y `$` antes de un salto de línea final;
+    - la deduplicación de `in` con dos instantes distintos en la misma zona durante un cambio de hora, que la v1 fusiona porque Python compara horas locales cuando comparten `tzinfo`.
 - [ ] A.4 Retirada: tag `python-reference` y eliminación de `src/rulepy` y de sus tests. Se conservan `spec/`, `docs/pitfalls.md` (pasa a la documentación del binding de Python) y los vectores.
 
 **Aceptación**: el conjunto de vectores cubre cada sección de la especificación; un script comprueba que cada regla normativa de `spec/` cita al menos un vector.
@@ -128,7 +155,7 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
 **Objetivo**: toda la funcionalidad de la fase P, en Rust, superando los vectores de conformidad.
 
 - [ ] B.1 Andamiaje: workspace, edición y MSRV, `clippy` pedante, `rustfmt`, `cargo-deny`, `cargo-nextest`, CI (Linux, macOS, Windows), `miri` en las partes con `unsafe` (idealmente ninguna en `core`).
-- [ ] B.2 Modelo de valores (`Value`, `Decimal` exacto con `rust_decimal`, fechas con `jiff` o `chrono`), normalización y grupos de tipo.
+- [ ] B.2 Modelo de valores (`Value`, `Decimal` exacto con `rust_decimal`, fechas con `jiff` o `chrono`), normalización y grupos de tipo. Base de datos de zonas horarias **empaquetada** y fijada por versión (no la del sistema), con su versión expuesta en la API. Lector JSON propio o `serde_json` configurado: enteros exactos, `float_roundtrip`, detección de claves duplicadas y límite de anidamiento sin depender de la recursión por defecto.
 - [ ] B.3 AST con serde: los 14 tipos de nodo y sus validaciones al construir, identidad estructural, `field_paths`, `Display` legible.
 - [ ] B.4 API de construcción idiomática en Rust (constructores y sobrecarga de operadores donde tenga sentido; macros solo si aportan).
 - [ ] B.5 Lógicas: `Logic` (trait), Kleene, registro por nombre y capacidad `Graded`.

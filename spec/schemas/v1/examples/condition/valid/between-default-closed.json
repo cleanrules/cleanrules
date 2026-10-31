@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "between",
+    "operand": {
+      "op": "field",
+      "path": [
+        "x"
+      ]
+    },
+    "low": {
+      "op": "const",
+      "value": 0
+    },
+    "high": {
+      "op": "const",
+      "value": 1
+    }
+  }
+}

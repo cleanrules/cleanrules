@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "eq",
+    "left": {
+      "op": "field",
+      "path": [
+        "a"
+      ]
+    },
+    "right": {
+      "op": "const",
+      "value": null
+    }
+  }
+}

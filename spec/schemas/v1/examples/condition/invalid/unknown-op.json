@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "xor",
+    "operands": [
+      {
+        "op": "field",
+        "path": [
+          "a"
+        ]
+      },
+      {
+        "op": "field",
+        "path": [
+          "b"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "matches",
+    "operand": {
+      "op": "field",
+      "path": [
+        "x"
+      ]
+    },
+    "pattern": 1
+  }
+}

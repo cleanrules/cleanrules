@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "and",
+    "operands": [
+      {
+        "op": "eq",
+        "left": {
+          "op": "field",
+          "path": [
+            "id"
+          ]
+        },
+        "right": {
+          "op": "const",
+          "value": {
+            "$int": "9223372036854775807"
+          }
+        }
+      },
+      {
+        "op": "eq",
+        "left": {
+          "op": "field",
+          "path": [
+            "ratio"
+          ]
+        },
+        "right": {
+          "op": "const",
+          "value": {
+            "$float": 1
+          }
+        }
+      },
+      {
+        "op": "in",
+        "operand": {
+          "op": "field",
+          "path": [
+            "day"
+          ]
+        },
+        "values": [
+          {
+            "$date": "2026-10-31"
+          },
+          {
+            "$date": "2026-11-01"
+          }
+        ]
+      },
+      {
+        "op": "in",
+        "operand": {
+          "op": "field",
+          "path": [
+            "at"
+          ]
+        },
+        "values": [
+          {
+            "$datetime": "2026-10-31T09:30:00"
+          }
+        ]
+      },
+      {
+        "op": "gt",
+        "left": {
+          "op": "field",
+          "path": [
+            "at_utc"
+          ]
+        },
+        "right": {
+          "op": "const",
+          "value": {
+            "$datetime": "2026-10-31T09:30:00Z"
+          }
+        }
+      }
+    ]
+  }
+}

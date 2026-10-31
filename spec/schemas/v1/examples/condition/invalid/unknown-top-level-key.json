@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "const",
+    "value": true
+  },
+  "rules": []
+}

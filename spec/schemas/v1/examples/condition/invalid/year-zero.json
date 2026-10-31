@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "eq",
+    "left": {
+      "op": "field",
+      "path": [
+        "a"
+      ]
+    },
+    "right": {
+      "op": "const",
+      "value": {
+        "$date": "0000-01-01"
+      }
+    }
+  }
+}

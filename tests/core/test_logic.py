@@ -52,7 +52,7 @@ def test_truth_reads_well_and_pickles() -> None:
     assert pickle.loads(pickle.dumps(U)) is U
 
 
-# --- Kleene tables (docs/spec/ast.md) ---------------------------------------------------
+# --- Kleene tables (spec/ast.md) ---------------------------------------------------
 
 AND_OR_TABLE = [
     (T, T, T, T),

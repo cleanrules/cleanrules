@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "eq",
+    "left": {
+      "op": "field",
+      "path": [
+        "a"
+      ]
+    },
+    "right": {
+      "op": "const",
+      "value": {
+        "$datetime": "2026-10-31T09:30:00+19:00"
+      }
+    }
+  }
+}

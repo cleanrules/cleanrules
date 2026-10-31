@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "not",
+    "operand": {
+      "op": "const",
+      "value": null
+    }
+  }
+}

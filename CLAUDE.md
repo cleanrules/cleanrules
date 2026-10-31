@@ -3,7 +3,7 @@
 Motor de reglas con **un único núcleo en Rust** y bindings para Rust, C/C++, Python, JavaScript, Java/Scala y Go. Cubre cuatro casos de uso con la misma semántica en todos los lenguajes: reglas de negocio, sistema experto (encadenamiento hacia delante), validación de datos y explicaciones de modelos de ML. Admite lógica nítida (Kleene, tres valores) y difusa (normas de `fuzzytool` portadas al núcleo).
 
 - **Hoja de ruta y estado**: [docs/PLAN.md](docs/PLAN.md) es la fuente de verdad. Antes de empezar cualquier tarea, léela y localiza la fase y la tarea.
-- **Contratos**: la especificación ([docs/spec/](docs/spec/), que pasa a `spec/` en la fase A) y la batería de conformidad (`conformance/`) definen la semántica. Si cambia el comportamiento, primero se actualizan la especificación y los vectores.
+- **Contratos**: la especificación ([spec/](spec/)) y la batería de conformidad (`conformance/`) definen la semántica. Si cambia el comportamiento, primero se actualizan la especificación y los vectores.
 - **Fase actual**: P (implementación Python v1, paquete `rulepy`) completada y congelada; 0' en curso. Siguiente: fase A (formato JSON, modelo de datos, vectores de conformidad y retirada de Python), después B (núcleo Rust).
 
 ## Estructura

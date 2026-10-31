@@ -1,7 +1,7 @@
 # Rules, rule sets and decisions
 
 **Status:** draft, normative for every engine (Python reference, Rust). The
-serialized form arrives in phase 3.
+serialized form arrives in task A.1b (`json-format.md`).
 
 ## Rules
 
@@ -26,7 +26,7 @@ A rule has:
 ## Evaluation
 
 For one input, every rule's condition is evaluated in rule order with the rule
-set's logic and strictness (`docs/spec/ast.md`). A rule **fires** when its truth
+set's logic and strictness (`ast.md`). A rule **fires** when its truth
 value passes the logic's **activation test**: `TRUE` under Kleene logic. Under a
 graded logic (phase 5) the test will be "degree ≥ the rule set's alpha"; the
 definition of *fires* does not change.

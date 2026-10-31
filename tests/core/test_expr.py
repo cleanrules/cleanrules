@@ -338,7 +338,7 @@ def test_node_union_covers_exactly_the_declared_tags() -> None:
 
 
 def test_every_tag_is_in_the_spec_catalogue() -> None:
-    spec = (Path(__file__).parents[2] / "docs" / "spec" / "ast.md").read_text(encoding="utf-8")
+    spec = (Path(__file__).parents[2] / "spec" / "ast.md").read_text(encoding="utf-8")
     catalogue = spec.split("## Catalogue", 1)[1].split("\n## ", 1)[0]
     first_cells = (line.split("|")[1] for line in catalogue.splitlines() if line.startswith("| `"))
     spec_tags = {tag for cell in first_cells for tag in re.findall(r"`([a-z_]+)`", cell)}

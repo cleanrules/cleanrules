@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "gt",
+    "left": {
+      "op": "add",
+      "left": {
+        "op": "const",
+        "value": "a"
+      },
+      "right": {
+        "op": "const",
+        "value": 1
+      }
+    },
+    "right": {
+      "op": "const",
+      "value": 0
+    }
+  }
+}

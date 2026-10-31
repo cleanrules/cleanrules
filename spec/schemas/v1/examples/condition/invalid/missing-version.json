@@ -1,0 +1,6 @@
+{
+  "condition": {
+    "op": "const",
+    "value": true
+  }
+}

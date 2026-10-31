@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanrules.github.io/schemas/v1/value.schema.json",
+  "title": "cleanrules values, format version 1",
+  "description": "Encoding of scalar values (constants) and data values (scalars, lists and maps). See spec/json-format.md, section Values, which is normative. A schema cannot tell an int literal from a float literal, check int64 and decimal ranges exactly, check that a date exists in the calendar, or check that a time zone exists and matches its offset: those rules are in the spec.",
+  "$ref": "#/$defs/value",
+  "$defs": {
+    "int": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$int": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^-?[0-9]+$"
+                }
+              ]
+            }
+          },
+          "required": [
+            "$int"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "float": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$float": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "inf",
+                    "-inf"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "$float"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "decimal": {
+      "type": "object",
+      "properties": {
+        "$decimal": {
+          "type": "string",
+          "pattern": "^(-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?|-?inf)$"
+        }
+      },
+      "required": [
+        "$decimal"
+      ],
+      "additionalProperties": false
+    },
+    "number": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/int"
+        },
+        {
+          "$ref": "#/$defs/float"
+        },
+        {
+          "$ref": "#/$defs/decimal"
+        }
+      ]
+    },
+    "date": {
+      "type": "object",
+      "properties": {
+        "$date": {
+          "type": "string",
+          "pattern": "^(?!0000)[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+        }
+      },
+      "required": [
+        "$date"
+      ],
+      "additionalProperties": false
+    },
+    "naiveDatetime": {
+      "type": "object",
+      "properties": {
+        "$datetime": {
+          "type": "string",
+          "pattern": "^(?!0000)[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,6})?$"
+        }
+      },
+      "required": [
+        "$datetime"
+      ],
+      "additionalProperties": false
+    },
+    "awareDatetime": {
+      "type": "object",
+      "properties": {
+        "$datetime": {
+          "type": "string",
+          "pattern": "^(?!0000)[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,6})?(Z|[+-]((0[0-9]|1[0-7]):[0-5][0-9](:[0-5][0-9])?|18:00(:00)?)(\\[[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*\\])?)$"
+        }
+      },
+      "required": [
+        "$datetime"
+      ],
+      "additionalProperties": false
+    },
+    "datetime": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/naiveDatetime"
+        },
+        {
+          "$ref": "#/$defs/awareDatetime"
+        }
+      ]
+    },
+    "nonNullScalar": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/number"
+        },
+        {
+          "$ref": "#/$defs/date"
+        },
+        {
+          "$ref": "#/$defs/datetime"
+        }
+      ]
+    },
+    "scalar": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/nonNullScalar"
+        }
+      ]
+    },
+    "map": {
+      "anyOf": [
+        {
+          "type": "object",
+          "propertyNames": {
+            "not": {
+              "pattern": "^\\$"
+            }
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/value"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$map": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/value"
+              }
+            }
+          },
+          "required": [
+            "$map"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "value": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/scalar"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/value"
+          }
+        },
+        {
+          "$ref": "#/$defs/map"
+        }
+      ]
+    }
+  }
+}

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- JSON format, version 1 (`spec/json-format.md`), the contract between
+  languages: documents with `"version": 1`, the encoding of values (exact
+  64-bit integers, floats with `{"$float": "inf"}`, `{"$decimal": ...}`,
+  `{"$date": ...}` and `{"$datetime": ...}` with fixed offsets or RFC 9557 time
+  zones, lists and maps), every condition node, canonical writing, error codes
+  and limits. JSON Schemas in `spec/schemas/v1/`, checked against valid and
+  invalid examples. The specification moved from `docs/spec/` to `spec/`.
+- Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
+  a null constant is only allowed as the operand of `is_null` (also under
+  `and`, `or` and `not`).
 - Repository skeleton: README, MIT license, changelog, `.gitignore`.
 - Package metadata (`pyproject.toml`, hatchling, `src/` layout): Python >= 3.11,
   no runtime dependencies, optional extras `fuzzy`, `polars`, `pandas`, `yaml`,

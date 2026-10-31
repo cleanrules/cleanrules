@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "eq",
+    "left": {
+      "op": "gt",
+      "left": {
+        "op": "field",
+        "path": [
+          "a"
+        ]
+      },
+      "right": {
+        "op": "const",
+        "value": 1
+      }
+    },
+    "right": {
+      "op": "gt",
+      "left": {
+        "op": "field",
+        "path": [
+          "b"
+        ]
+      },
+      "right": {
+        "op": "const",
+        "value": 2
+      }
+    }
+  }
+}

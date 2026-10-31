@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "in",
+    "operand": {
+      "op": "field",
+      "path": [
+        "a"
+      ]
+    },
+    "values": [
+      {
+        "$datetime": "2026-10-31T09:30:00"
+      },
+      {
+        "$datetime": "2026-10-31T09:30:00Z"
+      }
+    ]
+  }
+}

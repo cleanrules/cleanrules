@@ -9,7 +9,7 @@ argument-hint: "[fase.tarea]  (vacío = siguiente tarea sin marcar)"
 Argumento: `$ARGUMENTS` (por ejemplo `B.3`). Si está vacío, toma la primera casilla `- [ ]` de la fase más temprana sin terminar de `docs/PLAN.md`, siguiendo el orden de la sección "Dependencias entre fases".
 
 ## 1. Situarse
-- Lee `CLAUDE.md`, la fase completa en `docs/PLAN.md` (objetivo, tareas, criterios de aceptación y riesgos) y las secciones de la especificación (`spec/`, antes `docs/spec/`) que afecten a la tarea.
+- Lee `CLAUDE.md`, la fase completa en `docs/PLAN.md` (objetivo, tareas, criterios de aceptación y riesgos) y las secciones de la especificación (`spec/`) que afecten a la tarea.
 - Si la tarea depende de otra que no está marcada, o de una decisión pendiente del plan, dilo y propón resolverla primero.
 - Si la tarea es demasiado grande para un único commit revisable, divídela en subtareas dentro de `docs/PLAN.md` y haz solo la primera.
 

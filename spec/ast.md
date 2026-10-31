@@ -1,13 +1,15 @@
 # Condition AST
 
-**Status:** draft, format version `0`. The node catalogue and the semantics below
-are normative for every backend. The serialized JSON form (`"rulepy_ast": 1`) is
-defined in task 3.1; until then nothing is serialized.
+**Status:** draft. The node catalogue and the semantics below are normative for
+every implementation. The JSON form of each node is defined in
+[`json-format.md`](json-format.md) (format version 1).
 
 A rule's condition is a tree of immutable nodes (`rulepy.core.expr`). Users
-normally build it with the `F` proxy and the operators `&`, `|` and `~`, which
-arrive in tasks 2.2–2.3. This document defines what the tree *means*, so that
-the Python evaluator, polars, Rete and Rust all agree.
+normally build it with the `F` proxy and the operators `&`, `|` and `~` (or
+their equivalent in each language). This document defines what the tree
+*means*, so that every engine mode (row by row, Arrow batches, Rete) and every
+language agree. It still names the Python v1 classes, which phase A replaces
+with neutral terms.
 
 ## Node kinds
 
@@ -17,7 +19,7 @@ Every node has a **kind**, which says where it may appear:
 |---|---|---|---|
 | `condition` | evaluates to a truth value (crisp or fuzzy) | yes | no |
 | `value` | evaluates to a scalar | no | yes |
-| `any` | depends on the data: fields, boolean constants, `null` | yes | yes |
+| `any` | depends on the data: fields and boolean constants | yes | yes |
 
 Building a tree that breaks these rules raises `ExpressionError` immediately,
 not later at evaluation time. Comparing two conditions, as in
@@ -33,7 +35,7 @@ lists its tags in `TAGS`, `Node` is the closed union of concrete classes, and
 | Tag | Class | Fields | Kind | Task |
 |---|---|---|---|---|
 | `field` | `Field` | `path: tuple[str \| int, ...]` | any | 2.1a |
-| `const` | `Const` | `value: Scalar` | any if `bool` or `None`, else value | 2.1a |
+| `const` | `Const` | `value: Scalar` | any if `bool`, else value; `None` only under `is_null` | 2.1a |
 | `eq` `ne` `lt` `le` `gt` `ge` | `Compare` | `op`, `left`, `right` | condition | 2.1a |
 | `and` | `And` | `operands: tuple[Expr, ...]` (≥ 2) | condition | 2.1a |
 | `or` | `Or` | `operands: tuple[Expr, ...]` (≥ 2) | condition | 2.1a |
@@ -79,9 +81,11 @@ lists its tags in `TAGS`, `Node` is the closed union of concrete classes, and
   - the operand of `In`, `IsNull`, `Matches`, `StringTest`, `Abs` and `Neg`;
   - all three nodes of `Between`.
 
-  `Const(None)` is rejected everywhere except as the operand of `IsNull`. Under
-  Kleene logic, `x == null` or `x + null` would be null for every input; use
-  `IsNull` to test for missing values.
+  `Const(None)` is rejected everywhere except as the operand of `IsNull`,
+  including as an operand of `And`, `Or` and `Not`. Under Kleene logic,
+  `x == null` or `x + null` would be null for every input; use `IsNull` to test
+  for missing values. (The Python v1 accepted `Const(None)` under `And`, `Or`
+  and `Not`; that was a gap, not semantics.)
 - **Arithmetic** (`Arith`, `Abs`, `Neg`) also rejects constants that are not
   numbers (booleans included), such as `Const("a") + 1`.
 - **`In(operand, values)`** accepts any iterable of values, including a `set`.
@@ -94,8 +98,8 @@ lists its tags in `TAGS`, `Node` is the closed union of concrete classes, and
 - **`Between(operand, low, high, closed="both")`**: `closed` is `"both"`,
   `"left"`, `"right"` or `"none"`. When both bounds are constants, they must belong
   to one orderable group (not boolean).
-- **`Matches(operand, pattern)`**: the pattern must compile. The check for the
-  portable subset (no lookaround, no backreferences) arrives in task 3.6.
+- **`Matches(operand, pattern)`**: the pattern must be valid in the syntax
+  defined under *`matches`* below, and compile within the size limit.
 - **`StringTest(op, operand, text)`**: `op` is `starts_with`, `ends_with` or
   `contains`, and `text` is a literal `str`.
 
@@ -266,12 +270,18 @@ Values belong to one of these comparison groups:
   - `closed` is `"both"` (the default), `"left"`, `"right"` or `"none"`, exactly
     as in polars;
   - it is equivalent to the matching pair of comparisons joined by `and`.
-- **`matches`** uses **search** semantics (Python `re.search`, Rust
-  `Regex::is_match`, polars `str.contains`). It is case-sensitive unless the
-  pattern starts with the inline flag `(?i)`. Patterns are restricted to the
-  subset shared by Python `re` and Rust `regex`. Note that `$` differs: in
-  Python it also matches before a trailing newline, in Rust it does not, so task
-  3.6 either rejects `$` or rewrites it to `\z`.
+- **`matches`** uses **search** semantics: it is `TRUE` when the pattern
+  matches anywhere in the string (Rust `Regex::is_match`).
+  - The syntax is that of the Rust [`regex`](https://docs.rs/regex) crate, 1.x,
+    with its defaults: Unicode on, case-sensitive, `^` and `$` match only at
+    the start and end of the text (`$` never before a trailing newline), and
+    `.` does not match `\n`. Inline flags such as `(?i)` change this within the
+    pattern. There is no lookaround and there are no backreferences, so
+    matching takes linear time (`CLAUDE.md`, invariant 9; decision D9).
+  - A pattern that does not parse, or whose compiled form exceeds the crate's
+    default size limit, is an `ExpressionError`.
+  - Python's `re` accepted some patterns this syntax rejects and read `$`
+    differently; vectors taken from the v1 skip those cases.
 - **`starts_with`, `ends_with`, `contains`** take **literal** text; polars must
   call `str.contains(..., literal=True)`.
 - **Arithmetic** (`add`, `sub`, `mul`, `div`, `abs`, `neg`) is defined on

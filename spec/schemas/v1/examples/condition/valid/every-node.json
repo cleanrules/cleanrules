@@ -1,0 +1,213 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "or",
+    "operands": [
+      {
+        "op": "in",
+        "operand": {
+          "op": "field",
+          "path": [
+            "country"
+          ]
+        },
+        "values": [
+          "ES",
+          "FR",
+          "PT"
+        ]
+      },
+      {
+        "op": "in",
+        "operand": {
+          "op": "field",
+          "path": [
+            "score"
+          ]
+        },
+        "values": [
+          {
+            "$decimal": "1"
+          },
+          1.0,
+          1,
+          2.5
+        ]
+      },
+      {
+        "op": "between",
+        "operand": {
+          "op": "field",
+          "path": [
+            "age"
+          ]
+        },
+        "low": {
+          "op": "field",
+          "path": [
+            "limits",
+            "min"
+          ]
+        },
+        "high": {
+          "op": "const",
+          "value": 65
+        },
+        "closed": "left"
+      },
+      {
+        "op": "is_null",
+        "operand": {
+          "op": "const",
+          "value": null
+        }
+      },
+      {
+        "op": "matches",
+        "operand": {
+          "op": "field",
+          "path": [
+            "email"
+          ]
+        },
+        "pattern": "(?i)@example\\.com"
+      },
+      {
+        "op": "starts_with",
+        "operand": {
+          "op": "field",
+          "path": [
+            "code"
+          ]
+        },
+        "text": "ES-"
+      },
+      {
+        "op": "ends_with",
+        "operand": {
+          "op": "field",
+          "path": [
+            "code"
+          ]
+        },
+        "text": "-X"
+      },
+      {
+        "op": "contains",
+        "operand": {
+          "op": "field",
+          "path": [
+            "note"
+          ]
+        },
+        "text": "urgent"
+      },
+      {
+        "op": "not",
+        "operand": {
+          "op": "eq",
+          "left": {
+            "op": "field",
+            "path": [
+              "vip"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": true
+          }
+        }
+      },
+      {
+        "op": "lt",
+        "left": {
+          "op": "div",
+          "left": {
+            "op": "add",
+            "left": {
+              "op": "field",
+              "path": [
+                "items",
+                0,
+                "price"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 1.5
+            }
+          },
+          "right": {
+            "op": "const",
+            "value": {
+              "$decimal": "0.10"
+            }
+          }
+        },
+        "right": {
+          "op": "const",
+          "value": 100
+        }
+      },
+      {
+        "op": "ge",
+        "left": {
+          "op": "abs",
+          "operand": {
+            "op": "neg",
+            "operand": {
+              "op": "field",
+              "path": [
+                "delta"
+              ]
+            }
+          }
+        },
+        "right": {
+          "op": "const",
+          "value": {
+            "$float": "inf"
+          }
+        }
+      },
+      {
+        "op": "ne",
+        "left": {
+          "op": "field",
+          "path": [
+            "status"
+          ]
+        },
+        "right": {
+          "op": "const",
+          "value": "closed"
+        }
+      },
+      {
+        "op": "le",
+        "left": {
+          "op": "field",
+          "path": [
+            "created"
+          ]
+        },
+        "right": {
+          "op": "const",
+          "value": {
+            "$datetime": "2026-10-31T09:30:00.250000+01:00[Europe/Madrid]"
+          }
+        }
+      },
+      {
+        "op": "field",
+        "path": [
+          "active"
+        ]
+      },
+      {
+        "op": "const",
+        "value": false
+      }
+    ]
+  }
+}

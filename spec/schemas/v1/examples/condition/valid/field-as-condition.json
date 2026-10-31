@@ -1,0 +1,11 @@
+{
+  "$schema": "https://cleanrules.github.io/schemas/v1/condition.schema.json",
+  "version": 1,
+  "condition": {
+    "op": "field",
+    "path": [
+      "flags",
+      "enabled"
+    ]
+  }
+}

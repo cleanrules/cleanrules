@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "in",
+    "operand": {
+      "op": "field",
+      "path": [
+        "a"
+      ]
+    },
+    "values": []
+  }
+}
