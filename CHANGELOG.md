@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- Errors carry the context fields `node` (the operand that broke a
+  construction rule, or the innermost node whose evaluation failed),
+  `operation` and `reason` (`spec/errors.md`), in the Rust core and in Python,
+  where `node` is an `Expr` and appears in the message.
 - Python binding: `Rule`, `RuleSet` (a sequence of rules by position and by
   name), `HitPolicy`, `Aggregate`, `Truth`, `Status`, `Decision` (`results`,
   `selected`, `fired`, read-only `outputs` and `output`, `aggregated`,

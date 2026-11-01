@@ -416,7 +416,12 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
       - Los metadatos se validan como datos (sin NaN ni valores opacos, con la ruta de la clave en el error) y `Rule.metadata` devuelve lo que guarda el núcleo.
       - Salidas y decisiones de solo lectura; los errores de constantes de la carga nombran la regla y la clave; se permiten claves vacías, como en el formato; `hit_policy` y `aggregate` aceptan cualquier capitalización, como la v1; `Aggregate` es un `StrEnum`; la evaluación suelta el GIL en las compilaciones con GIL; un código de error nuevo se traduce a `CleanRulesError`; la pista del núcleo para salidas múltiples ya no usa sintaxis de método.
       - Pendiente (tarea propia, abajo): los campos de contexto `node`, `operation`, `reason` y `decision` de `spec/errors.md` no existen aún en el `Context` del núcleo.
-  - [ ] C.2c Campos de contexto de error que faltan en el núcleo (`node` en `expression_error` y en los errores de evaluación, `operation` y `reason` en `unsupported`, `decision` en `action_error`), y su paso a Python (`node` como `Expr`). No se comparan en los vectores.
+  - [x] C.2c Campos de contexto de error que faltan en el núcleo (`node` en `expression_error` y en los errores de evaluación, `operation` y `reason` en `unsupported`, `decision` en `action_error`), y su paso a Python (`node` como `Expr`). No se comparan en los vectores.
+    - Hecho el 2026-11-01: el `Context` del núcleo tiene `node`, `operation` y `reason`, y `Error::with_node`.
+    - En la construcción, `node` es el operando que rompe la regla (las comprobaciones comunes de operandos lo añaden). En la evaluación estricta es el nodo más interno que falla: el campo, si falta; la comparación, si los tipos no casan; el `between` del usuario, si falla una de sus mitades sintéticas.
+    - Python recibe `node` como `Expr` (también al deserializar con pickle) y lo muestra en el mensaje (`…, in \`F.a > 1\``); `operation` y `reason` pasan tal cual.
+    - Rendimiento medido con criterion contra el código anterior en las mismas condiciones: sin cambio en `evaluate/one/first` ni en `batch_1000/first`. Un primer intento que clonaba las mitades de `between` costaba un 5 %, y se descartó.
+    - Desviación: `decision` en `action_error` llega con las acciones (D.4), porque hasta entonces nadie lanza ese error.
 - [ ] C.3 Conversión de datos (dicts, dataclasses, Pydantic, namedtuples, filas de pandas, numpy) a `Value`, con las reglas de seguridad de `spec/data-model.md`.
 - [ ] C.4 `run` y acciones en Python; pickle; tipos (`.pyi`).
 - [ ] C.5 Runner de conformidad en Python.

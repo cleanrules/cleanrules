@@ -49,6 +49,9 @@ _CONTEXT_FIELDS = (
     "name",
     "available",
     "executed",
+    "node",
+    "operation",
+    "reason",
 )
 
 
@@ -76,6 +79,10 @@ class CleanRulesError(Exception):
         name: The name looked up, or `None`.
         available: The names that exist, sorted.
         executed: The rules whose actions had run.
+        node: The failing node, as an `Expr`: the operand that broke a
+            construction rule, or the innermost node whose evaluation failed.
+        operation: What was not supported, or `None`.
+        reason: Why it was not supported, or `None`.
     """
 
     # Each subclass names its code; the base has none of its own.
@@ -95,6 +102,9 @@ class CleanRulesError(Exception):
     name: str | None
     available: tuple[str, ...]
     executed: tuple[str, ...]
+    node: Any
+    operation: str | None
+    reason: str | None
 
     def __init__(
         self, message: str, *, hint: str | None = None, code: str | None = None, **context: Any
@@ -112,6 +122,8 @@ class CleanRulesError(Exception):
                 value = tuple(value or ())
             elif field == "path" and value is not None:
                 value = tuple(value)
+            elif field == "node" and value is not None:
+                value = _as_expr(value)
             setattr(self, field, value)
 
     def __str__(self) -> str:
@@ -119,6 +131,8 @@ class CleanRulesError(Exception):
         # Core messages often name the rule already (`two rules are named "a"`).
         if self.rule is not None and f'"{self.rule}"' not in text:
             text = f"rule {self.rule!r}: {text}"
+        if self.node is not None:
+            text = f"{text}, in `{self.node!r}`"
         if self.row is not None:
             text = f"{text} (input {self.row})"
         return text if self.hint is None else f"{text}\nhint: {self.hint}"
@@ -127,6 +141,14 @@ class CleanRulesError(Exception):
         # The default reduce calls __init__ again with `args` only, which drops the
         # keyword arguments; rebuild without __init__ and restore the attributes.
         return (_rebuild, (type(self), self.args, dict(self.__dict__)))
+
+
+def _as_expr(node: object) -> object:
+    """A native node from the core, as the `Expr` users build."""
+    from cleanrules import _cleanrules
+    from cleanrules._expr import _wrap  # pyright: ignore[reportPrivateUsage]
+
+    return _wrap(node) if isinstance(node, _cleanrules.Node) else node
 
 
 # Pickles store this function by name: keep the name, or errors pickled by an

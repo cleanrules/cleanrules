@@ -3,6 +3,7 @@
 
 use std::fmt;
 
+use crate::ast::Node;
 use crate::value::Group;
 
 /// The stable code of an error, the same in every language.
@@ -148,6 +149,13 @@ pub struct Context {
     pub available: Vec<String>,
     /// The rules whose actions had run.
     pub executed: Vec<String>,
+    /// The failing node: the operand that broke a construction rule, or the
+    /// innermost node whose evaluation failed.
+    pub node: Option<Box<Node>>,
+    /// What was not supported, in words.
+    pub operation: Option<String>,
+    /// Why it was not supported, in words.
+    pub reason: Option<String>,
 }
 
 /// An error of cleanrules. It is boxed, so a `Result` stays one pointer wide.
@@ -191,6 +199,13 @@ impl Error {
     #[must_use]
     pub fn with_context(mut self, context: Context) -> Self {
         self.inner.context = context;
+        self
+    }
+
+    /// Set the failing node.
+    #[must_use]
+    pub fn with_node(mut self, node: &Node) -> Self {
+        self.inner.context.node = Some(Box::new(node.clone()));
         self
     }
 

@@ -8,6 +8,8 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
+use crate::node::PyNode;
+
 /// The Python class of an error code.
 fn class_name(code: ErrorCode) -> &'static str {
     match code {
@@ -83,6 +85,18 @@ fn build(py: Python<'_>, error: &Error) -> PyResult<PyErr> {
     }
     if !context.executed.is_empty() {
         kwargs.set_item("executed", &context.executed)?;
+    }
+    if let Some(node) = &context.node {
+        let node = PyNode {
+            node: node.as_ref().clone(),
+        };
+        kwargs.set_item("node", node)?;
+    }
+    if let Some(operation) = &context.operation {
+        kwargs.set_item("operation", operation)?;
+    }
+    if let Some(reason) = &context.reason {
+        kwargs.set_item("reason", reason)?;
     }
     let instance = class.call((error.message(),), Some(&kwargs))?;
     Ok(PyErr::from_value(instance))

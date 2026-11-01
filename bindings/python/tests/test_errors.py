@@ -72,3 +72,27 @@ def test_core_errors_arrive_with_their_class_and_code() -> None:
         cleanrules.F.x.is_in([])
     assert info.value.code == "expression_error"
     assert isinstance(info.value, ValueError)
+
+
+def test_errors_name_the_failing_node() -> None:
+    from cleanrules import F, Rule, RuleSet
+
+    with pytest.raises(errors.ExpressionError) as built:
+        _ = (F.a > 1) < F.b
+    assert built.value.node.same_as(F.a > 1)
+    assert str(built.value).endswith(", in `F.a > 1`")
+
+    rules = RuleSet([Rule("r", (F.a > 1) & (F.b < 2))], strict=True)
+    with pytest.raises(errors.MissingFieldError) as missing:
+        rules.evaluate({"a": 5})
+    assert missing.value.node.same_as(F.b)
+    with pytest.raises(errors.TypeMismatchError) as mismatch:
+        rules.evaluate({"a": "x"})
+    assert mismatch.value.node.same_as(F.a > 1)
+    clone = pickle.loads(pickle.dumps(mismatch.value))
+    assert clone.node.same_as(F.a > 1)
+
+
+def test_unsupported_errors_say_what_and_why() -> None:
+    error = errors.UnsupportedError("no", operation="explain", reason="graded logic")
+    assert (error.operation, error.reason) == ("explain", "graded logic")

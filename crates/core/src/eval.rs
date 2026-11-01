@@ -133,6 +133,15 @@ pub struct Options<'r> {
     pub rule: Option<&'r str>,
 }
 
+/// Name `node` as the failing node of an evaluation error that names none yet.
+fn failed_at(error: Error, node: &Node) -> Error {
+    if error.code().is_a(ErrorCode::EvaluationError) && error.context().node.is_none() {
+        error.with_node(node)
+    } else {
+        error
+    }
+}
+
 /// Evaluate a condition (or a field or constant used as one) on `input`.
 ///
 /// # Errors
@@ -256,7 +265,20 @@ impl<L: Logic> Evaluator<'_, '_, L> {
 
     // --- Conditions --------------------------------------------------------------------
 
+    /// Evaluate a condition; an evaluation error names the innermost node that
+    /// failed (`spec/errors.md`, `node`).
     fn condition<'a>(&self, node: Cow<'a, Node>) -> Result<Evaluated<'a, L::Truth>> {
+        match node {
+            Cow::Borrowed(node) => self
+                .condition_of(Cow::Borrowed(node))
+                .map_err(|error| failed_at(error, node)),
+            // A synthetic node (the halves of `between`): the error names the
+            // user's node above it.
+            Cow::Owned(node) => self.condition_of(Cow::Owned(node)),
+        }
+    }
+
+    fn condition_of<'a>(&self, node: Cow<'a, Node>) -> Result<Evaluated<'a, L::Truth>> {
         let n: &Node = &node;
         match n.expr() {
             Expr::And(_) | Expr::Or(_) => {
@@ -548,7 +570,20 @@ impl<L: Logic> Evaluator<'_, '_, L> {
 
     // --- Values ----------------------------------------------------------------------------
 
+    /// Evaluate a value; an evaluation error names the innermost node that
+    /// failed.
     fn value<'a>(&self, node: Cow<'a, Node>) -> Result<Evaluated<'a, L::Truth>> {
+        match node {
+            Cow::Borrowed(node) => self
+                .value_of(Cow::Borrowed(node))
+                .map_err(|error| failed_at(error, node)),
+            // A synthetic node (the halves of `between`): the error names the
+            // user's node above it.
+            Cow::Owned(node) => self.value_of(Cow::Owned(node)),
+        }
+    }
+
+    fn value_of<'a>(&self, node: Cow<'a, Node>) -> Result<Evaluated<'a, L::Truth>> {
         match node.expr() {
             Expr::Field(path) => {
                 let (value, reason) = self.read(path)?;
@@ -922,6 +957,32 @@ mod tests {
         let error = evaluate_tree(&node, &data, &Kleene, strict).unwrap_err();
         assert_eq!(error.code(), ErrorCode::EvaluationError);
         assert_eq!(error.context().rule.as_deref(), Some("r"));
+    }
+
+    #[test]
+    fn strict_errors_name_the_innermost_failing_node() {
+        let strict = Options {
+            strict: true,
+            rule: None,
+        };
+        let failing = |node: &crate::ast::Node, data: &Value| {
+            let error = evaluate_tree(node, data, &Kleene, strict).unwrap_err();
+            (error.code(), *error.context().node.clone().unwrap())
+        };
+        // A missing field: the field itself.
+        let node = (field("a").gt(1) & field("b").lt(2)).build().unwrap();
+        let (code, at) = failing(&node, &input("a", Value::Int(5)));
+        assert_eq!(code, ErrorCode::MissingField);
+        assert_eq!(at, field("b").build().unwrap());
+        // A type mismatch: the comparison.
+        let (code, at) = failing(&node, &input("a", Value::String("x".into())));
+        assert_eq!(code, ErrorCode::TypeMismatch);
+        assert_eq!(at, field("a").gt(1).build().unwrap());
+        // Inside `between`, whose halves are synthetic: the user's `between`.
+        let node = field("a").between(1, 5).build().unwrap();
+        let (code, at) = failing(&node, &input("a", Value::String("x".into())));
+        assert_eq!(code, ErrorCode::TypeMismatch);
+        assert_eq!(at, node);
     }
 
     #[test]

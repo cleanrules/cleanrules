@@ -634,14 +634,16 @@ fn value_operand(node: &Node, of: &str) -> Result<()> {
     if node.is_null_constant() {
         return Err(
             invalid(format!("a null constant cannot be an operand of '{of}'"))
-                .with_hint("test for missing values with is_null"),
+                .with_hint("test for missing values with is_null")
+                .with_node(node),
         );
     }
     if node.kind() == Kind::Condition {
         return Err(invalid(format!(
             "a condition ('{}') cannot be an operand of '{of}'",
             node.tag()
-        )));
+        ))
+        .with_node(node));
     }
     Ok(())
 }
@@ -651,9 +653,9 @@ fn numeric_operand(node: &Node, of: &str) -> Result<()> {
     if let Expr::Const(value) = &node.expr
         && value.as_number().is_none()
     {
-        return Err(invalid(format!(
-            "'{of}' needs numbers; this constant is not one"
-        )));
+        return Err(
+            invalid(format!("'{of}' needs numbers; this constant is not one")).with_node(node),
+        );
     }
     Ok(())
 }
@@ -662,14 +664,16 @@ fn condition_operand(node: &Node, of: &str) -> Result<()> {
     if node.is_null_constant() {
         return Err(
             invalid(format!("a null constant cannot be an operand of '{of}'"))
-                .with_hint("test for missing values with is_null"),
+                .with_hint("test for missing values with is_null")
+                .with_node(node),
         );
     }
     if node.kind() == Kind::Value {
         return Err(invalid(format!(
             "a value ('{}') cannot be an operand of '{of}'",
             node.tag()
-        )));
+        ))
+        .with_node(node));
     }
     Ok(())
 }
@@ -829,6 +833,16 @@ mod tests {
         assert_eq!(c(Value::Bool(true)).kind(), Kind::Any);
         assert_eq!(c(Value::Int(1)).kind(), Kind::Value);
         assert_eq!(gt("a", 1).kind(), Kind::Condition);
+    }
+
+    #[test]
+    fn construction_errors_name_the_offending_operand() {
+        let condition = gt("a", 1);
+        let error = Node::compare(CompareOp::Lt, condition.clone(), f("b")).unwrap_err();
+        assert_eq!(*error.context().node.clone().unwrap(), condition);
+        let text = c(Value::String("x".into()));
+        let error = Node::abs(text.clone()).unwrap_err();
+        assert_eq!(*error.context().node.clone().unwrap(), text);
     }
 
     #[test]
