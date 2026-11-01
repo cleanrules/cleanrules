@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/core"]
+members = ["crates/core", "bindings/python"]
 
 [workspace.package]
 version = "0.0.0"
@@ -26,3 +26,12 @@ panic = "warn"
 print_stdout = "warn"
 print_stderr = "warn"
 dbg_macro = "warn"
+
+# Xcode 27's strip can corrupt Mach-O libraries ("mis-aligned LINKEDIT string
+# pool"; seen on a Python extension and on a proc macro, macOS 27), and release
+# strips debuginfo by default. Not stripping costs about 8 % in size.
+[profile.release]
+strip = false
+
+[profile.release.build-override]
+strip = false

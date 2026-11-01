@@ -37,7 +37,7 @@ cargo bench -p cleanrules              # criterion
 cargo test -p cleanrules --test conformance
 
 # Bindings, cuando existan
-uv run maturin develop -m bindings/python/Cargo.toml && uv run pytest bindings/python
+(cd bindings/python && uv run pytest && uv run pyright)   # uv compila la extensión con maturin
 cmake -S bindings/cpp -B build/cpp && ctest --test-dir build/cpp
 npm --prefix bindings/js test
 (cd bindings/jvm && ./gradlew test)

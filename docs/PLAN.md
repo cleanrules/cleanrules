@@ -386,7 +386,13 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
 
 ### Fase C. Binding Python · tamaño L · primera versión pública
 
-- [ ] C.1 PyO3 + maturin, wheels `abi3` y build *free-threaded*, CI de wheels.
+- [x] C.1 PyO3 + maturin, wheels `abi3` y build *free-threaded*, CI de wheels.
+  - Hecho el 2026-11-01: `bindings/python` (crate `cleanrules-python`, miembro del workspace; paquete `cleanrules` con el módulo nativo `cleanrules._cleanrules`), con PyO3 0.30.1 y maturin 1.16. De momento solo expone `__version__` y `FORMAT_VERSION`; la API llega en C.2.
+    - Tres wheels por plataforma, como permite PyO3 0.30: `cp311-abi3` (CPython 3.11 a 3.14 con GIL), `cp314-cp314t` (3.14 *free-threaded*; PyO3 ya no admite 3.13t) y `cp315-abi3.abi3t` (PEP 803: 3.15 y posteriores, con GIL o sin él). Se construyeron en macOS arm64 y sus tests pasan en 3.11, 3.14, 3.14t, 3.15 y 3.15t (rc1). El sdist también se instala.
+    - El módulo admite *free threading* (lo predeterminado en PyO3): un test comprueba que importarlo no reactiva el GIL, y falla si el módulo lo pide (comprobado).
+    - CI: un trabajo `python` en `ci.yml` (pytest en Linux, macOS y Windows con 3.11, 3.14t, 3.15 y 3.15t, y pyright) y `wheels.yml`, que construye las wheels (manylinux y musllinux x86_64/aarch64, macOS arm64 y x86_64, Windows x64 y arm64) y el sdist y prueba cada wheel instalada. Aún no se han ejecutado en GitHub: lo harán con el primer push.
+    - Dependencias: `pyo3` (aprobada) y, como herramientas de desarrollo del paquete, `pytest` y `pyright` (`uv.lock` en `bindings/python`).
+    - Desviación: el `strip` de Xcode 27 corrompe a veces bibliotecas Mach-O (la wheel `abi3t` no cargaba: «mis-aligned LINKEDIT string pool»), así que el perfil release del workspace no hace `strip`, también en `build-override`. Cuesta un 8 % de tamaño (37 KB).
 - [ ] C.2 API Python con la ergonomía de la v1: `F`, operadores, protección contra trampas (`docs/pitfalls.md`), `Rule`, `RuleSet`, `Decision`, `explain`, `summary`.
 - [ ] C.3 Conversión de datos (dicts, dataclasses, Pydantic, namedtuples, filas de pandas, numpy) a `Value`, con las reglas de seguridad de `spec/data-model.md`.
 - [ ] C.4 `run` y acciones en Python; pickle; tipos (`.pyi`).

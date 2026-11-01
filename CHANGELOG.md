@@ -43,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- Python binding scaffold (`bindings/python`, PyO3 and maturin): the
+  `cleanrules` package with its native module, `__version__` and
+  `FORMAT_VERSION`. Wheels: `abi3` for CPython 3.11+, `cp314t` for
+  free-threaded 3.14, and `abi3t` for CPython 3.15+; the module supports free
+  threading. CI builds and tests the wheels and the sdist (not published yet).
 - Benchmark comparison with zen-engine (`benchmarks/zen`), on the same rules
   as a zen decision table, after checking that both engines select the same
   rules for every input.

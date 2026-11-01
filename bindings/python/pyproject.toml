@@ -1,0 +1,66 @@
+[build-system]
+requires = ["maturin>=1.16,<2"]
+build-backend = "maturin"
+
+[project]
+name = "cleanrules"
+description = "Explainable rules engine: one Rust core with the same semantics in every language"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Jose L. Salmeron" }]
+keywords = ["rules-engine", "business-rules", "expert-system", "validation", "explainable"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: Free Threading :: 3 - Stable",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://cleanrules.github.io"
+Repository = "https://github.com/cleanrules/cleanrules"
+
+[tool.maturin]
+module-name = "cleanrules._cleanrules"
+python-source = "python"
+features = ["pyo3/extension-module"]
+
+[tool.uv]
+# Rebuild the extension when the Rust sources change.
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "Cargo.toml" },
+    { file = "src/**/*.rs" },
+    { file = "../../crates/core/Cargo.toml" },
+    { file = "../../crates/core/src/**/*.rs" },
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib", "-ra"]
+
+[tool.pyright]
+include = ["python", "tests"]
+typeCheckingMode = "strict"
+pythonVersion = "3.11"
+
+[tool.ruff]
+extend = "../../ruff.toml"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D103"]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+]

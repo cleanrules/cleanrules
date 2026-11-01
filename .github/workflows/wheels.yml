@@ -1,0 +1,117 @@
+name: Wheels
+
+# Builds the Python wheels and the sdist, and tests every wheel on the
+# interpreters it targets. Publishing (PyPI trusted publishing) comes in M.2.
+#
+# Per platform: one abi3 wheel (CPython 3.11+), one cp314t wheel (free-threaded
+# 3.14) and one abi3t wheel (CPython 3.15+, free-threaded or not).
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "bindings/python/**"
+      - "crates/core/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/wheels.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Wheels (${{ matrix.libc }} ${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, target: x86_64, libc: manylinux, manylinux: "2_28" }
+          - { runner: ubuntu-24.04-arm, target: aarch64, libc: manylinux, manylinux: "2_28" }
+          - { runner: ubuntu-latest, target: x86_64, libc: musllinux, manylinux: musllinux_1_2 }
+          - { runner: ubuntu-24.04-arm, target: aarch64, libc: musllinux, manylinux: musllinux_1_2 }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: bindings/python
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --out dist -i python3.11 python3.14t python3.15
+      - uses: actions/upload-artifact@v5
+        with:
+          name: wheels-${{ matrix.libc }}-${{ matrix.target }}
+          path: bindings/python/dist
+
+  macos-windows:
+    name: Wheels (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-latest, macos-15-intel, windows-latest, windows-11-arm]
+    defaults:
+      run:
+        shell: bash
+        working-directory: bindings/python
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v6
+      - run: uv python install 3.11 3.14t 3.15
+      - run: >-
+          uvx maturin build --release --out dist
+          -i "$(uv python find 3.11)" "$(uv python find 3.14t)" "$(uv python find 3.15)"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: wheels-${{ matrix.runner }}
+          path: bindings/python/dist
+
+  sdist:
+    name: Source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - run: uvx maturin sdist --out dist
+        working-directory: bindings/python
+      - uses: actions/upload-artifact@v5
+        with:
+          name: sdist
+          path: bindings/python/dist
+
+  test:
+    name: Test wheels (${{ matrix.runner }}, Python ${{ matrix.python }})
+    needs: [linux, macos-windows]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+        python: ["3.11", "3.14", "3.14t", "3.15", "3.15t"]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+      - uses: astral-sh/setup-uv@v6
+      - run: uv venv --python ${{ matrix.python }} .venv-test
+      - run: uv pip install --python .venv-test --no-index --find-links dist cleanrules
+      - run: uv pip install --python .venv-test pytest
+      # Run from outside the source tree, so that the installed wheel is tested.
+      - run: |
+          cd "$RUNNER_TEMP"
+          "$GITHUB_WORKSPACE/.venv-test/${{ runner.os == 'Windows' && 'Scripts/python.exe' || 'bin/python' }}" \
+            -m pytest -p no:cacheprovider "$GITHUB_WORKSPACE/bindings/python/tests"
