@@ -20,6 +20,7 @@ fn limits(max_size: Option<usize>, max_nesting: Option<usize>, max_depth: Option
     let mut limits = Limits::default();
     if let Some(size) = max_size {
         limits.max_size = size;
+        limits.max_yaml_size = size;
     }
     if let Some(nesting) = max_nesting {
         limits.max_nesting = nesting;
@@ -59,18 +60,25 @@ pub(crate) fn _read_document(
 /// Read a decision document with its rule set (the content of a rule set
 /// document); the decision as it is written back.
 #[pyfunction]
-#[pyo3(signature = (ruleset_json, text, max_size=None, max_nesting=None, max_depth=None))]
+#[pyo3(signature = (ruleset_json, text, format="json", max_size=None, max_nesting=None, max_depth=None))]
+#[allow(clippy::too_many_arguments)] // The limits are keyword arguments in Python.
 pub(crate) fn _read_decision(
     py: Python<'_>,
     ruleset_json: &str,
     text: &str,
+    format: &str,
     max_size: Option<usize>,
     max_nesting: Option<usize>,
     max_depth: Option<usize>,
 ) -> PyResult<String> {
     let rules = ruleset(py, ruleset_json)?;
     let limits = limits(max_size, max_nesting, max_depth);
-    let decision = read_decision_document(text, &rules, &limits).or_raise(py)?;
+    let decision = if format == "yaml" {
+        cleanrules::format::read_yaml_decision_document(text, &rules, &limits)
+    } else {
+        read_decision_document(text, &rules, &limits)
+    }
+    .or_raise(py)?;
     Ok(to_string(&write_decision(&decision)))
 }
 

@@ -9,6 +9,7 @@
 //! global mutable state.
 
 mod convert;
+mod documents;
 mod errors;
 mod json_api;
 mod node;
@@ -44,6 +45,10 @@ fn _cleanrules(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<rules::PyDecision>()?;
     module.add_function(wrap_pyfunction!(rules::rule, module)?)?;
     module.add_function(wrap_pyfunction!(rules::ruleset, module)?)?;
+    module.add_function(wrap_pyfunction!(documents::load_document, module)?)?;
+    module.add_function(wrap_pyfunction!(documents::dump_condition, module)?)?;
+    module.add_function(wrap_pyfunction!(documents::dump_rule, module)?)?;
+    module.add_function(wrap_pyfunction!(documents::dump_ruleset, module)?)?;
     module.add_function(wrap_pyfunction!(trees::evaluate_condition, module)?)?;
     module.add_function(wrap_pyfunction!(trees::evaluate_value, module)?)?;
     module.add_function(wrap_pyfunction!(json_api::_read_document, module)?)?;

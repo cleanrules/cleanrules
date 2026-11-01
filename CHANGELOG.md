@@ -43,6 +43,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- YAML rule files (`spec/json-format.md`, *YAML*): the JSON subset of the YAML
+  1.2 core schema, one document, no directives, anchors, aliases or tags,
+  errors with line and column, and a 1 MiB default size limit of their own;
+  38 new conformance vectors. Rust core: the `yaml` feature (`cleanrules::yaml`
+  with `parse` and `to_string`, `format::read_yaml_document` and
+  `format::read_yaml_decision_document`), `Limits::max_yaml_size`, and
+  `read_parsed_document`/`read_parsed_decision_document` for documents already
+  parsed.
+- Python binding: `loads`, `load`, `dumps` and `dump` read and write
+  conditions, rules and rule sets as JSON or YAML documents, from strings,
+  bytes, paths or open files.
 - Python binding, safety: frames, tracebacks, code objects, generators,
   coroutines and functions in the data are opaque; a rule can no longer reach
   the program's globals or locals through them. Decisions in reference cycles

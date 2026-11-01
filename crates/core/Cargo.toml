@@ -18,6 +18,7 @@ workspace = true
 [dependencies]
 jiff = { version = "0.2.38", default-features = false, features = ["std", "tzdb-bundle-always"] }
 regex = "1.13.1"
+saphyr-parser = { version = "0.3.3", optional = true }
 thiserror = "2.0.21"
 
 [dev-dependencies]
@@ -31,3 +32,7 @@ harness = false
 [[bench]]
 name = "explain"
 harness = false
+
+[features]
+# YAML rule files (`spec/json-format.md`, *YAML*).
+yaml = ["dep:saphyr-parser"]

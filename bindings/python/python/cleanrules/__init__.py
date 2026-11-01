@@ -10,6 +10,7 @@ format and the conformance vectors with every other language.
 
 from cleanrules import errors
 from cleanrules._cleanrules import FORMAT_VERSION, __version__
+from cleanrules._documents import Format, dump, dumps, load, loads
 from cleanrules._expr import Closed, Const, Expr, F, Field, Kind, StructuralKey
 from cleanrules._rules import (
     Action,
@@ -70,6 +71,7 @@ __all__ = [
     "F",
     "Field",
     "FieldUsage",
+    "Format",
     "FormatError",
     "HitPolicy",
     "HitPolicyError",
@@ -94,7 +96,11 @@ __all__ = [
     "TypeMismatchError",
     "UnsupportedError",
     "__version__",
+    "dump",
+    "dumps",
     "errors",
     "evaluate_tree",
     "evaluate_value_tree",
+    "load",
+    "loads",
 ]

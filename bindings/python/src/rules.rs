@@ -32,8 +32,62 @@ pub(crate) struct PyRule {
     rule: Rule,
 }
 
+impl From<Rule> for PyRule {
+    fn from(rule: Rule) -> Self {
+        PyRule { rule }
+    }
+}
+
+impl PyRule {
+    pub(crate) fn rule(&self) -> &Rule {
+        &self.rule
+    }
+}
+
+impl PyRuleSet {
+    pub(crate) fn ruleset(&self) -> &RuleSet {
+        &self.ruleset
+    }
+}
+
 #[pymethods]
 impl PyRule {
+    /// The rule's name.
+    #[getter]
+    fn name(&self) -> &str {
+        self.rule.name()
+    }
+
+    /// The condition.
+    #[getter]
+    fn when(&self) -> PyNode {
+        PyNode {
+            node: self.rule.when().clone(),
+        }
+    }
+
+    /// The payload, in order.
+    #[getter]
+    fn then(&self) -> Vec<(String, PyNode)> {
+        self.rule
+            .then()
+            .iter()
+            .map(|(key, node)| (key.clone(), PyNode { node: node.clone() }))
+            .collect()
+    }
+
+    /// The priority.
+    #[getter]
+    fn priority(&self) -> i64 {
+        self.rule.get_priority()
+    }
+
+    /// The description, if any.
+    #[getter]
+    fn description(&self) -> Option<&str> {
+        self.rule.get_description()
+    }
+
     /// The rule's tags, in order.
     #[getter]
     fn tags(&self) -> Vec<String> {

@@ -9,7 +9,12 @@ mod rules;
 pub mod value;
 
 pub use condition::write_node;
-pub use document::{Document, read_decision_document, read_document, write_document};
+pub use document::{
+    Document, read_decision_document, read_document, read_parsed_decision_document,
+    read_parsed_document, write_document,
+};
+#[cfg(feature = "yaml")]
+pub use document::{read_yaml_decision_document, read_yaml_document};
 pub use explain::{write_explanation, write_summary};
 pub use result::{write_path, write_reason, write_result, write_truth};
 pub use rules::{write_decision, write_rule, write_ruleset};

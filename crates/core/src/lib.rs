@@ -18,6 +18,8 @@ pub mod json;
 pub mod logic;
 pub mod rules;
 pub mod value;
+#[cfg(feature = "yaml")]
+pub mod yaml;
 
 pub use error::{Context, Error, ErrorCode, Result, Segment};
 /// The date and time library whose types dates and datetimes use.

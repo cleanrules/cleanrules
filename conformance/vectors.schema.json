@@ -73,6 +73,9 @@
             "text": {
               "type": "string"
             },
+            "yaml": {
+              "type": "string"
+            },
             "document": {
               "type": "object"
             },
@@ -101,6 +104,11 @@
             {
               "required": [
                 "text"
+              ]
+            },
+            {
+              "required": [
+                "yaml"
               ]
             },
             {

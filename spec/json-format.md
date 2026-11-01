@@ -713,12 +713,53 @@ The format is stricter than the v1 API in a few deliberate ways:
 
 ## YAML
 
-*Not checked by vectors yet: YAML loading arrives in task D.1.*
+Rule files may also be written in YAML 1.2. A YAML document is read into
+exactly the JSON model above, and then read as that JSON document would be:
+same keys, same errors, same pointers, same limits. Mapping order is kept.
 
-Rule files in YAML (task D.1) are read into exactly this model, with the YAML
-1.2 core schema restricted to JSON: no implicit timestamps (an unquoted
-`2026-10-31` is a string, never a date), no `yes`/`no` booleans, no anchors or aliases,
-no tags, and mapping order kept.
+**What a YAML file may hold.** One document (an optional `---` start and `...`
+end), block and flow mappings and sequences, plain, single-quoted,
+double-quoted, literal (`|`) and folded (`>`) scalars, comments, and a byte
+order mark at the start, as YAML allows. Directives (`%YAML`, `%TAG`), anchors
+(`&a`), aliases (`*a`), tags (`!!str`, `!x`), more than one document, mapping
+keys that are not scalars, and raw control characters other than tab and line
+breaks (anywhere, quoted or not) are `format_error`s located at their line and
+column.
+
+**Scalars.** Quoted, literal and folded scalars are always strings. A plain
+scalar is resolved with the JSON subset of the YAML 1.2 core schema:
+
+| Plain scalar | Value |
+|---|---|
+| empty, `null` or `~` | null |
+| `true`, `false` | that boolean |
+| text in the JSON number syntax (`42`, `-0.5`, `1e-7`) | that number, an integer literal or a float by the JSON rules (*Values*) |
+| anything else | a string |
+
+So `yes`, `True`, `0x1F`, `.inf`, `1_000` and an unquoted `2026-10-31` are
+strings: dates are written `{"$date": "2026-10-31"}` as in JSON. A mapping key
+is always a string, the text of its scalar (`1: x` has the key `"1"`).
+
+**Errors and limits.** A syntax error, a forbidden construct or a duplicate key
+gives the 1-based line and column, in code points, of where it starts (`\r\n`,
+`\r` and `\n` are line breaks); every later error gives a JSON Pointer, as in
+JSON. YAML texts have their own size limit, **1 MiB** by default: YAML parsers
+hold a flow collection whole before reading it, so a large flow sequence costs
+far more memory than the same JSON. The caller can raise it like the others.
+The nesting limit counts mappings and sequences as JSON counts objects and
+arrays; flow collections, in addition, nest at most **255** deep
+(`limit_exceeded`), so deeper data is written in block style.
+
+**Writing.** The canonical YAML of a document is block style with two-space
+indentation: mapping keys in the document's order, written plain when they are
+made of ASCII letters, digits, `_`, `$`, `.` and `-`, start with a letter, `_`
+or `$`, and are not `null`, `true` or `false`, and as JSON strings otherwise; a
+key longer than 1024 characters as written (the most YAML allows for an
+implicit key) as an explicit key, `? key` and then `: value` on the next line;
+every string value as a JSON string (double quotes, JSON escapes, which YAML
+accepts); numbers, booleans and null as in canonical JSON; `[]` and `{}` for an
+empty sequence or mapping. Reading the canonical YAML of a document gives the
+same document.
 
 ## Errors and limits
 

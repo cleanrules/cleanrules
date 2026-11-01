@@ -465,7 +465,21 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
 
 ### Fase D. Reglas como datos · tamaño M
 
-- [ ] D.1 Carga y volcado JSON y YAML en el núcleo (todos los lenguajes la heredan).
+- [x] D.1 Carga y volcado JSON y YAML en el núcleo (todos los lenguajes la heredan).
+  - Hecho el 2026-11-01. Especificación primero: la sección *YAML* de `spec/json-format.md` precisa qué puede tener un fichero (un documento; nada de anclas, alias, etiquetas ni claves no escalares), cómo se resuelven los escalares planos (el subconjunto JSON del esquema central de YAML 1.2: `null`/`~`/vacío, `true`/`false`, la sintaxis numérica de JSON y, todo lo demás, texto), los errores con línea y columna y la forma canónica al escribir.
+  - Núcleo: la *feature* `yaml` (con `saphyr-parser` 0.3.3, aprobada por el autor; desactivada por defecto) añade el módulo `cleanrules::yaml` (`parse`, `to_string`, como `cleanrules::json`) y `format::{read_yaml_document, read_yaml_decision_document}`; `read_parsed_document` y `read_parsed_decision_document` leen documentos ya convertidos a JSON, así que YAML pasa por las mismas comprobaciones, punteros y límites que JSON.
+  - 32 vectores nuevos (`conformance/vectors/format/yaml.json`, campo `yaml` en los vectores de lectura, aditivo): escalares, estilos, claves, errores con posición, límites. Pasan en el núcleo y en Python; se comprobó con un lector alterado (`yes` como booleano) que fallan. CI compila y prueba con `--all-features`.
+  - Python: `loads`, `load`, `dumps` y `dump` (como el módulo `json`), en JSON o YAML (`load`/`dump` deducen el formato del sufijo). Devuelven `Expr`, `Rule` o `RuleSet` construidos con la API pública; las reglas con acción no se escriben salvo con `omit_actions=True` (`UnsupportedError` con el puntero de la acción). El runner de conformidad lee ahora los vectores de lectura con esta API pública.
+  - 4.398 tests de Python en 3.11, 3.14, 3.14t y 3.15t; clippy, pyright, ruff y la comprobación de Rust 1.95 limpios.
+  - Desviación: la lectura de decisiones sigue privada en Python (`_read_decision`), porque una `Decision` de Python se reconstruye evaluando su entrada; queda para cuando haga falta. El YAML canónico escribe todas las secuencias en bloque, también las rutas cortas.
+  - Revisión de la API (subagente `api-reviewer`), aplicada:
+    - Bloqueantes: (1) el YAML canónico no podía releer claves de más de 1.024 caracteres (el máximo de YAML para una clave implícita): ahora se escriben como clave explícita (`? clave`). (2) La comprobación de claves duplicadas era cuadrática (26 s para 160.000 claves): ahora usa un `HashSet`. (3) `saphyr-parser` guarda entera cada colección de estilo flujo antes de emitir eventos (un YAML de 15 MB llegaba a 1,9 GB): los textos YAML tienen su propio límite de tamaño, 1 MiB por defecto (`Limits::max_yaml_size`), que la especificación explica.
+    - Las directivas (`%YAML`, `%TAG`) y los caracteres de control sin escapar quedan prohibidos, con su posición; la marca de orden de bytes se admite, como en YAML; las colecciones de flujo anidadas más de 255 niveles dan `limit_exceeded`; las líneas cuentan `\r`, `\r\n` y `\n`. Los mensajes llevan pistas y el de claves duplicadas sigue al de JSON.
+    - Hypothesis encontró, al aplicar la revisión, que el escritor dejaba un DEL sin escapar, que el lector rechaza ya: el escritor escapa ahora todo carácter de control como `\uXXXX`.
+    - Vectores nuevos (38 en total de YAML): directiva, carácter de control, marca de orden de bytes, clave larga explícita, anidamiento de flujo y una decisión leída en YAML, que ambos runners leen ya con su rule set.
+    - Python: `load` y `dump` aceptan rutas y ficheros abiertos, como el módulo `json`; `loads` acepta `bytes`; `load` comprueba el tamaño antes de leer; un límite negativo es un `ValueError`.
+    - Nombres de Rust alineados con JSON; CI compila la *feature* por su nombre (`--features cleanrules/yaml`) en vez de todas.
+    - Ejemplo en `docs/examples/discounts.{yaml,json}`, que un test mantiene canónico.
 - [ ] D.2 DSL de texto (`IF ... THEN ...`, sintaxis alineada con `fuzzytool.rule_from_text`) con parser propio en Rust y errores con línea y columna.
 - [ ] D.3 Tablas de decisión con políticas DMN (la prioridad de los valores de salida se compila a prioridades de regla), desde filas, CSV o JSON.
 - [ ] D.4 Acciones por nombre registrado en cada binding (nunca rutas de importación leídas de un fichero).

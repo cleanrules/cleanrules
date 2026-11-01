@@ -60,8 +60,17 @@ fn format_error(pointer: &str, message: impl Into<String>) -> Error {
 /// `unsupported` for an output-only document and for content this version of the
 /// core does not read yet.
 pub fn read_document(text: &str, limits: &Limits) -> Result<Document> {
-    let json = parse(text, limits)?;
-    let (members, content) = envelope(&json)?;
+    read_parsed_document(&parse(text, limits)?, limits)
+}
+
+/// Read a document already parsed into JSON values, such as one read from YAML
+/// (`spec/json-format.md`, *YAML*): every check after parsing, in the same order.
+///
+/// # Errors
+///
+/// As [`read_document`], except syntax errors, which belong to the parser.
+pub fn read_parsed_document(json: &Json, limits: &Limits) -> Result<Document> {
+    let (members, content) = envelope(json)?;
     let get = |key: &str| members.iter().find(|(k, _)| k == key).map(|(_, v)| v);
     let check_top_level = || top_level(members, content);
     match content {
@@ -77,7 +86,7 @@ pub fn read_document(text: &str, limits: &Limits) -> Result<Document> {
             if node.is_null_constant() || node.kind() == Kind::Value {
                 return Err(Error::new(
                     ErrorCode::ExpressionError,
-                    format!("a {} is not a condition", node.tag()),
+                    format!("'{}' is not a condition", node.tag()),
                 )
                 .at_pointer("/condition"));
             }
@@ -172,8 +181,59 @@ pub fn read_decision_document<'a>(
     ruleset: &'a RuleSet,
     limits: &Limits,
 ) -> Result<Decision<'a>> {
-    let json = parse(text, limits)?;
-    let (members, content) = envelope(&json)?;
+    read_parsed_decision_document(&parse(text, limits)?, ruleset, limits)
+}
+
+/// Read a YAML document (`spec/json-format.md`, *YAML*): parsed by
+/// [`crate::yaml::parse`], then read as [`read_parsed_document`] reads JSON.
+///
+/// # Errors
+///
+/// As [`crate::yaml::parse`], then as [`read_parsed_document`].
+///
+/// # Examples
+///
+/// ```
+/// use cleanrules::format::{Document, read_yaml_document};
+/// use cleanrules::json::Limits;
+///
+/// let text = "version: 1\ncondition: {op: gt, left: {op: field, path: [age]}, right: {op: const, value: 17}}\n";
+/// let Document::Condition(node) = read_yaml_document(text, &Limits::default())? else {
+///     unreachable!()
+/// };
+/// assert_eq!(node.tag(), "gt");
+/// # Ok::<(), cleanrules::Error>(())
+/// ```
+#[cfg(feature = "yaml")]
+pub fn read_yaml_document(text: &str, limits: &Limits) -> Result<Document> {
+    read_parsed_document(&crate::yaml::parse(text, limits)?, limits)
+}
+
+/// Read a YAML decision document with its rule set.
+///
+/// # Errors
+///
+/// As [`crate::yaml::parse`], then as [`read_parsed_decision_document`].
+#[cfg(feature = "yaml")]
+pub fn read_yaml_decision_document<'a>(
+    text: &str,
+    ruleset: &'a RuleSet,
+    limits: &Limits,
+) -> Result<Decision<'a>> {
+    read_parsed_decision_document(&crate::yaml::parse(text, limits)?, ruleset, limits)
+}
+
+/// Read a decision document already parsed into JSON values, with its rule set.
+///
+/// # Errors
+///
+/// As [`read_decision_document`], except syntax errors.
+pub fn read_parsed_decision_document<'a>(
+    json: &Json,
+    ruleset: &'a RuleSet,
+    limits: &Limits,
+) -> Result<Decision<'a>> {
+    let (members, content) = envelope(json)?;
     if content != "decision" {
         return Err(format_error("", "this is not a decision document"));
     }

@@ -100,7 +100,11 @@ def check_read(vector: dict[str, Any]) -> list[str]:
     found: list[str] = []
     source = given.get("text")
     document = given.get("document")
-    if source is not None:
+    yaml = given.get("yaml")
+    if yaml is not None:
+        # YAML is not parsed here: only locations are checked against the text.
+        source, document = yaml, None
+    elif source is not None:
         try:
             document = json.loads(source)
         except ValueError:

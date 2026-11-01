@@ -288,19 +288,34 @@ def run_json(vector: dict[str, Any]) -> None:
     kind = given["kind"]
     if kind == "read":
         limits = {k: int(v) for k, v in given.get("limits", {}).items()}
-        text = given["text"] if "text" in given else dumps(given["document"])
+        if "text" in given:
+            text = given["text"]
+        elif "yaml" in given:
+            text = given["yaml"]
+        else:
+            text = dumps(given["document"])
         if "ruleset" in given:
 
             def decision() -> Any:
                 content = json.loads(
-                    _cleanrules._read_decision(dumps(given["ruleset"]), text, **limits)
+                    _cleanrules._read_decision(
+                        dumps(given["ruleset"]),
+                        text,
+                        "yaml" if "yaml" in given else "json",
+                        **limits,
+                    )
                 )  # pyright: ignore[reportPrivateUsage]
                 return {"version": 1, "decision": content}
 
             expect_result(decision, expect, "document", read=True)
         else:
+            # Read with the public API: the Python objects are rebuilt and written back.
+            fmt: Any = "yaml" if "yaml" in given else "json"
+            source = given.get("yaml", text)
             expect_result(
-                lambda: json.loads(_cleanrules._read_document(text, **limits)),  # pyright: ignore[reportPrivateUsage]
+                lambda: json.loads(
+                    cleanrules.dumps(cleanrules.loads(source, format=fmt, **limits))
+                ),
                 expect,
                 "document",
                 read=True,

@@ -50,6 +50,16 @@ cleanrules uses three-valued logic instead of guessing. Pass `strict=True` to
 `RuleSet` to raise a `MissingFieldError` instead. Conditions are data, so some
 Python idioms do not work on them; see the [common pitfalls](../../docs/pitfalls.md).
 
+Rules are data, so they can be written to and read from JSON or YAML files,
+which every language reads the same way:
+
+```python
+import cleanrules
+
+cleanrules.dump(rules, "pricing.yaml")
+rules = cleanrules.load("pricing.yaml")
+```
+
 To evaluate one condition and see every step, use `evaluate_tree`:
 
 ```python

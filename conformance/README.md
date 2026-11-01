@@ -48,7 +48,7 @@ A vector file is a JSON document:
 
 | Kind | Given | Runner calls | Expected |
 |---|---|---|---|
-| `read` | `text` (a JSON text, for lexical cases) or `document`; `ruleset` when reading a decision; optional `limits` (`max_size` in bytes, `max_nesting`, `max_depth`) | the document reader | `document`: the canonical form that is read back, or `error` |
+| `read` | `text` (a JSON text, for lexical cases), `yaml` (a YAML text, `json-format.md`, *YAML*) or `document`; `ruleset` when reading a decision; optional `limits` (`max_size` in bytes, `max_nesting`, `max_depth`) | the document reader | `document`: the canonical form that is read back, or `error` |
 | `condition` | `condition` (a condition node), `input` (a data value), optional `logic` and `strict` | `evaluate_tree` (`spec/ast.md`, *Evaluating one node*) | `result`: its result tree, or `error` |
 | `value` | `value` (a value node), `input`, optional `strict` | `evaluate_value_tree` | `result`: its result tree, or `error` |
 | `evaluate` | `ruleset` (a rule set document's content), and `input` or `inputs` (a batch) | `evaluate`, or its batch form | `decision`, or `decisions` for a batch, or `error` |

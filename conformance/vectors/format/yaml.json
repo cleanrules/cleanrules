@@ -1,0 +1,1039 @@
+{
+  "version": 1,
+  "area": "format",
+  "vectors": [
+    {
+      "id": "format/yaml/block-ruleset",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A rule set in block style reads as the same JSON document",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\nruleset:\n  hit_policy: priority\n  rules:\n    - name: vip\n      when:\n        op: gt\n        left: {op: field, path: [customer, years]}\n        right: {op: const, value: 5}\n      then:\n        discount: {op: const, value: {$decimal: \"0.15\"}}\n      priority: 10\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  }
+                },
+                "priority": 10
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/unquoted-date-is-a-string",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "An unquoted 2026-10-31 is a string, never a date",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: 2026-10-31\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": "2026-10-31"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/yes-is-a-string",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "yes is a string, not a boolean",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: yes\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": "yes"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/capitalized-true-is-a-string",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "Only lowercase true and false are booleans",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: True\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": "True"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/true-is-a-boolean",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "true is a boolean",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: true\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/integer",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A plain integer in JSON syntax is an integer",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: 42\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 42
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/float-with-exponent",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A plain number with an exponent is a float",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: 1e-7\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 1e-07
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/negative-float",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A plain negative decimal fraction is a float",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: -0.5\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": -0.5
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/hex-is-a-string",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "0x1F is not in the JSON number syntax, so it is a string",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: 0x1F\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": "0x1F"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/underscores-is-a-string",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "1_000 is not in the JSON number syntax, so it is a string",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: 1_000\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": "1_000"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/infinity-is-a-string",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": ".inf is not in the JSON number syntax, so it is a string",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: .inf\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": ".inf"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/plus-sign-is-a-string",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "+1 is not in the JSON number syntax, so it is a string",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: +1\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": "+1"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/leading-zero-is-a-string",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "01 is not in the JSON number syntax, so it is a string",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: 01\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": "01"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/quoted-number-is-a-string",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A quoted scalar is always a string",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: \"42\"\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": "42"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/single-quoted-is-a-string",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A single-quoted scalar is a string",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: 'true'\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": "true"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/typed-value",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "Typed values are written with their $-keys, as in JSON",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: eq\n  left: {op: field, path: [x]}\n  right:\n    op: const\n    value: {$date: \"2026-10-31\"}\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$date": "2026-10-31"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/flow-style",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "Flow mappings and sequences read like block ones",
+      "given": {
+        "kind": "read",
+        "yaml": "{version: 1, condition: {op: gt, left: {op: field, path: [a, 0]}, right: {op: const, value: 1}}}\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "field",
+              "path": [
+                "a",
+                0
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/literal-block-scalar",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A literal block scalar is a string",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: matches\n  operand: {op: field, path: [email]}\n  pattern: |-\n    ^[a-z]+@\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "matches",
+            "operand": {
+              "op": "field",
+              "path": [
+                "email"
+              ]
+            },
+            "pattern": "^[a-z]+@"
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/comments-and-markers",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "Comments and the document start and end markers are allowed",
+      "given": {
+        "kind": "read",
+        "yaml": "# a rule file\n---\nversion: 1  # the format version\ncondition: {op: const, value: true}\n...\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "const",
+            "value": true
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/numeric-key-is-a-string",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A mapping key is the text of its scalar, so 1: x has the key \"1\"",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\nrule:\n  name: r\n  when: {op: field, path: [ok]}\n  metadata:\n    1: one\n    true: yes\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "field",
+              "path": [
+                "ok"
+              ]
+            },
+            "metadata": {
+              "1": "one",
+              "true": "yes"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/empty-plain-is-null",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "An empty plain scalar is null",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: is_null\n  operand:\n    op: const\n    value:\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "is_null",
+            "operand": {
+              "op": "const",
+              "value": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/anchor",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "Anchors are not allowed",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition: &c {op: const, value: true}\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 12
+        }
+      }
+    },
+    {
+      "id": "format/yaml/alias",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "Anchors and aliases are not allowed; the anchor an alias needs is found first",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\nx: &a 1\ncondition: *a\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 4
+        }
+      }
+    },
+    {
+      "id": "format/yaml/tag",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "Tags are not allowed",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition: {op: const, value: !!str 42}\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 31
+        }
+      }
+    },
+    {
+      "id": "format/yaml/two-documents",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A rule file holds one document",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition: {op: const, value: true}\n---\nversion: 1\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 3,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/yaml/duplicate-key",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A duplicate key is located at its second occurrence",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition: {op: const, value: true}\nversion: 1\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 3,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/yaml/sequence-key",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A mapping key must be a scalar",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\n? [a, b]\n: 1\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 3
+        }
+      }
+    },
+    {
+      "id": "format/yaml/unknown-key-has-a-pointer",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "After parsing, errors have JSON Pointers as in JSON",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition:\n  op: const\n  value: true\n  note: x\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/note"
+        }
+      }
+    },
+    {
+      "id": "format/yaml/date-is-not-a-version",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "An unquoted date is a string, so as a version it is unsupported",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 2026-10-31\ncondition: {op: const, value: true}\n"
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported_version",
+          "pointer": "/version"
+        }
+      }
+    },
+    {
+      "id": "format/yaml/nesting-limit",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "Mappings and sequences count against the nesting limit",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition: {op: const, value: [[1]]}\n",
+        "limits": {
+          "max_nesting": 3
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "line": 2,
+          "column": 32
+        }
+      }
+    },
+    {
+      "id": "format/yaml/size-limit",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "The size limit counts the bytes of the YAML text",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition: {op: const, value: true}\n",
+        "limits": {
+          "max_size": 20
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded"
+        }
+      }
+    },
+    {
+      "id": "format/yaml/empty-text",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A text without a document is an error",
+      "given": {
+        "kind": "read",
+        "yaml": "# nothing here\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/yaml/directive",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "Directives such as %YAML are not allowed",
+      "given": {
+        "kind": "read",
+        "yaml": "%YAML 1.1\n---\nversion: 1\ncondition: {op: const, value: true}\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/yaml/control-character",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "Raw control characters are rejected, even in quoted scalars",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition: {op: eq, left: {op: field, path: [a]}, right: {op: const, value: \"x\u0007y\"}}\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 79
+        }
+      }
+    },
+    {
+      "id": "format/yaml/byte-order-mark",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A byte order mark at the start is allowed, as YAML allows it",
+      "given": {
+        "kind": "read",
+        "yaml": "﻿version: 1\ncondition: {op: const, value: true}\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "const",
+            "value": true
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/explicit-long-key",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A key longer than 1024 characters is written as an explicit key and reads back",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\nrule:\n  name: r\n  when: {op: field, path: [ok]}\n  metadata:\n    ? kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk\n    : 1\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "field",
+              "path": [
+                "ok"
+              ]
+            },
+            "metadata": {
+              "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/yaml/flow-nesting",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "Flow collections nest at most 255 deep",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition: {op: const, value: [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}\n",
+        "limits": {
+          "max_nesting": 1000
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded"
+        }
+      }
+    },
+    {
+      "id": "format/yaml/decision",
+      "spec": [
+        "json-format.md#yaml"
+      ],
+      "description": "A decision document in YAML is read with its rule set, as in JSON",
+      "given": {
+        "kind": "read",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        },
+        "yaml": "{\"version\": 1, \"decision\": {\"hit_policy\": \"first\", \"logic\": \"boolean\", \"results\": [{\"rule\": \"a\", \"fired\": true, \"when\": {\"op\": \"gt\", \"truth\": true, \"children\": [{\"op\": \"field\", \"path\": [\"x\"], \"value\": 2}, {\"op\": \"const\", \"value\": 1}]}, \"then\": {\"y\": {\"op\": \"const\", \"value\": 1}}}, {\"rule\": \"b\", \"fired\": false, \"when\": {\"op\": \"gt\", \"truth\": false, \"children\": [{\"op\": \"field\", \"path\": [\"x\"], \"value\": 2}, {\"op\": \"const\", \"value\": 5}]}}], \"selected\": [\"a\"]}}\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

@@ -22,5 +22,5 @@ doctest = false
 workspace = true
 
 [dependencies]
-cleanrules = { path = "../../crates/core" }
+cleanrules = { path = "../../crates/core", features = ["yaml"] }
 pyo3 = { version = "0.30.1", features = ["abi3-py311", "abi3t-py315"] }

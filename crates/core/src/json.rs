@@ -109,6 +109,9 @@ pub struct Limits {
     pub max_nesting: usize,
     /// The deepest condition or payload value, in nodes (used by document readers).
     pub max_depth: usize,
+    /// The largest YAML text, in bytes: lower than `max_size`, because the YAML
+    /// parser holds a flow collection whole before reading it.
+    pub max_yaml_size: usize,
 }
 
 impl Default for Limits {
@@ -117,6 +120,7 @@ impl Default for Limits {
             max_size: 16 * 1024 * 1024,
             max_nesting: 1024,
             max_depth: 256,
+            max_yaml_size: 1024 * 1024,
         }
     }
 }
