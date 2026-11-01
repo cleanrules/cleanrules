@@ -640,6 +640,10 @@ impl<L: Logic> Evaluator<'_, '_, L> {
                 (Value::List(list), Segment::Index(index)) => {
                     usize::try_from(*index).ok().and_then(|i| list.get(i))
                 }
+                // A record's entries also have positions; a plain map has none.
+                (Value::Map(map), Segment::Index(index)) => {
+                    usize::try_from(*index).ok().and_then(|i| map.get_index(i))
+                }
                 _ => None,
             };
             let Some(value) = next else {
@@ -983,6 +987,37 @@ mod tests {
         let (code, at) = failing(&node, &input("a", Value::String("x".into())));
         assert_eq!(code, ErrorCode::TypeMismatch);
         assert_eq!(at, node);
+    }
+
+    #[test]
+    fn records_are_read_by_key_and_by_position() {
+        use crate::Segment;
+        use crate::ast::Node;
+
+        let mut row = Map::record();
+        row.insert("name", Value::String("ana".into()));
+        row.insert("age", Value::Int(30));
+        let mut plain = Map::new();
+        plain.insert("age", Value::Int(30));
+        let data = |map: Map| input("row", Value::Map(map));
+        let by_position = Node::compare(
+            crate::ast::CompareOp::Gt,
+            Node::field(vec![Segment::Key("row".into()), Segment::Index(1)]).unwrap(),
+            Node::constant(Value::Int(18)).unwrap(),
+        )
+        .unwrap();
+        let truth = |map| {
+            evaluate_tree(&by_position, &data(map), &Kleene, Options::default())
+                .unwrap()
+                .truth()
+        };
+        assert_eq!(truth(row.clone()), Some(Truth::True));
+        // An integer segment never reads a plain map, nor beyond the record.
+        assert_eq!(truth(plain), Some(Truth::Unknown));
+        let beyond = Node::field(vec![Segment::Key("row".into()), Segment::Index(2)]).unwrap();
+        let result =
+            super::evaluate_value_tree(&beyond, &data(row), &Kleene, Options::default()).unwrap();
+        assert_eq!(result.reason.unwrap().code, ReasonCode::MissingField);
     }
 
     #[test]

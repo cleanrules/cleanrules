@@ -422,7 +422,16 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
     - Python recibe `node` como `Expr` (también al deserializar con pickle) y lo muestra en el mensaje (`…, in \`F.a > 1\``); `operation` y `reason` pasan tal cual.
     - Rendimiento medido con criterion contra el código anterior en las mismas condiciones: sin cambio en `evaluate/one/first` ni en `batch_1000/first`. Un primer intento que clonaba las mitades de `between` costaba un 5 %, y se descartó.
     - Desviación: `decision` en `action_error` llega con las acciones (D.4), porque hasta entonces nadie lanza ese error.
-- [ ] C.3 Conversión de datos (dicts, dataclasses, Pydantic, namedtuples, filas de pandas, numpy) a `Value`, con las reglas de seguridad de `spec/data-model.md`.
+- C.3 Conversión de datos (dicts, dataclasses, Pydantic, namedtuples, filas de pandas, numpy) a `Value`, con las reglas de seguridad de `spec/data-model.md`. Se divide en dos subtareas:
+  - [x] C.3a Lectura dispersa de datos nativos: solo las rutas que lee el rule set, cada objeto una vez, registros, objetos, reglas de seguridad, `read_error` encadenado y objetos opacos devueltos.
+    - Hecho el 2026-11-01: `src/read.rs`. Al construir un rule set se forma el árbol de las rutas que leen sus condiciones y cargas (del `summary` del núcleo); cada entrada se recorre por ese árbol y el núcleo recibe un árbol de valores disperso. Donde termina una ruta, el valor se convierte entero (con límite de profundidad y detección de ciclos).
+    - Formas: mapas (`Mapping`, sin llamar nunca a `__missing__`), registros (namedtuples y objetos con `keys()`, como las filas de pandas), secuencias (índices `0 <= i < len`, nunca en cadenas ni mapas) y objetos (atributos públicos de datos, propiedades incluidas; dataclasses, attrs y Pydantic dan sus campos al convertirse enteros). Nunca un nombre privado, un método, una clase, un módulo ni un atributo de un escalar o de una secuencia.
+    - Un getter que lanza da un nulo con `read_error`, salvo `AttributeError`, que es ausente; en modo estricto, el `EvaluationError` lleva como `__cause__` la excepción original (también en lotes).
+    - Los valores opacos guardan su objeto nativo y vuelven en las salidas y explicaciones como el mismo objeto.
+    - Núcleo: los registros, mapas cuyas entradas tienen posición (`Map::record`, `get_index`); un segmento entero lee la posición en un registro y nunca en un mapa normal (`spec/ast.md`).
+    - 231 tests en 3.11, 3.14 y 3.14t (14 nuevos de lectura, uno por regla de la especificación); clippy, pyright y ruff limpios.
+    - Desviación: las listas dispersas solo llegan hasta el último índice leído (nadie lee su longitud). La pista de `missing_field` con las claves disponibles queda para más adelante.
+  - [ ] C.3b numpy y pandas (escalares de numpy, `datetime64`, `NaT`, `pandas.NA`, arrays como listas), y tests con numpy, pandas, Pydantic y attrs instalados (dependencias de desarrollo que hay que aprobar).
 - [ ] C.4 `run` y acciones en Python; pickle; tipos (`.pyi`).
 - [ ] C.5 Runner de conformidad en Python.
 

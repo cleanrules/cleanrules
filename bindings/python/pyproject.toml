@@ -57,7 +57,7 @@ pythonVersion = "3.11"
 extend = "../../ruff.toml"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D101", "D103"]
+"tests/**" = ["D101", "D102", "D103"]
 
 [dependency-groups]
 dev = [

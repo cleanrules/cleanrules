@@ -100,9 +100,14 @@ impl fmt::Display for Group {
 }
 
 /// A map with string keys, kept in insertion order, without duplicate keys.
+///
+/// A **record** is a map whose entries also have positions, such as a Python
+/// namedtuple or a pandas row: an integer segment reads the entry at that
+/// position (`spec/ast.md`, *Reading data*).
 #[derive(Clone, Debug, Default)]
 pub struct Map {
     entries: Vec<(String, Value)>,
+    record: bool,
 }
 
 impl Map {
@@ -110,6 +115,31 @@ impl Map {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// An empty record: its entries' positions are their insertion order.
+    #[must_use]
+    pub fn record() -> Self {
+        Self {
+            entries: Vec::new(),
+            record: true,
+        }
+    }
+
+    /// Whether the map is a record.
+    #[must_use]
+    pub fn is_record(&self) -> bool {
+        self.record
+    }
+
+    /// For a record, the value at a position; never for a plain map.
+    #[must_use]
+    pub fn get_index(&self, index: usize) -> Option<&Value> {
+        if self.record {
+            self.entries.get(index).map(|(_, v)| v)
+        } else {
+            None
+        }
     }
 
     /// Insert a value, replacing the one under the same key in place.

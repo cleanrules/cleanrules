@@ -4,10 +4,9 @@ The Python binding of [cleanrules](https://github.com/cleanrules/cleanrules), an
 explainable rules engine with one Rust core and the same semantics in Rust,
 C/C++, Python, JavaScript, Java/Scala, Go and Erlang.
 
-> **Pre-alpha.** Nothing is published yet. Input data is converted whole for
-> now (dicts, lists and scalars); other objects in the input are opaque, and an
-> opaque value in an output comes back as `None`. Reading objects, dataclasses
-> and pandas rows (giving opaque objects back), actions and loading rules from
+> **Pre-alpha.** Nothing is published yet. Input data can be dicts, lists,
+> dataclasses, namedtuples, pandas rows and other objects: only the fields the
+> rules read are read. numpy and pandas scalars, actions and loading rules from
 > files come next in the roadmap.
 
 ```python

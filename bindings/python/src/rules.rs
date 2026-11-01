@@ -14,7 +14,7 @@ use cleanrules::format::{write_decision, write_explanation, write_summary};
 use cleanrules::json::to_string;
 use cleanrules::logic::{LogicName, Truth};
 use cleanrules::rules::{Aggregate, Aggregated, Config, Decision, HitPolicy, Rule, RuleSet};
-use cleanrules::{Error, Map, Value};
+use cleanrules::{Error, ErrorCode, Map, Value};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDelta, PyDict, PyList, PyTuple};
@@ -23,6 +23,7 @@ use crate::convert;
 use crate::errors::path_to_py;
 use crate::errors::{self, IntoPyResult, to_py};
 use crate::node::PyNode;
+use crate::read::{Native, Paths, read};
 
 /// A rule of the core, immutable.
 #[pyclass(frozen, name = "Rule", module = "cleanrules._cleanrules")]
@@ -92,6 +93,8 @@ pub(crate) fn rule(
 #[pyclass(frozen, name = "RuleSet", module = "cleanrules._cleanrules")]
 pub(crate) struct PyRuleSet {
     ruleset: Arc<RuleSet>,
+    /// The paths its conditions and payloads read: the only ones read in data.
+    paths: Paths,
 }
 
 /// A rule set from its rules and configuration, by the names of the format.
@@ -122,8 +125,10 @@ pub(crate) fn ruleset(
     };
     let rules = rules.iter().map(|r| r.get().rule.clone()).collect();
     let ruleset = RuleSet::new(rules, config).or_raise(py)?;
+    let paths = Paths::new(summary(&ruleset).fields.iter().map(|f| f.path.as_slice()));
     Ok(PyRuleSet {
         ruleset: Arc::new(ruleset),
+        paths,
     })
 }
 
@@ -131,10 +136,12 @@ pub(crate) fn ruleset(
 impl PyRuleSet {
     /// Evaluate one input.
     fn evaluate(&self, py: Python<'_>, data: &Bound<'_, PyAny>) -> PyResult<PyDecision> {
-        let input = convert::data(data)?;
+        let native = read(data, &self.paths)?;
         // The core does not touch Python objects: other threads may run meanwhile.
-        let decision = py.detach(|| self.ruleset.evaluate(&input)).or_raise(py)?;
-        Ok(PyDecision::new(&self.ruleset, &decision, input))
+        let decision = py
+            .detach(|| self.ruleset.evaluate(&native.value))
+            .map_err(|error| chained(py, &error, &native))?;
+        Ok(PyDecision::new(&self.ruleset, &decision, native))
     }
 
     /// Evaluate a batch: errors name the input's position (`row`).
@@ -144,17 +151,24 @@ impl PyRuleSet {
         py: Python<'_>,
         data: Vec<Bound<'_, PyAny>>,
     ) -> PyResult<Vec<PyDecision>> {
-        let inputs = data
+        let natives = data
             .iter()
-            .map(convert::data)
+            .map(|item| read(item, &self.paths))
             .collect::<PyResult<Vec<_>>>()?;
+        let inputs: Vec<Value> = natives.iter().map(|n| n.value.clone()).collect();
         let decisions = py
             .detach(|| self.ruleset.evaluate_many(&inputs))
-            .or_raise(py)?;
+            .map_err(|error| {
+                let row = error.context().row.and_then(|r| usize::try_from(r).ok());
+                match row.and_then(|r| natives.get(r)) {
+                    Some(native) => chained(py, &error, native),
+                    None => to_py(py, &error),
+                }
+            })?;
         Ok(decisions
             .iter()
-            .zip(inputs)
-            .map(|(decision, input)| PyDecision::new(&self.ruleset, decision, input))
+            .zip(natives)
+            .map(|(decision, native)| PyDecision::new(&self.ruleset, decision, native))
             .collect())
     }
 
@@ -162,6 +176,19 @@ impl PyRuleSet {
     fn summary_json(&self) -> String {
         to_string(&write_summary(&summary(&self.ruleset)))
     }
+}
+
+/// The Python exception of a core error; a `read_error` in strict mode is
+/// chained to the exception that reading the data raised (`spec/ast.md`).
+fn chained(py: Python<'_>, error: &Error, native: &Native) -> PyErr {
+    let raised = to_py(py, error);
+    if error.code() == ErrorCode::EvaluationError
+        && let Some(path) = &error.context().path
+        && let Some((_, cause)) = native.errors.iter().find(|(at, _)| at == path)
+    {
+        raised.set_cause(py, Some(cause.clone_ref(py)));
+    }
+    raised
 }
 
 /// What a rule's result says, read at once.
@@ -176,6 +203,8 @@ struct RuleOutcome {
 pub(crate) struct PyDecision {
     ruleset: Arc<RuleSet>,
     input: Value,
+    /// The native objects of the input's opaque values, given back in outputs.
+    objects: Vec<Py<PyAny>>,
     outcomes: Vec<RuleOutcome>,
     selected: Vec<usize>,
     output: Result<Option<Value>, Error>,
@@ -192,7 +221,7 @@ fn truth_name(truth: Option<Truth>) -> &'static str {
 }
 
 impl PyDecision {
-    fn new(ruleset: &Arc<RuleSet>, decision: &Decision<'_>, input: Value) -> Self {
+    fn new(ruleset: &Arc<RuleSet>, decision: &Decision<'_>, native: Native) -> Self {
         let outcomes = decision
             .results()
             .iter()
@@ -217,7 +246,8 @@ impl PyDecision {
         };
         Self {
             ruleset: Arc::clone(ruleset),
-            input,
+            input: native.value,
+            objects: native.objects,
             outcomes,
             selected,
             output: decision.output(),
@@ -231,10 +261,14 @@ impl PyDecision {
     }
 }
 
-fn pairs_to_dict<'py>(py: Python<'py>, pairs: &[(String, Value)]) -> PyResult<Bound<'py, PyDict>> {
+fn pairs_to_dict<'py>(
+    py: Python<'py>,
+    pairs: &[(String, Value)],
+    objects: &[Py<PyAny>],
+) -> PyResult<Bound<'py, PyDict>> {
     let dict = PyDict::new(py);
     for (key, value) in pairs {
-        dict.set_item(key, convert::to_py(py, value)?)?;
+        dict.set_item(key, convert::to_py_with(py, value, objects)?)?;
     }
     Ok(dict)
 }
@@ -246,7 +280,7 @@ impl PyDecision {
         let list = PyList::empty(py);
         for outcome in &self.outcomes {
             let output = match &outcome.output {
-                Some(pairs) => pairs_to_dict(py, pairs)?.into_any(),
+                Some(pairs) => pairs_to_dict(py, pairs, &self.objects)?.into_any(),
                 None => py.None().into_bound(py),
             };
             list.append((outcome.fired, outcome.truth, output))?;
@@ -262,7 +296,7 @@ impl PyDecision {
     /// The single output, or `None`; raises for multi-hit decisions.
     fn output<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         match &self.output {
-            Ok(Some(value)) => convert::to_py(py, value),
+            Ok(Some(value)) => convert::to_py_with(py, value, &self.objects),
             Ok(None) => Ok(py.None().into_bound(py)),
             Err(error) => Err(to_py(py, error)),
         }
@@ -272,7 +306,7 @@ impl PyDecision {
     /// selected.
     fn aggregated<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         match &self.aggregated {
-            Some(map) => convert::to_py(py, &Value::Map(map.clone())),
+            Some(map) => convert::to_py_with(py, &Value::Map(map.clone()), &self.objects),
             None => Ok(py.None().into_bound(py)),
         }
     }
@@ -302,7 +336,10 @@ impl PyDecision {
                 None => dict.set_item("note", py.None())?,
             }
             dict.set_item("achievable", entry.achievable)?;
-            dict.set_item("requirement", requirement_to_py(py, &entry.requirement)?)?;
+            dict.set_item(
+                "requirement",
+                requirement_to_py(py, &entry.requirement, &self.objects)?,
+            )?;
             list.append(dict)?;
         }
         Ok(list)
@@ -318,9 +355,10 @@ impl PyDecision {
 fn requirement_to_py<'py>(
     py: Python<'py>,
     requirement: &Requirement<'_, '_>,
+    objects: &[Py<PyAny>],
 ) -> PyResult<Bound<'py, PyDict>> {
     match requirement {
-        Requirement::Cause(cause) => cause_to_py(py, cause),
+        Requirement::Cause(cause) => cause_to_py(py, cause, objects),
         Requirement::Group(kind, items) => {
             let dict = PyDict::new(py);
             let name = if *kind == GroupKind::All {
@@ -331,7 +369,7 @@ fn requirement_to_py<'py>(
             dict.set_item("kind", name)?;
             let list = PyList::empty(py);
             for item in items {
-                list.append(requirement_to_py(py, item)?)?;
+                list.append(requirement_to_py(py, item, objects)?)?;
             }
             dict.set_item("items", list)?;
             Ok(dict)
@@ -339,7 +377,11 @@ fn requirement_to_py<'py>(
     }
 }
 
-fn cause_to_py<'py>(py: Python<'py>, cause: &Cause<'_, '_>) -> PyResult<Bound<'py, PyDict>> {
+fn cause_to_py<'py>(
+    py: Python<'py>,
+    cause: &Cause<'_, '_>,
+    objects: &[Py<PyAny>],
+) -> PyResult<Bound<'py, PyDict>> {
     let dict = PyDict::new(py);
     dict.set_item("kind", "cause")?;
     let node: &cleanrules::ast::Node = &cause.result.node;
@@ -349,7 +391,10 @@ fn cause_to_py<'py>(py: Python<'py>, cause: &Cause<'_, '_>) -> PyResult<Bound<'p
     dict.set_item("holds", cause.holds())?;
     let values = PyList::empty(py);
     for (path, value) in &cause.values {
-        values.append((path_to_py(py, path)?.to_tuple(), convert::to_py(py, value)?))?;
+        values.append((
+            path_to_py(py, path)?.to_tuple(),
+            convert::to_py_with(py, value, objects)?,
+        ))?;
     }
     dict.set_item("values", values)?;
     match cause.reason() {
@@ -375,7 +420,7 @@ fn cause_to_py<'py>(py: Python<'py>, cause: &Cause<'_, '_>) -> PyResult<Bound<'p
     match &cause.counterfactual {
         Some(counterfactual) => {
             let gap = match &counterfactual.gap {
-                Some(Gap::Number(value)) => convert::to_py(py, value)?,
+                Some(Gap::Number(value)) => convert::to_py_with(py, value, objects)?,
                 Some(Gap::Days(days)) => {
                     PyDelta::new(py, i32::try_from(*days)?, 0, 0, true)?.into_any()
                 }
@@ -398,7 +443,7 @@ fn cause_to_py<'py>(py: Python<'py>, cause: &Cause<'_, '_>) -> PyResult<Bound<'p
                 (
                     path_to_py(py, &counterfactual.path)?.to_tuple(),
                     counterfactual.op.tag(),
-                    convert::to_py(py, &counterfactual.target)?,
+                    convert::to_py_with(py, &counterfactual.target, objects)?,
                     gap,
                 ),
             )?;

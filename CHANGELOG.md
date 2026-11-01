@@ -43,6 +43,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- Python binding: input data is read as `spec/data-model.md` says: only the
+  paths a rule set reads, each object once; mappings, records (namedtuples,
+  objects with `keys()` such as pandas rows), sequences and objects' public
+  data attributes (dataclasses, attrs, Pydantic, properties), never private
+  names, methods, classes or modules. A getter that raises gives `read_error`,
+  and strict mode chains the original exception. Opaque values come back as
+  the same object.
+- Rust core: records, maps whose entries also have positions (`Map::record`),
+  read by key and by position.
 - Errors carry the context fields `node` (the operand that broke a
   construction rule, or the innermost node whose evaluation failed),
   `operation` and `reason` (`spec/errors.md`), in the Rust core and in Python,

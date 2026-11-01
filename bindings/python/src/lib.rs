@@ -11,6 +11,7 @@
 mod convert;
 mod errors;
 mod node;
+mod read;
 mod rules;
 
 use pyo3::prelude::*;
