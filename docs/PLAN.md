@@ -322,6 +322,20 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - Los registros (mapas con posiciones, como namedtuples y filas de pandas) aún no existen como `Value`; llegan con el binding de Python (C.3).
       - El JSON de los valores de verdad solo existe para Kleene; las lógicas difusas lo añadirán en la fase J.
 - [ ] B.7 Reglas, rule sets, políticas DMN, payloads, agregados y `Decision`.
+  - Se divide en:
+  - [x] B.7a Reglas, rule sets, las 6 políticas, payloads, agregados, lotes y `Decision`, con sus documentos JSON (reglas y rule sets en lectura y escritura, decisiones en escritura).
+    - Hecho el 2026-11-01: `cleanrules::rules` y `format::{read_ruleset, write_rule, write_ruleset, write_decision}`.
+      - Mismo orden que la v1:
+        1. todas las condiciones;
+        2. con `any`, los payloads de las reglas que dispararon;
+        3. la selección, donde `unique` lanza su error;
+        4. los payloads de las reglas seleccionadas;
+        5. la igualdad de `any`;
+        6. el agregado.
+      - `sum` sigue la aritmética de Python: el entero es exacto hasta que aparece un float, y si algún valor es decimal todos pasan a float.
+      - `Aggregated` es un enum, en lugar de `Option<Option<Map>>`.
+      - El runner pasa **los 302 vectores de evaluación** a la primera, 1.628 en total. El test de lectura pasa los de reglas y rule sets, 178 en total. Se comprobó con expectativas alteradas que los runners las detectan.
+  - [ ] B.7b Lectura de decisiones con su rule set y las 8 comprobaciones de `decision_mismatch` (vectores `format/decisions`).
 - [ ] B.8 `explain` (requisitos `all`/`any`, De Morgan, fusión y absorción, validación de opciones con apariciones vinculadas, contrafactuales) y `summary`.
 - [ ] B.9 Runner de conformidad en Rust y tests de propiedades con `proptest` (leyes lógicas, De Morgan, suficiencia de las explicaciones).
 - [ ] B.10 Benchmarks con `criterion` (evaluación por lote, explicación), comparados con zen-engine.

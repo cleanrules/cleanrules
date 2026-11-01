@@ -12,7 +12,7 @@ use cleanrules::format::{read_document, write_document};
 use cleanrules::json::{Json, Limits, parse, to_string};
 use common::{get, int, limits_of, same, text, vectors};
 
-const NOT_YET: [&str; 3] = ["rule", "ruleset", "decision"];
+const NOT_YET: [&str; 1] = ["decision"];
 
 #[test]
 fn read_vectors() {
@@ -22,6 +22,9 @@ fn read_vectors() {
         "format/values.json",
         "format/conditions.json",
         "format/limits.json",
+        "format/rules.json",
+        "format/rulesets.json",
+        "format/decisions.json",
     ] {
         let all = vectors(file);
         let Json::Array(list) = &all else { panic!() };
@@ -39,7 +42,7 @@ fn read_vectors() {
                 let keys: Vec<&str> = members.iter().map(|(k, _)| k.as_str()).collect();
                 let contents: Vec<&&str> = keys
                     .iter()
-                    .filter(|k| NOT_YET.contains(k) || **k == "condition")
+                    .filter(|k| NOT_YET.contains(k) || ["condition", "rule", "ruleset"].contains(k))
                     .collect();
                 if contents.len() == 1 && NOT_YET.contains(contents[0]) {
                     skipped += 1;

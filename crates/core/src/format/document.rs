@@ -4,7 +4,11 @@ use crate::FORMAT_VERSION;
 use crate::ast::{Kind, Node};
 use crate::error::{Error, ErrorCode, Result};
 use crate::format::condition::{build, shape, write_node};
+use crate::format::rules::{
+    build_rule, build_ruleset, shape_rule, shape_ruleset, write_rule, write_ruleset,
+};
 use crate::json::{Json, JsonNumber, Limits, parse, pointer_token};
+use crate::rules::{Rule, RuleSet};
 
 /// The content keys a document may have, in the order of the spec.
 const CONTENT_KEYS: [&str; 6] = [
@@ -22,6 +26,10 @@ const CONTENT_KEYS: [&str; 6] = [
 pub enum Document {
     /// A condition.
     Condition(Node),
+    /// A rule.
+    Rule(Rule),
+    /// A rule set.
+    RuleSet(RuleSet),
 }
 
 impl Document {
@@ -30,6 +38,7 @@ impl Document {
     pub fn into_condition(self) -> Option<Node> {
         match self {
             Document::Condition(node) => Some(node),
+            _ => None,
         }
     }
 }
@@ -116,6 +125,16 @@ pub fn read_document(text: &str, limits: &Limits) -> Result<Document> {
             }
             Ok(Document::Condition(node))
         }
+        "rule" => {
+            let raw = shape_rule(get("rule").unwrap_or(&Json::Null), "/rule", limits)?;
+            check_top_level()?;
+            Ok(Document::Rule(build_rule(raw)?))
+        }
+        "ruleset" => {
+            let raw = shape_ruleset(get("ruleset").unwrap_or(&Json::Null), "/ruleset", limits)?;
+            check_top_level()?;
+            Ok(Document::RuleSet(build_ruleset(raw)?))
+        }
         "explanation" | "summary" => {
             check_top_level()?;
             Err(Error::new(
@@ -138,6 +157,14 @@ pub fn write_document(document: &Document) -> Json {
         Document::Condition(node) => Json::Object(vec![
             ("version".into(), version),
             ("condition".into(), write_node(node)),
+        ]),
+        Document::Rule(rule) => Json::Object(vec![
+            ("version".into(), version),
+            ("rule".into(), write_rule(rule)),
+        ]),
+        Document::RuleSet(ruleset) => Json::Object(vec![
+            ("version".into(), version),
+            ("ruleset".into(), write_ruleset(ruleset)),
         ]),
     }
 }

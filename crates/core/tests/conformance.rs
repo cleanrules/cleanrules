@@ -14,7 +14,9 @@ use std::fs;
 
 use cleanrules::Error;
 use cleanrules::eval::{Options, evaluate_tree, evaluate_value_tree};
-use cleanrules::format::{ValueContext, read_node, read_value, write_path, write_result};
+use cleanrules::format::{
+    ValueContext, read_node, read_ruleset, read_value, write_decision, write_path, write_result,
+};
 use cleanrules::json::{Json, Limits, parse, to_string};
 use cleanrules::logic::Kleene;
 use common::{get, same, text, vector_files};
@@ -55,6 +57,14 @@ fn error_json(error: &Error) -> Json {
             .collect();
         members.push(("types".into(), Json::Array(types)));
     }
+    if !context.rules.is_empty() {
+        let rules = context
+            .rules
+            .iter()
+            .map(|r| Json::String(r.clone()))
+            .collect();
+        members.push(("rules".into(), Json::Array(rules)));
+    }
     if let Some(row) = context.row {
         members.push((
             "row".into(),
@@ -74,9 +84,77 @@ fn same_error(actual: &Json, expected: &Json) -> bool {
             .all(|(k, v)| a.iter().any(|(l, w)| l == k && same(w, v)))
 }
 
+fn compare(actual: Result<Json, Error>, expect: &Json, key: &str) -> Result<(), String> {
+    match (actual, get(expect, "error")) {
+        (Ok(json), None) => {
+            let actual = strip_detail(&json);
+            let wanted = strip_detail(get(expect, key).unwrap());
+            if same(&actual, &wanted) {
+                Ok(())
+            } else {
+                Err(format!(
+                    "got {}\nwant {}",
+                    to_string(&actual),
+                    to_string(&wanted)
+                ))
+            }
+        }
+        (Ok(json), Some(error)) => Err(format!(
+            "got {}, expected the error {}",
+            to_string(&json),
+            to_string(error)
+        )),
+        (Err(error), None) => Err(format!(
+            "unexpected error {}: {error}",
+            to_string(&error_json(&error))
+        )),
+        (Err(error), Some(wanted)) => {
+            let actual = error_json(&error);
+            if same_error(&actual, wanted) {
+                Ok(())
+            } else {
+                Err(format!(
+                    "got the error {}, expected {}",
+                    to_string(&actual),
+                    to_string(wanted)
+                ))
+            }
+        }
+    }
+}
+
+fn run_evaluate(vector: &Json) -> Result<(), String> {
+    let given = get(vector, "given").unwrap();
+    let limits = Limits::default();
+    let ruleset = read_ruleset(get(given, "ruleset").unwrap(), "/ruleset", &limits)
+        .map_err(|e| format!("reading the rule set: {e} at {:?}", e.context().pointer))?;
+    let expect = get(vector, "expect").unwrap();
+    if let Some(Json::Array(items)) = get(given, "inputs") {
+        let inputs = items
+            .iter()
+            .map(|i| read_value(i, "/inputs", ValueContext::Data))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("reading the inputs: {e}"))?;
+        let actual = ruleset
+            .evaluate_many(&inputs)
+            .map(|decisions| Json::Array(decisions.iter().map(write_decision).collect()));
+        return compare(actual, expect, "decisions");
+    }
+    let input = read_value(get(given, "input").unwrap(), "/input", ValueContext::Data)
+        .map_err(|e| format!("reading the input: {e}"))?;
+    compare(
+        ruleset.evaluate(&input).map(|d| write_decision(&d)),
+        expect,
+        "decision",
+    )
+}
+
 fn run(vector: &Json) -> Result<(), String> {
     let given = get(vector, "given").unwrap();
     let kind = text(get(given, "kind")).unwrap();
+    if kind == "evaluate" {
+        return run_evaluate(vector);
+    }
     let limits = Limits::default();
     let node_key = if kind == "condition" {
         "condition"
@@ -147,7 +225,7 @@ fn conformance_vectors() {
         };
         for vector in vectors {
             let kind = text(get(get(vector, "given").unwrap(), "kind")).unwrap();
-            if !matches!(kind, "condition" | "value") {
+            if !matches!(kind, "condition" | "value" | "evaluate") {
                 *pending.entry(kind.to_owned()).or_default() += 1;
                 continue;
             }

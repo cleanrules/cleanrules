@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- `cleanrules::rules`: rules, rule sets, the six hit policies, payloads,
+  aggregates, batches and decisions; rule and rule set documents, and decisions
+  written in JSON. The conformance runner passes all 302 evaluation vectors.
 - `cleanrules::eval`: the evaluator, generic over the logic, with result
   trees, structured reasons, exact comparisons, 64-bit overflow, and strict
   mode; result trees in JSON (`format::write_result`). The core's conformance
