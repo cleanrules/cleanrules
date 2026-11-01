@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- `cleanrules::logic`: the `Logic` trait, Kleene's three-valued logic
+  registered as `"boolean"`, and lookup by name with `registry_error`.
 - `cleanrules::build`: idiomatic Rust construction of conditions, with
   methods for comparisons and tests, operators for connectives and arithmetic,
   and the first construction error reported by `.build()`.

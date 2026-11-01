@@ -13,6 +13,7 @@ pub mod build;
 mod error;
 pub mod format;
 pub mod json;
+pub mod logic;
 pub mod value;
 
 pub use error::{Context, Error, ErrorCode, Result, Segment};

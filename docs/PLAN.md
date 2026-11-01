@@ -305,7 +305,12 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
     - `Build` arrastra el primer error, por la izquierda, y se comprueba una vez con `.build()?`.
     - Conversiones desde `bool`, enteros, `f64` (NaN es un error), texto, `Decimal` y fechas de `jiff`.
     - Sin macros, porque no aportaban.
-- [ ] B.5 Lógicas: `Logic` (trait), Kleene, registro por nombre y capacidad `Graded`.
+- [x] B.5 Lógicas: `Logic` (trait), Kleene, registro por nombre y capacidad `Graded`.
+  - Hecho el 2026-11-01: `cleanrules::logic`.
+    - El trait `Logic` tiene un tipo de verdad asociado, las conectivas, la lectura de un dato como condición y la prueba de activación.
+    - `Kleene` está registrada como `"boolean"`. `LogicName::from_name` devuelve `registry_error` con el nombre y los disponibles.
+    - Las tablas de la especificación y las leyes (De Morgan, doble negación, asociatividad, distributividad) se prueban de forma exhaustiva sobre las 27 combinaciones.
+    - Desviación: la capacidad `Graded` se define en la fase J, con su primera lógica difusa, en lugar de dejar ahora un trait vacío.
 - [ ] B.6 Evaluador: lectura de `Value` por rutas, nulos, tipos, aritmética (float64, desbordamiento de 64 bits, `Decimal`), todos los nodos, árbol de resultados con `Reason`, modo estricto y orden de errores.
 - [ ] B.7 Reglas, rule sets, políticas DMN, payloads, agregados y `Decision`.
 - [ ] B.8 `explain` (requisitos `all`/`any`, De Morgan, fusión y absorción, validación de opciones con apariciones vinculadas, contrafactuales) y `summary`.
