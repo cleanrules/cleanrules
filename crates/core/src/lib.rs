@@ -9,6 +9,7 @@
 //! condition AST, the evaluator, rules and rule sets, and explanations.
 
 mod error;
+pub mod json;
 pub mod value;
 
 pub use error::{Context, Error, ErrorCode, Result, Segment};

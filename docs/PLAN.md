@@ -271,7 +271,15 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - La conversión de decimal a float pasa por el texto canónico, porque el lector de floats de Rust redondea correctamente.
       - Queda para B.8 la resta exacta de decimales para los contrafactuales.
       - La revisión de la API pública del crate se hará al final de la fase B, antes de la v0.1, porque hasta entonces cambiará mucho.
-  - [ ] B.2b Lector JSON propio (el autor lo prefirió a `serde_json`): posiciones en puntos de código, claves duplicadas, enteros exactos, floats con redondeo correcto, límites de tamaño y anidamiento.
+  - [x] B.2b Lector JSON propio (el autor lo prefirió a `serde_json`): posiciones en puntos de código, claves duplicadas, enteros exactos, floats con redondeo correcto, límites de tamaño y anidamiento.
+    - Hecho el 2026-11-01: `cleanrules::json`.
+      - Lector iterativo, con pila explícita, que conserva el orden de las claves y el texto de cada número.
+      - Rechaza claves duplicadas, surrogates sueltos, BOM y UTF-8 inválido.
+      - Da posiciones en puntos de código y aplica los límites de tamaño y anidamiento.
+      - `Json` se destruye de forma iterativa, así que ni la lectura ni la destrucción desbordan la pila; se probó con 200.000 niveles.
+      - El escritor es compacto.
+      - `Error` va en una `Box`, para que `Result` ocupe un puntero.
+      - Los tests de integración leen los 2.135 vectores con el propio lector y pasan los 12 vectores léxicos de `format/`.
   - [ ] B.2c Lectura y escritura de valores en JSON (`$int`, `$float`, `$decimal`, `$date`, `$datetime` con zonas, `$map`, `$opaque`), contra los vectores de `format/values`.
 - [ ] B.3 AST con serde: los 14 tipos de nodo y sus validaciones al construir, identidad estructural, `field_paths`, `Display` legible.
 - [ ] B.4 API de construcción idiomática en Rust (constructores y sobrecarga de operadores donde tenga sentido; macros solo si aportan).

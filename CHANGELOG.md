@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- `cleanrules::json`: a strict JSON reader and writer that keeps member order
+  and number literals, rejects duplicate keys, lone surrogates and byte order
+  marks, reports errors by line and column in code points, enforces size and
+  nesting limits, and never overflows the stack.
 - Core value model: `Value` (null with a reason, booleans, ints, floats,
   38-digit decimals, strings, dates, naive and aware datetimes, lists, maps,
   opaque values), exact comparison across ints, floats and decimals, type

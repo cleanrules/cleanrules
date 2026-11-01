@@ -150,15 +150,18 @@ pub struct Context {
     pub executed: Vec<String>,
 }
 
-/// An error of cleanrules.
-#[derive(Debug, thiserror::Error)]
-#[error("{message}")]
+/// An error of cleanrules. It is boxed, so a `Result` stays one pointer wide.
+#[derive(Debug)]
 pub struct Error {
+    inner: Box<Inner>,
+}
+
+#[derive(Debug)]
+struct Inner {
     code: ErrorCode,
     message: String,
     hint: Option<String>,
     context: Context,
-    #[source]
     source: Option<Box<dyn std::error::Error + Send + Sync>>,
 }
 
@@ -167,72 +170,94 @@ impl Error {
     #[must_use]
     pub fn new(code: ErrorCode, message: impl Into<String>) -> Self {
         Self {
-            code,
-            message: message.into(),
-            hint: None,
-            context: Context::default(),
-            source: None,
+            inner: Box::new(Inner {
+                code,
+                message: message.into(),
+                hint: None,
+                context: Context::default(),
+                source: None,
+            }),
         }
     }
 
     /// Add a hint: how to fix it.
     #[must_use]
     pub fn with_hint(mut self, hint: impl Into<String>) -> Self {
-        self.hint = Some(hint.into());
+        self.inner.hint = Some(hint.into());
         self
     }
 
     /// Set the context.
     #[must_use]
     pub fn with_context(mut self, context: Context) -> Self {
-        self.context = context;
+        self.inner.context = context;
         self
     }
 
     /// Set the JSON Pointer.
     #[must_use]
     pub fn at_pointer(mut self, pointer: impl Into<String>) -> Self {
-        self.context.pointer = Some(pointer.into());
+        self.inner.context.pointer = Some(pointer.into());
         self
     }
 
     /// Set the 1-based line and column.
     #[must_use]
     pub fn at_position(mut self, line: u64, column: u64) -> Self {
-        self.context.line = Some(line);
-        self.context.column = Some(column);
+        self.inner.context.line = Some(line);
+        self.inner.context.column = Some(column);
         self
     }
 
     /// Keep the error that caused this one.
     #[must_use]
     pub fn caused_by(mut self, source: impl std::error::Error + Send + Sync + 'static) -> Self {
-        self.source = Some(Box::new(source));
+        self.inner.source = Some(Box::new(source));
         self
     }
 
     /// The stable code.
     #[must_use]
     pub fn code(&self) -> ErrorCode {
-        self.code
+        self.inner.code
     }
 
     /// The message.
     #[must_use]
     pub fn message(&self) -> &str {
-        &self.message
+        &self.inner.message
     }
 
     /// The hint, if any.
     #[must_use]
     pub fn hint(&self) -> Option<&str> {
-        self.hint.as_deref()
+        self.inner.hint.as_deref()
     }
 
     /// The context.
     #[must_use]
     pub fn context(&self) -> &Context {
-        &self.context
+        &self.inner.context
+    }
+
+    /// The context, to fill in.
+    pub fn context_mut(&mut self) -> &mut Context {
+        &mut self.inner.context
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.inner.message)
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.inner
+            .source
+            .as_deref()
+            .map(|e| e as &(dyn std::error::Error + 'static))
     }
 }
 
