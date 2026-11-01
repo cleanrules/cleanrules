@@ -299,7 +299,12 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - El `Display` de las condiciones se deja para la sintaxis del DSL (D.2), que también fijará el texto de `explain()`.
       - El lector de nodos es recursivo hasta `max_depth` (256 por defecto). Si alguien sube mucho ese límite, necesitará más pila; se revisará antes de la v0.1.
       - Sigue pendiente exponer la versión de la base de zonas horarias.
-- [ ] B.4 API de construcción idiomática en Rust (constructores y sobrecarga de operadores donde tenga sentido; macros solo si aportan).
+- [x] B.4 API de construcción idiomática en Rust (constructores y sobrecarga de operadores donde tenga sentido; macros solo si aportan).
+  - Hecho el 2026-11-01: `cleanrules::build`. Por ejemplo, `(field("customer").get("years").gt(5) & field("order").get("total").gt(1000)).build()?`.
+    - Comparaciones y tests como métodos (`gt`, `is_in`, `between`, `matches`…), porque Rust no deja sobrecargar `<` y `>` para construir nodos. Conectivas y aritmética como operadores (`&`, `|`, `!`, `+`, `-`, `*`, `/` y el menos unario).
+    - `Build` arrastra el primer error, por la izquierda, y se comprueba una vez con `.build()?`.
+    - Conversiones desde `bool`, enteros, `f64` (NaN es un error), texto, `Decimal` y fechas de `jiff`.
+    - Sin macros, porque no aportaban.
 - [ ] B.5 Lógicas: `Logic` (trait), Kleene, registro por nombre y capacidad `Graded`.
 - [ ] B.6 Evaluador: lectura de `Value` por rutas, nulos, tipos, aritmética (float64, desbordamiento de 64 bits, `Decimal`), todos los nodos, árbol de resultados con `Reason`, modo estricto y orden de errores.
 - [ ] B.7 Reglas, rule sets, políticas DMN, payloads, agregados y `Decision`.

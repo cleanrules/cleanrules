@@ -24,6 +24,16 @@ pub enum Document {
     Condition(Node),
 }
 
+impl Document {
+    /// The condition, if the document holds one.
+    #[must_use]
+    pub fn into_condition(self) -> Option<Node> {
+        match self {
+            Document::Condition(node) => Some(node),
+        }
+    }
+}
+
 fn format_error(pointer: &str, message: impl Into<String>) -> Error {
     Error::new(ErrorCode::FormatError, message).at_pointer(pointer)
 }

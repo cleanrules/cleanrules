@@ -9,6 +9,7 @@
 //! condition AST, the evaluator, rules and rule sets, and explanations.
 
 pub mod ast;
+pub mod build;
 mod error;
 pub mod format;
 pub mod json;
