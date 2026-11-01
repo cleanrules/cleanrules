@@ -1,108 +1,113 @@
-//! Reading documents against the `read` conformance vectors.
-//!
-//! Vectors whose document holds a rule, a rule set or a decision wait for the
-//! readers of later tasks; every other vector of these files runs.
+//! Reading documents against the `read` conformance vectors: conditions, rules,
+//! rule sets, and decisions read with their rule set.
 
 // A test: a panic is the failure report.
 #![allow(clippy::unwrap_used, clippy::panic)]
 
 mod common;
 
-use cleanrules::format::{read_document, write_document};
-use cleanrules::json::{Json, Limits, parse, to_string};
+use cleanrules::Error;
+use cleanrules::format::{
+    read_decision_document, read_document, read_ruleset, write_decision, write_document,
+};
+use cleanrules::json::{Json, JsonNumber, Limits, to_string};
 use common::{get, int, limits_of, same, text, vectors};
 
-const NOT_YET: [&str; 1] = ["decision"];
+const FILES: [&str; 7] = [
+    "format/documents.json",
+    "format/values.json",
+    "format/conditions.json",
+    "format/limits.json",
+    "format/rules.json",
+    "format/rulesets.json",
+    "format/decisions.json",
+];
+
+/// Read the vector's document, as a decision when a rule set is given.
+fn read(given: &Json, source: &str) -> Result<Json, Error> {
+    match get(given, "ruleset") {
+        Some(ruleset_json) => {
+            let ruleset = read_ruleset(ruleset_json, "/ruleset", &Limits::default()).unwrap();
+            read_decision_document(source, &ruleset, &limits_of(given)).map(|decision| {
+                Json::Object(vec![
+                    (
+                        "version".into(),
+                        Json::Number(JsonNumber::from_literal("1")),
+                    ),
+                    ("decision".into(), write_decision(&decision)),
+                ])
+            })
+        }
+        None => read_document(source, &limits_of(given)).map(|d| write_document(&d)),
+    }
+}
+
+fn check(vector: &Json) -> Option<String> {
+    let given = get(vector, "given").unwrap();
+    let source = match (text(get(given, "text")), get(given, "document")) {
+        (Some(source), _) => source.to_owned(),
+        (None, Some(document)) => to_string(document),
+        _ => panic!("nothing given"),
+    };
+    let expect = get(vector, "expect").unwrap();
+    match (read(given, &source), get(expect, "error")) {
+        (Ok(written), None) => {
+            let wanted = get(expect, "document").unwrap();
+            (!same(&written, wanted)).then(|| {
+                format!(
+                    "wrote {}, expected {}",
+                    to_string(&written),
+                    to_string(wanted)
+                )
+            })
+        }
+        (Ok(written), Some(error)) => Some(format!(
+            "read {}, expected {}",
+            to_string(&written),
+            to_string(error)
+        )),
+        (Err(error), None) => Some(format!(
+            "{} at {:?}: {error}",
+            error.code(),
+            error.context()
+        )),
+        (Err(error), Some(wanted)) => {
+            let context = error.context();
+            let ok = error.code().as_str() == text(get(wanted, "code")).unwrap()
+                && (get(wanted, "pointer").is_none()
+                    || context.pointer.as_deref() == text(get(wanted, "pointer")))
+                && (get(wanted, "line").is_none() || context.line == int(get(wanted, "line")))
+                && (get(wanted, "column").is_none()
+                    || context.column == int(get(wanted, "column")));
+            (!ok).then(|| {
+                format!(
+                    "got {} pointer={:?} line={:?} column={:?} ({error}), expected {}",
+                    error.code(),
+                    context.pointer,
+                    context.line,
+                    context.column,
+                    to_string(wanted)
+                )
+            })
+        }
+    }
+}
 
 #[test]
 fn read_vectors() {
-    let (mut run, mut skipped, mut failures) = (0, 0, Vec::new());
-    for file in [
-        "format/documents.json",
-        "format/values.json",
-        "format/conditions.json",
-        "format/limits.json",
-        "format/rules.json",
-        "format/rulesets.json",
-        "format/decisions.json",
-    ] {
+    let (mut run, mut failures) = (0, Vec::new());
+    for file in FILES {
         let all = vectors(file);
         let Json::Array(list) = &all else { panic!() };
         for vector in list {
-            let id = text(get(vector, "id")).unwrap();
-            let given = get(vector, "given").unwrap();
-            let source = match (text(get(given, "text")), get(given, "document")) {
-                (Some(source), _) => source.to_owned(),
-                (None, Some(document)) => to_string(document),
-                _ => panic!("{id}: nothing given"),
-            };
-            if let Ok(parsed) = parse(&source, &Limits::default())
-                && let Json::Object(members) = &parsed
-            {
-                let keys: Vec<&str> = members.iter().map(|(k, _)| k.as_str()).collect();
-                let contents: Vec<&&str> = keys
-                    .iter()
-                    .filter(|k| NOT_YET.contains(k) || ["condition", "rule", "ruleset"].contains(k))
-                    .collect();
-                if contents.len() == 1 && NOT_YET.contains(contents[0]) {
-                    skipped += 1;
-                    continue;
-                }
-            }
             run += 1;
-            let expect = get(vector, "expect").unwrap();
-            let problem = match (
-                read_document(&source, &limits_of(given)),
-                get(expect, "error"),
-            ) {
-                (Ok(document), None) => {
-                    let wanted = get(expect, "document").unwrap();
-                    let written = write_document(&document);
-                    (!same(&written, wanted)).then(|| {
-                        format!(
-                            "wrote {}, expected {}",
-                            to_string(&written),
-                            to_string(wanted)
-                        )
-                    })
-                }
-                (Ok(document), Some(error)) => Some(format!(
-                    "read {}, expected {}",
-                    to_string(&write_document(&document)),
-                    to_string(error)
-                )),
-                (Err(error), None) => Some(format!(
-                    "{} at {:?}: {error}",
-                    error.code(),
-                    error.context()
-                )),
-                (Err(error), Some(wanted)) => {
-                    let context = error.context();
-                    let ok = error.code().as_str() == text(get(wanted, "code")).unwrap()
-                        && (get(wanted, "pointer").is_none()
-                            || context.pointer.as_deref() == text(get(wanted, "pointer")))
-                        && (get(wanted, "line").is_none()
-                            || context.line == int(get(wanted, "line")))
-                        && (get(wanted, "column").is_none()
-                            || context.column == int(get(wanted, "column")));
-                    (!ok).then(|| {
-                        format!(
-                            "got {} pointer={:?} line={:?} column={:?} ({error}), expected {}",
-                            error.code(),
-                            context.pointer,
-                            context.line,
-                            context.column,
-                            to_string(wanted)
-                        )
-                    })
-                }
-            };
-            if let Some(problem) = problem {
-                failures.push(format!("{id}: {problem}"));
+            if let Some(problem) = check(vector) {
+                failures.push(format!("{}: {problem}", text(get(vector, "id")).unwrap()));
             }
         }
     }
-    println!("{run} read vectors run, {skipped} waiting for later readers");
+    println!("{run} read vectors run");
+    assert!(run >= 187, "only {run} read vectors");
     assert!(
         failures.is_empty(),
         "{} of {run} failed:\n{}",

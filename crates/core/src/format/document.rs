@@ -4,11 +4,12 @@ use crate::FORMAT_VERSION;
 use crate::ast::{Kind, Node};
 use crate::error::{Error, ErrorCode, Result};
 use crate::format::condition::{build, shape, write_node};
+use crate::format::decision::read_decision;
 use crate::format::rules::{
     build_rule, build_ruleset, shape_rule, shape_ruleset, write_rule, write_ruleset,
 };
 use crate::json::{Json, JsonNumber, Limits, parse, pointer_token};
-use crate::rules::{Rule, RuleSet};
+use crate::rules::{Decision, Rule, RuleSet};
 
 /// The content keys a document may have, in the order of the spec.
 const CONTENT_KEYS: [&str; 6] = [
@@ -60,53 +61,10 @@ fn format_error(pointer: &str, message: impl Into<String>) -> Error {
 /// core does not read yet.
 pub fn read_document(text: &str, limits: &Limits) -> Result<Document> {
     let json = parse(text, limits)?;
-    let Json::Object(members) = &json else {
-        return Err(format_error("", "a document is a JSON object"));
-    };
+    let (members, content) = envelope(&json)?;
     let get = |key: &str| members.iter().find(|(k, _)| k == key).map(|(_, v)| v);
-    let version_ok = match get("version") {
-        Some(Json::Number(n)) => {
-            n.is_integer_literal() && n.as_i128() == Some(i128::from(FORMAT_VERSION))
-        }
-        _ => false,
-    };
-    if !version_ok {
-        return Err(Error::new(
-            ErrorCode::UnsupportedVersion,
-            format!("this reader knows format version {FORMAT_VERSION}"),
-        )
-        .at_pointer("/version"));
-    }
-    let present: Vec<&str> = CONTENT_KEYS
-        .iter()
-        .copied()
-        .filter(|k| get(k).is_some())
-        .collect();
-    let [content] = present.as_slice() else {
-        return Err(format_error(
-            "",
-            format!("a document has exactly one of {}", CONTENT_KEYS.join(", ")),
-        ));
-    };
-    let check_top_level = || -> Result<()> {
-        if let Some(schema) = get("$schema")
-            && !matches!(schema, Json::String(_))
-        {
-            return Err(format_error("/$schema", "\"$schema\" must be a string"));
-        }
-        match members
-            .iter()
-            .find(|(k, _)| !matches!(k.as_str(), "version" | "$schema") && k != content)
-        {
-            Some((key, _)) => Err(format_error(
-                &format!("/{}", pointer_token(key)),
-                format!("unknown key {key:?}"),
-            )
-            .with_hint("it may come from a newer version of cleanrules")),
-            None => Ok(()),
-        }
-    };
-    match *content {
+    let check_top_level = || top_level(members, content);
+    match content {
         "condition" => {
             let raw = shape(
                 get("condition").unwrap_or(&Json::Null),
@@ -147,6 +105,88 @@ pub fn read_document(text: &str, limits: &Limits) -> Result<Document> {
             format!("{other} documents are not read yet"),
         )),
     }
+}
+
+/// Steps 1 and 2 of reading (`spec/json-format.md`, *Errors and limits*): a JSON
+/// object with a known `version` and exactly one content key.
+fn envelope(json: &Json) -> Result<(&[(String, Json)], &'static str)> {
+    let Json::Object(members) = json else {
+        return Err(format_error("", "a document is a JSON object"));
+    };
+    let get = |key: &str| members.iter().find(|(k, _)| k == key).map(|(_, v)| v);
+    let version_ok = match get("version") {
+        Some(Json::Number(n)) => {
+            n.is_integer_literal() && n.as_i128() == Some(i128::from(FORMAT_VERSION))
+        }
+        _ => false,
+    };
+    if !version_ok {
+        return Err(Error::new(
+            ErrorCode::UnsupportedVersion,
+            format!("this reader knows format version {FORMAT_VERSION}"),
+        )
+        .at_pointer("/version"));
+    }
+    let present: Vec<&'static str> = CONTENT_KEYS
+        .iter()
+        .copied()
+        .filter(|k| get(k).is_some())
+        .collect();
+    let [content] = present.as_slice() else {
+        return Err(format_error(
+            "",
+            format!("a document has exactly one of {}", CONTENT_KEYS.join(", ")),
+        ));
+    };
+    Ok((members, content))
+}
+
+/// The top-level keys besides the content: `$schema` a string, nothing unknown.
+fn top_level(members: &[(String, Json)], content: &str) -> Result<()> {
+    if let Some((_, schema)) = members.iter().find(|(k, _)| k == "$schema")
+        && !matches!(schema, Json::String(_))
+    {
+        return Err(format_error("/$schema", "\"$schema\" must be a string"));
+    }
+    match members
+        .iter()
+        .find(|(k, _)| !matches!(k.as_str(), "version" | "$schema") && k != content)
+    {
+        Some((key, _)) => Err(format_error(
+            &format!("/{}", pointer_token(key)),
+            format!("unknown key {key:?}"),
+        )
+        .with_hint("it may come from a newer version of cleanrules")),
+        None => Ok(()),
+    }
+}
+
+/// Read a decision document with the rule set that produced it
+/// (`spec/json-format.md`, *Reading a decision*).
+///
+/// # Errors
+///
+/// As [`read_document`], then `decision_mismatch` for the first failed check.
+pub fn read_decision_document<'a>(
+    text: &str,
+    ruleset: &'a RuleSet,
+    limits: &Limits,
+) -> Result<Decision<'a>> {
+    let json = parse(text, limits)?;
+    let (members, content) = envelope(&json)?;
+    if content != "decision" {
+        return Err(format_error("", "this is not a decision document"));
+    }
+    let null = Json::Null;
+    let decision = members
+        .iter()
+        .find(|(k, _)| k == "decision")
+        .map_or(&null, |(_, v)| v);
+    // The shape of the content comes before unknown top-level keys; reading the
+    // decision checks both shape and consistency, so the order is kept by checking
+    // the top level when the content's shape is valid.
+    top_level(members, content)?;
+    read_decision(decision, "/decision", ruleset, limits.max_depth)
 }
 
 /// Write a document in canonical form.

@@ -748,6 +748,118 @@ impl<L: Logic> Evaluator<'_, '_, L> {
     }
 }
 
+/// Recompute a result from its children's results, as evaluation would
+/// (`spec/json-format.md`, *Reading a decision*, check 5). Leaves (a field or
+/// constant in a value position) are taken as they are.
+///
+/// # Errors
+///
+/// `expression_error` when the result's shape does not fit its node; callers
+/// check shapes first.
+pub(crate) fn recompute<L: Logic>(
+    logic: &L,
+    result: &Evaluated<'_, L::Truth>,
+) -> Result<(Outcome<L::Truth>, Option<Reason>)> {
+    let null = Value::Null(NullCause::Null);
+    let evaluator = Evaluator {
+        input: &null,
+        logic,
+        options: Options::default(),
+    };
+    let node: &Node = &result.node;
+    let children = &result.children;
+    let child = |i: usize| {
+        children
+            .get(i)
+            .ok_or_else(|| Error::new(ErrorCode::ExpressionError, "a result lacks a child"))
+    };
+    let truth_of = |c: &Evaluated<'_, L::Truth>| c.truth().unwrap_or_else(|| logic.unknown());
+    if let Outcome::Value(_) = result.outcome {
+        return match node.expr() {
+            Expr::Field(_) | Expr::Const(_) => Ok((result.outcome.clone(), result.reason.clone())),
+            Expr::Arith { op, .. } => {
+                let (value, reason) = evaluator.arith(node, *op, child(0)?, child(1)?)?;
+                Ok((Outcome::Value(value), reason))
+            }
+            _ => {
+                let (value, reason) = evaluator.unary(node, child(0)?)?;
+                Ok((Outcome::Value(value), reason))
+            }
+        };
+    }
+    let connective = |truth: L::Truth| {
+        let reason = if logic.is_unknown(truth) {
+            children
+                .iter()
+                .find(|c| c.truth().is_some_and(|t| logic.is_unknown(t)))
+                .and_then(|c| c.reason.clone())
+        } else {
+            None
+        };
+        (Outcome::Truth(truth), reason)
+    };
+    Ok(match node.expr() {
+        Expr::And(_) => connective(logic.all(&children.iter().map(truth_of).collect::<Vec<_>>())),
+        Expr::Or(_) => connective(logic.any(&children.iter().map(truth_of).collect::<Vec<_>>())),
+        Expr::Not(_) => connective(logic.not(truth_of(child(0)?))),
+        Expr::Between { .. } => connective(logic.and(truth_of(child(0)?), truth_of(child(1)?))),
+        Expr::Field(path) => {
+            let value = child(0)?;
+            let read = value
+                .value()
+                .cloned()
+                .unwrap_or(Value::Null(NullCause::Null));
+            match logic.value_truth(&read) {
+                Ok(Some(truth)) => (Outcome::Truth(truth), None),
+                Ok(None) => (Outcome::Truth(logic.unknown()), value.reason.clone()),
+                Err(group) => {
+                    let mut reason = Reason::new(ReasonCode::TypeMismatch, vec![path.clone()]);
+                    reason.types = vec![group, Group::Boolean];
+                    (Outcome::Truth(logic.unknown()), Some(reason))
+                }
+            }
+        }
+        Expr::Const(_) => {
+            let value = child(0)?;
+            let read = value
+                .value()
+                .cloned()
+                .unwrap_or(Value::Null(NullCause::Null));
+            match logic.value_truth(&read) {
+                Ok(Some(truth)) => (Outcome::Truth(truth), None),
+                Ok(None) => (Outcome::Truth(logic.unknown()), value.reason.clone()),
+                Err(group) => {
+                    let mut reason = Reason::new(ReasonCode::TypeMismatch, Vec::new());
+                    reason.types = vec![group, Group::Boolean];
+                    (Outcome::Truth(logic.unknown()), Some(reason))
+                }
+            }
+        }
+        Expr::Compare { op, .. } => {
+            let (truth, reason) = evaluator.compare_values(node, *op, child(0)?, child(1)?)?;
+            (Outcome::Truth(truth), reason)
+        }
+        Expr::In { values, .. } => {
+            let (truth, reason) = evaluator.member(node, child(0)?, values)?;
+            (Outcome::Truth(truth), reason)
+        }
+        Expr::IsNull(_) => {
+            let is_null = child(0)?.value().is_none_or(Value::is_null);
+            (Outcome::Truth(logic.truth(is_null)), None)
+        }
+        Expr::Matches { .. } | Expr::StringTest { .. } => {
+            let (truth, reason) = evaluator.string_test(node, child(0)?)?;
+            (Outcome::Truth(truth), reason)
+        }
+        Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_) => {
+            return Err(Error::new(
+                ErrorCode::ExpressionError,
+                "a value has no truth value",
+            ));
+        }
+    })
+}
+
 /// A float result: NaN is null with `nan_result`; infinities are kept.
 fn float_result(value: f64, paths: impl Fn() -> Vec<Vec<Segment>>) -> (Value, Option<Reason>) {
     if value.is_nan() {

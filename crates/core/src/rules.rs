@@ -397,29 +397,7 @@ impl RuleSet {
                 results[i].then = Some(self.payload(&self.rules[i], input, logic)?);
             }
         }
-        let selected: Vec<usize> = match self.hit_policy {
-            HitPolicy::First | HitPolicy::Any => fired.iter().copied().take(1).collect(),
-            HitPolicy::Priority => {
-                let top = fired.iter().map(|&i| self.rules[i].priority).max();
-                fired
-                    .iter()
-                    .copied()
-                    .find(|&i| Some(self.rules[i].priority) == top)
-                    .into_iter()
-                    .collect()
-            }
-            HitPolicy::Unique => {
-                if fired.len() > 1 {
-                    return Err(self.policy_error(
-                        format!("{} rules fired under the unique hit policy", fired.len()),
-                        &fired,
-                        "make the conditions mutually exclusive, or use first or priority",
-                    ));
-                }
-                fired.clone()
-            }
-            HitPolicy::RuleOrder | HitPolicy::Collect => fired.clone(),
-        };
+        let selected = self.select(&fired)?;
         for &i in &selected {
             if results[i].then.is_none() {
                 results[i].then = Some(self.payload(&self.rules[i], input, logic)?);
@@ -441,6 +419,33 @@ impl RuleSet {
             results,
             selected,
             aggregated,
+        })
+    }
+
+    /// The rules the hit policy selects among those that fired (`spec/rules.md`).
+    pub(crate) fn select(&self, fired: &[usize]) -> Result<Vec<usize>> {
+        Ok(match self.hit_policy {
+            HitPolicy::First | HitPolicy::Any => fired.iter().copied().take(1).collect(),
+            HitPolicy::Priority => {
+                let top = fired.iter().map(|&i| self.rules[i].priority).max();
+                fired
+                    .iter()
+                    .copied()
+                    .find(|&i| Some(self.rules[i].priority) == top)
+                    .into_iter()
+                    .collect()
+            }
+            HitPolicy::Unique => {
+                if fired.len() > 1 {
+                    return Err(self.policy_error(
+                        format!("{} rules fired under the unique hit policy", fired.len()),
+                        fired,
+                        "make the conditions mutually exclusive, or use first or priority",
+                    ));
+                }
+                fired.to_vec()
+            }
+            HitPolicy::RuleOrder | HitPolicy::Collect => fired.to_vec(),
         })
     }
 
@@ -474,7 +479,7 @@ impl RuleSet {
         error
     }
 
-    fn outputs_agree(results: &[RuleResult<'_>], fired: &[usize]) -> bool {
+    pub(crate) fn outputs_agree(results: &[RuleResult<'_>], fired: &[usize]) -> bool {
         let Some((&first, rest)) = fired.split_first() else {
             return true;
         };
@@ -489,7 +494,7 @@ impl RuleSet {
         })
     }
 
-    fn aggregated(
+    pub(crate) fn aggregated(
         &self,
         aggregate: Aggregate,
         results: &[RuleResult<'_>],
@@ -653,6 +658,21 @@ pub struct Decision<'a> {
 }
 
 impl<'a> Decision<'a> {
+    /// A decision from its parts, for readers that rebuild one.
+    pub(crate) fn from_parts(
+        ruleset: &'a RuleSet,
+        results: Vec<RuleResult<'a>>,
+        selected: Vec<usize>,
+        aggregated: Option<Aggregated>,
+    ) -> Self {
+        Self {
+            ruleset,
+            results,
+            selected,
+            aggregated,
+        }
+    }
+
     /// The rule set that produced it.
     #[must_use]
     pub fn ruleset(&self) -> &'a RuleSet {

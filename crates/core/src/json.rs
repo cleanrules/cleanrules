@@ -586,6 +586,30 @@ fn write_string(out: &mut String, text: &str) {
     out.push('"');
 }
 
+/// Typed equality of JSON trees (`spec/json-format.md`, *Comparing documents*):
+/// members in order, numbers by lexical class and exact value, and the sign of a
+/// float zero.
+#[must_use]
+pub fn same(a: &Json, b: &Json) -> bool {
+    match (a, b) {
+        (Json::Number(x), Json::Number(y)) => {
+            x.is_integer_literal() == y.is_integer_literal()
+                && if x.is_integer_literal() {
+                    x.as_i128().is_some() && x.as_i128() == y.as_i128()
+                } else {
+                    x.as_f64().to_bits() == y.as_f64().to_bits()
+                }
+        }
+        (Json::Array(x), Json::Array(y)) => {
+            x.len() == y.len() && x.iter().zip(y).all(|(p, q)| same(p, q))
+        }
+        (Json::Object(x), Json::Object(y)) => {
+            x.len() == y.len() && x.iter().zip(y).all(|((k, p), (l, q))| k == l && same(p, q))
+        }
+        _ => a == b,
+    }
+}
+
 /// Escape a key for a JSON Pointer: `~` becomes `~0` and `/` becomes `~1`.
 #[must_use]
 pub fn pointer_token(key: &str) -> String {
