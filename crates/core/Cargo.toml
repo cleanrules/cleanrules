@@ -21,4 +21,13 @@ regex = "1.13.1"
 thiserror = "2.0.21"
 
 [dev-dependencies]
+criterion = { version = "0.8.2", default-features = false, features = ["cargo_bench_support"] }
 proptest = "1.12.0"
+
+[[bench]]
+name = "eval"
+harness = false
+
+[[bench]]
+name = "explain"
+harness = false

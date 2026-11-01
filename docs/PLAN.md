@@ -355,7 +355,14 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
     - Generadores: escalares (int, float, decimal, bool, texto, fecha) y nulos en los campos `a`, `b` y `c` (a veces ausente), y árboles de condiciones de hasta 3 niveles construidos con los constructores de `Node`.
     - Propiedades: la evaluación no estricta nunca falla y da razón justo cuando la verdad es desconocida o el valor es nulo; el modo estricto coincide o lanza un error de la familia de evaluación; De Morgan y la doble negación; ida y vuelta de las condiciones por JSON; toda decisión se relee (cuatro políticas); y la suficiencia de las explicaciones (`selected`: todas las causas se cumplen; `not_fired` alcanzable: ninguna; `unknown`: todas desconocidas).
     - Pasan a la primera, sin contraejemplos que convertir en vectores. Se comprobó con dos propiedades alteradas que proptest las detecta y reduce el contraejemplo.
-- [ ] B.10 Benchmarks con `criterion` (evaluación por lote, explicación), comparados con zen-engine.
+- B.10 Benchmarks con `criterion` (evaluación por lote, explicación), comparados con zen-engine. Se divide en dos subtareas:
+  - [x] B.10a Suites `eval` y `explain` con `criterion`, y la primera medición.
+    - Hecho el 2026-11-01: `crates/core/benches/` con una carga común (12 reglas de admisión de préstamos que usan todas las familias de nodos y 1.000 solicitantes deterministas, con campos ausentes o nulos).
+    - Casos: una entrada y lotes de 1.000 con `first`, `priority` y `collect`; un árbol de condición; lectura y escritura del rule set en JSON; explicación de 1.000 decisiones, con y sin JSON; evaluar y explicar juntos; y el resumen.
+    - Medición en `benchmarks/results/2026-11-01-core.json` (Apple M5, rustc 1.97.1), guardada como línea base de criterion `2026-11-01`: unos 7,2 µs por entrada con `first` (12 reglas), 11,5 µs por explicación y 58 µs con su JSON.
+    - Desviación: `criterion` sin las características por defecto (sin gráficos ni rayon), para no arrastrar dependencias.
+    - Pendiente para optimizar (con benchmark, en una tarea propia): escribir la explicación en JSON cuesta unas 4 veces más que construirla.
+  - [ ] B.10b Comparación con zen-engine con el mismo rule set como tabla de decisión JDM, en un crate aparte en `benchmarks/` fuera del workspace. Requiere aprobar la dependencia `zen-engine`.
 
 **Aceptación**: el 100 % de los vectores en verde; `clippy -D warnings`; sin `unsafe` en `core`.
 

@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- Benchmarks of the Rust core (`criterion`, `crates/core/benches/`): the `eval`
+  and `explain` suites over a shared loan screening workload, with the first
+  results in `benchmarks/results/`.
 - Property tests of the Rust core (`proptest`): non-strict evaluation never
   fails and gives a reason exactly for unknown truths and null values; strict
   mode agrees or raises an evaluation error; De Morgan and double negation

@@ -1,0 +1,115 @@
+{
+  "date": "2026-11-01",
+  "suites": [
+    "eval",
+    "explain"
+  ],
+  "machine": {
+    "os": "Darwin 27.0.0 arm64",
+    "cpu": "Apple M5",
+    "cores": 10,
+    "memory_gib": 32
+  },
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+  "profile": "bench (release)",
+  "workload": "crates/core/benches/common: 12 loan screening rules, 1,000 deterministic applicants",
+  "interval": "criterion's 95 % confidence interval of the mean time per iteration",
+  "cases": [
+    {
+      "case": "evaluate/one/first",
+      "low_ns": 7232.8,
+      "estimate_ns": 7246.2,
+      "high_ns": 7260.1
+    },
+    {
+      "case": "evaluate/batch_1000/first",
+      "low_ns": 7890100.0,
+      "estimate_ns": 7973900.0,
+      "high_ns": 8062000.0
+    },
+    {
+      "case": "evaluate/one/priority",
+      "low_ns": 7485.9,
+      "estimate_ns": 7561.4,
+      "high_ns": 7644.6
+    },
+    {
+      "case": "evaluate/batch_1000/priority",
+      "low_ns": 9471200.0,
+      "estimate_ns": 10183000.0,
+      "high_ns": 11163000.0
+    },
+    {
+      "case": "evaluate/one/collect",
+      "low_ns": 8726.8,
+      "estimate_ns": 8771.0,
+      "high_ns": 8818.4
+    },
+    {
+      "case": "evaluate/batch_1000/collect",
+      "low_ns": 9264300.0,
+      "estimate_ns": 9320800.0,
+      "high_ns": 9380600.0
+    },
+    {
+      "case": "condition/prime",
+      "low_ns": 1039.6,
+      "estimate_ns": 1062.3,
+      "high_ns": 1090.3
+    },
+    {
+      "case": "json/read_ruleset",
+      "low_ns": 176560.0,
+      "estimate_ns": 177280.0,
+      "high_ns": 177980.0
+    },
+    {
+      "case": "json/write_ruleset",
+      "low_ns": 36854.0,
+      "estimate_ns": 36997.0,
+      "high_ns": 37143.0
+    },
+    {
+      "case": "explain/batch_1000/first",
+      "low_ns": 11455000.0,
+      "estimate_ns": 11497000.0,
+      "high_ns": 11539000.0
+    },
+    {
+      "case": "explain/batch_1000_json/first",
+      "low_ns": 58198000.0,
+      "estimate_ns": 58359000.0,
+      "high_ns": 58516000.0
+    },
+    {
+      "case": "explain/evaluate_and_explain_1000/first",
+      "low_ns": 19111000.0,
+      "estimate_ns": 19133000.0,
+      "high_ns": 19154000.0
+    },
+    {
+      "case": "explain/batch_1000/collect",
+      "low_ns": 11569000.0,
+      "estimate_ns": 11612000.0,
+      "high_ns": 11656000.0
+    },
+    {
+      "case": "explain/batch_1000_json/collect",
+      "low_ns": 57462000.0,
+      "estimate_ns": 57613000.0,
+      "high_ns": 57756000.0
+    },
+    {
+      "case": "explain/evaluate_and_explain_1000/collect",
+      "low_ns": 20716000.0,
+      "estimate_ns": 20780000.0,
+      "high_ns": 20853000.0
+    },
+    {
+      "case": "summary",
+      "low_ns": 20418.0,
+      "estimate_ns": 20723.0,
+      "high_ns": 21190.0
+    }
+  ]
+}
