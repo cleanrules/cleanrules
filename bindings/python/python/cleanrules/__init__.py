@@ -12,6 +12,8 @@ from cleanrules import errors
 from cleanrules._cleanrules import FORMAT_VERSION, __version__
 from cleanrules._expr import Closed, Const, Expr, F, Field, Kind, StructuralKey
 from cleanrules._rules import (
+    Action,
+    ActionContext,
     Aggregate,
     Cause,
     CauseGroup,
@@ -49,6 +51,8 @@ from cleanrules.errors import (
 
 __all__ = [
     "FORMAT_VERSION",
+    "Action",
+    "ActionContext",
     "ActionError",
     "Aggregate",
     "Cause",

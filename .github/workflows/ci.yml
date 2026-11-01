@@ -95,6 +95,9 @@ jobs:
       - run: uv run --python ${{ matrix.python }} pytest
       - if: matrix.python == '3.11' && matrix.os == 'ubuntu-latest'
         run: uv run --python 3.11 pyright
+      # Every public name of the package has a complete type.
+      - if: matrix.python == '3.11' && matrix.os == 'ubuntu-latest'
+        run: uv run --python 3.11 pyright --verifytypes cleanrules --ignoreexternal
 
   conformance:
     name: Spec schemas and conformance vectors

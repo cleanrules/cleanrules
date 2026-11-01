@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- Python binding: actions (`Rule(..., do=...)`) and `RuleSet.run`, which runs
+  the actions of the selected rules in order with an `ActionContext` and stops
+  at the first that raises with `ActionError`. `Rule` and `RuleSet` pickle and
+  copy. The public API is fully typed (`pyright --verifytypes`).
 - Python binding: numpy and pandas values: numpy scalars, `datetime64` (a
   naive datetime, truncated to the microsecond), arrays as lists, `NaT`,
   `pandas.NA` and `pandas.NaT` as nulls, `Timestamp`s, and pandas rows from

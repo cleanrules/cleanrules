@@ -52,6 +52,7 @@ _CONTEXT_FIELDS = (
     "node",
     "operation",
     "reason",
+    "decision",
 )
 
 
@@ -83,6 +84,8 @@ class CleanRulesError(Exception):
             construction rule, or the innermost node whose evaluation failed.
         operation: What was not supported, or `None`.
         reason: Why it was not supported, or `None`.
+        decision: For an `ActionError`, the decision whose actions were running.
+            It is not pickled.
     """
 
     # Each subclass names its code; the base has none of its own.
@@ -105,6 +108,7 @@ class CleanRulesError(Exception):
     node: Any
     operation: str | None
     reason: str | None
+    decision: Any
 
     def __init__(
         self, message: str, *, hint: str | None = None, code: str | None = None, **context: Any
@@ -140,7 +144,9 @@ class CleanRulesError(Exception):
     def __reduce__(self) -> tuple[Any, tuple[Any, ...]]:
         # The default reduce calls __init__ again with `args` only, which drops the
         # keyword arguments; rebuild without __init__ and restore the attributes.
-        return (_rebuild, (type(self), self.args, dict(self.__dict__)))
+        state = dict(self.__dict__)
+        state["decision"] = None  # a decision holds native objects
+        return (_rebuild, (type(self), self.args, state))
 
 
 def _as_expr(node: object) -> object:
@@ -201,8 +207,9 @@ class RuleNotFoundError(CleanRulesError, KeyError):
 
     default_code = "rule_not_found"
 
-    # KeyError would show the repr of the message.
-    __str__ = CleanRulesError.__str__
+    def __str__(self) -> str:
+        # KeyError would show the repr of the message.
+        return CleanRulesError.__str__(self)
 
 
 class EvaluationError(CleanRulesError):

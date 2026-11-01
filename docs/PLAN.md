@@ -436,7 +436,12 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
     - `pandas.NA`, `pandas.NaT` y el `NaT` de numpy son nulos; `numpy.datetime64` es una fecha con hora sin zona, truncada al microsegundo (fuera de los años 1 a 9999, opaca); `numpy.timedelta64`, que numpy declara entero, es opaco y no rompe la lectura.
     - Ya funcionaban, y ahora tienen tests: escalares de numpy, arrays como listas, `pandas.Timestamp` con nanosegundos o con zona, filas de `iterrows()` (registros con `keys()`) e `itertuples()` (namedtuples), y modelos de Pydantic (por nombre de campo y no por alias, con campos extra y calculados) y clases de attrs.
     - 251 tests en 3.11, 3.14, 3.14t, 3.15 y 3.15t (rc1), sin ninguno omitido.
-- [ ] C.4 `run` y acciones en Python; pickle; tipos (`.pyi`).
+- [x] C.4 `run` y acciones en Python; pickle; tipos (`.pyi`).
+  - Hecho el 2026-11-01: `Rule(..., do=acción)` y `RuleSet.run(data)`, que evalúa y llama a las acciones de las reglas seleccionadas en orden de regla con un `ActionContext` (`rule`, `data`, `result`, `output`, `decision`); `evaluate` nunca las ejecuta. La primera que lanza para el `run` con `ActionError` (`rule`, `executed`, `decision`, y la excepción original como `__cause__`).
+  - `Rule` y `RuleSet` se serializan con pickle y se copian cuando su acción también (las condiciones viajan en el formato JSON); el `decision` de un `ActionError` no se serializa.
+  - Tipos: `pyright --verifytypes` da un 100 % de completitud en la API pública (antes un 83 %, por dos asignaciones de métodos sin anotar) y se comprueba en CI.
+  - 258 tests en 3.11, 3.14, 3.14t y 3.15t.
+  - Desviación respecto a la v1: el `ActionContext` lleva el `RuleResult` de la regla (`result`) en vez del árbol de resultados de su condición (`tree`), que Python aún no expone; y añade `decision`.
 - [ ] C.5 Runner de conformidad en Python.
 
 ---

@@ -125,7 +125,8 @@ class Expr:
         )
 
     # Defining __eq__ would set __hash__ to None; nodes keep identity hashing.
-    __hash__ = object.__hash__
+    def __hash__(self) -> int:
+        return object.__hash__(self)
 
     # Make numpy arrays and pandas objects on the left of an operator defer to the
     # node (which then rejects them clearly) instead of broadcasting element by element.

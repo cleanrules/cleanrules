@@ -21,14 +21,15 @@ from __future__ import annotations
 
 import enum
 import json
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, NoReturn, overload
+from typing import Any, NoReturn, TypeAlias, overload
 
 from cleanrules import _cleanrules as _native
 from cleanrules._expr import Const, Expr, _wrap  # pyright: ignore[reportPrivateUsage]
 from cleanrules.errors import (
+    ActionError,
     CleanRulesError,
     EvaluationError,
     HitPolicyError,
@@ -37,6 +38,8 @@ from cleanrules.errors import (
 )
 
 __all__ = [
+    "Action",
+    "ActionContext",
     "Aggregate",
     "Cause",
     "CauseGroup",
@@ -131,13 +134,17 @@ class Rule:
         tags: Labels for grouping and filtering.
         description: A human-readable description.
         metadata: Free-form data (owner, ticket, version, ...).
+        do: An action: a callable that `RuleSet.run` calls with an
+            `ActionContext` when the rule is selected (never `evaluate`).
+
+    Rules pickle and copy when their action does.
 
     Raises:
         RuleDefinitionError: If an argument is invalid.
         ExpressionError: If a payload value is not a value (a condition, NaN, ...).
     """
 
-    __slots__ = ("_description", "_native", "_priority", "_then", "_when", "name")
+    __slots__ = ("_description", "_do", "_native", "_priority", "_then", "_when", "name")
 
     name: str
     _when: Expr
@@ -145,6 +152,7 @@ class Rule:
     _priority: int
     _description: str | None
     _native: _native.Rule
+    _do: Action | None
 
     def __init__(
         self,
@@ -156,6 +164,7 @@ class Rule:
         tags: Iterable[str] = (),
         description: str | None = None,
         metadata: Mapping[str, object] | None = None,
+        do: Action | None = None,
     ) -> None:
         if not isinstance(name, str) or not name:  # pyright: ignore[reportUnnecessaryIsInstance]
             raise RuleDefinitionError(f"a rule name must be a non-empty string, got {name!r}")
@@ -184,6 +193,12 @@ class Rule:
             raise RuleDefinitionError(
                 f"description must be a string, got {type(description).__name__}", rule=name
             )
+        if do is not None and not callable(do):
+            raise RuleDefinitionError(
+                f"do must be a callable, got {type(do).__name__} {do!r}",
+                rule=name,
+                hint="pass a function that takes an ActionContext",
+            )
         payload = _payload(name, then)
         frozen_metadata = _mapping(name, "metadata", metadata)
         native = _native.rule(
@@ -201,6 +216,7 @@ class Rule:
         object.__setattr__(self, "_priority", priority)
         object.__setattr__(self, "_description", description)
         object.__setattr__(self, "_native", native)
+        object.__setattr__(self, "_do", do)
 
     def __setattr__(self, name: str, value: object) -> None:
         raise AttributeError(f"rules are immutable: cannot set {name!r}")
@@ -235,9 +251,85 @@ class Rule:
         """The metadata, as the core holds it (read-only)."""
         return MappingProxyType(self._native.metadata)
 
+    @property
+    def do(self) -> Action | None:
+        """The action, if any."""
+        return self._do
+
+    def __reduce__(self) -> tuple[Any, tuple[Any, ...]]:
+        return (
+            _make_rule,
+            (
+                self.name,
+                self._when,
+                dict(self._then),
+                self._priority,
+                self.tags,
+                self._description,
+                dict(self.metadata),
+                self._do,
+            ),
+        )
+
     def __repr__(self) -> str:
         then = "" if not self._then else f", {dict(self._then)!r}"
         return f"Rule({self.name!r}, {self._when!r}{then})"
+
+
+# Pickles store these functions by name: keep the names.
+def _make_rule(
+    name: str,
+    when: Expr,
+    then: dict[str, Expr],
+    priority: int,
+    tags: tuple[str, ...],
+    description: str | None,
+    metadata: dict[str, object],
+    do: Action | None,
+) -> Rule:
+    return Rule(
+        name,
+        when,
+        then,
+        priority=priority,
+        tags=tags,
+        description=description,
+        metadata=metadata,
+        do=do,
+    )
+
+
+def _make_ruleset(
+    rules: tuple[Rule, ...],
+    hit_policy: str,
+    aggregate: str | None,
+    logic: str,
+    strict: bool,
+) -> RuleSet:
+    return RuleSet(rules, hit_policy=hit_policy, aggregate=aggregate, logic=logic, strict=strict)
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class ActionContext:
+    """What an action receives (`spec/rules.md`, *Actions*).
+
+    Attributes:
+        rule: The rule whose action runs.
+        data: The input, as given to `RuleSet.run`.
+        result: The rule's result in the decision: its truth and its output.
+        output: The rule's evaluated payload (empty when it has none).
+        decision: The whole decision.
+    """
+
+    rule: Rule
+    data: object
+    result: RuleResult
+    output: Mapping[str, object]
+    decision: Decision
+
+
+Action: TypeAlias = Callable[[ActionContext], object]
+"""A callable that `RuleSet.run` calls when its rule is selected; its result is ignored."""
 
 
 def _payload(rule: str, then: Mapping[str, object] | None) -> dict[str, Expr]:
@@ -393,6 +485,48 @@ class RuleSet(Sequence[Rule]):
         """
         return Decision(self, self._native.evaluate(data))
 
+    def run(self, data: object) -> Decision:
+        """Evaluate like `evaluate`, then run the actions of the selected rules.
+
+        Actions run in rule order, each with an `ActionContext`. `evaluate` never
+        runs them, so a decision can be computed any number of times.
+
+        Returns:
+            The `Decision`.
+
+        Raises:
+            ActionError: If an action raised; the original exception is its
+                `__cause__`, and it carries the `decision` and the rules whose
+                actions had already run (`executed`). Later actions do not run.
+            EvaluationError: As `evaluate`.
+        """
+        decision = self.evaluate(data)
+        executed: list[str] = []
+        for result in decision.selected:
+            action = result.rule.do
+            if action is None:
+                continue
+            context = ActionContext(
+                rule=result.rule,
+                data=data,
+                result=result,
+                output=result.output or MappingProxyType({}),
+                decision=decision,
+            )
+            try:
+                action(context)
+            except Exception as error:
+                raise ActionError(
+                    f"the action of rule {result.rule.name!r} raised"
+                    f" {type(error).__name__}: {error}",
+                    rule=result.rule.name,
+                    executed=executed,
+                    decision=decision,
+                    hint="later actions did not run; the decision is in error.decision",
+                ) from error
+            executed.append(result.rule.name)
+        return decision
+
     def evaluate_many(self, rows: Iterable[object]) -> list[Decision]:
         """Evaluate the rule set on each input of a batch, in order.
 
@@ -434,6 +568,13 @@ class RuleSet(Sequence[Rule]):
 
     def __iter__(self) -> Iterator[Rule]:
         return iter(self._rules)
+
+    def __reduce__(self) -> tuple[Any, tuple[Any, ...]]:
+        aggregate = None if self._aggregate is None else self._aggregate.value
+        return (
+            _make_ruleset,
+            (self._rules, self._hit_policy.value, aggregate, self._logic, self._strict),
+        )
 
     def __repr__(self) -> str:
         names = ", ".join(rule.name for rule in self._rules)
