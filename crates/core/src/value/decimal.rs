@@ -185,6 +185,18 @@ impl Decimal {
         }
     }
 
+    /// The exact difference `self − other`, with the larger of the two scales, or
+    /// `None` when it does not fit in 38 digits or an operand is infinite
+    /// (`spec/explain.md`, *Counterfactuals*).
+    #[must_use]
+    pub fn checked_sub(self, other: Self) -> Option<Self> {
+        let ((a, sa), (b, sb)) = (self.parts()?, other.parts()?);
+        let scale = sa.max(sb);
+        let a = a.checked_mul(10_i128.checked_pow(scale - sa)?)?;
+        let b = b.checked_mul(10_i128.checked_pow(scale - sb)?)?;
+        Self::new(a.checked_sub(b)?, scale).ok()
+    }
+
     /// The exact value as `(negative, magnitude, scale)`, for comparisons.
     fn exact(self) -> Option<(bool, u128, u32)> {
         self.parts().map(|(c, s)| (c < 0, c.unsigned_abs(), s))
@@ -418,6 +430,17 @@ mod tests {
         };
         assert_eq!(hash(d("1.0")), hash(d("1.000")));
         assert_eq!(hash(d("0")), hash(d("-0.00")));
+    }
+
+    #[test]
+    fn exact_differences() {
+        assert_eq!(
+            d("10.05").checked_sub(d("9.9")).unwrap().to_string(),
+            "0.15"
+        );
+        assert_eq!(d("1").checked_sub(d("0.001")).unwrap().to_string(), "0.999");
+        assert!(d(&"9".repeat(38)).checked_sub(d("-1")).is_none());
+        assert!(d("inf").checked_sub(d("1")).is_none());
     }
 
     #[test]

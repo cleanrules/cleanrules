@@ -12,6 +12,7 @@ pub mod ast;
 pub mod build;
 mod error;
 pub mod eval;
+pub mod explain;
 pub mod format;
 pub mod json;
 pub mod logic;

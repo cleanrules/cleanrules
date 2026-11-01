@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- `cleanrules::explain`: explanations (status, `all`/`any` requirements,
+  simplification, options checked to make the rule fire, causes with the values
+  read, counterfactuals with exact gaps, notes) and summaries, with their JSON
+  forms. The conformance runner passes all 317 explanation and 3 summary vectors.
 - `cleanrules::format::read_decision_document`: decisions read with their rule
   set, rebuilt into a `Decision` and checked as `spec/json-format.md` requires
   (`decision_mismatch`).

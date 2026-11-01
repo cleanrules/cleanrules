@@ -14,9 +14,11 @@ use std::fs;
 
 use cleanrules::Error;
 use cleanrules::eval::{Options, evaluate_tree, evaluate_value_tree};
+use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
     ValueContext, read_node, read_ruleset, read_value, write_decision, write_path, write_result,
 };
+use cleanrules::format::{read_decision_document, write_explanation, write_summary};
 use cleanrules::json::{Json, Limits, parse, to_string};
 use cleanrules::logic::Kleene;
 use common::{get, same, text, vector_files};
@@ -142,11 +144,74 @@ fn run_evaluate(vector: &Json) -> Result<(), String> {
     }
     let input = read_value(get(given, "input").unwrap(), "/input", ValueContext::Data)
         .map_err(|e| format!("reading the input: {e}"))?;
-    compare(
-        ruleset.evaluate(&input).map(|d| write_decision(&d)),
-        expect,
-        "decision",
+    let decision = ruleset.evaluate(&input);
+    if let Ok(decision) = &decision {
+        // Every decision the core produces reads back, passes the checks of
+        // *Reading a decision*, and is written the same way.
+        let written = write_decision(decision);
+        let document = Json::Object(vec![
+            (
+                "version".into(),
+                Json::Number(cleanrules::json::JsonNumber::from_literal("1")),
+            ),
+            ("decision".into(), written.clone()),
+        ]);
+        let read =
+            read_decision_document(&to_string(&document), &ruleset, &limits).map_err(|e| {
+                format!(
+                    "the decision does not read back: {e} at {:?}",
+                    e.context().pointer
+                )
+            })?;
+        if !same(&write_decision(&read), &written) {
+            return Err("the decision read back is written differently".into());
+        }
+    }
+    compare(decision.map(|d| write_decision(&d)), expect, "decision")
+}
+
+fn run_explain(vector: &Json) -> Result<(), String> {
+    let given = get(vector, "given").unwrap();
+    let ruleset = read_ruleset(
+        get(given, "ruleset").unwrap(),
+        "/ruleset",
+        &Limits::default(),
     )
+    .map_err(|e| format!("reading the rule set: {e}"))?;
+    let expect = get(vector, "expect").unwrap();
+    if text(get(given, "kind")) == Some("summary") {
+        return compare(Ok(write_summary(&summary(&ruleset))), expect, "summary");
+    }
+    let input = read_value(get(given, "input").unwrap(), "/input", ValueContext::Data)
+        .map_err(|e| format!("reading the input: {e}"))?;
+    let decision = ruleset.evaluate(&input);
+    if let Ok(d) = &decision {
+        // A decision read back from JSON explains exactly as the evaluated one.
+        let document = Json::Object(vec![
+            (
+                "version".into(),
+                Json::Number(cleanrules::json::JsonNumber::from_literal("1")),
+            ),
+            ("decision".into(), write_decision(d)),
+        ]);
+        let read = read_decision_document(&to_string(&document), &ruleset, &Limits::default())
+            .map_err(|e| format!("the decision does not read back: {e}"))?;
+        if !same(
+            &write_explanation(&explain(&read)),
+            &write_explanation(&explain(d)),
+        ) {
+            return Err("the decision read back explains differently".into());
+        }
+    }
+    let (decision_json, explanation_json) = match &decision {
+        Ok(d) => (Ok(write_decision(d)), Ok(write_explanation(&explain(d)))),
+        Err(e) => (
+            Err(cleanrules::Error::new(e.code(), e.message())),
+            Err(cleanrules::Error::new(e.code(), e.message())),
+        ),
+    };
+    compare(decision_json, expect, "decision")?;
+    compare(explanation_json, expect, "explanation")
 }
 
 fn run(vector: &Json) -> Result<(), String> {
@@ -154,6 +219,9 @@ fn run(vector: &Json) -> Result<(), String> {
     let kind = text(get(given, "kind")).unwrap();
     if kind == "evaluate" {
         return run_evaluate(vector);
+    }
+    if kind == "explain" || kind == "summary" {
+        return run_explain(vector);
     }
     let limits = Limits::default();
     let node_key = if kind == "condition" {
@@ -225,7 +293,10 @@ fn conformance_vectors() {
         };
         for vector in vectors {
             let kind = text(get(get(vector, "given").unwrap(), "kind")).unwrap();
-            if !matches!(kind, "condition" | "value" | "evaluate") {
+            if !matches!(
+                kind,
+                "condition" | "value" | "evaluate" | "explain" | "summary"
+            ) {
                 *pending.entry(kind.to_owned()).or_default() += 1;
                 continue;
             }

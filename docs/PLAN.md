@@ -341,7 +341,15 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - Para la comprobación 5 reutiliza el evaluador (`eval::recompute`); para la 7 y la 8, la selección y el agregado de `RuleSet`.
       - Pasan los 187 vectores de lectura.
       - Además, el runner relee cada decisión evaluada: las 302 superan las 8 comprobaciones y se reescriben idénticas.
-- [ ] B.8 `explain` (requisitos `all`/`any`, De Morgan, fusión y absorción, validación de opciones con apariciones vinculadas, contrafactuales) y `summary`.
+      - Corrección del 2026-11-01: esa prueba de ida y vuelta no llegó a insertarse en el runner en B.7b, porque el script que la añadía falló antes. Se añadió y comprobó en B.8, y pasa.
+- [x] B.8 `explain` (requisitos `all`/`any`, De Morgan, fusión y absorción, validación de opciones con apariciones vinculadas, contrafactuales) y `summary`.
+  - Hecho el 2026-11-01: `cleanrules::explain` (`explain`, `summary`) y `format::{write_explanation, write_summary}`.
+    - Estados, requisitos `all`/`any` con De Morgan, simplificación (aplanar, fusionar y absorber), y comprobación de las opciones que hacen disparar la regla, con un tope de 64 y la detección de conflictos.
+    - Causas con los valores leídos y contrafactuales con la aritmética exacta de la especificación (`Decimal::checked_sub`; fechas con hora en UTC), y notas.
+    - El puntero `at` se obtiene por identidad del resultado en la decisión.
+    - Pasan **los 317 vectores de explicación y los 3 de resumen** a la primera; en total, 1.948 vectores en el runner más 187 de lectura. Se comprobó con cinco expectativas alteradas que el runner las detecta.
+    - Cada decisión, evaluada o explicada, se relee con su rule set y supera las 8 comprobaciones; la releída se explica igual.
+    - Desviación: el texto de `explain()` y de `summary()` se deja para D.2, con la sintaxis del DSL.
 - [ ] B.9 Runner de conformidad en Rust y tests de propiedades con `proptest` (leyes lógicas, De Morgan, suficiencia de las explicaciones).
 - [ ] B.10 Benchmarks con `criterion` (evaluación por lote, explicación), comparados con zen-engine.
 
