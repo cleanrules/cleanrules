@@ -1,9 +1,9 @@
 # Specification
 
 cleanrules has one engine, the Rust core, used from Rust, C/C++, Python,
-JavaScript, Java/Scala and Go. Users' rule files (JSON, YAML, text) are read by
-all of them and have to keep meaning the same thing across versions. The
-documents in this directory are the contract they all follow, and the
+JavaScript, Java/Scala, Go and Erlang. Users' rule files (JSON, YAML, text) are
+read by all of them and have to keep meaning the same thing across versions.
+The documents in this directory are the contract they all follow, and the
 conformance vectors in `conformance/` turn it into tests that every binding
 runs. When the engine and a spec disagree, the spec wins, and the disagreement
 is a bug in the engine or in the spec. It is never acceptable

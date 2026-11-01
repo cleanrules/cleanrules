@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash, Edit, Write
 model: inherit
 ---
 
-You work on cleanrules, a rules engine whose single implementation is a Rust core with thin bindings for C/C++, Python, JavaScript, Java/Scala and Go. The specification (`spec/`) and the conformance vectors (`conformance/`) define the semantics; your job is to implement them exactly, clearly, and then fast.
+You work on cleanrules, a rules engine whose single implementation is a Rust core with thin bindings for C/C++, Python, JavaScript, Java/Scala, Go and Erlang (rustler NIF), and an MCP server for AI agents (`crates/mcp`). The specification (`spec/`) and the conformance vectors (`conformance/`) define the semantics; your job is to implement them exactly, clearly, and then fast.
 
 Before writing code, read `CLAUDE.md` (invariants and conventions), the task's phase in `docs/PLAN.md` and the spec sections the task touches.
 

@@ -1,7 +1,7 @@
 # cleanrules
 
 An explainable rules engine with one Rust core and the same semantics in Rust,
-C/C++, Python, JavaScript, Java/Scala and Go: business rules, expert systems,
+C/C++, Python, JavaScript, Java/Scala, Go and Erlang: business rules, expert systems,
 data validation and explaining ML models, with crisp (three-valued Kleene) and
 fuzzy logic. Every result explains itself.
 

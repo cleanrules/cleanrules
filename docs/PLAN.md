@@ -1,8 +1,10 @@
-# Plan de desarrollo (v2: núcleo Rust, bindings multilenguaje)
+# Plan de desarrollo (v3: núcleo Rust, bindings multilenguaje, agentes de IA)
 
 > Documento vivo y fuente de verdad del roadmap. Cada tarea es una casilla; al completarla se marca y se anotan debajo las desviaciones. Claude lo sigue con `/plan-task`.
 >
 > v1 (2026-10-30): implementación en Python con Rust como acelerador opcional. **v2 (2026-10-31)**: decisión del autor de poner **Rust en el centro** y ofrecer bindings para **Rust, C/C++, Python, JavaScript, Java/Scala y Go**. La implementación Python de la v1 se **descarta**; su valor se conserva en la especificación y en los vectores de conformidad que se extraen de ella (fase A). El plan v1 completo está en el historial de git.
+>
+> **v3 (2026-11-01)**: decisión del autor de añadir **Erlang** (fase N) y la **conexión con IA agéntica y frameworks de agentes** (fase O).
 
 ## 0. Visión
 
@@ -10,13 +12,14 @@ Un motor de reglas con un **único núcleo en Rust** que sirve, con la misma sem
 
 | Caso de uso | Rival principal | Por dónde ganamos |
 |---|---|---|
-| Reglas de negocio | Drools, zen-engine, rule-engine | Mismo motor y mismas reglas en 7 lenguajes; tablas de decisión; **auditoría estática**; explicación con requisitos `all`/`any` y contrafactuales |
+| Reglas de negocio | Drools, zen-engine, rule-engine | Mismo motor y mismas reglas en 8 lenguajes; tablas de decisión; **auditoría estática**; explicación con requisitos `all`/`any` y contrafactuales |
 | Sistema experto | Drools, CLIPS, experta | Rete en Rust, mantenimiento de verdad, hechos con grado, árbol de derivación |
 | Validación de datos | pandera, Great Expectations | Mismas reglas que en negocio; evaluación vectorizada sobre Arrow; explicación por fila |
 | Explicaciones de ML | imodels, alibi | Reglas extraídas que se ejecutan y auditan en cualquier lenguaje (extracción en Python) |
 | Lógica difusa | simpful, scikit-fuzzy, jFuzzyLogic | Normas difusas en el núcleo, disponibles en todos los lenguajes; fuzzytool para lo avanzado en Python |
+| IA agéntica | OPA/Rego, Cedar, NeMo Guardrails, Guardrails AI | Decisiones deterministas y explicadas como herramientas y *guardrails* de agentes (MCP y adaptadores por framework); reglas que un LLM propone como datos y el motor valida, audita y prueba antes de usarlas; contrafactuales que dicen al agente qué cambiar |
 
-Lo que nos diferencia es la combinación: **condiciones como AST serializable** + **lógica intercambiable** + **explicación y auditoría** + **un núcleo, siete lenguajes, una batería de conformidad**.
+Lo que nos diferencia es la combinación: **condiciones como AST serializable** + **lógica intercambiable** + **explicación y auditoría** + **un núcleo, ocho lenguajes, una batería de conformidad** + **un puente estable con los agentes de IA**.
 
 ## 1. Decisiones de arquitectura
 
@@ -33,6 +36,8 @@ Lo que nos diferencia es la combinación: **condiciones como AST serializable** 
 | D9 | Regex con el crate `regex` (tiempo lineal, sin *lookaround* ni *backreferences*): su semántica es la de referencia | Desaparece el problema de compatibilidad Python/Rust; sin ReDoS |
 | D10 | Monorepo: workspace de Cargo + un paquete por lenguaje, CI única | Versiones sincronizadas y conformidad en cada cambio |
 | D11 | El proyecto se llama **cleanrules** (decidido el 2026-10-31; *clean* ≈ *Kleene*) | "RulePy" no encaja fuera de Python |
+| D12 | **Erlang** con un NIF en Rust hecho con `rustler` directamente sobre `crates/core` (no sobre la C ABI); los rule sets son recursos inmutables que comparten los procesos, y el trabajo largo va a *dirty schedulers* | rustler convierte términos y captura *panics*, y es el estándar de la BEAM; un NIF que bloquea o falla tumbaría la VM |
+| D13 | **La IA usa el motor, no forma parte de él**: ni el núcleo ni los bindings llaman a modelos de lenguaje. Los agentes llegan por un servidor MCP (`crates/mcp`) y por adaptadores finos y opcionales para cada framework | Determinismo y dependencias mínimas; MCP sirve a la mayoría de frameworks con una sola implementación |
 
 **Nombres por registro** (libres a 2026-10-31 en crates.io, PyPI, npm con y sin scope, y como organización de GitHub; sin marcas ni productos homónimos conocidos). Descartados:
 
@@ -43,12 +48,13 @@ Lo que nos diferencia es la combinación: **condiciones como AST serializable** 
 
 | Registro | Nombre |
 |---|---|
-| crates.io | `cleanrules` (núcleo, en `crates/core`), `cleanrules-ffi`, `cleanrules-cli` |
+| crates.io | `cleanrules` (núcleo, en `crates/core`), `cleanrules-ffi`, `cleanrules-cli`, `cleanrules-mcp` (servidor MCP; libre a 2026-11-01) |
 | PyPI | `cleanrules` (`import cleanrules`) |
 | npm | `cleanrules`; binarios por plataforma de napi-rs en el scope `@cleanrules/*` |
 | Maven Central | `io.github.cleanrules:cleanrules` (+ `cleanrules-scala_3`) |
 | Go | `github.com/cleanrules/cleanrules/bindings/go` |
 | C/C++ | biblioteca `libcleanrules`, prefijo de símbolos `cr_`, paquetes Conan y vcpkg `cleanrules` |
+| Hex (Erlang) | `cleanrules`: aplicación OTP y módulo `cleanrules` (libre a 2026-11-01) |
 
 ### Decisiones pendientes (confirmar con el autor)
 
@@ -57,6 +63,8 @@ Lo que nos diferencia es la combinación: **condiciones como AST serializable** 
 - [ ] JavaScript: napi-rs (Node, más rápido) y wasm (navegador, Deno). Propuesto: los dos, con la misma API TypeScript.
 - [x] MSRV de Rust y edición: edición 2024 y MSRV 1.95, la estable menos dos (decidido el 2026-10-31).
 - [ ] UNKNOWN en lógica difusa como intervalo `[0, 1]` (propuesta de la v1, ver `spec/ast.md`).
+- [ ] Erlang: cómo se distribuye el NIF (binarios precompilados por plataforma frente a compilarlo con Rust al instalar) y si hay además una capa Elixir. Propuesto: precompilados; Elixir y Gleam usan el módulo Erlang directamente, y una capa propia solo si se pide.
+- [ ] Agentes: SDK de MCP en Rust (propuesto: `rmcp`, el oficial) y frameworks con adaptador propio. Propuesto: Claude Agent SDK, OpenAI Agents SDK, LangChain/LangGraph y Pydantic AI en Python; Vercel AI SDK en JavaScript; LangChain4j y Spring AI en la JVM; los demás, por MCP.
 - [x] Organización de GitHub: `cleanrules` (la crea el autor el 2026-10-31). La necesitan el groupId de Maven y la ruta del módulo Go.
 
 ## 2. Estructura objetivo del repositorio
@@ -69,13 +77,15 @@ Lo que nos diferencia es la combinación: **condiciones como AST serializable** 
 │   ├── core/                       AST, valores, evaluador, lógicas, reglas, políticas,
 │   │                               explain, summary, (después) Rete, auditoría, Arrow
 │   ├── ffi/                        C ABI: handles opacos, errores, JSON in/out; cbindgen
+│   ├── mcp/                        servidor MCP para agentes de IA (`cleanrules-mcp`)
 │   └── cli/                        (opcional) evaluar reglas JSON sobre datos JSON
 ├── bindings/
 │   ├── python/                     PyO3 + maturin (paquete `cleanrules`)
 │   ├── c/ · cpp/                   cabecera C generada; envoltorio C++ RAII; CMake
 │   ├── js/                         napi-rs (Node) + wasm-bindgen (web); TypeScript
 │   ├── jvm/                        Java (FFM sobre la C ABI) + módulo Scala
-│   └── go/                         cgo sobre la C ABI
+│   ├── go/                         cgo sobre la C ABI
+│   └── erlang/                     NIF con rustler, aplicación OTP y rebar3
 ├── spec/                           ast.md, rules.md, data-model.md, json-format.md, *.schema.json
 ├── conformance/                    vectores JSON + un runner por lenguaje
 ├── benchmarks/
@@ -457,11 +467,60 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
 
 ---
 
+### Fase N. Erlang · tamaño M
+
+**Objetivo**: usar cleanrules desde Erlang (y, por la BEAM, desde Elixir y Gleam) con la misma semántica y sin poner en riesgo la VM (D12).
+
+- [ ] N.1 Especificación: correspondencia entre los términos de Erlang y `Value` en `spec/data-model.md`, con sus vectores. Cubre mapas con claves binarias o átomos, enteros grandes, flotantes, binarios UTF-8 como texto, los átomos `true`, `false`, `null` y `undefined`, fechas de `calendar` y decimales.
+- [ ] N.2 NIF con `rustler` sobre `crates/core`.
+  - `RuleSet` como recurso inmutable que comparten los procesos.
+  - Una entrada se evalúa en el planificador normal; los lotes y las explicaciones van a *dirty schedulers* (o se trocean) para no pasar de ~1 ms por llamada.
+  - Los *panics* se capturan y llegan como `{error, ...}`. Binarios precompilados por plataforma.
+- [ ] N.3 API Erlang idiomática (módulo `cleanrules`).
+  - Reglas construidas con términos y leídas de JSON (D.1); `explain/1` y `summary/1`.
+  - Resultados `{ok, Decision} | {error, #{code := atom(), message := binary(), ...}}`.
+  - Acciones como funs registradas por nombre (D.4), que ejecuta el proceso que llama. Especificaciones para Dialyzer.
+- [ ] N.4 Runner de conformidad (Common Test), documentación con ex_doc y paquete en Hex con rebar3.
+
+---
+
+### Fase O. IA agéntica y frameworks de agentes · tamaño L
+
+**Objetivo**: que los agentes de IA usen cleanrules como herramienta de decisión, como *guardrail* determinista y explicable de sus propias acciones, y como destino verificable de las reglas que proponen. El motor sigue sin ningún modelo dentro (D13).
+
+- [ ] O.1 Especificación del contrato para agentes, con vectores.
+  - Herramientas `evaluate`, `explain`, `summary`, `validate` y `list_rulesets`, con JSON Schemas de entrada y salida derivados del formato v1.
+  - El esquema de entrada de cada rule set se genera desde `summary()` (los campos que lee y sus tipos).
+  - Una explicación compacta para el contexto de un LLM, con un presupuesto de tamaño.
+  - Errores con puntero, mensaje y pista que un modelo pueda corregir.
+- [ ] O.2 Servidor MCP `cleanrules-mcp` (`crates/mcp`, binario).
+  - Las herramientas de O.1 sobre rule sets cargados de un directorio configurado, que también se ofrecen como recursos MCP.
+  - Transportes stdio y HTTP *streamable*.
+  - Solo lectura por defecto, nunca ejecuta acciones, y con límites de tamaño y de tiempo.
+  - Tests: la salida de cada herramienta coincide con la del núcleo.
+- [ ] O.3 *Guardrails* para agentes.
+  - Un rule set decide `allow`, `deny` o `ask` sobre una llamada a herramienta (nombre, argumentos y contexto) o sobre una salida, y devuelve al modelo la explicación y los contrafactuales.
+  - El documento de decisión es el registro de auditoría: se relee y se verifica con las 8 comprobaciones.
+  - Integración con los *hooks* del Claude Agent SDK (`PreToolUse`), los *guardrails* del OpenAI Agents SDK y los nodos e interrupciones de LangGraph.
+- [ ] O.4 Adaptadores finos y opcionales (extras de carga perezosa) que convierten un `RuleSet` en herramienta de cada framework, probados contra versiones fijadas.
+  - Python: Claude Agent SDK, OpenAI Agents SDK, LangChain/LangGraph, LlamaIndex, Pydantic AI y CrewAI.
+  - JavaScript: Vercel AI SDK, LangChain.js y Mastra.
+  - JVM: LangChain4j y Spring AI.
+  - Go y Erlang, por MCP.
+- [ ] O.5 Reglas escritas por agentes.
+  - Ciclo proponer → validar (esquema y construcción, con errores corregibles) → auditar (J.4) → probar con casos → aprobación humana → desplegar, como herramientas MCP y como API.
+  - Nunca `eval`: las reglas propuestas son datos (invariante 9).
+  - Conjunto de evaluación (políticas en lenguaje natural → reglas) con métricas de validez y de acierto sobre casos reservados.
+- [ ] O.6 Sistema experto para agentes (tras K): hechos que aportan las herramientas del agente, encadenamiento hacia delante y el árbol de derivación como explicación.
+- [ ] O.7 Seguridad y documentación: modelo de amenazas (inyección de *prompts* a través de los datos, rule sets de origen no confiable, abuso de recursos), una guía por framework y ejemplos en `docs/`.
+
+---
+
 ### Fase M. Documentación y publicación 1.0 · tamaño M
 
 - [ ] M.0 Documentación con Zensical (Material for MkDocs termina su soporte el 5 de mayo de 2027).
-- [ ] M.1 Guías por lenguaje con los mismos ejemplos, referencia de la especificación, matriz de funcionalidades y benchmarks reproducibles.
-- [ ] M.2 Publicación sincronizada (crates.io, PyPI, npm, Maven Central, módulo Go, Conan y vcpkg) con *trusted publishing* donde exista; política de estabilidad de la API y de la ABI.
+- [ ] M.1 Guías por lenguaje (Erlang incluido) y por framework de agentes con los mismos ejemplos, referencia de la especificación, matriz de funcionalidades y benchmarks reproducibles.
+- [ ] M.2 Publicación sincronizada (crates.io, PyPI, npm, Maven Central, módulo Go, Hex, Conan y vcpkg, y el servidor MCP en el registro de MCP) con *trusted publishing* donde exista; política de estabilidad de la API y de la ABI.
 - [ ] M.3 Paper en JOSS, DOI en Zenodo y `CITATION.cff`.
   - `CITATION.cff` añadido por adelantado el 2026-10-31, sin `version` ni `doi`. Falta añadirlos con la primera *release*, junto con el DOI de Zenodo y el paper.
 
@@ -479,23 +538,28 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
 ## 5. Dependencias entre fases
 
 ```
-P (hecha) → 0' → A → B → C ─┬→ D → E → F → G → H
+P (hecha) → 0' → A → B → C ─┬→ D → E → F → G → H → N
                             ├→ I (necesita B; integra con C, F, G)
                             ├→ J (necesita B y D)
                             ├→ K (necesita B y D)
-                            └→ L (necesita C)
+                            ├→ L (necesita C)
+                            └→ O (necesita B, C y D; los adaptadores llegan a cada binding cuando existe)
 todas → M
 ```
 
-Los bindings E–H siguen el orden decidido (C/C++ → JS → JVM → Go). Las fases de funcionalidad I–K se implementan en el núcleo y llegan a todos los bindings existentes.
+Los bindings E–H y N siguen el orden decidido (C/C++ → JS → JVM → Go → Erlang); N necesita el núcleo y D.4, no la C ABI. O.1–O.3 pueden empezar en cuanto termine D, porque el servidor MCP solo necesita el núcleo y la carga de reglas; O.5 usa la auditoría de J.4, y O.6, el sistema experto de K. Las letras N y O se añadieron en la v3 del plan; las dos van antes de M. Las fases de funcionalidad I–K se implementan en el núcleo y llegan a todos los bindings existentes.
 
 ## 6. Riesgos
 
 | Riesgo | Impacto | Mitigación |
 |---|---|---|
-| Siete ecosistemas que empaquetar y mantener | Alto | Bindings finos, C ABI común, conformidad compartida y CI única desde E.1 |
+| Ocho ecosistemas que empaquetar y mantener | Alto | Bindings finos, C ABI común, conformidad compartida y CI única desde E.1 |
 | Divergencias entre lenguajes | Alto | Sin lógica en los bindings; vectores obligatorios |
 | Perder conocimiento al retirar Python | Medio | Fase A antes de borrar; tag en git |
 | Fallos de memoria en la frontera FFI | Alto | Handles opacos, propiedad explícita, sanitizers y `miri` |
 | Coste de convertir datos entre lenguajes | Medio | `Value` y lotes Arrow; benchmarks por binding |
 | Lógica difusa duplicada respecto a fuzzytool | Bajo | Solo las normas; tests contra fuzzytool como referencia |
+| Un NIF que bloquea o falla tumba la VM de Erlang | Alto | rustler (captura *panics*), *dirty schedulers* para el trabajo largo, sin estado global, tests de carga |
+| Los frameworks de agentes cambian deprisa | Medio | MCP como base estable; adaptadores finos, opcionales y probados contra versiones fijadas |
+| Reglas propuestas por un LLM incorrectas o maliciosas | Alto | Las reglas son datos (sin `eval`); validación, auditoría estática, casos de prueba y aprobación humana antes de desplegar |
+| Inyección de *prompts* a través de los datos evaluados | Medio | Los datos nunca son instrucciones para el motor; el servidor MCP es de solo lectura y no ejecuta acciones |

@@ -10,10 +10,10 @@ type: software
 title: "cleanrules: An explainable rules engine with a Rust core"
 abstract: >-
   An explainable rules engine with one Rust core and the same semantics in Rust,
-  C/C++, Python, JavaScript, Java/Scala and Go. One engine for business rules,
-  expert systems (forward chaining), data validation and explaining machine
-  learning models, with crisp three-valued (Kleene) and fuzzy logic. Every
-  result explains which rules fired, which did not, and why.
+  C/C++, Python, JavaScript, Java/Scala, Go and Erlang. One engine for business
+  rules, expert systems (forward chaining), data validation, explaining machine
+  learning models and guarding AI agents, with crisp three-valued (Kleene) and
+  fuzzy logic. Every result explains which rules fired, which did not, and why.
 authors:
   - family-names: "Salmeron"
     given-names: "Jose L."

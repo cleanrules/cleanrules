@@ -1,6 +1,6 @@
 # cleanrules
 
-Motor de reglas con **un único núcleo en Rust** y bindings para Rust, C/C++, Python, JavaScript, Java/Scala y Go. Cubre cuatro casos de uso con la misma semántica en todos los lenguajes: reglas de negocio, sistema experto (encadenamiento hacia delante), validación de datos y explicaciones de modelos de ML. Admite lógica nítida (Kleene, tres valores) y difusa (normas de `fuzzytool` portadas al núcleo).
+Motor de reglas con **un único núcleo en Rust** y bindings para Rust, C/C++, Python, JavaScript, Java/Scala, Go y Erlang. Cubre cuatro casos de uso con la misma semántica en todos los lenguajes: reglas de negocio, sistema experto (encadenamiento hacia delante), validación de datos y explicaciones de modelos de ML. Además, los agentes de IA lo usan como herramienta de decisión y como *guardrail* explicable, por un servidor MCP y adaptadores para sus frameworks. Admite lógica nítida (Kleene, tres valores) y difusa (normas de `fuzzytool` portadas al núcleo).
 
 - **Hoja de ruta y estado**: [docs/PLAN.md](docs/PLAN.md) es la fuente de verdad. Antes de empezar cualquier tarea, léela y localiza la fase y la tarea.
 - **Contratos**: la especificación ([spec/](spec/)) y la batería de conformidad (`conformance/`) definen la semántica. Si cambia el comportamiento, primero se actualizan la especificación y los vectores.
@@ -11,7 +11,8 @@ Motor de reglas con **un único núcleo en Rust** y bindings para Rust, C/C++, P
 ```text
 crates/core      el motor: valores, AST, lógicas, evaluador, reglas, políticas, explain, summary (crate `cleanrules`)
 crates/ffi       C ABI (cbindgen) que usan C/C++, Go y la JVM (crate `cleanrules-ffi`)
-bindings/<lang>  python (PyO3), c, cpp, js (napi-rs + wasm), jvm (Java FFM + Scala), go (cgo)
+crates/mcp       servidor MCP para agentes de IA (crate `cleanrules-mcp`, fase O)
+bindings/<lang>  python (PyO3), c, cpp, js (napi-rs + wasm), jvm (Java FFM + Scala), go (cgo), erlang (rustler)
 spec/            especificación normativa y JSON Schemas
 conformance/     vectores JSON, su comprobador (tools/check.py) y un runner por lenguaje
 scripts/         utilidades del repositorio (progress.py: barra de progreso del plan)
@@ -41,6 +42,8 @@ cmake -S bindings/cpp -B build/cpp && ctest --test-dir build/cpp
 npm --prefix bindings/js test
 (cd bindings/jvm && ./gradlew test)
 (cd bindings/go && go test ./...)
+(cd bindings/erlang && rebar3 ct)
+cargo run -p cleanrules-mcp -- --rules <dir>   # servidor MCP (fase O)
 
 # Especificación y vectores
 uv run --no-project --with jsonschema python spec/schemas/check.py
@@ -63,7 +66,8 @@ Un hook (`.claude/hooks/format.sh`) formatea tras cada edición los `.rs` (rustf
 8. **Todo resultado se explica.** Cada motor devuelve un resultado con `explain()`. Las explicaciones forman parte de la API pública, tienen forma JSON en la especificación y tests de *snapshot*.
 9. **Nada de `eval`.** El DSL de texto tiene parser propio, YAML se carga de forma segura y las regex usan el crate `regex` (tiempo lineal, sin *lookaround* ni *backreferences*). Los parsers tienen límites de profundidad y tamaño.
 10. **Memoria segura.** Sin `unsafe` en `crates/core`. En `crates/ffi` y los bindings, cada bloque `unsafe` lleva un comentario `// SAFETY:` y se prueba con `miri` o sanitizers. La propiedad de cada puntero de la C ABI está documentada en la cabecera.
-11. **Dependencias mínimas.** El núcleo depende solo de lo imprescindible (serde, regex, decimal, fechas). Arrow, YAML, rayon y z3 van detrás de *features* de Cargo. En cada binding, las integraciones (pandas, polars, fuzzytool, scikit-learn…) son opcionales y se cargan de forma perezosa.
+11. **Dependencias mínimas.** El núcleo depende solo de lo imprescindible (serde, regex, decimal, fechas). Arrow, YAML, rayon y z3 van detrás de *features* de Cargo. En cada binding, las integraciones (pandas, polars, fuzzytool, scikit-learn…) son opcionales y se cargan de forma perezosa. Lo mismo vale para los frameworks de agentes, y el SDK de MCP vive solo en `crates/mcp`.
+12. **La IA usa el motor, no forma parte de él.** Ni el núcleo ni los bindings llaman a modelos de lenguaje. Los agentes llegan por MCP o por adaptadores finos, que no ejecutan acciones ni leen fuera de lo configurado. Una regla propuesta por un LLM es un dato que se valida, se audita y se prueba como cualquier otro.
 
 ## Coherencia con fuzzytool
 
@@ -81,9 +85,9 @@ Un detalle para el binding de Python: `fuzzytool.sets.Antecedent.__and__` no dev
 
 - **Todo lo que se publica va en inglés**: código, identificadores, documentación, mensajes de error y commits. Este fichero y `docs/PLAN.md` están en español.
 - **Rust**: edición 2024, `clippy` pedante, `rustfmt`. Errores con `thiserror`: un tipo de error del núcleo con códigos estables (los mismos que en la especificación) y mensajes que indican qué regla o nodo falla y cómo corregirlo. Sin `unwrap`/`expect` en código de biblioteca salvo invariantes demostrables y comentadas. Logging con `tracing`, nunca `println!`.
-- **Bindings**: API idiomática de cada lenguaje (excepciones en Python, Java y C++; `error` como valor en Go; códigos de retorno en C), con los mismos nombres de conceptos (`Rule`, `RuleSet`, `Decision`, `explain`, `summary`) y la misma jerarquía de errores, que en Python cuelga de `cleanrules.CleanRulesError`.
+- **Bindings**: API idiomática de cada lenguaje (excepciones en Python, Java y C++; `error` como valor en Go; códigos de retorno en C; tuplas `{ok, _}` y `{error, _}` en Erlang), con los mismos nombres de conceptos (`Rule`, `RuleSet`, `Decision`, `explain`, `summary`) y la misma jerarquía de errores, que en Python cuelga de `cleanrules.CleanRulesError`.
 - **API pública**: lo exportado por cada paquete. Cualquier cambio actualiza `CHANGELOG.md` (Keep a Changelog), la documentación de los lenguajes afectados y, si toca el formato, la especificación. SemVer común a todos los paquetes; la versión del formato JSON es independiente.
-- **Commits**: Conventional Commits con ámbito por componente: `core`, `ffi`, `py`, `c`, `cpp`, `js`, `jvm`, `go`, `spec`, `conformance`, `docs`, `ci`. Un commit o PR por tarea del plan.
+- **Commits**: Conventional Commits con ámbito por componente: `core`, `ffi`, `py`, `c`, `cpp`, `js`, `jvm`, `go`, `erl`, `mcp`, `agents`, `spec`, `conformance`, `docs`, `ci`. Un commit o PR por tarea del plan.
 - **Tests**: unitarios junto al código en Rust; propiedades con `proptest` (leyes lógicas, De Morgan, suficiencia de explicaciones); vectores en `conformance/` para todo lo observable desde fuera; *snapshots* con `insta` para texto de `explain()` y `summary()`. Los tests lentos se marcan (`#[ignore]` con motivo, o `slow` en cada binding).
 
 ## Definición de terminado (cada tarea)

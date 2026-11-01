@@ -1,17 +1,19 @@
 # cleanrules
 
 An explainable rules engine with **one Rust core** and the same semantics in
-**Rust, C/C++, Python, JavaScript, Java/Scala and Go**. One engine for four
-jobs: **business rules**, **expert systems** (forward chaining), **data
-validation** and **explaining ML models**. Crisp (three-valued Kleene) and
-fuzzy logic share the same engine (fuzzy norms follow
-[fuzzytool](https://fuzzytool.github.io)), and every result explains itself.
+**Rust, C/C++, Python, JavaScript, Java/Scala, Go and Erlang**. One engine for
+four jobs: **business rules**, **expert systems** (forward chaining), **data
+validation** and **explaining ML models**, and a deterministic, explainable
+tool and guardrail for **AI agents** (through MCP and adapters for agent
+frameworks). Crisp (three-valued Kleene) and fuzzy logic share the same engine
+(fuzzy norms follow [fuzzytool](https://fuzzytool.github.io)), and every result
+explains itself.
 
 Website: <https://cleanrules.github.io>
 
 > **Status:** pre-alpha, nothing is published yet. The semantics are written
-> down as a **specification** and checked by **conformance vectors**; the Rust
-> core and the bindings are built against them next. See the
+> down as a **specification** and checked by **conformance vectors**. The Rust
+> core passes all of them; the bindings come next. See the
 > [roadmap](docs/PLAN.md) (in Spanish).
 
 ## What is here
@@ -20,6 +22,8 @@ Website: <https://cleanrules.github.io>
 |---|---|
 | [`spec/`](spec/) | The normative specification: condition AST, rules and hit policies, the data model, explanations, errors, and the JSON format (version 1) with its JSON Schemas |
 | [`conformance/`](conformance/) | 2,000+ language-neutral test vectors that every implementation must pass, and their checker |
+| [`crates/core/`](crates/core/) | The Rust core (crate `cleanrules`) |
+| [`benchmarks/`](benchmarks/) | Benchmark suites, results, and the comparison with zen-engine |
 | [`docs/PLAN.md`](docs/PLAN.md) | The roadmap and its decisions (in Spanish) |
 
 A rule as the engine reads it, in the JSON format:
