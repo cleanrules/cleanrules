@@ -24,7 +24,7 @@ import json
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, NoReturn, TypeAlias, overload
+from typing import TYPE_CHECKING, Any, NoReturn, TypeAlias, overload
 
 from cleanrules import _cleanrules as _native
 from cleanrules._expr import Const, Expr, _wrap  # pyright: ignore[reportPrivateUsage]
@@ -36,6 +36,9 @@ from cleanrules.errors import (
     RuleDefinitionError,
     RuleNotFoundError,
 )
+
+if TYPE_CHECKING:
+    from cleanrules._trees import ResultTree
 
 __all__ = [
     "Action",
@@ -238,7 +241,7 @@ class Rule:
 
     @property
     def tags(self) -> tuple[str, ...]:
-        """The tags, in order and without repeats."""
+        """The tags, sorted and without repeats."""
         return tuple(self._native.tags)
 
     @property
@@ -317,6 +320,8 @@ class ActionContext:
         rule: The rule whose action runs.
         data: The input, as given to `RuleSet.run`.
         result: The rule's result in the decision: its truth and its output.
+        tree: The result tree of the rule's condition: each node's truth or
+            value, and why it is unknown.
         output: The rule's evaluated payload (empty when it has none).
         decision: The whole decision.
     """
@@ -324,6 +329,7 @@ class ActionContext:
     rule: Rule
     data: object
     result: RuleResult
+    tree: ResultTree
     output: Mapping[str, object]
     decision: Decision
 
@@ -500,16 +506,21 @@ class RuleSet(Sequence[Rule]):
                 actions had already run (`executed`). Later actions do not run.
             EvaluationError: As `evaluate`.
         """
+        from cleanrules._trees import _tree  # pyright: ignore[reportPrivateUsage]
+
         decision = self.evaluate(data)
         executed: list[str] = []
         for result in decision.selected:
             action = result.rule.do
             if action is None:
                 continue
+            position = decision.results.index(result)
+            data_tree, encoded = decision._native.rule_tree(position)  # pyright: ignore[reportPrivateUsage]
             context = ActionContext(
                 rule=result.rule,
                 data=data,
                 result=result,
+                tree=_tree(data_tree, json.loads(encoded)),
                 output=result.output or MappingProxyType({}),
                 decision=decision,
             )
@@ -517,8 +528,7 @@ class RuleSet(Sequence[Rule]):
                 action(context)
             except Exception as error:
                 raise ActionError(
-                    f"the action of rule {result.rule.name!r} raised"
-                    f" {type(error).__name__}: {error}",
+                    f"the action raised {type(error).__name__}: {error}",
                     rule=result.rule.name,
                     executed=executed,
                     decision=decision,

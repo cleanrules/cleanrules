@@ -19,7 +19,11 @@ boundaries.
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
+
+if TYPE_CHECKING:
+    from cleanrules._expr import Expr
+    from cleanrules._rules import Decision
 
 __all__ = [
     "ActionError",
@@ -105,10 +109,10 @@ class CleanRulesError(Exception):
     name: str | None
     available: tuple[str, ...]
     executed: tuple[str, ...]
-    node: Any
+    node: Expr | None
     operation: str | None
     reason: str | None
-    decision: Any
+    decision: Decision | None
 
     def __init__(
         self, message: str, *, hint: str | None = None, code: str | None = None, **context: Any
@@ -135,7 +139,10 @@ class CleanRulesError(Exception):
         # Core messages often name the rule already (`two rules are named "a"`).
         if self.rule is not None and f'"{self.rule}"' not in text:
             text = f"rule {self.rule!r}: {text}"
-        if self.node is not None:
+        # A missing field's node is the field itself, which the message names.
+        if self.node is not None and not (
+            self.code == "missing_field" and self.node.tag == "field"
+        ):
             text = f"{text}, in `{self.node!r}`"
         if self.row is not None:
             text = f"{text} (input {self.row})"

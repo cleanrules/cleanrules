@@ -134,3 +134,11 @@ def test_attrs_classes() -> None:
     rules = RuleSet([Rule("r", (F.o.total > 10) & (F.o.lines[1] == 2), {"o": F.o})])
     decision = rules.evaluate({"o": Order(12.5, [1, 2])})
     assert decision.output == {"o": {"total": 12.5, "lines": [1, 2]}}
+
+
+@pytest.mark.filterwarnings("ignore::PendingDeprecationWarning")  # numpy.matrix itself
+def test_array_subclasses_are_lists() -> None:
+    matrix = np.asmatrix([[1, 2]])
+    truth, back = read(matrix, ~F.x.is_null())
+    assert truth is Truth.TRUE
+    assert back == [[1, 2]]

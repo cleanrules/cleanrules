@@ -43,6 +43,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- Python binding, safety: frames, tracebacks, code objects, generators,
+  coroutines and functions in the data are opaque; a rule can no longer reach
+  the program's globals or locals through them. Decisions in reference cycles
+  are freed by the garbage collector. `ActionContext.tree` gives the result
+  tree of the rule's condition.
+- Rust core and spec: a read error met in the middle of a path gives
+  `read_error` (and raises in strict mode) instead of an ordinary null;
+  `Error::unsupported` sets `operation` and `reason`.
+- Python binding: `evaluate_tree` and `evaluate_value_tree` evaluate one node
+  and return its `ResultTree` (`spec/ast.md`, *Evaluating one node*).
+- Python conformance runner: every vector runs through the binding's JSON
+  entry points and, except the `read` vectors, with native Python data and the
+  Python API; all pass.
 - Python binding: actions (`Rule(..., do=...)`) and `RuleSet.run`, which runs
   the actions of the selected rules in order with an `ActionContext` and stops
   at the first that raises with `ActionError`. `Rule` and `RuleSet` pickle and

@@ -158,7 +158,7 @@ pub fn evaluate_tree<'a, L: Logic>(
     if node.kind() == Kind::Value || node.is_null_constant() {
         return Err(Error::new(
             ErrorCode::ExpressionError,
-            format!("a {} is not a condition", node.tag()),
+            format!("'{}' is not a condition", node.tag()),
         )
         .with_hint("compare it, or evaluate it with evaluate_value_tree"));
     }
@@ -347,7 +347,7 @@ impl<L: Logic> Evaluator<'_, '_, L> {
             }
             Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_) => Err(Error::new(
                 ErrorCode::ExpressionError,
-                format!("a {} is not a condition", n.tag()),
+                format!("'{}' is not a condition", n.tag()),
             )),
         }
     }
@@ -625,9 +625,31 @@ impl<L: Logic> Evaluator<'_, '_, L> {
     }
 
     /// Follow a path through the input (`spec/ast.md`, *Reading data*).
+    /// A read error met while reading `path`: null with reason `read_error` for
+    /// the path being read, or in strict mode an `evaluation_error`.
+    fn read_error(&self, path: &[Segment], detail: &str) -> Result<(Value, Option<Reason>)> {
+        if self.options.strict {
+            return Err(self.error(
+                ErrorCode::EvaluationError,
+                format!("cannot read {}: {detail}", display_path(path)),
+                Some(path.to_vec()),
+            ));
+        }
+        let mut reason = Reason::new(ReasonCode::ReadError, vec![path.to_vec()]);
+        reason.detail = Some(detail.to_owned());
+        Ok((
+            Value::Null(NullCause::ReadError(detail.to_owned())),
+            Some(reason),
+        ))
+    }
+
     fn read(&self, path: &[Segment]) -> Result<(Value, Option<Reason>)> {
         let mut current = self.input;
         for (i, segment) in path.iter().enumerate() {
+            if let Value::Null(NullCause::ReadError(detail)) = current {
+                // A failure to read never passes for an ordinary null (`spec/ast.md`).
+                return self.read_error(path, detail);
+            }
             if current.is_null() {
                 // A null in the middle: the path exists up to it, even in strict mode.
                 return Ok((
@@ -677,18 +699,7 @@ impl<L: Logic> Evaluator<'_, '_, L> {
                 current.clone(),
                 Some(Reason::new(ReasonCode::DecimalOverflow, full())),
             ),
-            Value::Null(NullCause::ReadError(detail)) => {
-                if self.options.strict {
-                    return Err(self.error(
-                        ErrorCode::EvaluationError,
-                        format!("cannot read {}: {detail}", display_path(path)),
-                        Some(path.to_vec()),
-                    ));
-                }
-                let mut reason = Reason::new(ReasonCode::ReadError, full());
-                reason.detail = Some(detail.clone());
-                (current.clone(), Some(reason))
-            }
+            Value::Null(NullCause::ReadError(detail)) => return self.read_error(path, detail),
             other => (other.clone(), None),
         })
     }
@@ -961,6 +972,26 @@ mod tests {
         let error = evaluate_tree(&node, &data, &Kleene, strict).unwrap_err();
         assert_eq!(error.code(), ErrorCode::EvaluationError);
         assert_eq!(error.context().rule.as_deref(), Some("r"));
+    }
+
+    #[test]
+    fn read_errors_in_the_middle_of_a_path_are_not_ordinary_nulls() {
+        let node = field("customer").get("age").gt(1).build().unwrap();
+        let data = input(
+            "customer",
+            Value::Null(NullCause::ReadError("getter raised".into())),
+        );
+        let result = evaluate_tree(&node, &data, &Kleene, Options::default()).unwrap();
+        let reason = result.reason.as_ref().unwrap();
+        assert_eq!(reason.code, ReasonCode::ReadError);
+        assert_eq!(reason.paths.len(), 1);
+        assert_eq!(reason.paths[0].len(), 2); // the path being read
+        let strict = Options {
+            strict: true,
+            rule: None,
+        };
+        let error = evaluate_tree(&node, &data, &Kleene, strict).unwrap_err();
+        assert_eq!(error.code(), ErrorCode::EvaluationError);
     }
 
     #[test]

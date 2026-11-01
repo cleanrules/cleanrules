@@ -228,3 +228,136 @@ def test_objects_that_contain_themselves_do_not_crash() -> None:
     rules = RuleSet([Rule("r", F.n.value == 1, {"n": F.n})])
     decision = rules.evaluate({"n": Node()})
     assert decision.fired == ("r",)
+
+
+# --- Review fixes ---------------------------------------------------------------------
+
+
+def test_the_interpreter_cannot_be_reached_through_the_data() -> None:
+    import logging
+    import sys
+
+    # A local that no rule may read.
+    api_key = "secret"  # noqa: F841  # pyright: ignore[reportUnusedVariable]
+
+    try:
+        raise ValueError("boom")
+    except ValueError:
+        record = logging.LogRecord("x", logging.ERROR, "f", 1, "m", (), sys.exc_info())
+
+    def generator() -> Any:
+        secret = "local"  # noqa: F841  # pyright: ignore[reportUnusedVariable]
+        yield 1
+
+    running = generator()
+    next(running)
+
+    async def coroutine() -> None:
+        pass
+
+    pending = coroutine()
+    frame = sys._getframe()  # pyright: ignore[reportPrivateUsage]
+    data = {"rec": record, "g": running, "c": pending, "f": frame}
+    for path in (
+        F.rec.exc_info[2].tb_frame.f_globals,
+        F.g.gi_frame.f_locals.secret,
+        F.c.cr_frame,
+        F.f.f_locals.api_key,
+        F.f.f_code.co_name,
+    ):
+        assert reason(path == "x", data) == "missing_field"
+    pending.close()
+
+
+def test_a_decision_in_a_reference_cycle_is_freed() -> None:
+    import gc
+    import weakref
+
+    class Holder:
+        decision: object = None
+
+    rules = RuleSet([Rule("r", F.h.is_null() | ~F.h.is_null(), {"h": F.h})])
+    holder = Holder()
+    holder.decision = rules.evaluate({"h": holder})
+    gone = weakref.ref(holder)
+    del holder
+    gc.collect()
+    assert gone() is None
+
+
+def test_only_attribute_error_means_missing_for_attributes() -> None:
+    class Lookup:
+        @property
+        def value(self) -> int:
+            raise KeyError("not here")
+
+    assert reason(F.o.value > 1, {"o": Lookup()}) == "read_error"
+
+
+def test_rows_with_fields_are_records_even_if_not_tuples() -> None:
+    class Row:  # a stand-in for a SQLAlchemy 2 row
+        _fields = ("name", "age")
+
+        def __init__(self, name: str, age: int) -> None:
+            self.name, self.age = name, age
+
+        def __len__(self) -> int:
+            return 2
+
+        def __getitem__(self, i: int) -> object:
+            return (self.name, self.age)[i]
+
+    row = Row("ana", 30)
+    assert truth(F.r.age == 30, {"r": row}) is Truth.TRUE
+    assert truth(F.r[1] == 30, {"r": row}) is Truth.TRUE
+
+
+def test_functions_are_opaque() -> None:
+    def function() -> None:
+        pass
+
+    function.public = 1  # type: ignore[attr-defined]
+    decision = RuleSet([Rule("r", ~F.f.is_null(), {"f": F.f})]).evaluate({"f": function})
+    assert decision.output == {"f": function}
+    assert reason(F.f.public == 1, {"f": function}) == "missing_field"
+
+
+def test_errors_while_finding_the_shape_are_read_errors() -> None:
+    class Broken:
+        def __len__(self) -> int:
+            raise RuntimeError("no length")
+
+        def __getitem__(self, i: int) -> int:
+            return i
+
+    assert reason(F.b[0] == 0, {"b": Broken()}) == "read_error"
+
+
+def test_keys_are_listed_once_per_record() -> None:
+    class Row:
+        calls = 0
+
+        def keys(self) -> list[str]:
+            Row.calls += 1
+            return ["a", "b", "c", "d"]
+
+        def __getitem__(self, key: str) -> int:
+            return 1
+
+    rules = RuleSet([Rule("r", F.row.a == 1, {"row": F.row})])
+    rules.evaluate({"row": Row()})
+    assert Row.calls <= 2  # once to read `a`, once to convert the whole row
+
+
+def test_a_read_error_in_the_middle_of_a_path_is_not_a_null() -> None:
+    class Customer:
+        @property
+        def profile(self) -> object:
+            raise ValueError("the profile service is down")
+
+    data = {"c": Customer()}
+    assert reason(F.c.profile.age > 18, data) == "read_error"
+    with pytest.raises(EvaluationError) as info:
+        RuleSet([Rule("r", F.c.profile.age > 18)], strict=True).evaluate(data)
+    assert info.value.path == ("c", "profile", "age")
+    assert isinstance(info.value.__cause__, ValueError)

@@ -50,6 +50,16 @@ cleanrules uses three-valued logic instead of guessing. Pass `strict=True` to
 `RuleSet` to raise a `MissingFieldError` instead. Conditions are data, so some
 Python idioms do not work on them; see the [common pitfalls](../../docs/pitfalls.md).
 
+To evaluate one condition and see every step, use `evaluate_tree`:
+
+```python
+from cleanrules import evaluate_tree
+
+tree = evaluate_tree((F.age >= 18) & F.country.is_in(["ES"]), {"age": 20})
+tree.truth  # Truth.UNKNOWN
+tree.children[1].reason.code  # 'missing_field': there is no country
+```
+
 Wheels: one `abi3` wheel for CPython 3.11 and later, a version-specific wheel for
 free-threaded CPython 3.14, and one `abi3t` wheel for CPython 3.15 and later,
 free-threaded or not.

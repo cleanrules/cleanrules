@@ -109,7 +109,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv venv --python ${{ matrix.python }} .venv-test
       - run: uv pip install --python .venv-test --no-index --find-links dist cleanrules
-      - run: uv pip install --python .venv-test pytest
+      # The test suite's own dependencies (pytest, hypothesis, numpy, pandas, ...).
+      - run: uv pip install --python .venv-test pytest hypothesis numpy pandas pydantic attrs
       # Run from outside the source tree, so that the installed wheel is tested.
       - run: |
           cd "$RUNNER_TEMP"

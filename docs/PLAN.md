@@ -442,7 +442,24 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
   - Tipos: `pyright --verifytypes` da un 100 % de completitud en la API pública (antes un 83 %, por dos asignaciones de métodos sin anotar) y se comprueba en CI.
   - 258 tests en 3.11, 3.14, 3.14t y 3.15t.
   - Desviación respecto a la v1: el `ActionContext` lleva el `RuleResult` de la regla (`result`) en vez del árbol de resultados de su condición (`tree`), que Python aún no expone; y añade `decision`.
-- [ ] C.5 Runner de conformidad en Python.
+- [x] C.5 Runner de conformidad en Python.
+  - Hecho el 2026-11-01: `bindings/python/tests/test_conformance.py`, con pytest, un caso por vector y pasada. Cada vector corre dos veces, como pide `conformance/README.md`:
+    - `json`: por las entradas JSON del binding (`_cleanrules._read_document`, `_evaluate`, `_explain`, …; privadas hasta D.1). Comprueba que documentos y errores llegan a Python intactos.
+    - `native`: la entrada se convierte en valores nativos de Python (`Decimal`, `datetime` con su zona, `dict`…), las condiciones y reglas se construyen con `F`, `Const`, operadores y `Rule`, y el resultado vuelve por la API de Python. Prueba el código propio del binding.
+  - API nueva que pide la especificación (`spec/ast.md`, *Evaluating one node*): `evaluate_tree(condition, data, *, logic, strict)` y `evaluate_value_tree(value, data, *, strict)`, que devuelven un `ResultTree` (nodo, verdad o valor, motivo, hijos, `to_dict()`).
+  - Resultado: pasan los 2.135 vectores por JSON y los 1.948 que no son de lectura en nativo (4.084 casos), en 3.11, 3.14, 3.14t, 3.15 y 3.15t. Se comprobó con un fallo provocado en el lector nativo (las claves ausentes leídas como nulos) que la pasada nativa lo detecta: 851 casos fallan.
+  - El runner conserva el texto de los números al releer los documentos (`1e-7` no pasa a `1e-07`), para que los vectores de límites de tamaño cuenten los mismos bytes.
+  - CI: el trabajo de pruebas de `wheels.yml` instala las dependencias de los tests (hypothesis, numpy, pandas…), que faltaban desde C.2.
+  - Desviaciones: los vectores de lectura solo tienen la pasada JSON (la nativa no lee documentos); el texto de `explain()` y `summary()` llega con D.2.
+  - Revisión de la API de C.2c a C.5 (subagente `api-reviewer`), aplicada:
+    - Bloqueante: una regla podía leer variables globales y locales del programa a través de frames, tracebacks y generadores (`F.rec.exc_info[2].tb_frame.f_globals…`). Esos objetos del intérprete, y las funciones, son ahora opacos y nunca se lee a través de ellos; `spec/data-model.md` (*Safety*, *Python*) lo dice.
+    - Bloqueante: una decisión con objetos opacos en un ciclo de referencias no se liberaba. `PyDecision` implementa `__traverse__` y `__clear__` (los objetos van tras un `Mutex` que solo se toma para copiarlos, sin ejecutar Python, y el recolector usa `try_lock`).
+    - `KeyError` solo significa ausente al leer un elemento, no un atributo; las filas con `_fields` que no son tuplas (SQLAlchemy 2) son registros; los arrays de numpy (también `matrix`) se leen por `tolist()`; los escalares de numpy se reconocen por `numpy.generic`; una excepción al averiguar la forma de un valor (un `__len__` que lanza) es un `read_error`; `keys()` se pide una vez por registro; las fichas opacas usan un `HashMap`; las listas dispersas conservan su longitud.
+    - Núcleo y especificación: un `read_error` en mitad de una ruta ya no pasa por un nulo corriente (`spec/ast.md`, *Missing values*): da `read_error` y, en modo estricto, un `EvaluationError` encadenado. `Error::unsupported(operation, reason)`. El mensaje «a add is not a condition» pasa a «'add' is not a condition».
+    - `ActionContext.tree` (el árbol de resultados de la condición, sin volver a leer los datos); el mensaje de `ActionError` ya no repite la regla; `evaluate_tree` elige la lógica con un `match`; `ResultTree` no expone su JSON en el constructor; `node` y `decision` de los errores tienen tipo; el docstring de `Rule.tags` dice que van ordenadas, como hace el núcleo.
+    - Desviaciones anotadas: donde termina una ruta, las listas y mapas se convierten enteros en el momento (la especificación permite referencias nativas perezosas; queda como optimización); las claves no textuales de un mapa se descartan en vez de volverse opacas, porque una ruta no puede leerlas.
+
+**Cumplida la fase C el 2026-11-01**: el binding de Python tiene la API de la v1, lee datos nativos como dice la especificación, ejecuta acciones, se serializa con pickle, tiene tipos completos y pasa todos los vectores en sus dos pasadas. La publicación en PyPI (la «primera versión pública») la hace el autor cuando decida; antes conviene la revisión de la API de la v0.1.
 
 ---
 

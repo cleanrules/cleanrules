@@ -33,6 +33,7 @@ from cleanrules._rules import (
     Summary,
     Truth,
 )
+from cleanrules._trees import ResultTree, evaluate_tree, evaluate_value_tree
 from cleanrules.errors import (
     ActionError,
     CleanRulesError,
@@ -77,6 +78,7 @@ __all__ = [
     "Note",
     "Reason",
     "RegistryError",
+    "ResultTree",
     "Rule",
     "RuleDefinitionError",
     "RuleExplanation",
@@ -93,4 +95,6 @@ __all__ = [
     "UnsupportedError",
     "__version__",
     "errors",
+    "evaluate_tree",
+    "evaluate_value_tree",
 ]

@@ -190,7 +190,12 @@ result into an error that another order would not raise (see *Types*).
   `is_null`.
 - A null met **in the middle** of a path (`F.customer.age` with `customer`
   null) makes the field null, even in strict mode: the path exists up to a
-  null. A null input is null at the empty path ("the input").
+  null. A null input is null at the empty path ("the input"). The exception is
+  a null that stands for a **read error** (reading `customer` raised): the field
+  is null with reason `read_error`, and strict mode raises, as when the error
+  is met at the end of the path (*Reading data*). A failure to read never
+  passes for an ordinary null. *Not checked by vectors: read errors only come
+  from native data, so each binding's tests check this.*
 - **NaN read from the data is null**, whatever its type (`data-model.md`).
   Languages disagree on how NaN compares and orders, so treating it as missing
   is the only portable choice. NaN produced by arithmetic, such as

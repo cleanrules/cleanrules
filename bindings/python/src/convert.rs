@@ -484,15 +484,23 @@ pub(crate) fn decimal_class(py: Python<'_>) -> PyResult<&Bound<'_, PyType>> {
     DECIMAL.import(py, "decimal", "Decimal")
 }
 
-/// Whether `value` is a numpy scalar (not an array): `numpy.bool_`,
-/// `numpy.datetime64` and the others, read as scalars.
+/// Whether `value` is a numpy scalar (`numpy.generic`: `bool_`, `int64`,
+/// `datetime64`...), never an array. numpy is not imported for this: a value
+/// can only be one if numpy is already loaded.
 ///
 /// # Errors
 ///
-/// If the type's module cannot be read.
+/// If `sys.modules` cannot be read.
 pub(crate) fn is_numpy_scalar(value: &Bound<'_, PyAny>) -> PyResult<bool> {
-    let class = value.get_type();
-    Ok(class.module()?.to_str()? == "numpy" && class.name()?.to_str()? != "ndarray")
+    let py = value.py();
+    let modules = py.import("sys")?.getattr("modules")?;
+    let Ok(numpy) = modules.get_item("numpy") else {
+        return Ok(false);
+    };
+    match numpy.getattr("generic") {
+        Ok(generic) => value.is_instance(&generic),
+        Err(_) => Ok(false),
+    }
 }
 
 /// A datetime finer than a microsecond (`pandas.Timestamp`), truncated to its
@@ -518,4 +526,26 @@ pub(crate) fn truncated(value: &Bound<'_, PyAny>) -> PyResult<Value> {
         Ok(converted) => converted,
         Err(_) => Value::Null(NullCause::Null),
     })
+}
+
+/// A numpy array (any `ndarray`, subclasses such as `matrix` included) as the
+/// nested Python lists of its `tolist()`, which convert like any list; `None`
+/// for anything else. Indexing a matrix gives a matrix again, so arrays are
+/// never read element by element.
+///
+/// # Errors
+///
+/// If `tolist()` raises.
+pub(crate) fn numpy_array_as_list<'py>(
+    value: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    let py = value.py();
+    let modules = py.import("sys")?.getattr("modules")?;
+    let Ok(numpy) = modules.get_item("numpy") else {
+        return Ok(None);
+    };
+    match numpy.getattr("ndarray") {
+        Ok(ndarray) if value.is_instance(&ndarray)? => Ok(Some(value.call_method0("tolist")?)),
+        _ => Ok(None),
+    }
 }

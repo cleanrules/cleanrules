@@ -10,9 +10,11 @@
 
 mod convert;
 mod errors;
+mod json_api;
 mod node;
 mod read;
 mod rules;
+mod trees;
 
 use pyo3::prelude::*;
 
@@ -42,5 +44,14 @@ fn _cleanrules(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<rules::PyDecision>()?;
     module.add_function(wrap_pyfunction!(rules::rule, module)?)?;
     module.add_function(wrap_pyfunction!(rules::ruleset, module)?)?;
+    module.add_function(wrap_pyfunction!(trees::evaluate_condition, module)?)?;
+    module.add_function(wrap_pyfunction!(trees::evaluate_value, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::_read_document, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::_read_decision, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::_evaluate, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::_evaluate_many, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::_explain, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::_summary, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::_evaluate_node, module)?)?;
     Ok(())
 }

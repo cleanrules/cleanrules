@@ -127,3 +127,19 @@ def test_rules_with_lambdas_do_not_pickle() -> None:
     rule = Rule("r", F.x > 1, do=lambda context: None)
     with pytest.raises((pickle.PicklingError, AttributeError, TypeError)):
         pickle.dumps(rule)
+
+
+def test_actions_receive_the_condition_tree() -> None:
+    seen: list[ActionContext] = []
+    shop(do_loyal=seen.append).run({"years": 3})
+    tree = seen[0].tree
+    assert tree.truth is Truth.TRUE
+    assert tree.node.same_as(F.years > 2)
+    assert tree.children[0].value == 3
+
+
+def test_action_errors_name_the_rule_once() -> None:
+    with pytest.raises(ActionError) as info:
+        shop(do_vip=fail).run({"years": 9})
+    assert str(info.value).count("vip") == 2  # the rule, and the action's own message
+    assert str(info.value).startswith("rule 'vip': the action raised ValueError")

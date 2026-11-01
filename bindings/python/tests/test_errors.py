@@ -79,17 +79,21 @@ def test_errors_name_the_failing_node() -> None:
 
     with pytest.raises(errors.ExpressionError) as built:
         _ = (F.a > 1) < F.b
+    assert built.value.node is not None
     assert built.value.node.same_as(F.a > 1)
     assert str(built.value).endswith(", in `F.a > 1`")
 
     rules = RuleSet([Rule("r", (F.a > 1) & (F.b < 2))], strict=True)
     with pytest.raises(errors.MissingFieldError) as missing:
         rules.evaluate({"a": 5})
+    assert missing.value.node is not None
     assert missing.value.node.same_as(F.b)
     with pytest.raises(errors.TypeMismatchError) as mismatch:
         rules.evaluate({"a": "x"})
+    assert mismatch.value.node is not None
     assert mismatch.value.node.same_as(F.a > 1)
     clone = pickle.loads(pickle.dumps(mismatch.value))
+    assert clone.node is not None
     assert clone.node.same_as(F.a > 1)
 
 

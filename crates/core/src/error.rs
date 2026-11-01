@@ -209,6 +209,14 @@ impl Error {
         self
     }
 
+    /// Say what was not supported, and why (`unsupported`).
+    #[must_use]
+    pub fn unsupported(mut self, operation: impl Into<String>, reason: impl Into<String>) -> Self {
+        self.inner.context.operation = Some(operation.into());
+        self.inner.context.reason = Some(reason.into());
+        self
+    }
+
     /// Set the JSON Pointer.
     #[must_use]
     pub fn at_pointer(mut self, pointer: impl Into<String>) -> Self {
@@ -306,6 +314,13 @@ mod tests {
                 "unsupported",
             ]
         );
+    }
+
+    #[test]
+    fn unsupported_says_what_and_why() {
+        let error = Error::new(ErrorCode::Unsupported, "no").unsupported("explain", "graded logic");
+        assert_eq!(error.context().operation.as_deref(), Some("explain"));
+        assert_eq!(error.context().reason.as_deref(), Some("graded logic"));
     }
 
     #[test]

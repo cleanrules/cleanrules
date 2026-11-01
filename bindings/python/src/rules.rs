@@ -7,7 +7,7 @@
 //! again: evaluation is deterministic (`CLAUDE.md`, invariant 7), so it is the
 //! same decision.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use cleanrules::explain::{Cause, Gap, GroupKind, Requirement, explain, summary};
 use cleanrules::format::{write_decision, write_explanation, write_summary};
@@ -18,6 +18,7 @@ use cleanrules::{Error, ErrorCode, Map, Value};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDelta, PyDict, PyList, PyTuple};
+use pyo3::{PyTraverseError, PyVisit};
 
 use crate::convert;
 use crate::errors::path_to_py;
@@ -180,11 +181,12 @@ impl PyRuleSet {
 
 /// The Python exception of a core error; a `read_error` in strict mode is
 /// chained to the exception that reading the data raised (`spec/ast.md`).
-fn chained(py: Python<'_>, error: &Error, native: &Native) -> PyErr {
+pub(crate) fn chained(py: Python<'_>, error: &Error, native: &Native) -> PyErr {
     let raised = to_py(py, error);
     if error.code() == ErrorCode::EvaluationError
         && let Some(path) = &error.context().path
-        && let Some((_, cause)) = native.errors.iter().find(|(at, _)| at == path)
+        // The exception was raised reading the path or one of its prefixes.
+        && let Some((_, cause)) = native.errors.iter().find(|(at, _)| path.starts_with(at))
     {
         raised.set_cause(py, Some(cause.clone_ref(py)));
     }
@@ -204,7 +206,9 @@ pub(crate) struct PyDecision {
     ruleset: Arc<RuleSet>,
     input: Value,
     /// The native objects of the input's opaque values, given back in outputs.
-    objects: Vec<Py<PyAny>>,
+    /// Behind a lock so that the garbage collector can clear them (`__clear__`)
+    /// in a frozen class: an object may hold its own decision.
+    objects: Mutex<Vec<Py<PyAny>>>,
     outcomes: Vec<RuleOutcome>,
     selected: Vec<usize>,
     output: Result<Option<Value>, Error>,
@@ -247,12 +251,19 @@ impl PyDecision {
         Self {
             ruleset: Arc::clone(ruleset),
             input: native.value,
-            objects: native.objects,
+            objects: Mutex::new(native.objects),
             outcomes,
             selected,
             output: decision.output(),
             aggregated,
         }
+    }
+
+    /// The native objects, copied out of the lock: no Python code runs while
+    /// it is held, so the garbage collector never waits on it.
+    fn objects(&self, py: Python<'_>) -> Vec<Py<PyAny>> {
+        let objects = self.objects.lock().unwrap_or_else(PoisonError::into_inner);
+        objects.iter().map(|object| object.clone_ref(py)).collect()
     }
 
     /// Evaluate the input again; it succeeded before, so it succeeds now.
@@ -275,12 +286,29 @@ fn pairs_to_dict<'py>(
 
 #[pymethods]
 impl PyDecision {
+    fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
+        // Never wait inside the collector: a held lock is released at once anyway.
+        if let Ok(objects) = self.objects.try_lock() {
+            for object in objects.iter() {
+                visit.call(object)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn __clear__(&self) {
+        let taken =
+            std::mem::take(&mut *self.objects.lock().unwrap_or_else(PoisonError::into_inner));
+        drop(taken);
+    }
+
     /// Every rule's result, in rule order: `(fired, truth, output or None)`.
     fn results<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
+        let objects = self.objects(py);
         let list = PyList::empty(py);
         for outcome in &self.outcomes {
             let output = match &outcome.output {
-                Some(pairs) => pairs_to_dict(py, pairs, &self.objects)?.into_any(),
+                Some(pairs) => pairs_to_dict(py, pairs, &objects)?.into_any(),
                 None => py.None().into_bound(py),
             };
             list.append((outcome.fired, outcome.truth, output))?;
@@ -296,7 +324,7 @@ impl PyDecision {
     /// The single output, or `None`; raises for multi-hit decisions.
     fn output<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         match &self.output {
-            Ok(Some(value)) => convert::to_py_with(py, value, &self.objects),
+            Ok(Some(value)) => convert::to_py_with(py, value, &self.objects(py)),
             Ok(None) => Ok(py.None().into_bound(py)),
             Err(error) => Err(to_py(py, error)),
         }
@@ -306,7 +334,7 @@ impl PyDecision {
     /// selected.
     fn aggregated<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         match &self.aggregated {
-            Some(map) => convert::to_py_with(py, &Value::Map(map.clone()), &self.objects),
+            Some(map) => convert::to_py_with(py, &Value::Map(map.clone()), &self.objects(py)),
             None => Ok(py.None().into_bound(py)),
         }
     }
@@ -320,6 +348,7 @@ impl PyDecision {
     /// `note`, `achievable` and `requirement` (a cause or a group, as dicts).
     fn explanation<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
         let decision = self.rebuild(py)?;
+        let objects = self.objects(py);
         let list = PyList::empty(py);
         for entry in explain(&decision).rules {
             let dict = PyDict::new(py);
@@ -338,11 +367,30 @@ impl PyDecision {
             dict.set_item("achievable", entry.achievable)?;
             dict.set_item(
                 "requirement",
-                requirement_to_py(py, &entry.requirement, &self.objects)?,
+                requirement_to_py(py, &entry.requirement, &objects)?,
             )?;
             list.append(dict)?;
         }
         Ok(list)
+    }
+
+    /// The result tree of rule `index`'s condition, as Python data and in the
+    /// JSON format, from the input already read (never read again).
+    fn rule_tree<'py>(
+        &self,
+        py: Python<'py>,
+        index: usize,
+    ) -> PyResult<(Bound<'py, PyDict>, String)> {
+        let decision = self.rebuild(py)?;
+        let Some(result) = decision.results().get(index) else {
+            return Err(pyo3::exceptions::PyIndexError::new_err(
+                "no rule at that position",
+            ));
+        };
+        Ok((
+            crate::trees::tree_to_py(py, &result.when, &self.objects(py))?,
+            to_string(&cleanrules::format::write_result(&result.when)),
+        ))
     }
 
     /// The explanation in the JSON format, as text.

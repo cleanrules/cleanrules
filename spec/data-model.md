@@ -193,8 +193,11 @@ Every binding follows the same rules, adapted to its language:
   component, or an object's **public data attribute**. It never reads a private
   member (Python names starting with `_`, JavaScript `#` fields and symbols,
   Java non-public members, Go unexported fields), a method, a class, a module or
-  a prototype, and never an attribute of a scalar (a string, a number, a date).
-  A rule loaded from a file can never reach into the process.
+  a prototype, and never an attribute of a scalar (a string, a number, a date)
+  or of the runtime's own objects that expose the program (Python frames,
+  tracebacks, code objects, generators and coroutines, whose public attributes
+  lead to its globals and locals). A rule loaded from a file can never reach
+  into the process.
 - **No side effects.** Looking up a key never inserts one (Python
   `defaultdict`, `__missing__`). A getter or property that raises gives a null
   with reason `read_error`, except the error the language uses to mean "no such
@@ -225,8 +228,13 @@ The Python binding reads exactly as the v1 did. A string segment reads:
 - on any other object, the attribute if it is public data: never a name
   starting with `_`, a method, a class or a module, never an attribute of a
   plain sequence, and never one of a scalar (`bool`, numbers, `str`, `bytes`,
-  `bytearray`, `complex`, `Decimal`, dates, times, `timedelta`), a class or a
-  module. So `F.d.days` on a `timedelta` is missing.
+  `bytearray`, `complex`, `Decimal`, dates, times, `timedelta`), a class, a
+  module, a function or method, or one of the interpreter's objects (frames,
+  tracebacks, code objects, generators, coroutines, async generators and
+  cells). So `F.d.days` on a `timedelta` is missing, and so is
+  `F.rec.exc_info[2].tb_frame` on a logging record. These values are opaque.
+- a numpy array, through its `tolist()`: indexing a `numpy.matrix` gives a
+  matrix again.
 
 Pydantic models are read by field name, not alias, and their extra and computed
 fields are readable. An integer segment indexes anything with `__len__` and

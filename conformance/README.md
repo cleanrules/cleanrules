@@ -88,6 +88,10 @@ output, never stopping at the first one.
 
 - **Core**: `cargo test -p cleanrules --test conformance` reads the documents
   and data with the core's own JSON reader.
+- **Python**: `cd bindings/python && uv run pytest tests/test_conformance.py`
+  runs every vector through the binding's JSON entry points (`json:<id>`) and,
+  except the `read` vectors, with native Python data and the Python API
+  (`native:<id>`).
 - **Each binding** runs every vector twice: once through its JSON entry points,
   and once converting `input` into the language's native data (with the
   conversions of `spec/data-model.md`: floats as floats, with `cr.float` in
