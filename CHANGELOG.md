@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- `cleanrules::ast`: the condition AST, valid by construction, with the
+  construction rules of `spec/ast.md`, structural identity and field paths.
+- `cleanrules::format::read_document` and `write_document` for condition
+  documents, with the error order and locations of the spec.
 - `cleanrules::format::value`: values in JSON, read as constants, data or
   recorded values and written in canonical form, including datetimes with
   fixed offsets or IANA time zones checked against the bundled database.

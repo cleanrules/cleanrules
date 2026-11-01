@@ -8,68 +8,12 @@
 // A test: a panic is the failure report.
 #![allow(clippy::unwrap_used, clippy::panic)]
 
+mod common;
+
 use std::fs;
-use std::path::{Path, PathBuf};
 
 use cleanrules::json::{Json, Limits, parse};
-
-fn vectors_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance/vectors")
-}
-
-fn vector_files() -> Vec<PathBuf> {
-    let mut files = Vec::new();
-    let mut dirs = vec![vectors_dir()];
-    while let Some(dir) = dirs.pop() {
-        for entry in fs::read_dir(&dir).unwrap() {
-            let path = entry.unwrap().path();
-            if path.is_dir() {
-                dirs.push(path);
-            } else if path.extension().is_some_and(|e| e == "json") {
-                files.push(path);
-            }
-        }
-    }
-    files.sort();
-    files
-}
-
-fn get<'a>(value: &'a Json, key: &str) -> Option<&'a Json> {
-    match value {
-        Json::Object(members) => members.iter().find(|(k, _)| k == key).map(|(_, v)| v),
-        _ => None,
-    }
-}
-
-fn text(value: Option<&Json>) -> Option<&str> {
-    match value {
-        Some(Json::String(s)) => Some(s),
-        _ => None,
-    }
-}
-
-fn int(value: Option<&Json>) -> Option<u64> {
-    match value {
-        Some(Json::Number(n)) => n.as_i128().and_then(|i| u64::try_from(i).ok()),
-        _ => None,
-    }
-}
-
-fn limits_of(given: &Json) -> Limits {
-    let mut limits = Limits::default();
-    if let Some(custom) = get(given, "limits") {
-        if let Some(size) = int(get(custom, "max_size")) {
-            limits.max_size = usize::try_from(size).unwrap();
-        }
-        if let Some(nesting) = int(get(custom, "max_nesting")) {
-            limits.max_nesting = usize::try_from(nesting).unwrap();
-        }
-        if let Some(depth) = int(get(custom, "max_depth")) {
-            limits.max_depth = usize::try_from(depth).unwrap();
-        }
-    }
-    limits
-}
+use common::{get, int, limits_of, text, vector_files, vectors_dir};
 
 #[test]
 fn every_vector_file_is_readable() {

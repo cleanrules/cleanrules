@@ -287,7 +287,18 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - La escritura es canónica.
       - Pasan los 79 vectores de `format/values`. Se comprobó que el test detecta expectativas alteradas, incluido el signo de `-0.0`.
     - Pendiente: exponer en la API la versión de la base de datos de zonas (`spec/json-format.md`, *Time zones*); se hará cuando exista una API pública de documentos (B.3).
-- [ ] B.3 AST con serde: los 14 tipos de nodo y sus validaciones al construir, identidad estructural, `field_paths`, `Display` legible.
+- [x] B.3 AST con serde: los 14 tipos de nodo y sus validaciones al construir, identidad estructural, `field_paths`, `Display` legible.
+  - Hecho el 2026-11-01.
+    - `cleanrules::ast`: `Node` solo se construye con constructores que aplican las reglas de `spec/ast.md`, así que no puede existir un árbol inválido; `Expr` expone su forma para leerla.
+    - Igualdad y hash estructurales: el entero 1 y el float 1.0 son nodos distintos, mientras que 0.0 y -0.0 son el mismo. Incluye `field_paths` en preorden.
+    - Los valores de `in` se ordenan y deduplican. `matches` compila con `regex`, que rechaza lookaround y retroreferencias.
+    - `cleanrules::format`: `read_document` y `write_document` para documentos de condición, con el orden de errores de la especificación: forma en preorden y luego construcción en postorden, con punteros.
+    - Pasan los 150 vectores de `format/documents`, `values`, `conditions` y `limits`. Se comprobó que el test detecta expectativas alteradas. Las ayudas de los tests están en `tests/common`.
+    - Desviaciones:
+      - No se usa serde, porque el lector JSON es propio (B.2b).
+      - El `Display` de las condiciones se deja para la sintaxis del DSL (D.2), que también fijará el texto de `explain()`.
+      - El lector de nodos es recursivo hasta `max_depth` (256 por defecto). Si alguien sube mucho ese límite, necesitará más pila; se revisará antes de la v0.1.
+      - Sigue pendiente exponer la versión de la base de zonas horarias.
 - [ ] B.4 API de construcción idiomática en Rust (constructores y sobrecarga de operadores donde tenga sentido; macros solo si aportan).
 - [ ] B.5 Lógicas: `Logic` (trait), Kleene, registro por nombre y capacidad `Graded`.
 - [ ] B.6 Evaluador: lectura de `Value` por rutas, nulos, tipos, aritmética (float64, desbordamiento de 64 bits, `Decimal`), todos los nodos, árbol de resultados con `Reason`, modo estricto y orden de errores.
