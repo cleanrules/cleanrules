@@ -169,6 +169,9 @@ pub(crate) fn scalar(value: &Bound<'_, PyAny>) -> PyResult<Result<Value, Problem
     if value.is_none() {
         return Ok(Ok(Value::Null(NullCause::Null)));
     }
+    if let Some(converted) = numpy_or_pandas(value)? {
+        return Ok(converted);
+    }
     if let Ok(boolean) = value.cast::<PyBool>() {
         return Ok(Ok(Value::Bool(boolean.is_true())));
     }
@@ -213,6 +216,57 @@ pub(crate) fn scalar(value: &Bound<'_, PyAny>) -> PyResult<Result<Value, Problem
         return Ok(Ok(Value::Date(civil_date(date)?)));
     }
     Ok(Err(Problem::Opaque(type_name(value))))
+}
+
+fn is_pandas_missing(module: &str, name: &str) -> bool {
+    module.starts_with("pandas") && (name == "NAType" || name == "NaTType")
+}
+
+/// Whether `value` is `pandas.NA` or `pandas.NaT`, which read as null scalars.
+///
+/// # Errors
+///
+/// If the type's module or name cannot be read.
+pub(crate) fn is_missing_scalar(value: &Bound<'_, PyAny>) -> PyResult<bool> {
+    let class = value.get_type();
+    Ok(is_pandas_missing(
+        class.module()?.to_str()?,
+        class.name()?.to_str()?,
+    ))
+}
+
+/// The numpy and pandas values the generic rules would get wrong: their
+/// missing values (`pandas.NA`, `pandas.NaT`, numpy's `NaT`) are null,
+/// `numpy.datetime64` is a naive datetime (truncated to the microsecond), and
+/// `numpy.timedelta64`, which numpy makes an integer, is opaque.
+fn numpy_or_pandas(value: &Bound<'_, PyAny>) -> PyResult<Option<Result<Value, Problem>>> {
+    let class = value.get_type();
+    let module = class.module()?;
+    let module = module.to_str()?;
+    let name = class.name()?;
+    let name = name.to_str()?;
+    if is_pandas_missing(module, name) {
+        return Ok(Some(Ok(Value::Null(NullCause::Null))));
+    }
+    if module != "numpy" || !(name == "datetime64" || name == "timedelta64") {
+        return Ok(None);
+    }
+    // NaT is the only value not equal to itself.
+    if !value.eq(value)? {
+        return Ok(Some(Ok(Value::Null(NullCause::Null))));
+    }
+    if name == "timedelta64" {
+        return Ok(Some(Err(Problem::Opaque(name.to_owned()))));
+    }
+    // Microseconds give a datetime.datetime; beyond its years numpy gives an int.
+    let item = value
+        .call_method1("astype", ("datetime64[us]",))?
+        .call_method0("item")?;
+    Ok(Some(if item.is_instance_of::<PyDateTime>() {
+        scalar(&item)?
+    } else {
+        Err(Problem::Opaque(name.to_owned()))
+    }))
 }
 
 /// A Python constant as a value (`spec/data-model.md`, *Constants*).

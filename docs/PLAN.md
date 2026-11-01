@@ -431,7 +431,11 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
     - Núcleo: los registros, mapas cuyas entradas tienen posición (`Map::record`, `get_index`); un segmento entero lee la posición en un registro y nunca en un mapa normal (`spec/ast.md`).
     - 231 tests en 3.11, 3.14 y 3.14t (14 nuevos de lectura, uno por regla de la especificación); clippy, pyright y ruff limpios.
     - Desviación: las listas dispersas solo llegan hasta el último índice leído (nadie lee su longitud). La pista de `missing_field` con las claves disponibles queda para más adelante.
-  - [ ] C.3b numpy y pandas (escalares de numpy, `datetime64`, `NaT`, `pandas.NA`, arrays como listas), y tests con numpy, pandas, Pydantic y attrs instalados (dependencias de desarrollo que hay que aprobar).
+  - [x] C.3b numpy y pandas (escalares de numpy, `datetime64`, `NaT`, `pandas.NA`, arrays como listas), y tests con numpy, pandas, Pydantic y attrs instalados (dependencias de desarrollo que hay que aprobar).
+    - Hecho el 2026-11-01 (dependencias de desarrollo aprobadas por el autor: numpy, pandas, Pydantic y attrs; los usuarios no las necesitan).
+    - `pandas.NA`, `pandas.NaT` y el `NaT` de numpy son nulos; `numpy.datetime64` es una fecha con hora sin zona, truncada al microsegundo (fuera de los años 1 a 9999, opaca); `numpy.timedelta64`, que numpy declara entero, es opaco y no rompe la lectura.
+    - Ya funcionaban, y ahora tienen tests: escalares de numpy, arrays como listas, `pandas.Timestamp` con nanosegundos o con zona, filas de `iterrows()` (registros con `keys()`) e `itertuples()` (namedtuples), y modelos de Pydantic (por nombre de campo y no por alias, con campos extra y calculados) y clases de attrs.
+    - 251 tests en 3.11, 3.14, 3.14t, 3.15 y 3.15t (rc1), sin ninguno omitido.
 - [ ] C.4 `run` y acciones en Python; pickle; tipos (`.pyi`).
 - [ ] C.5 Runner de conformidad en Python.
 

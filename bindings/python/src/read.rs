@@ -355,6 +355,7 @@ fn shape(value: &Bound<'_, PyAny>) -> PyResult<Shape> {
         || value.is_instance(NUMBER.import(py, "numbers", "Number")?)?
         || value.is_instance(convert::decimal_class(py)?)?
         || convert::is_numpy_scalar(value)?
+        || convert::is_missing_scalar(value)?
     {
         return Ok(Shape::Scalar);
     }

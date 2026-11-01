@@ -61,7 +61,11 @@ extend = "../../ruff.toml"
 
 [dependency-groups]
 dev = [
+    "attrs>=26.1.0",
     "hypothesis>=6.170.14",
+    "numpy>=2.4.6",
+    "pandas>=3.1.0",
+    "pydantic>=2.14.2",
     "pyright>=1.1.414",
     "pytest>=9.2.0",
 ]

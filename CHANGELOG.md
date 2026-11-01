@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- Python binding: numpy and pandas values: numpy scalars, `datetime64` (a
+  naive datetime, truncated to the microsecond), arrays as lists, `NaT`,
+  `pandas.NA` and `pandas.NaT` as nulls, `Timestamp`s, and pandas rows from
+  `iterrows()` and `itertuples()`.
 - Python binding: input data is read as `spec/data-model.md` says: only the
   paths a rule set reads, each object once; mappings, records (namedtuples,
   objects with `keys()` such as pandas rows), sequences and objects' public

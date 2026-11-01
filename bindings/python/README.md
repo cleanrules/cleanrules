@@ -5,9 +5,9 @@ explainable rules engine with one Rust core and the same semantics in Rust,
 C/C++, Python, JavaScript, Java/Scala, Go and Erlang.
 
 > **Pre-alpha.** Nothing is published yet. Input data can be dicts, lists,
-> dataclasses, namedtuples, pandas rows and other objects: only the fields the
-> rules read are read. numpy and pandas scalars, actions and loading rules from
-> files come next in the roadmap.
+> dataclasses, Pydantic models, namedtuples, pandas rows, numpy values and other
+> objects: only the fields the rules read are read. Actions and loading rules
+> from files come next in the roadmap.
 
 ```python
 from decimal import Decimal
