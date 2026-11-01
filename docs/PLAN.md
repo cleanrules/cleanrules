@@ -362,9 +362,15 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
     - Medición en `benchmarks/results/2026-11-01-core.json` (Apple M5, rustc 1.97.1), guardada como línea base de criterion `2026-11-01`: unos 7,2 µs por entrada con `first` (12 reglas), 11,5 µs por explicación y 58 µs con su JSON.
     - Desviación: `criterion` sin las características por defecto (sin gráficos ni rayon), para no arrastrar dependencias.
     - Pendiente para optimizar (con benchmark, en una tarea propia): escribir la explicación en JSON cuesta unas 4 veces más que construirla.
-  - [ ] B.10b Comparación con zen-engine con el mismo rule set como tabla de decisión JDM, en un crate aparte en `benchmarks/` fuera del workspace. Requiere aprobar la dependencia `zen-engine`.
+  - [x] B.10b Comparación con zen-engine con el mismo rule set como tabla de decisión JDM, en un crate aparte en `benchmarks/` fuera del workspace.
+    - Hecho el 2026-11-01: `benchmarks/zen` (zen-engine 2.1.6, con su propio `[workspace]`; no se compila en CI). Reutiliza la carga de `crates/core/benches/common` y expresa las 12 reglas como una tabla de decisión compilada, sin traza.
+    - Antes de medir comprueba que los dos motores seleccionan las mismas reglas para los 1.000 solicitantes con `first` y con `collect`, y que zen no modifica la entrada. Coinciden en todos; se comprobó con una fila alterada que la comprobación lo detecta.
+    - Resultado en `benchmarks/results/2026-11-01-zen.json`: 1.000 evaluaciones en 7,22 ms frente a 46,4 ms con `first` (6,4×) y 8,51 ms frente a 56,7 ms con `collect` (6,7×), sin solapamiento de intervalos. cleanrules hace más trabajo (evalúa todas las reglas y guarda los árboles para explicar). Es una sola carga en una sola máquina.
+    - Desviación: en macOS 27, el `strip` de Xcode deja inservible la proc macro `rquickjs-macro` (de zen) en perfil release (E0463), así que el crate desactiva `strip` en `profile.release.build-override`.
 
 **Aceptación**: el 100 % de los vectores en verde; `clippy -D warnings`; sin `unsafe` en `core`.
+
+Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de lectura), `clippy -D warnings` está limpio y `core` prohíbe `unsafe` (`unsafe_code = "forbid"`). Antes de publicar la v0.1 del crate quedan la revisión de la API y el lector de nodos iterativo.
 
 ---
 

@@ -1,0 +1,28 @@
+[package]
+name = "cleanrules-bench-zen"
+description = "Compares cleanrules with zen-engine on the core's benchmark workload"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT"
+
+# Outside the cleanrules workspace, so that the core never depends on zen-engine.
+[workspace]
+
+[dependencies]
+cleanrules = { path = "../../crates/core" }
+serde_json = "1.0.154"
+zen-engine = "2.1.6"
+
+[dev-dependencies]
+criterion = { version = "0.8.2", default-features = false, features = ["cargo_bench_support"] }
+
+[[bench]]
+name = "compare"
+harness = false
+
+# Stripping the rquickjs-macro proc macro (release's default) leaves a library
+# that rustc rejects with E0463 on macOS 27 (Xcode's strip), so proc macros and
+# build scripts keep their symbols.
+[profile.release.build-override]
+strip = false

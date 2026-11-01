@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- Benchmark comparison with zen-engine (`benchmarks/zen`), on the same rules
+  as a zen decision table, after checking that both engines select the same
+  rules for every input.
 - Benchmarks of the Rust core (`criterion`, `crates/core/benches/`): the `eval`
   and `explain` suites over a shared loan screening workload, with the first
   results in `benchmarks/results/`.

@@ -4,7 +4,7 @@ Motor de reglas con **un único núcleo en Rust** y bindings para Rust, C/C++, P
 
 - **Hoja de ruta y estado**: [docs/PLAN.md](docs/PLAN.md) es la fuente de verdad. Antes de empezar cualquier tarea, léela y localiza la fase y la tarea.
 - **Contratos**: la especificación ([spec/](spec/)) y la batería de conformidad (`conformance/`) definen la semántica. Si cambia el comportamiento, primero se actualizan la especificación y los vectores.
-- **Fase actual**: A completada (especificación, formato JSON v1 y vectores de conformidad). La implementación Python v1 (`rulepy`) se retiró en A.4 y queda en el tag `python-reference` como referencia secundaria. Siguiente: fase B (núcleo Rust).
+- **Fase actual**: A y B completadas (especificación, formato JSON v1 y vectores de conformidad; núcleo Rust en `crates/core`, que pasa todos los vectores). La implementación Python v1 (`rulepy`) se retiró en A.4 y queda en el tag `python-reference` como referencia secundaria. Siguiente: fase C (binding Python).
 
 ## Estructura
 
@@ -15,6 +15,7 @@ bindings/<lang>  python (PyO3), c, cpp, js (napi-rs + wasm), jvm (Java FFM + Sca
 spec/            especificación normativa y JSON Schemas
 conformance/     vectores JSON, su comprobador (tools/check.py) y un runner por lenguaje
 scripts/         utilidades del repositorio (progress.py: barra de progreso del plan)
+benchmarks/      resultados de los benchmarks y comparación con rivales (zen/, fuera del workspace)
 docs/            PLAN.md y pitfalls.md (pasa a la documentación del binding de Python en la fase C)
 ```
 

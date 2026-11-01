@@ -1,0 +1,50 @@
+{
+  "date": "2026-11-01",
+  "suites": [
+    "compare"
+  ],
+  "machine": {
+    "os": "Darwin 27.0.0 arm64",
+    "cpu": "Apple M5",
+    "cores": 10,
+    "memory_gib": 32
+  },
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+  "profile": "bench (release)",
+  "rivals": {
+    "zen-engine": "2.1.6"
+  },
+  "workload": "crates/core/benches/common: 12 loan screening rules, 1,000 deterministic applicants; the same rules as one zen decision table, compiled, without trace",
+  "agreement": "both engines select the same rules for all 1,000 applicants under first and collect (checked before measuring)",
+  "interval": "criterion's 95 % confidence interval of the mean time per iteration (1,000 evaluations)",
+  "cases": [
+    {
+      "case": "compare/cleanrules/batch_1000/first",
+      "low_ns": 7216700,
+      "estimate_ns": 7221700,
+      "high_ns": 7226700
+    },
+    {
+      "case": "compare/zen/batch_1000/first",
+      "low_ns": 46366000,
+      "estimate_ns": 46416000,
+      "high_ns": 46468000
+    },
+    {
+      "case": "compare/cleanrules/batch_1000/collect",
+      "low_ns": 8503700,
+      "estimate_ns": 8510200,
+      "high_ns": 8516600
+    },
+    {
+      "case": "compare/zen/batch_1000/collect",
+      "low_ns": 56617000,
+      "estimate_ns": 56696000,
+      "high_ns": 56794000
+    }
+  ],
+  "factors": {
+    "first": 6.4,
+    "collect": 6.7
+  }
+}
