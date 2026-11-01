@@ -350,7 +350,11 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
     - Pasan **los 317 vectores de explicación y los 3 de resumen** a la primera; en total, 1.948 vectores en el runner más 187 de lectura. Se comprobó con cinco expectativas alteradas que el runner las detecta.
     - Cada decisión, evaluada o explicada, se relee con su rule set y supera las 8 comprobaciones; la releída se explica igual.
     - Desviación: el texto de `explain()` y de `summary()` se deja para D.2, con la sintaxis del DSL.
-- [ ] B.9 Runner de conformidad en Rust y tests de propiedades con `proptest` (leyes lógicas, De Morgan, suficiencia de las explicaciones).
+- [x] B.9 Runner de conformidad en Rust y tests de propiedades con `proptest` (leyes lógicas, De Morgan, suficiencia de las explicaciones).
+  - Hecho el 2026-11-01: el runner de conformidad ya existía desde B.4 (`crates/core/tests/conformance.rs`); se añadió `crates/core/tests/properties.rs` con 6 propiedades, 512 casos cada una.
+    - Generadores: escalares (int, float, decimal, bool, texto, fecha) y nulos en los campos `a`, `b` y `c` (a veces ausente), y árboles de condiciones de hasta 3 niveles construidos con los constructores de `Node`.
+    - Propiedades: la evaluación no estricta nunca falla y da razón justo cuando la verdad es desconocida o el valor es nulo; el modo estricto coincide o lanza un error de la familia de evaluación; De Morgan y la doble negación; ida y vuelta de las condiciones por JSON; toda decisión se relee (cuatro políticas); y la suficiencia de las explicaciones (`selected`: todas las causas se cumplen; `not_fired` alcanzable: ninguna; `unknown`: todas desconocidas).
+    - Pasan a la primera, sin contraejemplos que convertir en vectores. Se comprobó con dos propiedades alteradas que proptest las detecta y reduce el contraejemplo.
 - [ ] B.10 Benchmarks con `criterion` (evaluación por lote, explicación), comparados con zen-engine.
 
 **Aceptación**: el 100 % de los vectores en verde; `clippy -D warnings`; sin `unsafe` en `core`.

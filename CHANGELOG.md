@@ -43,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- Property tests of the Rust core (`proptest`): non-strict evaluation never
+  fails and gives a reason exactly for unknown truths and null values; strict
+  mode agrees or raises an evaluation error; De Morgan and double negation
+  hold on evaluation; conditions round-trip through JSON; every decision reads
+  back; and explanation causes all hold for selected rules, none hold for
+  achievable rules that did not fire, and are all unknown for unknown ones.
 - `cleanrules::explain`: explanations (status, `all`/`any` requirements,
   simplification, options checked to make the rule fire, causes with the values
   read, counterfactuals with exact gaps, notes) and summaries, with their JSON
