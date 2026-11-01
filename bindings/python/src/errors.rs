@@ -25,8 +25,9 @@ fn class_name(code: ErrorCode) -> &'static str {
         ErrorCode::TypeMismatch => "TypeMismatchError",
         ErrorCode::HitPolicyError => "HitPolicyError",
         ErrorCode::ActionError => "ActionError",
+        ErrorCode::Unsupported => "UnsupportedError",
         // The core's codes are `#[non_exhaustive]`: a new one is still an error.
-        _ => "UnsupportedError",
+        _ => "CleanRulesError",
     }
 }
 
@@ -106,6 +107,18 @@ pub(crate) fn expression(py: Python<'_>, message: impl Into<String>, hint: &str)
         py,
         &Error::new(ErrorCode::ExpressionError, message).with_hint(hint),
     )
+}
+
+/// A `rule_definition_error` raised by the binding itself, naming the rule.
+pub(crate) fn definition(
+    py: Python<'_>,
+    rule: &str,
+    message: impl Into<String>,
+    hint: &str,
+) -> PyErr {
+    let mut error = Error::new(ErrorCode::RuleDefinitionError, message).with_hint(hint);
+    error.context_mut().rule = Some(rule.to_owned());
+    to_py(py, &error)
 }
 
 /// Turn core results into Python ones.

@@ -12,7 +12,7 @@ use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{
     PyBool, PyDate, PyDateAccess, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyFloat, PyInt,
-    PyList, PyString, PyTimeAccess, PyType, PyTzInfo, PyTzInfoAccess,
+    PyList, PyString, PyTimeAccess, PyTuple, PyType, PyTzInfo, PyTzInfoAccess,
 };
 
 use crate::errors;
@@ -334,4 +334,173 @@ fn map_to_py<'py>(py: Python<'py>, map: &Map) -> PyResult<Bound<'py, PyDict>> {
         dict.set_item(key, to_py(py, item)?)?;
     }
     Ok(dict)
+}
+
+/// How deep input data and metadata are converted: the format's node depth.
+const MAX_DEPTH: usize = 256;
+
+/// Python input data as a value, converted whole.
+///
+/// Provisional (task C.2b): mappings, sequences and scalars only. Task C.3
+/// replaces it with the sparse reading of `spec/data-model.md` (*Reading native
+/// data*): only the paths a rule set reads, records, objects and `read_error`.
+/// A container nested deeper than 256 levels, or one that contains itself, is
+/// opaque, as any element that cannot be converted.
+///
+/// # Errors
+///
+/// A Python exception raised while reading the data.
+pub(crate) fn data(value: &Bound<'_, PyAny>) -> PyResult<Value> {
+    data_at(value, &mut Reading::default())
+}
+
+/// The state of one conversion.
+#[derive(Default)]
+struct Reading {
+    /// The containers being converted, outermost first, by identity.
+    open: Vec<usize>,
+    /// The opaque objects met, by identity, in order: their tokens are their
+    /// positions, so they never depend on memory addresses (invariant 7).
+    opaque: Vec<usize>,
+}
+
+impl Reading {
+    fn opaque(&mut self, value: &Bound<'_, PyAny>, type_name: String) -> Value {
+        let id = value.as_ptr() as usize;
+        let position = self
+            .opaque
+            .iter()
+            .position(|&o| o == id)
+            .unwrap_or_else(|| {
+                self.opaque.push(id);
+                self.opaque.len() - 1
+            });
+        Value::Opaque(cleanrules::value::Opaque {
+            type_name,
+            token: position as u64,
+        })
+    }
+}
+
+fn data_at(value: &Bound<'_, PyAny>, reading: &mut Reading) -> PyResult<Value> {
+    let is_dict = value.cast::<PyDict>().is_ok();
+    let is_sequence = value.cast::<PyList>().is_ok() || value.cast::<PyTuple>().is_ok();
+    if is_dict || is_sequence {
+        let id = value.as_ptr() as usize;
+        if reading.open.len() >= MAX_DEPTH || reading.open.contains(&id) {
+            return Ok(reading.opaque(value, type_name(value)));
+        }
+        reading.open.push(id);
+        let converted = if let Ok(dict) = value.cast::<PyDict>() {
+            let mut map = Map::new();
+            for (key, item) in dict.iter() {
+                // Keys are strings; an entry under another key cannot be read by a path.
+                if let Ok(key) = key.cast::<PyString>()
+                    && let Ok(key) = key.to_str()
+                {
+                    map.insert(key, data_at(&item, reading)?);
+                }
+            }
+            Value::Map(map)
+        } else {
+            let mut items = Vec::new();
+            for item in value.try_iter()? {
+                items.push(data_at(&item?, reading)?);
+            }
+            Value::List(items)
+        };
+        reading.open.pop();
+        return Ok(converted);
+    }
+    scalar_data(value, reading)
+}
+
+fn scalar_data(value: &Bound<'_, PyAny>, reading: &mut Reading) -> PyResult<Value> {
+    Ok(match scalar(value)? {
+        Ok(converted) => converted,
+        Err(Problem::IntOverflow) => Value::Null(NullCause::IntOverflow),
+        Err(Problem::DecimalOverflow) => Value::Null(NullCause::DecimalOverflow),
+        Err(Problem::NotANumber) => Value::Null(NullCause::Null),
+        // Data finer than a microsecond is truncated: the datetime part is kept.
+        Err(Problem::TooPrecise) => {
+            let datetime = value.cast::<PyDateTime>()?;
+            let plain = PyDateTime::new(
+                value.py(),
+                datetime.get_year(),
+                datetime.get_month(),
+                datetime.get_day(),
+                datetime.get_hour(),
+                datetime.get_minute(),
+                datetime.get_second(),
+                datetime.get_microsecond(),
+                datetime.get_tzinfo().as_ref(),
+            )?;
+            return scalar_data(&plain, reading);
+        }
+        // Task C.3 keeps the native object, to give it back in outputs.
+        Err(Problem::Opaque(type_name)) => reading.opaque(value, type_name),
+    })
+}
+
+/// Rule metadata as a value: data values only, converted with the rules of
+/// constants (`spec/json-format.md`: no NaN, nothing opaque).
+///
+/// # Errors
+///
+/// A message naming the key path of the first value that is not data.
+pub(crate) fn metadata(value: &Bound<'_, PyAny>) -> PyResult<Result<Value, String>> {
+    metadata_at(value, "metadata", &mut Vec::new())
+}
+
+fn metadata_at(
+    value: &Bound<'_, PyAny>,
+    at: &str,
+    open: &mut Vec<usize>,
+) -> PyResult<Result<Value, String>> {
+    let is_dict = value.cast::<PyDict>().is_ok();
+    let is_sequence = value.cast::<PyList>().is_ok() || value.cast::<PyTuple>().is_ok();
+    if is_dict || is_sequence {
+        let id = value.as_ptr() as usize;
+        if open.contains(&id) {
+            return Ok(Err(format!("{at} contains itself")));
+        }
+        if open.len() >= MAX_DEPTH {
+            return Ok(Err(format!(
+                "{at} is nested deeper than {MAX_DEPTH} levels"
+            )));
+        }
+        open.push(id);
+        let converted = if let Ok(dict) = value.cast::<PyDict>() {
+            let mut map = Map::new();
+            for (key, item) in dict.iter() {
+                let Ok(key) = key.extract::<String>() else {
+                    return Ok(Err(format!("{at} has a key that is not a string: {key}")));
+                };
+                match metadata_at(&item, &format!("{at}[{key:?}]"), open)? {
+                    Ok(item) => map.insert(key, item),
+                    Err(problem) => return Ok(Err(problem)),
+                }
+            }
+            Value::Map(map)
+        } else {
+            let mut items = Vec::new();
+            for (index, item) in value.try_iter()?.enumerate() {
+                match metadata_at(&item?, &format!("{at}[{index}]"), open)? {
+                    Ok(item) => items.push(item),
+                    Err(problem) => return Ok(Err(problem)),
+                }
+            }
+            Value::List(items)
+        };
+        open.pop();
+        return Ok(Ok(converted));
+    }
+    let shown = value
+        .repr()
+        .map_or_else(|_| "?".to_owned(), |r| r.to_string());
+    Ok(match scalar(value)? {
+        Ok(converted) => Ok(converted),
+        Err(Problem::NotANumber) => Err(format!("{at} is NaN, which is not data")),
+        Err(_) => Err(format!("{at} is not a data value: {shown}")),
+    })
 }

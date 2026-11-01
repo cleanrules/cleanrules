@@ -116,7 +116,8 @@ class CleanRulesError(Exception):
 
     def __str__(self) -> str:
         text = self.message
-        if self.rule is not None:
+        # Core messages often name the rule already (`two rules are named "a"`).
+        if self.rule is not None and f'"{self.rule}"' not in text:
             text = f"rule {self.rule!r}: {text}"
         if self.row is not None:
             text = f"{text} (input {self.row})"

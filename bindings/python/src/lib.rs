@@ -11,6 +11,7 @@
 mod convert;
 mod errors;
 mod node;
+mod rules;
 
 use pyo3::prelude::*;
 
@@ -35,5 +36,10 @@ fn _cleanrules(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(node::abs_, module)?)?;
     module.add_function(wrap_pyfunction!(node::neg, module)?)?;
     module.add_function(wrap_pyfunction!(node::node_from_json, module)?)?;
+    module.add_class::<rules::PyRule>()?;
+    module.add_class::<rules::PyRuleSet>()?;
+    module.add_class::<rules::PyDecision>()?;
+    module.add_function(wrap_pyfunction!(rules::rule, module)?)?;
+    module.add_function(wrap_pyfunction!(rules::ruleset, module)?)?;
     Ok(())
 }

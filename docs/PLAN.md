@@ -401,7 +401,22 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
     - Los nodos se copian como sí mismos y se serializan con pickle a través del formato JSON (`node_from_json`).
     - 166 tests (los de la v1, adaptados, y propiedades con hypothesis: el `repr` se reevalúa al mismo árbol, pickle conserva el árbol y la clase). Pasan en 3.11, 3.14 y 3.14t; pyright estricto y ruff limpios.
     - Desviaciones: los nodos son una sola familia (`Field`, `Const` y un nodo genérico hermano), no una clase por operador; las comparaciones entre nodos conservan su orientación. Siguiendo la especificación, la constante nula es de tipo `value` (la v1 decía `any`). Dependencia de desarrollo nueva: `hypothesis`.
-  - [ ] C.2b `Rule`, `RuleSet`, `Decision`, `explain` y `summary`, con una conversión provisional de los datos de entrada (la definitiva es C.3).
+  - [x] C.2b `Rule`, `RuleSet`, `Decision`, `explain` y `summary`, con una conversión provisional de los datos de entrada (la definitiva es C.3).
+    - Hecho el 2026-11-01: `python/cleanrules/_rules.py` (`HitPolicy`, `Truth`, `Rule`, `RuleSet` como secuencia por posición y por nombre, `RuleResult`, `Decision`, `Explanation`, `RuleExplanation`, `Summary`) sobre las clases nativas de `src/rules.rs`.
+    - Una `Decision` del núcleo toma prestado su rule set, así que la de Python guarda el rule set (compartido con `Arc`) y la entrada convertida, con lo que se lee de inmediato (resultados, seleccionadas, salidas). `explain()` y `to_dict()` evalúan otra vez la entrada: la evaluación es determinista (invariante 7).
+    - `explain()` devuelve la explicación estructurada (la forma JSON de la especificación, con accesos por regla y `causes`); su texto llega en D.2, con el DSL. `to_dict()` devuelve documentos completos (`version` más `decision`, `explanation` o `summary`), así que los punteros `at` de una explicación se resuelven en el documento de la decisión (hay un test).
+    - Conversión provisional de la entrada: dicts, listas, tuplas y escalares; enteros fuera de 64 bits, decimales que no caben y NaN pasan a nulos con su motivo; lo demás es opaco. La lectura dispersa de la especificación llega en C.3.
+    - 202 tests en 3.11, 3.14 y 3.14t (uno evalúa el mismo rule set desde 8 hilos); pyright estricto, ruff y clippy limpios.
+    - Desviaciones respecto a la v1: `evaluate_many` devuelve una lista (los errores llevan `row`), no un iterador; `Rule` aún no tiene `do` (acciones, C.4) y aún no se serializa con pickle (C.4).
+    - Revisión de la API (subagente `api-reviewer`), aplicada:
+      - Bloqueante: convertir datos que se contienen a sí mismos o con 200.000 niveles tumbaba el intérprete. Ahora la conversión tiene un límite de 256 niveles y detecta ciclos; lo que pasa de ahí es opaco, como cualquier elemento que no se puede convertir. Las fichas de los valores opacos se numeran por orden de aparición, nunca por dirección de memoria (invariante 7).
+      - `evaluate_many` rechaza cadenas, mapas y data frames (`spec/rules.md`).
+      - `explain()` devuelve objetos con valores de Python (`Cause` con su nodo, `Truth`, `holds`, los valores leídos, `Reason` y `Counterfactual`, con huecos `Decimal` o `timedelta`; `CauseGroup`; `Note`; `Status`), no la codificación JSON, que sigue en `to_dict()`.
+      - `Summary` expone `FieldUsage` (qué reglas y qué cargas leen cada campo), `rules` y la configuración.
+      - Los metadatos se validan como datos (sin NaN ni valores opacos, con la ruta de la clave en el error) y `Rule.metadata` devuelve lo que guarda el núcleo.
+      - Salidas y decisiones de solo lectura; los errores de constantes de la carga nombran la regla y la clave; se permiten claves vacías, como en el formato; `hit_policy` y `aggregate` aceptan cualquier capitalización, como la v1; `Aggregate` es un `StrEnum`; la evaluación suelta el GIL en las compilaciones con GIL; un código de error nuevo se traduce a `CleanRulesError`; la pista del núcleo para salidas múltiples ya no usa sintaxis de método.
+      - Pendiente (tarea propia, abajo): los campos de contexto `node`, `operation`, `reason` y `decision` de `spec/errors.md` no existen aún en el `Context` del núcleo.
+  - [ ] C.2c Campos de contexto de error que faltan en el núcleo (`node` en `expression_error` y en los errores de evaluación, `operation` y `reason` en `unsupported`, `decision` en `action_error`), y su paso a Python (`node` como `Expr`). No se comparan en los vectores.
 - [ ] C.3 Conversión de datos (dicts, dataclasses, Pydantic, namedtuples, filas de pandas, numpy) a `Value`, con las reglas de seguridad de `spec/data-model.md`.
 - [ ] C.4 `run` y acciones en Python; pickle; tipos (`.pyi`).
 - [ ] C.5 Runner de conformidad en Python.

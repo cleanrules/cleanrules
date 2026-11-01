@@ -723,7 +723,7 @@ impl<'a> Decision<'a> {
                     self.ruleset.hit_policy.as_str()
                 ),
             )
-            .with_hint("read outputs(), or use collect with an aggregate"));
+            .with_hint("read the outputs, or use collect with an aggregate"));
         }
         Ok(self
             .selected()

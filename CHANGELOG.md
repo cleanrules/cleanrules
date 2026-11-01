@@ -43,6 +43,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- Python binding: `Rule`, `RuleSet` (a sequence of rules by position and by
+  name), `HitPolicy`, `Aggregate`, `Truth`, `Status`, `Decision` (`results`,
+  `selected`, `fired`, read-only `outputs` and `output`, `aggregated`,
+  `explain()`, `why_not()`, `to_dict()`), `RuleResult`, `Explanation`,
+  `RuleExplanation`, `Cause`, `CauseGroup`, `Reason`, `Counterfactual`, `Note`,
+  `Summary`, `FieldUsage` and `RuleSummary`, evaluated and explained by the
+  core. Explanations hold Python values (gaps are numbers or `timedelta`s).
+  Input data is converted whole for now (dicts, lists and scalars), with a
+  depth limit and cycle detection. Rule sets can be shared by threads, also on
+  free-threaded Python; evaluation releases the GIL.
 - Python binding: conditions built with `F`, `Field`, `Const`, operators and
   methods (`is_in`, `between`, `is_null`, `matches`, `starts_with`,
   `ends_with`, `contains`, `abs`), with the v1's guards against Python
