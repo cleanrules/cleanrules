@@ -1,0 +1,13 @@
+HIT POLICY priority
+
+RULE blocked PRIORITY 99 DESCRIPTION "blocked customers never get a discount"
+IF customer.blocked
+THEN discount = 0
+
+RULE vip PRIORITY 10 TAGS loyalty
+IF customer.years > 5 AND order.total > 1000
+THEN discount = 0.15
+
+RULE loyal PRIORITY 5 TAGS loyalty
+IF customer.years > 2 OR customer.newsletter
+THEN discount = 0.05

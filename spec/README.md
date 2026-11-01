@@ -22,6 +22,7 @@ lists the differences.
 | [`data-model.md`](data-model.md) | draft | Values (decimals of 38 digits, datetimes, opaque values, nulls with a reason) and how each language's data becomes values |
 | [`errors.md`](errors.md) | draft | Error codes, hierarchy and compared context fields |
 | [`explain.md`](explain.md) | draft | Explanations (status, requirements, simplification, counterfactuals, notes) and summaries |
+| [`text.md`](text.md) | draft | The text syntax of conditions, rules and rule sets (`IF … THEN …`), and their canonical printed form |
 | [`json-format.md`](json-format.md) | draft, format version 1 | Documents, values, conditions, rules, rule sets, decisions, explanations and summaries as JSON |
 | [`schemas/v1/`](schemas/v1/) | draft | JSON Schemas (draft 2020-12) for values and for every document (condition, rule, rule set, decision, explanation, summary), with valid and invalid examples checked by `schemas/check.py` |
 

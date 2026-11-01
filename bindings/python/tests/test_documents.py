@@ -1,4 +1,4 @@
-"""Loading and dumping documents in JSON and YAML (task D.1)."""
+"""Loading and dumping documents in JSON and YAML (task D.1) and text (task D.2a)."""
 
 import json
 from decimal import Decimal
@@ -7,6 +7,7 @@ from pathlib import Path
 import cleanrules
 import pytest
 from cleanrules import (
+    Const,
     Expr,
     ExpressionError,
     F,
@@ -191,3 +192,89 @@ def test_the_documented_examples_load() -> None:
     assert isinstance(from_yaml, RuleSet)
     assert dumps(from_yaml) == dumps(from_json)
     assert (examples / "discounts.yaml").read_text() == dumps(from_yaml, format="yaml")
+    from_text = load(examples / "discounts.rules")
+    assert dumps(from_text) == dumps(from_json)
+    assert (examples / "discounts.rules").read_text() == dumps(from_text, format="text") + "\n"
+
+
+# --- Text (task D.2a) -------------------------------------------------------------------
+
+SHOP_TEXT = """HIT POLICY priority
+
+RULE vip PRIORITY 10 TAGS gold
+IF customer.years > 5 AND since IS NULL
+THEN discount = 0.15, label = "VIP"
+
+RULE loyal PRIORITY 5
+IF customer.years > 2
+THEN discount = 0.05"""
+
+
+def test_text_round_trip() -> None:
+    rules = loads(SHOP_TEXT, format="text")
+    assert isinstance(rules, RuleSet)
+    assert dumps(rules, format="text") == SHOP_TEXT
+    assert rules["vip"].then["discount"].same_as(Const(Decimal("0.15")))
+    decision = rules.evaluate({"customer": {"years": 9}, "since": None})
+    assert decision.output == {"discount": Decimal("0.15"), "label": "VIP"}
+    # The same model as the JSON document, without metadata and description.
+    plain = RuleSet(
+        [Rule(r.name, r.when, r.then, priority=r.priority, tags=r.tags) for r in shop()],
+        hit_policy="priority",
+    )
+    assert dumps(loads(dumps(plain, format="text"), format="text")) == dumps(plain)
+
+
+@given(tree=conditions)
+def test_conditions_round_trip_through_text(tree: Expr) -> None:
+    text = dumps(tree, format="text")
+    back = loads(text, format="text")
+    assert isinstance(back, Expr)
+    assert back.same_as(tree), text
+
+
+def test_rule_from_text() -> None:
+    rule = cleanrules.rule_from_text("if total > 100 then discount = 0.1")
+    assert (rule.name, rule.priority, rule.do) == ("rule_1", 0, None)
+    assert rule.when.same_as(F.total > 100)
+    with_action = cleanrules.rule_from_text("RULE big TAGS a IF total > 100", do=record)
+    assert (with_action.name, with_action.tags, with_action.do) == ("big", ("a",), record)
+    with pytest.raises(cleanrules.RuleSyntaxError, match="expected RULE or IF") as condition:
+        cleanrules.rule_from_text("total > 100")
+    assert (condition.value.line, condition.value.column) == (1, 1)
+    with pytest.raises(cleanrules.RuleSyntaxError, match="end of the text") as two:
+        cleanrules.rule_from_text(b"IF a\nIF b")
+    assert (two.value.line, two.value.column) == (2, 1)
+    assert "rule set" in (two.value.hint or "")
+
+
+def test_text_errors_have_line_and_column() -> None:
+    with pytest.raises(cleanrules.RuleSyntaxError) as info:
+        loads("RULE r\nIF x >\nTHEN y = 1", format="text")
+    assert (info.value.line, info.value.column) == (3, 1)
+    assert "expected a field" in str(info.value)
+    with pytest.raises(ExpressionError) as expression:
+        loads('a AND\n  x MATCHES "("', format="text")
+    assert (expression.value.line, expression.value.column) == (2, 3)
+    with pytest.raises(FormatError) as limit:
+        loads("NOT NOT NOT x", format="text", max_depth=2)
+    assert limit.value.code == "limit_exceeded"
+
+
+def test_text_cannot_hold_metadata_or_actions() -> None:
+    with pytest.raises(UnsupportedError, match="metadata"):
+        dumps(shop()["vip"], format="text")
+    rules = RuleSet([Rule("a", F.x > 1, do=record)])
+    with pytest.raises(UnsupportedError, match="action"):
+        dumps(rules, format="text")
+    assert dumps(rules, format="text", omit_actions=True) == "HIT POLICY first\n\nRULE a\nIF x > 1"
+
+
+def test_text_files(tmp_path: Path) -> None:
+    path = tmp_path / "pricing.rules"
+    path.write_text(SHOP_TEXT, encoding="utf-8")
+    assert dumps(load(path), format="text") == SHOP_TEXT
+    dump(load(path), tmp_path / "copy.rules")
+    assert (tmp_path / "copy.rules").read_text(encoding="utf-8") == SHOP_TEXT + "\n"
+    with pytest.raises(ValueError, match="format='text'"):
+        load(tmp_path / "pricing.txt")

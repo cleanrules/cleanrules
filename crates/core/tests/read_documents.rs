@@ -13,7 +13,7 @@ use cleanrules::format::{
 use cleanrules::json::{Json, JsonNumber, Limits, to_string};
 use common::{get, int, limits_of, same, text, vectors};
 
-const FILES: [&str; 8] = [
+const FILES: [&str; 9] = [
     "format/documents.json",
     "format/values.json",
     "format/conditions.json",
@@ -22,6 +22,7 @@ const FILES: [&str; 8] = [
     "format/rulesets.json",
     "format/decisions.json",
     "format/yaml.json",
+    "format/text.json",
 ];
 
 /// A decision as the document it is written in.
@@ -33,6 +34,31 @@ fn decision_document(decision: &cleanrules::rules::Decision<'_>) -> Json {
         ),
         ("decision".into(), write_decision(decision)),
     ])
+}
+
+/// What a vector reads: the document, or its text when it is written as text
+/// (`expect.printed`).
+enum Read {
+    Document(Json),
+    Text(String),
+}
+
+/// Read the vector's document; write it as text when the vector asks.
+fn read_or_print(given: &Json, expect: &Json, source: &str) -> Result<Read, Error> {
+    let document = if let Some(rules_text) = text(get(given, "rules_text")) {
+        cleanrules::text::parse(rules_text, &limits_of(given))?
+    } else if text(get(given, "write")) == Some("text") {
+        read_document(source, &limits_of(given))?
+    } else {
+        return read(given, source).map(Read::Document);
+    };
+    let written = write_document(&document);
+    if get(expect, "document").is_some_and(|wanted| !same(&written, wanted))
+        || (get(expect, "printed").is_none() && get(given, "write").is_none())
+    {
+        return Ok(Read::Document(written));
+    }
+    cleanrules::text::to_string(&document).map(Read::Text)
 }
 
 /// Read the vector's document, as a decision when a rule set is given.
@@ -67,7 +93,9 @@ fn check(vector: &Json) -> Option<String> {
         return None; // YAML vectors need the `yaml` feature.
     }
     let source = match (
-        text(get(given, "text")).or(text(get(given, "yaml"))),
+        text(get(given, "text"))
+            .or(text(get(given, "yaml")))
+            .or(text(get(given, "rules_text"))),
         get(given, "document"),
     ) {
         (Some(source), _) => source.to_owned(),
@@ -75,8 +103,16 @@ fn check(vector: &Json) -> Option<String> {
         _ => panic!("nothing given"),
     };
     let expect = get(vector, "expect").unwrap();
-    match (read(given, &source), get(expect, "error")) {
-        (Ok(written), None) => {
+    match (read_or_print(given, expect, &source), get(expect, "error")) {
+        (Ok(Read::Text(printed)), None) => {
+            let wanted = text(get(expect, "printed")).unwrap();
+            (printed != wanted).then(|| format!("printed {printed:?}, expected {wanted:?}"))
+        }
+        (Ok(Read::Text(printed)), Some(error)) => Some(format!(
+            "printed {printed:?}, expected {}",
+            to_string(error)
+        )),
+        (Ok(Read::Document(written)), None) => {
             let wanted = get(expect, "document").unwrap();
             (!same(&written, wanted)).then(|| {
                 format!(
@@ -86,7 +122,7 @@ fn check(vector: &Json) -> Option<String> {
                 )
             })
         }
-        (Ok(written), Some(error)) => Some(format!(
+        (Ok(Read::Document(written)), Some(error)) => Some(format!(
             "read {}, expected {}",
             to_string(&written),
             to_string(error)

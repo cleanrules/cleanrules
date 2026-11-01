@@ -1,0 +1,3322 @@
+{
+  "version": 1,
+  "area": "format",
+  "vectors": [
+    {
+      "id": "format/text/keywords-any-case",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "Keywords are case-insensitive and print in upper case",
+      "given": {
+        "kind": "read",
+        "rules_text": "x > 1 and Not y"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              {
+                "op": "not",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "y"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "printed": "x > 1 AND NOT y"
+      }
+    },
+    {
+      "id": "format/text/comments-and-line-breaks",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "A # comment runs to the end of the line; \\r\\n is a line break",
+      "given": {
+        "kind": "read",
+        "rules_text": "# discounts\r\nx > 1 # big orders\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        },
+        "printed": "x > 1"
+      }
+    },
+    {
+      "id": "format/text/names-are-case-sensitive",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "Names keep their case",
+      "given": {
+        "kind": "read",
+        "rules_text": "Total > total"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "field",
+              "path": [
+                "Total"
+              ]
+            },
+            "right": {
+              "op": "field",
+              "path": [
+                "total"
+              ]
+            }
+          }
+        },
+        "printed": "Total > total"
+      }
+    },
+    {
+      "id": "format/text/backtick-names",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "Any text between backticks is a name, keywords included",
+      "given": {
+        "kind": "read",
+        "rules_text": "`first name` = 'Ann' AND `and` = 1 AND `a``b` = 2"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "first name"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": "Ann"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "and"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a`b"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            ]
+          }
+        },
+        "printed": "`first name` = \"Ann\" AND `and` = 1 AND `a``b` = 2"
+      }
+    },
+    {
+      "id": "format/text/single-quoted-strings",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "In single quotes a quote is written twice and nothing else is escaped",
+      "given": {
+        "kind": "read",
+        "rules_text": "x = 'it''s \\n'"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": "it's \\n"
+            }
+          }
+        },
+        "printed": "x = \"it's \\\\n\""
+      }
+    },
+    {
+      "id": "format/text/json-escapes",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "Double-quoted strings have the escapes of JSON",
+      "given": {
+        "kind": "read",
+        "rules_text": "x = \"a\\\"b\\n\\u00e9\""
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": "a\"b\né"
+            }
+          }
+        },
+        "printed": "x = \"a\\\"b\\né\""
+      }
+    },
+    {
+      "id": "format/text/numbers",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "Digits are an int, a fraction makes an exact decimal with its scale, an exponent a float",
+      "given": {
+        "kind": "read",
+        "rules_text": "a = 42 AND b = 2.50 AND c = 1.5e0 AND d = 1E-7 AND e = 2e+3"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 42
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "2.50"
+                  }
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "c"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1.5
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "d"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1e-07
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "e"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 2000.0
+                }
+              }
+            ]
+          }
+        },
+        "printed": "a = 42 AND b = 2.50 AND c = 1.5e0 AND d = 1e-7 AND e = 2e3"
+      }
+    },
+    {
+      "id": "format/text/negative-constants",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "A minus directly before a number makes a negative constant",
+      "given": {
+        "kind": "read",
+        "rules_text": "a = -5 AND b = -0.50 AND c = -0e0"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": -5
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "-0.50"
+                  }
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "c"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": -0.0
+                }
+              }
+            ]
+          }
+        },
+        "printed": "a = -5 AND b = -0.50 AND c = -0e0"
+      }
+    },
+    {
+      "id": "format/text/negated-numbers",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "A minus not directly before a number negates; it prints with parentheses",
+      "given": {
+        "kind": "read",
+        "rules_text": "a = - 5 AND b = -(5)"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "neg",
+                  "operand": {
+                    "op": "const",
+                    "value": 5
+                  }
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ]
+                },
+                "right": {
+                  "op": "neg",
+                  "operand": {
+                    "op": "const",
+                    "value": 5
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "printed": "a = -(5) AND b = -(5)"
+      }
+    },
+    {
+      "id": "format/text/typed-literals",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "DATE, DATETIME, DECIMAL and FLOAT take the text of the typed forms",
+      "given": {
+        "kind": "read",
+        "rules_text": "d = DATE \"2026-10-31\" AND t > DATETIME \"2026-10-31T09:30:00+01:00\" AND e = DECIMAL \"5\" AND g = FLOAT \"-inf\" AND h = float \"1.5\""
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "d"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$date": "2026-10-31"
+                  }
+                }
+              },
+              {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "t"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$datetime": "2026-10-31T09:30:00+01:00"
+                  }
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "e"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "5"
+                  }
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "g"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$float": "-inf"
+                  }
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "h"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1.5
+                }
+              }
+            ]
+          }
+        },
+        "printed": "d = DATE \"2026-10-31\" AND t > DATETIME \"2026-10-31T09:30:00+01:00\" AND e = DECIMAL \"5\" AND g = FLOAT \"-inf\" AND h = 1.5e0"
+      }
+    },
+    {
+      "id": "format/text/unquoted-date-is-arithmetic",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "An unquoted 2026-10-31 is a subtraction, never a date",
+      "given": {
+        "kind": "read",
+        "rules_text": "x = 2026-10-31"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "sub",
+              "left": {
+                "op": "sub",
+                "left": {
+                  "op": "const",
+                  "value": 2026
+                },
+                "right": {
+                  "op": "const",
+                  "value": 10
+                }
+              },
+              "right": {
+                "op": "const",
+                "value": 31
+              }
+            }
+          }
+        },
+        "printed": "x = 2026 - 10 - 31"
+      }
+    },
+    {
+      "id": "format/text/boolean-constants",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "TRUE and FALSE are constants; == and <> are = and !=",
+      "given": {
+        "kind": "read",
+        "rules_text": "x == true OR y <> FALSE"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "or",
+            "operands": [
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": true
+                }
+              },
+              {
+                "op": "ne",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "y"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": false
+                }
+              }
+            ]
+          }
+        },
+        "printed": "x = TRUE OR y != FALSE"
+      }
+    },
+    {
+      "id": "format/text/constant-condition",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "A boolean constant stands alone as a condition",
+      "given": {
+        "kind": "read",
+        "rules_text": "TRUE"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "const",
+            "value": true
+          }
+        },
+        "printed": "TRUE"
+      }
+    },
+    {
+      "id": "format/text/or-binds-looser-than-and",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "AND binds tighter than OR",
+      "given": {
+        "kind": "read",
+        "rules_text": "a OR b AND c"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "or",
+            "operands": [
+              {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "b"
+                    ]
+                  },
+                  {
+                    "op": "field",
+                    "path": [
+                      "c"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "printed": "a OR b AND c"
+      }
+    },
+    {
+      "id": "format/text/parentheses-kept",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "Parentheses that change the tree are printed",
+      "given": {
+        "kind": "read",
+        "rules_text": "(a OR b) AND c"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "or",
+                "operands": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  {
+                    "op": "field",
+                    "path": [
+                      "b"
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "field",
+                "path": [
+                  "c"
+                ]
+              }
+            ]
+          }
+        },
+        "printed": "(a OR b) AND c"
+      }
+    },
+    {
+      "id": "format/text/parentheses-dropped",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "Parentheses that do not change the tree are not printed",
+      "given": {
+        "kind": "read",
+        "rules_text": "((a > 1)) OR (b)"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "or",
+            "operands": [
+              {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              {
+                "op": "field",
+                "path": [
+                  "b"
+                ]
+              }
+            ]
+          }
+        },
+        "printed": "a > 1 OR b"
+      }
+    },
+    {
+      "id": "format/text/flattened",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "A chain of AND is one node, and so is a parenthesized one inside it",
+      "given": {
+        "kind": "read",
+        "rules_text": "a AND b AND (c AND d) OR (e OR f)"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "or",
+            "operands": [
+              {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  {
+                    "op": "field",
+                    "path": [
+                      "b"
+                    ]
+                  },
+                  {
+                    "op": "field",
+                    "path": [
+                      "c"
+                    ]
+                  },
+                  {
+                    "op": "field",
+                    "path": [
+                      "d"
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "field",
+                "path": [
+                  "e"
+                ]
+              },
+              {
+                "op": "field",
+                "path": [
+                  "f"
+                ]
+              }
+            ]
+          }
+        },
+        "printed": "a AND b AND c AND d OR e OR f"
+      }
+    },
+    {
+      "id": "format/text/symbols",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "&, | and ~ are AND, OR and NOT, as in fuzzytool",
+      "given": {
+        "kind": "read",
+        "rules_text": "a & b | ~c"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "or",
+            "operands": [
+              {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  {
+                    "op": "field",
+                    "path": [
+                      "b"
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "not",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "c"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "printed": "a AND b OR NOT c"
+      }
+    },
+    {
+      "id": "format/text/not-before-predicate",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "NOT before a predicate needs no parentheses",
+      "given": {
+        "kind": "read",
+        "rules_text": "NOT x > 5 AND NOT (a OR b)"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "not",
+                "operand": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "operand": {
+                  "op": "or",
+                  "operands": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "a"
+                      ]
+                    },
+                    {
+                      "op": "field",
+                      "path": [
+                        "b"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "printed": "NOT x > 5 AND NOT (a OR b)"
+      }
+    },
+    {
+      "id": "format/text/in",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "IN lists constants",
+      "given": {
+        "kind": "read",
+        "rules_text": "x IN (1, -2, 3) OR s IN ('a', \"b\")"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "or",
+            "operands": [
+              {
+                "op": "in",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "values": [
+                  -2,
+                  1,
+                  3
+                ]
+              },
+              {
+                "op": "in",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "s"
+                  ]
+                },
+                "values": [
+                  "a",
+                  "b"
+                ]
+              }
+            ]
+          }
+        },
+        "printed": "x IN (-2, 1, 3) OR s IN (\"a\", \"b\")"
+      }
+    },
+    {
+      "id": "format/text/not-in",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "x NOT IN (...) is NOT of IN, and prints that way",
+      "given": {
+        "kind": "read",
+        "rules_text": "x NOT IN (DATE \"2026-01-01\")"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "not",
+            "operand": {
+              "op": "in",
+              "operand": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "values": [
+                {
+                  "$date": "2026-01-01"
+                }
+              ]
+            }
+          }
+        },
+        "printed": "NOT x IN (DATE \"2026-01-01\")"
+      }
+    },
+    {
+      "id": "format/text/between",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "The AND of BETWEEN belongs to it; CLOSED is both when omitted",
+      "given": {
+        "kind": "read",
+        "rules_text": "x BETWEEN 1 AND 10 AND y BETWEEN a + 1 AND b CLOSED left"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "between",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "low": {
+                  "op": "const",
+                  "value": 1
+                },
+                "high": {
+                  "op": "const",
+                  "value": 10
+                },
+                "closed": "both"
+              },
+              {
+                "op": "between",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "y"
+                  ]
+                },
+                "low": {
+                  "op": "add",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "high": {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ]
+                },
+                "closed": "left"
+              }
+            ]
+          }
+        },
+        "printed": "x BETWEEN 1 AND 10 AND y BETWEEN a + 1 AND b CLOSED LEFT"
+      }
+    },
+    {
+      "id": "format/text/not-between",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "x NOT BETWEEN is NOT of BETWEEN",
+      "given": {
+        "kind": "read",
+        "rules_text": "x NOT BETWEEN 0 AND 1 CLOSED NONE"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "not",
+            "operand": {
+              "op": "between",
+              "operand": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "low": {
+                "op": "const",
+                "value": 0
+              },
+              "high": {
+                "op": "const",
+                "value": 1
+              },
+              "closed": "none"
+            }
+          }
+        },
+        "printed": "NOT x BETWEEN 0 AND 1 CLOSED NONE"
+      }
+    },
+    {
+      "id": "format/text/is-null",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "IS NULL and IS NOT NULL",
+      "given": {
+        "kind": "read",
+        "rules_text": "a IS NULL OR b IS NOT NULL"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "or",
+            "operands": [
+              {
+                "op": "is_null",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                }
+              },
+              {
+                "op": "not",
+                "operand": {
+                  "op": "is_null",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "b"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "printed": "a IS NULL OR NOT b IS NULL"
+      }
+    },
+    {
+      "id": "format/text/string-tests",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "MATCHES, STARTS WITH, ENDS WITH and CONTAINS, each with NOT",
+      "given": {
+        "kind": "read",
+        "rules_text": "s MATCHES '^a.*' AND s STARTS WITH \"ab\" AND s NOT ENDS WITH 'z' AND s not contains \"q\""
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "matches",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "s"
+                  ]
+                },
+                "pattern": "^a.*"
+              },
+              {
+                "op": "starts_with",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "s"
+                  ]
+                },
+                "text": "ab"
+              },
+              {
+                "op": "not",
+                "operand": {
+                  "op": "ends_with",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "s"
+                    ]
+                  },
+                  "text": "z"
+                }
+              },
+              {
+                "op": "not",
+                "operand": {
+                  "op": "contains",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "s"
+                    ]
+                  },
+                  "text": "q"
+                }
+              }
+            ]
+          }
+        },
+        "printed": "s MATCHES \"^a.*\" AND s STARTS WITH \"ab\" AND NOT s ENDS WITH \"z\" AND NOT s CONTAINS \"q\""
+      }
+    },
+    {
+      "id": "format/text/arithmetic-precedence",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "* and / bind tighter than + and -, which are left-associative",
+      "given": {
+        "kind": "read",
+        "rules_text": "a + b * c - d / e > (a + b) * c - (d - e)"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "sub",
+              "left": {
+                "op": "add",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "mul",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "b"
+                    ]
+                  },
+                  "right": {
+                    "op": "field",
+                    "path": [
+                      "c"
+                    ]
+                  }
+                }
+              },
+              "right": {
+                "op": "div",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "d"
+                  ]
+                },
+                "right": {
+                  "op": "field",
+                  "path": [
+                    "e"
+                  ]
+                }
+              }
+            },
+            "right": {
+              "op": "sub",
+              "left": {
+                "op": "mul",
+                "left": {
+                  "op": "add",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "field",
+                    "path": [
+                      "b"
+                    ]
+                  }
+                },
+                "right": {
+                  "op": "field",
+                  "path": [
+                    "c"
+                  ]
+                }
+              },
+              "right": {
+                "op": "sub",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "d"
+                  ]
+                },
+                "right": {
+                  "op": "field",
+                  "path": [
+                    "e"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "printed": "a + b * c - d / e > (a + b) * c - (d - e)"
+      }
+    },
+    {
+      "id": "format/text/unary-and-abs",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "Unary minus binds tightest; ABS takes a value",
+      "given": {
+        "kind": "read",
+        "rules_text": "-x * 2 > ABS(y - 1) AND -(a + b) < - -c"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "gt",
+                "left": {
+                  "op": "mul",
+                  "left": {
+                    "op": "neg",
+                    "operand": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    }
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "right": {
+                  "op": "abs",
+                  "operand": {
+                    "op": "sub",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "y"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  }
+                }
+              },
+              {
+                "op": "lt",
+                "left": {
+                  "op": "neg",
+                  "operand": {
+                    "op": "add",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "a"
+                      ]
+                    },
+                    "right": {
+                      "op": "field",
+                      "path": [
+                        "b"
+                      ]
+                    }
+                  }
+                },
+                "right": {
+                  "op": "neg",
+                  "operand": {
+                    "op": "neg",
+                    "operand": {
+                      "op": "field",
+                      "path": [
+                        "c"
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "printed": "-x * 2 > ABS(y - 1) AND -(a + b) < --c"
+      }
+    },
+    {
+      "id": "format/text/paths",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "Paths have .name and [index] segments, and may start with an index",
+      "given": {
+        "kind": "read",
+        "rules_text": "orders[0].total > 1 AND [1][2] = 0 AND order.`unit price` >= 5"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "orders",
+                    0,
+                    "total"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    1,
+                    2
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              },
+              {
+                "op": "ge",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "order",
+                    "unit price"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            ]
+          }
+        },
+        "printed": "orders[0].total > 1 AND [1][2] = 0 AND order.`unit price` >= 5"
+      }
+    },
+    {
+      "id": "format/text/constant-on-the-left",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "Either side of a comparison may be a constant or a field",
+      "given": {
+        "kind": "read",
+        "rules_text": "1 < x AND a <= b"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "lt",
+                "left": {
+                  "op": "const",
+                  "value": 1
+                },
+                "right": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                }
+              },
+              {
+                "op": "le",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "printed": "1 < x AND a <= b"
+      }
+    },
+    {
+      "id": "format/text/comparison-of-conditions",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A parenthesized node starts at its parenthesis",
+      "given": {
+        "kind": "read",
+        "rules_text": "(a > 1) = TRUE"
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/text/rule",
+      "spec": [
+        "text.md#rules-and-rule-sets"
+      ],
+      "description": "A rule with a RULE header",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE vip PRIORITY 10\nIF customer.years > 5 AND order.total > 1000\nTHEN discount = 0.15"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "vip",
+            "when": {
+              "op": "and",
+              "operands": [
+                {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1000
+                  }
+                }
+              ]
+            },
+            "then": {
+              "discount": {
+                "op": "const",
+                "value": {
+                  "$decimal": "0.15"
+                }
+              }
+            },
+            "priority": 10
+          }
+        },
+        "printed": "RULE vip PRIORITY 10\nIF customer.years > 5 AND order.total > 1000\nTHEN discount = 0.15"
+      }
+    },
+    {
+      "id": "format/text/rule-without-header",
+      "spec": [
+        "text.md#rules-and-rule-sets"
+      ],
+      "description": "Without a RULE header, a rule is named rule_<n>",
+      "given": {
+        "kind": "read",
+        "rules_text": "if a > 1 then x = 1"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "rule_1",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {
+              "x": {
+                "op": "const",
+                "value": 1
+              }
+            }
+          }
+        },
+        "printed": "RULE rule_1\nIF a > 1\nTHEN x = 1"
+      }
+    },
+    {
+      "id": "format/text/rule-without-payload",
+      "spec": [
+        "text.md#rules-and-rule-sets"
+      ],
+      "description": "The payload is optional",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE r IF x"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            }
+          }
+        },
+        "printed": "RULE r\nIF x"
+      }
+    },
+    {
+      "id": "format/text/rule-header",
+      "spec": [
+        "text.md#rules-and-rule-sets"
+      ],
+      "description": "Names and tags are names or strings; payload values are any expression",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE \"big order\" PRIORITY -3 TAGS gold, 'two words' DESCRIPTION \"for big orders\"\nIF total > 1000\nTHEN discount = 0.10, 'unit price' = total * 0.21"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "big order",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "total"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1000
+              }
+            },
+            "then": {
+              "discount": {
+                "op": "const",
+                "value": {
+                  "$decimal": "0.10"
+                }
+              },
+              "unit price": {
+                "op": "mul",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "total"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.21"
+                  }
+                }
+              }
+            },
+            "priority": -3,
+            "tags": [
+              "gold",
+              "two words"
+            ],
+            "description": "for big orders"
+          }
+        },
+        "printed": "RULE \"big order\" PRIORITY -3 TAGS gold, \"two words\" DESCRIPTION \"for big orders\"\nIF total > 1000\nTHEN discount = 0.10, \"unit price\" = total * 0.21"
+      }
+    },
+    {
+      "id": "format/text/payload-condition",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A payload value is a value, not a condition; the error is at the value",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE r IF a\nTHEN late = days > 30"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 2,
+          "column": 13
+        }
+      }
+    },
+    {
+      "id": "format/text/ruleset",
+      "spec": [
+        "text.md#rules-and-rule-sets"
+      ],
+      "description": "A rule set with a header",
+      "given": {
+        "kind": "read",
+        "rules_text": "HIT POLICY priority\n\nRULE vip PRIORITY 10 TAGS gold, loyalty\nIF customer.years > 5 AND order.total > 1000\nTHEN discount = 0.15, label = \"VIP\"\n\nRULE loyal PRIORITY 5\nIF customer.years > 2 OR customer.newsletter\nTHEN discount = 0.05"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "total"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1000
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "VIP"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold",
+                  "loyalty"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "or",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 2
+                      }
+                    },
+                    {
+                      "op": "field",
+                      "path": [
+                        "customer",
+                        "newsletter"
+                      ]
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              }
+            ]
+          }
+        },
+        "printed": "HIT POLICY priority\n\nRULE vip PRIORITY 10 TAGS gold, loyalty\nIF customer.years > 5 AND order.total > 1000\nTHEN discount = 0.15, label = \"VIP\"\n\nRULE loyal PRIORITY 5\nIF customer.years > 2 OR customer.newsletter\nTHEN discount = 0.05"
+      }
+    },
+    {
+      "id": "format/text/ruleset-without-header",
+      "spec": [
+        "text.md#rules-and-rule-sets"
+      ],
+      "description": "Several rules without a header are a rule set with the first hit policy",
+      "given": {
+        "kind": "read",
+        "rules_text": "IF a THEN x = 1\nIF b THEN x = 2"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "rule_1",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "then": {
+                  "x": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "name": "rule_2",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ]
+                },
+                "then": {
+                  "x": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "printed": "HIT POLICY first\n\nRULE rule_1\nIF a\nTHEN x = 1\n\nRULE rule_2\nIF b\nTHEN x = 2"
+      }
+    },
+    {
+      "id": "format/text/ruleset-header-lines",
+      "spec": [
+        "text.md#rules-and-rule-sets"
+      ],
+      "description": "AGGREGATE, LOGIC and STRICT header lines; LOGIC boolean is not printed",
+      "given": {
+        "kind": "read",
+        "rules_text": "hit policy COLLECT\naggregate sum\nlogic boolean\nstrict\nRULE r IF a > 1 THEN x = 1"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "x": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "printed": "HIT POLICY collect\nAGGREGATE sum\nSTRICT\n\nRULE r\nIF a > 1\nTHEN x = 1"
+      }
+    },
+    {
+      "id": "format/text/one-rule-with-header",
+      "spec": [
+        "text.md#rules-and-rule-sets"
+      ],
+      "description": "One rule after a header is a rule set",
+      "given": {
+        "kind": "read",
+        "rules_text": "HIT POLICY unique\nIF a"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "rule_1",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "printed": "HIT POLICY unique\n\nRULE rule_1\nIF a"
+      }
+    },
+    {
+      "id": "format/text/chained-comparison",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A predicate has one comparison at most",
+      "given": {
+        "kind": "read",
+        "rules_text": "0 < x < 10"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 7
+        }
+      }
+    },
+    {
+      "id": "format/text/unexpected-end",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "An unexpected end is located one past the last character",
+      "given": {
+        "kind": "read",
+        "rules_text": "x >"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 4
+        }
+      }
+    },
+    {
+      "id": "format/text/unclosed-string",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "An unclosed string is located at its quote",
+      "given": {
+        "kind": "read",
+        "rules_text": "x = \"abc"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 5
+        }
+      }
+    },
+    {
+      "id": "format/text/unclosed-backtick",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "An unclosed backtick name is located at its backtick",
+      "given": {
+        "kind": "read",
+        "rules_text": "`abc > 1"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/text/invalid-escape",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A double-quoted string has only the escapes of JSON",
+      "given": {
+        "kind": "read",
+        "rules_text": "x = \"\\q\""
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 5
+        }
+      }
+    },
+    {
+      "id": "format/text/unexpected-character",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A character outside the syntax",
+      "given": {
+        "kind": "read",
+        "rules_text": "x > 1 ; y"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 7
+        }
+      }
+    },
+    {
+      "id": "format/text/in-takes-constants",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "IN lists constants only",
+      "given": {
+        "kind": "read",
+        "rules_text": "x IN (1, y)"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 10
+        }
+      }
+    },
+    {
+      "id": "format/text/line-and-column",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "Lines and columns count \\r\\n as one line break",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE r\r\nIF x >\r\nTHEN y = 1"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 3,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/text/keys-after-a-dot",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "After a dot any identifier is a key, keywords included, as written",
+      "given": {
+        "kind": "read",
+        "rules_text": "order.date > 1 AND item.Priority = 2 AND x.if = 3"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "order",
+                    "date"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "item",
+                    "Priority"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 2
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x",
+                    "if"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 3
+                }
+              }
+            ]
+          }
+        },
+        "printed": "order.date > 1 AND item.Priority = 2 AND x.if = 3"
+      }
+    },
+    {
+      "id": "format/text/number-after-dot",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A key after a dot is an identifier or a name between backticks",
+      "given": {
+        "kind": "read",
+        "rules_text": "a.5 > 1"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 3
+        }
+      }
+    },
+    {
+      "id": "format/text/missing-if",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A rule needs IF",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE r THEN x = 1"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 8
+        }
+      }
+    },
+    {
+      "id": "format/text/trailing-text",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A condition is the whole text",
+      "given": {
+        "kind": "read",
+        "rules_text": "a > 1 b"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 7
+        }
+      }
+    },
+    {
+      "id": "format/text/unknown-hit-policy",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "An unknown hit policy is a syntax error at its name",
+      "given": {
+        "kind": "read",
+        "rules_text": "HIT POLICY bogus\nIF a"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 12
+        }
+      }
+    },
+    {
+      "id": "format/text/unknown-logic",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "An unknown logic is a registry error at its name",
+      "given": {
+        "kind": "read",
+        "rules_text": "LOGIC fuzzy\nIF a"
+      },
+      "expect": {
+        "error": {
+          "code": "registry_error",
+          "line": 1,
+          "column": 7
+        }
+      }
+    },
+    {
+      "id": "format/text/float-too-large",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A float literal beyond the float range",
+      "given": {
+        "kind": "read",
+        "rules_text": "x > 1e999"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 5
+        }
+      }
+    },
+    {
+      "id": "format/text/int-too-large",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "An int literal beyond 64 bits",
+      "given": {
+        "kind": "read",
+        "rules_text": "x > 9223372036854775808"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 5
+        }
+      }
+    },
+    {
+      "id": "format/text/int-min",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "The smallest int is a negative constant",
+      "given": {
+        "kind": "read",
+        "rules_text": "x > -9223372036854775808"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$int": "-9223372036854775808"
+              }
+            }
+          }
+        },
+        "printed": "x > -9223372036854775808"
+      }
+    },
+    {
+      "id": "format/text/bad-index",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "An index is a non-negative integer",
+      "given": {
+        "kind": "read",
+        "rules_text": "a[1.5] > 0"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 3
+        }
+      }
+    },
+    {
+      "id": "format/text/bad-date",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A typed literal's text is checked like its typed form",
+      "given": {
+        "kind": "read",
+        "rules_text": "d = DATE \"2026-13-01\""
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 10
+        }
+      }
+    },
+    {
+      "id": "format/text/expression-error-located",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A construction error is located where its node starts",
+      "given": {
+        "kind": "read",
+        "rules_text": "a AND\n  x MATCHES \"(\""
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "line": 2,
+          "column": 3
+        }
+      }
+    },
+    {
+      "id": "format/text/in-mixed-types",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "IN values of different type groups",
+      "given": {
+        "kind": "read",
+        "rules_text": "x IN (1, 'a')"
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/text/value-is-not-a-condition",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A text that is a value is not a condition",
+      "given": {
+        "kind": "read",
+        "rules_text": "x + 1"
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/text/duplicate-rule",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A rule set error is located at the rule it names",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE a IF x\nRULE a IF y"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 2,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/text/max-size",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "Texts have the size limit of documents",
+      "given": {
+        "kind": "read",
+        "rules_text": "x > 100",
+        "limits": {
+          "max_size": 5
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded"
+        }
+      }
+    },
+    {
+      "id": "format/text/max-depth",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "The depth limit stops at the first node completed that goes deeper",
+      "given": {
+        "kind": "read",
+        "rules_text": "NOT NOT NOT x",
+        "limits": {
+          "max_depth": 3
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/text/max-depth-payload",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "Payload values have the depth limit too",
+      "given": {
+        "kind": "read",
+        "rules_text": "IF x THEN y = - - - z",
+        "limits": {
+          "max_depth": 3
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "line": 1,
+          "column": 15
+        }
+      }
+    },
+    {
+      "id": "format/text/max-depth-chain",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A chain of arithmetic nests to the left and has the depth limit",
+      "given": {
+        "kind": "read",
+        "rules_text": "x + x + x + x > 0",
+        "limits": {
+          "max_depth": 3
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/text/max-nesting",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "Parentheses, NOT, - and ABS nest at most 2 x max_depth + 2 deep",
+      "given": {
+        "kind": "read",
+        "rules_text": "((((x))))",
+        "limits": {
+          "max_depth": 1
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "line": 1,
+          "column": 5
+        }
+      }
+    },
+    {
+      "id": "format/text/nesting-at-limit",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "Parentheses within the nesting limit are read",
+      "given": {
+        "kind": "read",
+        "rules_text": "(((x)))",
+        "limits": {
+          "max_depth": 1
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          }
+        },
+        "printed": "x"
+      }
+    },
+    {
+      "id": "format/text/duplicate-payload-key",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A payload key written twice is located at its second occurrence",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE r IF a THEN x = 1, x = 2"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 1,
+          "column": 25
+        }
+      }
+    },
+    {
+      "id": "format/text/leading-zero",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A number does not start with 0 followed by digits, as in JSON",
+      "given": {
+        "kind": "read",
+        "rules_text": "x = 007"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 5
+        }
+      }
+    },
+    {
+      "id": "format/text/control-character",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "Strings between single quotes hold no control characters",
+      "given": {
+        "kind": "read",
+        "rules_text": "x = 'a\tb'"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 5
+        }
+      }
+    },
+    {
+      "id": "format/text/other-whitespace",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "Whitespace is spaces, tabs and line breaks only",
+      "given": {
+        "kind": "read",
+        "rules_text": "x > 1"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 2
+        }
+      }
+    },
+    {
+      "id": "format/text/byte-order-mark",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "A byte order mark may start the text",
+      "given": {
+        "kind": "read",
+        "rules_text": "﻿x > 1"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        },
+        "printed": "x > 1"
+      }
+    },
+    {
+      "id": "format/text/typed-literal-spaces",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "The text of a typed literal is exactly its form",
+      "given": {
+        "kind": "read",
+        "rules_text": "x = FLOAT \" 1.5\""
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 11
+        }
+      }
+    },
+    {
+      "id": "format/text/header-order",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "Header lines come in their order",
+      "given": {
+        "kind": "read",
+        "rules_text": "STRICT HIT POLICY first IF a"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 8
+        }
+      }
+    },
+    {
+      "id": "format/text/depth-at-limit",
+      "spec": [
+        "text.md#errors-and-limits"
+      ],
+      "description": "A condition exactly at the depth limit is read",
+      "given": {
+        "kind": "read",
+        "rules_text": "NOT NOT x",
+        "limits": {
+          "max_depth": 3
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "not",
+            "operand": {
+              "op": "not",
+              "operand": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              }
+            }
+          }
+        },
+        "printed": "NOT NOT x"
+      }
+    },
+    {
+      "id": "format/text/floats",
+      "spec": [
+        "text.md#printing"
+      ],
+      "description": "Floats print in exponent notation with the shortest digits",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$float": 1
+                  }
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0.1
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "c"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 123456.789
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "d"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$float": "inf"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "write": "text"
+      },
+      "expect": {
+        "printed": "a = 1e0 AND b = 1e-1 AND c = 1.23456789e5 AND d = FLOAT \"inf\""
+      }
+    },
+    {
+      "id": "format/text/decimals",
+      "spec": [
+        "text.md#printing"
+      ],
+      "description": "Decimals print with their scale, DECIMAL when the scale is 0",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "5"
+                  }
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "-1.500"
+                  }
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "c"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "inf"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "write": "text"
+      },
+      "expect": {
+        "printed": "a = DECIMAL \"5\" AND b = -1.500 AND c = DECIMAL \"inf\""
+      }
+    },
+    {
+      "id": "format/text/negations",
+      "spec": [
+        "text.md#printing"
+      ],
+      "description": "The negation of a number constant prints with parentheses",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "gt",
+                "left": {
+                  "op": "neg",
+                  "operand": {
+                    "op": "const",
+                    "value": -5
+                  }
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              },
+              {
+                "op": "gt",
+                "left": {
+                  "op": "neg",
+                  "operand": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "1.5"
+                    }
+                  }
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              },
+              {
+                "op": "gt",
+                "left": {
+                  "op": "neg",
+                  "operand": {
+                    "op": "neg",
+                    "operand": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    }
+                  }
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              }
+            ]
+          }
+        },
+        "write": "text"
+      },
+      "expect": {
+        "printed": "-(-5) > 0 AND -(1.5) > 0 AND --x > 0"
+      }
+    },
+    {
+      "id": "format/text/names",
+      "spec": [
+        "text.md#printing"
+      ],
+      "description": "Keys that are not names print between backticks, other labels as strings",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "if",
+            "when": {
+              "op": "eq",
+              "left": {
+                "op": "field",
+                "path": [
+                  "if",
+                  "a b",
+                  "x"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {
+              "unit price": {
+                "op": "const",
+                "value": 1
+              },
+              "ok": {
+                "op": "const",
+                "value": 2
+              }
+            },
+            "tags": [
+              "a-b",
+              "c"
+            ]
+          }
+        },
+        "write": "text"
+      },
+      "expect": {
+        "printed": "RULE \"if\" TAGS \"a-b\", c\nIF `if`.`a b`.x = 1\nTHEN \"unit price\" = 1, ok = 2"
+      }
+    },
+    {
+      "id": "format/text/nesting",
+      "spec": [
+        "text.md#printing"
+      ],
+      "description": "Nested and and or are flattened; arithmetic keeps its parentheses",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "or",
+                "operands": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  {
+                    "op": "or",
+                    "operands": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "b"
+                        ]
+                      },
+                      {
+                        "op": "field",
+                        "path": [
+                          "c"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "d"
+                    ]
+                  },
+                  {
+                    "op": "field",
+                    "path": [
+                      "e"
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "gt",
+                "left": {
+                  "op": "sub",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "add",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "y"
+                      ]
+                    },
+                    "right": {
+                      "op": "field",
+                      "path": [
+                        "z"
+                      ]
+                    }
+                  }
+                },
+                "right": {
+                  "op": "div",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "p"
+                    ]
+                  },
+                  "right": {
+                    "op": "mul",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "q"
+                      ]
+                    },
+                    "right": {
+                      "op": "field",
+                      "path": [
+                        "r"
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "write": "text"
+      },
+      "expect": {
+        "printed": "(a OR b OR c) AND d AND e AND x - (y + z) > p / (q * r)"
+      }
+    },
+    {
+      "id": "format/text/strings-and-null",
+      "spec": [
+        "text.md#printing"
+      ],
+      "description": "Strings print with JSON escapes; NULL is a constant",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "s"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": "tab\there \"q\""
+                }
+              },
+              {
+                "op": "is_null",
+                "operand": {
+                  "op": "const",
+                  "value": null
+                }
+              }
+            ]
+          }
+        },
+        "write": "text"
+      },
+      "expect": {
+        "printed": "s = \"tab\\there \\\"q\\\"\" AND NULL IS NULL"
+      }
+    },
+    {
+      "id": "format/text/metadata",
+      "spec": [
+        "text.md#printing"
+      ],
+      "description": "A rule with metadata has no text",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "metadata": {
+              "owner": "risk"
+            }
+          }
+        },
+        "write": "text"
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
+      "id": "format/text/control-character-key",
+      "spec": [
+        "text.md#printing"
+      ],
+      "description": "A field key with a control character has no text",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a\nb"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        },
+        "write": "text"
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
+      "id": "format/text/ruleset-defaults",
+      "spec": [
+        "text.md#printing"
+      ],
+      "description": "A rule set always prints its hit policy",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "priority": 0
+              }
+            ]
+          }
+        },
+        "write": "text"
+      },
+      "expect": {
+        "printed": "HIT POLICY first\n\nRULE r\nIF a"
+      }
+    }
+  ]
+}

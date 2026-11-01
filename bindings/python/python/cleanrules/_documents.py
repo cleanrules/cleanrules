@@ -1,14 +1,16 @@
-"""Loading and dumping conditions, rules and rule sets as JSON or YAML documents.
+"""Loading and dumping conditions, rules and rule sets as JSON, YAML or text.
 
     rules = cleanrules.load("pricing.yaml")
     text = cleanrules.dumps(rules, format="yaml")
+    vip = cleanrules.rule_from_text("RULE vip IF customer.years > 5 THEN discount = 0.15")
 
 The documents are the JSON format of `spec/json-format.md`, the contract between
 languages: a rule set written here is read the same way in Rust, Java or Go.
-YAML files hold the same documents (`spec/json-format.md`, *YAML*). Reading is
-strict and bounded: unknown keys, duplicate keys and malformed values are errors
-with a JSON Pointer or a line and column, and documents larger or deeper than
-the limits are refused.
+YAML files hold the same documents (`spec/json-format.md`, *YAML*), and the text
+syntax (`spec/text.md`) the same model, as people write rules on paper. Reading
+is strict and bounded: unknown keys, duplicate keys, malformed values and syntax
+errors are errors with a JSON Pointer or a line and column, and documents larger
+or deeper than the limits are refused.
 """
 
 from __future__ import annotations
@@ -19,15 +21,22 @@ from typing import IO, Literal, TypeAlias
 
 from cleanrules import _cleanrules as _native
 from cleanrules._expr import Expr, _wrap  # pyright: ignore[reportPrivateUsage]
-from cleanrules._rules import Rule, RuleSet
+from cleanrules._rules import Action, Rule, RuleSet
 from cleanrules.errors import ExpressionError, FormatError, UnsupportedError
 
-__all__ = ["Format", "dump", "dumps", "load", "loads"]
+__all__ = ["Format", "dump", "dumps", "load", "loads", "rule_from_text"]
 
-Format: TypeAlias = Literal["json", "yaml"]
-"""A document format."""
+Format: TypeAlias = Literal["json", "yaml", "text"]
+"""A document format: JSON, YAML or the text syntax of rules."""
 
-_SUFFIXES: dict[str, Format] = {".json": "json", ".yaml": "yaml", ".yml": "yaml"}
+_DEFAULT_SIZES: dict[Format, int] = {"json": 16 << 20, "yaml": 1 << 20, "text": 4 << 20}
+
+_SUFFIXES: dict[str, Format] = {
+    ".json": "json",
+    ".yaml": "yaml",
+    ".yml": "yaml",
+    ".rules": "text",
+}
 
 
 def loads(
@@ -41,11 +50,14 @@ def loads(
     """Read a condition, rule or rule set document.
 
     Args:
-        text: The document, in JSON or YAML; `bytes` are read as UTF-8.
-        format: `"json"` or `"yaml"`.
-        max_size: The largest document, in bytes: 16 MiB by default for JSON
-            and 1 MiB for YAML, whose parser holds a flow collection whole.
-        max_nesting: The deepest nesting of objects and arrays (1024).
+        text: The document, in JSON, YAML or the text syntax; `bytes` are read
+            as UTF-8.
+        format: `"json"`, `"yaml"` or `"text"`.
+        max_size: The largest document, in bytes: 16 MiB by default for JSON,
+            4 MiB for text, which holds up to a node in every two bytes, and
+            1 MiB for YAML, whose parser holds a flow collection whole.
+        max_nesting: The deepest nesting of JSON or YAML objects and arrays
+            (1024); text has none.
         max_depth: The deepest condition or payload value, in nodes (256).
 
     Returns:
@@ -56,21 +68,14 @@ def loads(
         FormatError: For invalid JSON or YAML, an unknown or duplicate key, a
             wrong type or an unknown version, with a JSON Pointer or a line and
             column; or a document beyond the limits.
-        ExpressionError: If a condition breaks a construction rule.
+        RuleSyntaxError: For a text that does not follow the syntax, with the
+            line and column of the first token that cannot be read.
+        ExpressionError: If a condition breaks a construction rule; read from
+            text, with the line and column where the node starts.
         RuleDefinitionError: If a rule or rule set breaks a construction rule.
+        RegistryError: For an unknown logic.
     """
-    for name, limit in (
-        ("max_size", max_size),
-        ("max_nesting", max_nesting),
-        ("max_depth", max_depth),
-    ):
-        if limit is not None and limit < 1:
-            raise ValueError(f"{name} must be at least 1, got {limit}")
-    if isinstance(text, bytes):
-        try:
-            text = text.decode("utf-8")
-        except UnicodeDecodeError as error:
-            raise FormatError(f"the document is not valid UTF-8: {error.reason}") from error
+    text = _text(text, max_size=max_size, max_nesting=max_nesting, max_depth=max_depth)
     kind, content = _native.load_document(text, format, max_size, max_nesting, max_depth)
     if kind == "condition":
         return _wrap(content)
@@ -84,6 +89,19 @@ def loads(
         logic=logic,
         strict=strict,
     )
+
+
+def _text(text: str | bytes, **limits: int | None) -> str:
+    """The text as `str`, once the limits are checked."""
+    for name, limit in limits.items():
+        if limit is not None and limit < 1:
+            raise ValueError(f"{name} must be at least 1, got {limit}")
+    if isinstance(text, bytes):
+        try:
+            return text.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise FormatError(f"the document is not valid UTF-8: {error.reason}") from error
+    return text
 
 
 def _rule(native: _native.Rule) -> Rule:
@@ -108,7 +126,8 @@ def dumps(
 
     Args:
         value: A condition, a rule or a rule set.
-        format: `"json"` (compact) or `"yaml"` (block style).
+        format: `"json"` (compact), `"yaml"` (block style) or `"text"` (the
+            canonical text, `IF … THEN …`).
         omit_actions: Write rules without their actions instead of refusing.
             Actions are code, which a document cannot hold.
 
@@ -118,7 +137,8 @@ def dumps(
     Raises:
         ExpressionError: If `value` is a value node, not a condition.
         UnsupportedError: If a rule has an action and `omit_actions` is false;
-            its `pointer` locates the rule.
+            its `pointer` locates the rule. In text, also for a rule with
+            metadata, which the text syntax cannot hold.
     """
     if isinstance(value, Expr):
         if value.kind == "value":
@@ -149,6 +169,48 @@ def _check_actions(rules: list[Rule], pointer: str, omit_actions: bool) -> None:
             )
 
 
+def rule_from_text(
+    text: str | bytes,
+    *,
+    do: Action | None = None,
+    max_size: int | None = None,
+    max_depth: int | None = None,
+) -> Rule:
+    """Read one rule written in the text syntax (`spec/text.md`).
+
+        vip = rule_from_text("RULE vip IF customer.years > 5 THEN discount = 0.15")
+
+    Line breaks are free, as in every text. Without a `RULE` line the rule is
+    named `rule_1`. To read a condition or a rule set written as text, use
+    `loads(text, format="text")`.
+
+    Args:
+        text: The rule; `bytes` are read as UTF-8.
+        do: An action for the rule, as `Rule` takes: text holds no code.
+        max_size: As `loads`.
+        max_depth: As `loads`.
+
+    Raises:
+        RuleSyntaxError: If the text does not follow the syntax, or holds a
+            condition or a rule set instead of one rule.
+        ExpressionError: As `loads`.
+        RuleDefinitionError: As `loads`.
+    """
+    text = _text(text, max_size=max_size, max_depth=max_depth)
+    rule = _rule(_native.load_rule(text, max_size, max_depth))
+    if do is None:
+        return rule
+    return Rule(
+        rule.name,
+        rule.when,
+        rule.then,
+        priority=rule.priority,
+        tags=rule.tags,
+        description=rule.description,
+        do=do,
+    )
+
+
 def load(
     source: str | os.PathLike[str] | IO[str],
     *,
@@ -160,8 +222,8 @@ def load(
     """Read a document from a file, as `loads` does.
 
     Args:
-        source: A path (its suffix, `.json`, `.yaml` or `.yml`, gives the format)
-            or an open text file, as `json.load` takes.
+        source: A path (its suffix, `.json`, `.yaml`, `.yml` or `.rules`, gives
+            the format) or an open text file, as `json.load` takes.
         format: The format, when the suffix does not say; required for a file
             object without a known name.
         max_size: As `loads`; a file larger than the limit is not read.
@@ -175,7 +237,7 @@ def load(
     if isinstance(source, str | os.PathLike):
         file = Path(source)
         chosen = format or _format_of(file)
-        limit = max_size or (1024 * 1024 if chosen == "yaml" else 16 * 1024 * 1024)
+        limit = max_size or _DEFAULT_SIZES[chosen]
         size = file.stat().st_size
         if size > limit:
             raise FormatError(
@@ -205,16 +267,21 @@ def dump(
 ) -> None:
     """Write a document to a path or an open text file, as `dumps` does.
 
-    A path's suffix (`.json`, `.yaml` or `.yml`) gives the format when it is not
-    given.
+    A path's suffix (`.json`, `.yaml`, `.yml` or `.rules`) gives the format when
+    it is not given. A text file ends with a line break.
     """
     if isinstance(target, str | os.PathLike):
         file = Path(target)
-        text = dumps(value, format=format or _format_of(file), omit_actions=omit_actions)
-        file.write_text(text, encoding="utf-8")
+        file.write_text(_document_text(value, format or _format_of(file), omit_actions), "utf-8")
     else:
         chosen = format or _format_of(Path(getattr(target, "name", "")))
-        target.write(dumps(value, format=chosen, omit_actions=omit_actions))
+        target.write(_document_text(value, chosen, omit_actions))
+
+
+def _document_text(value: Expr | Rule | RuleSet, format: Format, omit_actions: bool) -> str:
+    """The text of a file: a rule text ends with a line break."""
+    text = dumps(value, format=format, omit_actions=omit_actions)
+    return text + "\n" if format == "text" else text
 
 
 def _format_of(file: Path) -> Format:
@@ -222,6 +289,6 @@ def _format_of(file: Path) -> Format:
         return _SUFFIXES[file.suffix.lower()]
     except KeyError:
         raise ValueError(
-            f"cannot tell the format of {file.name!r} from its suffix; pass format='json' or"
-            " format='yaml'"
+            f"cannot tell the format of {file.name!r} from its suffix; pass format='json',"
+            " format='yaml' or format='text'"
         ) from None

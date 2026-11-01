@@ -7,7 +7,7 @@ C/C++, Python, JavaScript, Java/Scala, Go and Erlang.
 > **Pre-alpha.** Nothing is published yet. Input data can be dicts, lists,
 > dataclasses, Pydantic models, namedtuples, pandas rows, numpy values and other
 > objects: only the fields the rules read are read. Rules can carry actions,
-> run by `RuleSet.run`. Loading rules from files comes next in the roadmap.
+> run by `RuleSet.run`, and are read from JSON, YAML or plain text.
 
 ```python
 from decimal import Decimal
@@ -58,6 +58,31 @@ import cleanrules
 
 cleanrules.dump(rules, "pricing.yaml")
 rules = cleanrules.load("pricing.yaml")
+```
+
+They can also be written as text, the way people write rules on paper; errors
+give the line and column:
+
+```python
+rules = cleanrules.loads(
+    """
+    HIT POLICY priority
+
+    RULE vip PRIORITY 10
+    IF customer.years > 5 AND order.total > 1000
+    THEN discount = 0.15
+
+    RULE loyal PRIORITY 5
+    IF customer.years > 2 OR customer.newsletter
+    THEN discount = 0.05
+    """,
+    format="text",
+)
+vip = cleanrules.rule_from_text("RULE vip IF customer.years > 5 THEN discount = 0.15")
+print(cleanrules.dumps(rules["loyal"], format="text"))
+# RULE loyal PRIORITY 5
+# IF customer.years > 2 OR customer.newsletter
+# THEN discount = 0.05
 ```
 
 To evaluate one condition and see every step, use `evaluate_tree`:

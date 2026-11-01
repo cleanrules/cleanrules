@@ -52,12 +52,12 @@ its cause.
 |---|---|---|
 | `format_error` | a document's JSON or shape is invalid (`json-format.md`) | **`pointer`**, or **`line`** and **`column`** for a syntax error |
 | `unsupported_version` | a document's `version` is missing or unknown | **`pointer`** |
-| `limit_exceeded` | a document is too large or nested too deep | for node depth, **`pointer`** to the first node too deep; for JSON nesting, **`line`** and **`column`** of the bracket that exceeds it; for size, none |
+| `limit_exceeded` | a document is too large or nested too deep | for node depth, **`pointer`** to the first node too deep, or in text **`line`** and **`column`** where it starts; for JSON nesting, **`line`** and **`column`** of the bracket that exceeds it, and in text of the token that nests too deep (`text.md`); for size, none |
 | `decision_mismatch` | a decision does not belong to the rule set it is read with | **`pointer`** |
-| `expression_error` | a condition node breaks a construction rule (`ast.md`) | `rule`, `node`; **`pointer`** when read from JSON |
-| `rule_definition_error` | a rule or rule set breaks a construction rule (`rules.md`, `json-format.md`) | **`rule`** when known; **`pointer`** when read from JSON |
-| `rule_syntax_error` | the text DSL cannot be parsed (phase D) | **`line`**, **`column`** |
-| `registry_error` | a name is not registered (a logic; later, an action) | **`name`**, `available`; **`pointer`** when read from JSON |
+| `expression_error` | a condition node breaks a construction rule (`ast.md`) | `rule`, `node`; **`pointer`** when read from JSON; **`line`** and **`column`** when read from text (`text.md`) |
+| `rule_definition_error` | a rule or rule set breaks a construction rule (`rules.md`, `json-format.md`) | **`rule`** when known; **`pointer`** when read from JSON; **`line`** and **`column`** when read from text |
+| `rule_syntax_error` | a text in the rule syntax cannot be parsed (`text.md`) | **`line`**, **`column`** |
+| `registry_error` | a name is not registered (a logic; later, an action) | **`name`**, `available`; **`pointer`** when read from JSON, **`line`** and **`column`** when read from text |
 | `rule_not_found` | a rule is looked up by a name the rule set does not have | **`name`**, `available` |
 | `evaluation_error` | strict mode met a value it cannot read (`read_error`), or a batch was given something that is not a collection of inputs (`rules.md`) | **`rule`**, **`path`**, `node`, **`row`** |
 | `missing_field` | strict mode met a field whose path cannot be resolved | **`rule`**, **`path`**, `node`, **`row`**, `available` |

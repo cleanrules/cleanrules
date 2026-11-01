@@ -21,6 +21,7 @@ fn limits(max_size: Option<usize>, max_nesting: Option<usize>, max_depth: Option
     if let Some(size) = max_size {
         limits.max_size = size;
         limits.max_yaml_size = size;
+        limits.max_text_size = size;
     }
     if let Some(nesting) = max_nesting {
         limits.max_nesting = nesting;

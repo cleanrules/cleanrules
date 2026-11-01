@@ -112,6 +112,9 @@ pub struct Limits {
     /// The largest YAML text, in bytes: lower than `max_size`, because the YAML
     /// parser holds a flow collection whole before reading it.
     pub max_yaml_size: usize,
+    /// The largest text in the rule syntax, in bytes: lower than `max_size`,
+    /// because a text holds up to one node in every two bytes (`a|a|…`).
+    pub max_text_size: usize,
 }
 
 impl Default for Limits {
@@ -121,6 +124,7 @@ impl Default for Limits {
             max_nesting: 1024,
             max_depth: 256,
             max_yaml_size: 1024 * 1024,
+            max_text_size: 4 * 1024 * 1024,
         }
     }
 }

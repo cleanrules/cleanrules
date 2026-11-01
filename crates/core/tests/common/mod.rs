@@ -72,9 +72,10 @@ pub fn limits_of(given: &Json) -> Limits {
     let mut limits = Limits::default();
     if let Some(custom) = get(given, "limits") {
         if let Some(size) = int(get(custom, "max_size")) {
-            // A vector's size limit applies to its text, JSON or YAML.
+            // A vector's size limit applies to its text, JSON, YAML or rules.
             limits.max_size = usize::try_from(size).unwrap();
             limits.max_yaml_size = limits.max_size;
+            limits.max_text_size = limits.max_size;
         }
         if let Some(nesting) = int(get(custom, "max_nesting")) {
             limits.max_nesting = usize::try_from(nesting).unwrap();

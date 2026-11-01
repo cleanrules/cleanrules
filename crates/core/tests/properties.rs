@@ -10,7 +10,9 @@
 use cleanrules::ast::{ArithOp, Closed, CompareOp, Node, StringOp};
 use cleanrules::eval::{Evaluated, Options, Outcome, evaluate_tree};
 use cleanrules::explain::{Requirement, Status, explain};
-use cleanrules::format::{read_decision_document, read_node, write_decision, write_node};
+use cleanrules::format::{
+    Document, read_decision_document, read_node, write_decision, write_document, write_node,
+};
 use cleanrules::json::{Json, JsonNumber, Limits, same, to_string};
 use cleanrules::logic::{Kleene, Truth};
 use cleanrules::rules::{Config, HitPolicy, Rule, RuleSet};
@@ -123,6 +125,91 @@ fn condition() -> impl Strategy<Value = Node> {
     })
 }
 
+/// Conditions with the keys, strings and numbers that text must quote or
+/// escape: keywords, spaces, backticks, quotes, control characters, -0.0.
+fn odd_condition() -> impl Strategy<Value = Node> {
+    let key = prop::sample::select(vec!["if", "a b", "x`y", "", "_1", "é", "NOT"]);
+    let path = prop::collection::vec(
+        prop_oneof![
+            key.prop_map(|k| Segment::Key(k.into())),
+            (0_u64..3).prop_map(Segment::Index)
+        ],
+        1..3,
+    );
+    let field = path.prop_filter_map("valid field", |p| Node::field(p).ok());
+    let constant = prop_oneof![
+        "[a\"'\\\n\t`é\u{7f}]{0,3}".prop_map(Value::String),
+        any::<f64>()
+            .prop_filter("finite", |f| f.is_finite())
+            .prop_map(Value::Float),
+        Just(Value::Float(-0.0)),
+        Just(Value::Float(f64::INFINITY)),
+        any::<i64>().prop_map(Value::Int),
+        (any::<i64>(), 0_u32..6)
+            .prop_map(|(c, s)| Value::Decimal(Decimal::new(i128::from(c), s).unwrap())),
+    ]
+    .prop_map(|v| Node::constant(v).unwrap());
+    let operand = prop_oneof![
+        field.clone(),
+        constant.clone(),
+        constant.prop_filter_map("valid neg", |n| Node::neg(n).ok()),
+    ];
+    (operand.clone(), operand, field).prop_filter_map("valid condition", |(a, b, f)| {
+        Node::and(vec![
+            Node::compare(CompareOp::Ne, a, b).ok()?,
+            Node::is_null(f).ok()?,
+        ])
+        .ok()
+    })
+}
+
+/// Rule sets whose names, tags, payload keys and descriptions text must quote.
+fn odd_ruleset() -> impl Strategy<Value = RuleSet> {
+    let label = || {
+        prop::sample::select(vec![
+            "if", "a b", "", "x`y", "é", "rule_1", "NOT", "q\"\n", "_",
+        ])
+    };
+    let rule = (
+        label(),
+        condition(),
+        prop::collection::vec((label(), value_node()), 0..3),
+        any::<i64>(),
+        prop::collection::vec(label(), 0..3),
+        proptest::option::of(r#"[a"\n\\é]{0,4}"#),
+    )
+        .prop_filter_map(
+            "valid rule",
+            |(name, when, then, priority, tags, description)| {
+                let then = then.into_iter().map(|(k, v)| (k.to_owned(), v)).collect();
+                let mut rule = Rule::with_payload(name, when, then)
+                    .ok()?
+                    .priority(priority)
+                    .tags(tags.into_iter().map(str::to_owned).collect::<Vec<String>>());
+                if let Some(description) = description {
+                    rule = rule.description(description);
+                }
+                Some(rule)
+            },
+        );
+    let policy = prop::sample::select(vec![
+        HitPolicy::First,
+        HitPolicy::Priority,
+        HitPolicy::Collect,
+    ]);
+    (prop::collection::vec(rule, 0..4), policy, any::<bool>()).prop_filter_map(
+        "valid rule set",
+        |(rules, hit_policy, strict)| {
+            let config = Config {
+                hit_policy,
+                strict,
+                ..Config::default()
+            };
+            RuleSet::new(rules, config).ok()
+        },
+    )
+}
+
 // --- Helpers -------------------------------------------------------------------------------
 
 fn truth(node: &Node, input: &Value) -> Truth {
@@ -210,6 +297,28 @@ proptest! {
         let read = read_node(&written, "", &Limits::default()).unwrap();
         prop_assert!(read == node);
         prop_assert!(same(&write_node(&read), &written));
+    }
+
+    #[test]
+    fn conditions_round_trip_through_text(node in prop_oneof![condition(), odd_condition()]) {
+        let printed = node.to_string();
+        let Document::Condition(read) = cleanrules::text::parse(&printed, &Limits::default())
+            .map_err(|e| TestCaseError::fail(format!("{printed:?}: {e}")))?
+        else {
+            return Err(TestCaseError::fail(format!("{printed:?} is not a condition")));
+        };
+        prop_assert!(read == node, "{printed:?} read back as {read}");
+        prop_assert_eq!(read.to_string(), printed);
+    }
+
+    #[test]
+    fn rule_sets_round_trip_through_text(ruleset in odd_ruleset()) {
+        let document = Document::RuleSet(ruleset);
+        let printed = cleanrules::text::to_string(&document).unwrap();
+        let read = cleanrules::text::parse(&printed, &Limits::default())
+            .map_err(|e| TestCaseError::fail(format!("{printed:?}: {e}")))?;
+        prop_assert!(same(&write_document(&read), &write_document(&document)), "{printed:?}");
+        prop_assert_eq!(cleanrules::text::to_string(&read).unwrap(), printed);
     }
 
     #[test]

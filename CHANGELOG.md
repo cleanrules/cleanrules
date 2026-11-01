@@ -54,6 +54,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Python binding: `loads`, `load`, `dumps` and `dump` read and write
   conditions, rules and rule sets as JSON or YAML documents, from strings,
   bytes, paths or open files.
+- Text syntax for conditions, rules and rule sets (`spec/text.md`):
+  `RULE vip PRIORITY 10 IF customer.years > 5 THEN discount = 0.15`, with
+  `AND`/`OR`/`NOT` (and `&`, `|`, `~`, as in fuzzytool), comparisons, `IN`,
+  `BETWEEN`, `IS [NOT] NULL`, `MATCHES`, `STARTS WITH`, `ENDS WITH`,
+  `CONTAINS`, arithmetic, typed literals (`DATE "…"`, `DECIMAL "…"`) and rule
+  set headers (`HIT POLICY`, `AGGREGATE`, `LOGIC`, `STRICT`). Errors carry the
+  line and column; every condition, rule and rule set without metadata has a
+  canonical text that reads back as the same model. Rule files use the suffix
+  `.rules` and have a 4 MiB default size limit. 85 new conformance vectors.
+  Rust core: `cleanrules::text::{parse, parse_rule, to_string}`, `Display` for
+  `Node`, and `Limits::max_text_size` (a new public field of `Limits`).
+- Python binding: `format="text"` in `loads`, `load`, `dumps` and `dump`
+  (`.rules` files), and `rule_from_text`, which reads one rule and can attach
+  an action to it.
 - Python binding, safety: frames, tracebacks, code objects, generators,
   coroutines and functions in the data are opaque; a rule can no longer reach
   the program's globals or locals through them. Decisions in reference cycles

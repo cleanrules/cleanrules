@@ -1,5 +1,6 @@
 //! Loading and dumping documents (`spec/json-format.md`), in JSON or YAML
-//! (task D.1): the core reads and writes; Python builds its objects.
+//! (task D.1) and in the text syntax (`spec/text.md`, task D.2a): the core
+//! reads and writes; Python builds its objects.
 
 use cleanrules::format::{Document, read_document, read_yaml_document, write_document};
 use cleanrules::json::{Limits, to_string};
@@ -13,10 +14,11 @@ use crate::rules::{PyRule, PyRuleSet};
 
 fn limits(max_size: Option<usize>, max_nesting: Option<usize>, max_depth: Option<usize>) -> Limits {
     let mut limits = Limits::default();
-    // One size limit for the caller: it applies to JSON and YAML texts alike.
+    // One size limit for the caller: it applies to JSON, YAML and rule texts alike.
     if let Some(size) = max_size {
         limits.max_size = size;
         limits.max_yaml_size = size;
+        limits.max_text_size = size;
     }
     if let Some(nesting) = max_nesting {
         limits.max_nesting = nesting;
@@ -43,6 +45,7 @@ pub(crate) fn load_document<'py>(
     let document = match format {
         "json" => read_document(text, &limits),
         "yaml" => read_yaml_document(text, &limits),
+        "text" => cleanrules::text::parse(text, &limits),
         other => return Err(PyValueError::new_err(format!("unknown format {other:?}"))),
     }
     .or_raise(py)?;
@@ -81,29 +84,56 @@ pub(crate) fn load_document<'py>(
     })
 }
 
-fn write(document: &Document, format: &str) -> PyResult<String> {
-    let json = write_document(document);
+/// Read a text that holds one rule (`cleanrules::text::parse_rule`).
+#[pyfunction]
+#[pyo3(signature = (text, max_size=None, max_depth=None))]
+pub(crate) fn load_rule(
+    py: Python<'_>,
+    text: &str,
+    max_size: Option<usize>,
+    max_depth: Option<usize>,
+) -> PyResult<PyRule> {
+    let limits = limits(max_size, None, max_depth);
+    Ok(PyRule::from(
+        cleanrules::text::parse_rule(text, &limits).or_raise(py)?,
+    ))
+}
+
+fn write(py: Python<'_>, document: &Document, format: &str) -> PyResult<String> {
     match format {
-        "json" => Ok(to_string(&json)),
-        "yaml" => Ok(cleanrules::yaml::to_string(&json)),
+        "json" => Ok(to_string(&write_document(document))),
+        "yaml" => Ok(cleanrules::yaml::to_string(&write_document(document))),
+        "text" => cleanrules::text::to_string(document).or_raise(py),
         other => Err(PyValueError::new_err(format!("unknown format {other:?}"))),
     }
 }
 
-/// The document of a condition, in `format` (`json` or `yaml`).
+/// The document of a condition, in `format` (`json`, `yaml` or `text`).
 #[pyfunction]
 pub(crate) fn dump_condition(node: &Bound<'_, PyNode>, format: &str) -> PyResult<String> {
-    write(&Document::Condition(node.get().node.clone()), format)
+    write(
+        node.py(),
+        &Document::Condition(node.get().node.clone()),
+        format,
+    )
 }
 
 /// The document of a rule, in `format`.
 #[pyfunction]
 pub(crate) fn dump_rule(rule: &Bound<'_, PyRule>, format: &str) -> PyResult<String> {
-    write(&Document::Rule(rule.get().rule().clone()), format)
+    write(
+        rule.py(),
+        &Document::Rule(rule.get().rule().clone()),
+        format,
+    )
 }
 
 /// The document of a rule set, in `format`.
 #[pyfunction]
 pub(crate) fn dump_ruleset(ruleset: &Bound<'_, PyRuleSet>, format: &str) -> PyResult<String> {
-    write(&Document::RuleSet(ruleset.get().ruleset().clone()), format)
+    write(
+        ruleset.py(),
+        &Document::RuleSet(ruleset.get().ruleset().clone()),
+        format,
+    )
 }
