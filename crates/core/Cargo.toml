@@ -16,3 +16,5 @@ homepage.workspace = true
 workspace = true
 
 [dependencies]
+jiff = { version = "0.2.38", default-features = false, features = ["std", "tzdb-bundle-always"] }
+thiserror = "2.0.21"
