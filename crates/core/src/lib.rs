@@ -9,6 +9,7 @@
 //! condition AST, the evaluator, rules and rule sets, and explanations.
 
 mod error;
+pub mod format;
 pub mod json;
 pub mod value;
 

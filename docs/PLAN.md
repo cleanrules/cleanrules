@@ -263,7 +263,7 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
     - Desviaciones:
       - No hay trabajo de `miri`, porque el núcleo no tiene `unsafe`; llegará con `crates/ffi` (fase E).
       - nextest, cargo-deny, cargo-llvm-cov y la toolchain 1.95 no están instalados en local: el CI los usa, y en local basta `cargo test`.
-- [ ] B.2 Modelo de valores (`Value`, `Decimal` exacto propio de 38 dígitos según `spec/data-model.md`, fechas con `jiff` o `chrono`), normalización y grupos de tipo. Base de datos de zonas horarias **empaquetada** y fijada por versión (no la del sistema), con su versión expuesta en la API. Lector JSON propio o `serde_json` configurado: enteros exactos, `float_roundtrip`, detección de claves duplicadas y límite de anidamiento sin depender de la recursión por defecto.
+- [x] B.2 Modelo de valores (`Value`, `Decimal` exacto propio de 38 dígitos según `spec/data-model.md`, fechas con `jiff` o `chrono`), normalización y grupos de tipo. Base de datos de zonas horarias **empaquetada** y fijada por versión (no la del sistema), con su versión expuesta en la API. Lector JSON propio o `serde_json` configurado: enteros exactos, `float_roundtrip`, detección de claves duplicadas y límite de anidamiento sin depender de la recursión por defecto.
   - Se divide en:
   - [x] B.2a Valores (`Value`, `Map`, `Opaque`, `NullCause`), decimales propios de 38 dígitos, comparación exacta entre enteros, floats y decimales, fechas y fechas con hora con zona sobre `jiff`, grupos de tipo, igualdad bajo `ANY`, y el tipo de error del núcleo con los códigos de `spec/errors.md`.
     - Hecho el 2026-10-31. El autor aprobó las dependencias `thiserror`, `jiff` (sin funciones por defecto, con `tzdb-bundle-always`), `serde`/`serde_json`, `regex` y `tracing`; de momento solo se añaden `thiserror` y `jiff`.
@@ -280,7 +280,13 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - El escritor es compacto.
       - `Error` va en una `Box`, para que `Result` ocupe un puntero.
       - Los tests de integración leen los 2.135 vectores con el propio lector y pasan los 12 vectores léxicos de `format/`.
-  - [ ] B.2c Lectura y escritura de valores en JSON (`$int`, `$float`, `$decimal`, `$date`, `$datetime` con zonas, `$map`, `$opaque`), contra los vectores de `format/values`.
+  - [x] B.2c Lectura y escritura de valores en JSON (`$int`, `$float`, `$decimal`, `$date`, `$datetime` con zonas, `$map`, `$opaque`), contra los vectores de `format/values`.
+    - Hecho el 2026-11-01: `cleanrules::format::value`.
+      - Tres contextos de lectura: constante, datos (los desbordamientos dan nulos con motivo) y valores registrados (admiten opacos).
+      - Las fechas con hora siguen la gramática de la especificación. Las zonas IANA se validan contra la base empaquetada de `jiff`, distinguiendo mayúsculas y conservando los alias, y se comprueba que el desfase coincide con el de la zona en ese instante.
+      - La escritura es canónica.
+      - Pasan los 79 vectores de `format/values`. Se comprobó que el test detecta expectativas alteradas, incluido el signo de `-0.0`.
+    - Pendiente: exponer en la API la versión de la base de datos de zonas (`spec/json-format.md`, *Time zones*); se hará cuando exista una API pública de documentos (B.3).
 - [ ] B.3 AST con serde: los 14 tipos de nodo y sus validaciones al construir, identidad estructural, `field_paths`, `Display` legible.
 - [ ] B.4 API de construcción idiomática en Rust (constructores y sobrecarga de operadores donde tenga sentido; macros solo si aportan).
 - [ ] B.5 Lógicas: `Logic` (trait), Kleene, registro por nombre y capacidad `Graded`.

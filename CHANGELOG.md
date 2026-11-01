@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- `cleanrules::format::value`: values in JSON, read as constants, data or
+  recorded values and written in canonical form, including datetimes with
+  fixed offsets or IANA time zones checked against the bundled database.
 - `cleanrules::json`: a strict JSON reader and writer that keeps member order
   and number literals, rejects duplicate keys, lone surrogates and byte order
   marks, reports errors by line and column in code points, enforces size and
