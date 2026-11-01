@@ -85,6 +85,32 @@ impl AwareDateTime {
         Ok(Self { timestamp, zone })
     }
 
+    /// Build an aware datetime from a native one: its instant, its offset at that
+    /// instant, and its zone's IANA name when it has one (`spec/data-model.md`,
+    /// *Time zones*). The zone is kept when the bundled database knows the name
+    /// and gives it the same offset at that instant; otherwise the value keeps
+    /// the native offset as a fixed offset.
+    ///
+    /// # Errors
+    ///
+    /// As [`AwareDateTime::new`].
+    pub fn from_native(
+        timestamp: Timestamp,
+        offset: Offset,
+        name: Option<&str>,
+    ) -> Result<Self, DateTimeError> {
+        let known = name.filter(|name| {
+            jiff::tz::db()
+                .get(name)
+                .is_ok_and(|zone| zone.to_offset(timestamp) == offset)
+        });
+        let zone = match known {
+            Some(name) => Zone::Named(name.to_owned()),
+            None => Zone::Fixed(offset),
+        };
+        Self::new(timestamp, zone)
+    }
+
     /// The instant.
     #[must_use]
     pub fn timestamp(&self) -> Timestamp {
@@ -160,5 +186,27 @@ mod tests {
             AwareDateTime::new(instant, Zone::Fixed(offset)),
             Err(DateTimeError::BadOffset)
         );
+    }
+
+    #[test]
+    fn native_zones_are_kept_only_when_they_agree() {
+        // Summer time in Madrid ended on 2026-10-25, so the offset is +01:00.
+        let instant: Timestamp = "2026-10-31T08:30:00Z".parse().unwrap();
+        let one = Offset::from_seconds(3600).unwrap();
+        let two = Offset::from_seconds(7200).unwrap();
+        let zone = |name, offset| {
+            AwareDateTime::from_native(instant, offset, name)
+                .unwrap()
+                .zone()
+                .clone()
+        };
+        assert_eq!(
+            zone(Some("Europe/Madrid"), one),
+            Zone::Named("Europe/Madrid".into())
+        );
+        // The database gives another offset, the name is unknown, or there is none.
+        assert_eq!(zone(Some("Europe/Madrid"), two), Zone::Fixed(two));
+        assert_eq!(zone(Some("Mars/Olympus"), one), Zone::Fixed(one));
+        assert_eq!(zone(None, Offset::UTC), Zone::Fixed(Offset::UTC));
     }
 }

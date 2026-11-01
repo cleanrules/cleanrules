@@ -57,10 +57,11 @@ pythonVersion = "3.11"
 extend = "../../ruff.toml"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D103"]
+"tests/**" = ["D101", "D103"]
 
 [dependency-groups]
 dev = [
+    "hypothesis>=6.170.14",
     "pyright>=1.1.414",
     "pytest>=9.2.0",
 ]

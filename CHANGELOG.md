@@ -43,6 +43,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- Python binding: conditions built with `F`, `Field`, `Const`, operators and
+  methods (`is_in`, `between`, `is_null`, `matches`, `starts_with`,
+  `ends_with`, `contains`, `abs`), with the v1's guards against Python
+  pitfalls and a `repr` that is Python source; every construction rule is
+  checked by the core. The exception hierarchy of `spec/errors.md`
+  (`cleanrules.CleanRulesError` and its subclasses, with codes and context).
+  Nodes pickle through the JSON format.
+- Rust core: `AwareDateTime::from_native` builds an aware datetime from a
+  native one as `spec/data-model.md` says, and the crate re-exports `jiff`.
 - Python binding scaffold (`bindings/python`, PyO3 and maturin): the
   `cleanrules` package with its native module, `__version__` and
   `FORMAT_VERSION`. Wheels: `abi3` for CPython 3.11+, `cp314t` for

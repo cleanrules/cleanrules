@@ -20,6 +20,8 @@ pub mod rules;
 pub mod value;
 
 pub use error::{Context, Error, ErrorCode, Result, Segment};
+/// The date and time library whose types dates and datetimes use.
+pub use jiff;
 pub use value::{Decimal, Group, Map, NullCause, Number, Value};
 
 /// The version of the JSON format this crate reads and writes

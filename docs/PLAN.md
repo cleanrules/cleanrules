@@ -393,7 +393,15 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
     - CI: un trabajo `python` en `ci.yml` (pytest en Linux, macOS y Windows con 3.11, 3.14t, 3.15 y 3.15t, y pyright) y `wheels.yml`, que construye las wheels (manylinux y musllinux x86_64/aarch64, macOS arm64 y x86_64, Windows x64 y arm64) y el sdist y prueba cada wheel instalada. Aún no se han ejecutado en GitHub: lo harán con el primer push.
     - Dependencias: `pyo3` (aprobada) y, como herramientas de desarrollo del paquete, `pytest` y `pyright` (`uv.lock` en `bindings/python`).
     - Desviación: el `strip` de Xcode 27 corrompe a veces bibliotecas Mach-O (la wheel `abi3t` no cargaba: «mis-aligned LINKEDIT string pool»), así que el perfil release del workspace no hace `strip`, también en `build-override`. Cuesta un 8 % de tamaño (37 KB).
-- [ ] C.2 API Python con la ergonomía de la v1: `F`, operadores, protección contra trampas (`docs/pitfalls.md`), `Rule`, `RuleSet`, `Decision`, `explain`, `summary`.
+- C.2 API Python con la ergonomía de la v1: `F`, operadores, protección contra trampas (`docs/pitfalls.md`), `Rule`, `RuleSet`, `Decision`, `explain`, `summary`. Se divide en dos subtareas:
+  - [x] C.2a Expresiones y errores: `F`, `Field`, `Const`, operadores y métodos, guardas de las trampas, `repr` como código Python, y la jerarquía de excepciones de `spec/errors.md`.
+    - Hecho el 2026-11-01: cada nodo lo construye el núcleo, que aplica las reglas de construcción. En Python quedan los operadores, las guardas y el `repr`, portados de la v1 (`python/cleanrules/_expr.py`); las excepciones están en `python/cleanrules/errors.py`, y el módulo nativo elige la clase por código y pasa el contexto.
+    - Las constantes se convierten en Rust según la tabla de Python de `spec/data-model.md`: enteros de 64 bits, decimales exactos de hasta 38 dígitos (nunca redondeados), NaN rechazado, fechas, datetimes con zona IANA o desplazamiento fijo, y subclases (`StrEnum`, `IntEnum`).
+    - Núcleo: `AwareDateTime::from_native`, que conserva la zona IANA solo si la base de datos del núcleo la conoce y coincide el desplazamiento, y la reexportación de `jiff`, cuyos tipos ya forman parte de la API pública.
+    - Los nodos se copian como sí mismos y se serializan con pickle a través del formato JSON (`node_from_json`).
+    - 166 tests (los de la v1, adaptados, y propiedades con hypothesis: el `repr` se reevalúa al mismo árbol, pickle conserva el árbol y la clase). Pasan en 3.11, 3.14 y 3.14t; pyright estricto y ruff limpios.
+    - Desviaciones: los nodos son una sola familia (`Field`, `Const` y un nodo genérico hermano), no una clase por operador; las comparaciones entre nodos conservan su orientación. Siguiendo la especificación, la constante nula es de tipo `value` (la v1 decía `any`). Dependencia de desarrollo nueva: `hypothesis`.
+  - [ ] C.2b `Rule`, `RuleSet`, `Decision`, `explain` y `summary`, con una conversión provisional de los datos de entrada (la definitiva es C.3).
 - [ ] C.3 Conversión de datos (dicts, dataclasses, Pydantic, namedtuples, filas de pandas, numpy) a `Value`, con las reglas de seguridad de `spec/data-model.md`.
 - [ ] C.4 `run` y acciones en Python; pickle; tipos (`.pyi`).
 - [ ] C.5 Runner de conformidad en Python.

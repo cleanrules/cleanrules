@@ -1,7 +1,7 @@
 # Common pitfalls
 
-RulePy conditions are **data**: `F.age >= 18` does not compare anything, it
-builds a node that RulePy evaluates later. This is what lets one rule be
+cleanrules conditions are **data**: `F.age >= 18` does not compare anything, it
+builds a node that the cleanrules core evaluates later. This is what lets one rule be
 explained, serialized, vectorized and audited. Polars and SQLAlchemy work the
 same way. It also means some everyday Python idioms behave differently. Each
 pitfall below either raises a clear `ExpressionError` or has a simple
@@ -15,7 +15,7 @@ alternative.
 ```
 
 Python's `and`, `or`, `not` and `if` ask for a real `True` or `False`, which a
-node cannot give. RulePy raises instead of guessing.
+node cannot give. cleanrules raises instead of guessing.
 
 **Parenthesize comparisons.** `&` and `|` bind more tightly than `>` and `==`
 in Python, so `F.a > 1 & F.b < 2` means `F.a > (1 & F.b) < 2` (an error).
@@ -64,6 +64,9 @@ look up the very same objects.
 - `list.index`, `list.remove`, `list.count` and `==` between lists or tuples of
   nodes compare with `==`, so avoid them on nodes.
 - `WeakKeyDictionary` does not work with nodes.
+
+Nodes are immutable: `copy.copy` and `copy.deepcopy` return the node itself,
+and pickling keeps the tree (in the JSON format).
 - `sorted`, `min`, `max` and `list.sort` on nodes raise, because `<` builds a
   node too.
 
@@ -82,7 +85,7 @@ by default. Use `matches` for patterns.
 ## Field names that clash with node attributes
 
 Any public attribute of a `Field` keeps its meaning after a dot: `path`, `tag`,
-`kind`, `TAGS`, `children`, `walk`, `same_as`, `structural_key`, `field_paths`,
+`kind`, `children`, `walk`, `same_as`, `structural_key`, `field_paths`,
 and the methods
 `is_in`, `between`, `is_null`, `matches`, `starts_with`, `ends_with`,
 `contains` and `abs`. So `F.customer.kind` is the node's kind (`"any"`), not a
@@ -119,10 +122,10 @@ one of those names is reached as `F.x["str"]`.
 numpy scalars work on either side: `np.int64(5) < F.x` builds `F.x > 5`.
 Arrays, Series and DataFrames are not constants. `np.array([1, 2]) == F.x`
 and `df["a"] > F.x` raise instead of comparing element by element. To check
-whole columns, use the validation backend (phase 4).
+whole columns, use vectorized validation (phase I of the roadmap).
 
 ## fuzzytool terms go on the right
 
 Until fuzzytool 0.8, `score["poor"] & (F.x > 2)` builds a fuzzytool node
-instead of a RulePy one. Put the RulePy condition first,
-`(F.x > 2) & score["poor"]`, or wrap the term with `fz(...)` (phase 5).
+instead of a cleanrules one. Put the cleanrules condition first,
+`(F.x > 2) & score["poor"]`, or wrap the term with `fz(...)` (phase J).
