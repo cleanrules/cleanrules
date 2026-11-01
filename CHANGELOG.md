@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: `matches` patterns use the syntax of Rust's `regex` crate, and
   a null constant is only allowed as the operand of `is_null` (also under
   `and`, `or` and `not`).
+- `cleanrules::eval`: the evaluator, generic over the logic, with result
+  trees, structured reasons, exact comparisons, 64-bit overflow, and strict
+  mode; result trees in JSON (`format::write_result`). The core's conformance
+  runner passes all 1,326 condition and value vectors.
 - `cleanrules::logic`: the `Logic` trait, Kleene's three-valued logic
   registered as `"boolean"`, and lookup by name with `registry_error`.
 - `cleanrules::build`: idiomatic Rust construction of conditions, with
