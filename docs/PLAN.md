@@ -38,6 +38,7 @@ Lo que nos diferencia es la combinación: **condiciones como AST serializable** 
 | D11 | El proyecto se llama **cleanrules** (decidido el 2026-10-31; *clean* ≈ *Kleene*) | "RulePy" no encaja fuera de Python |
 | D12 | **Erlang** con un NIF en Rust hecho con `rustler` directamente sobre `crates/core` (no sobre la C ABI); los rule sets son recursos inmutables que comparten los procesos, y el trabajo largo va a *dirty schedulers* | rustler convierte términos y captura *panics*, y es el estándar de la BEAM; un NIF que bloquea o falla tumbaría la VM |
 | D13 | **La IA usa el motor, no forma parte de él**: ni el núcleo ni los bindings llaman a modelos de lenguaje. Los agentes llegan por un servidor MCP (`crates/mcp`) y por adaptadores finos y opcionales para cada framework | Determinismo y dependencias mínimas; MCP sirve a la mayoría de frameworks con una sola implementación |
+| D14 | **Visualización como texto**: el núcleo escribe diagramas en DOT, Mermaid y HTML autónomo, sin dependencias; ninguna biblioteca gráfica entra en el núcleo, y en los bindings dibujar o mostrar es un extra opcional de carga perezosa | El mismo diagrama en todos los lenguajes, probado con *snapshots*; dependencias mínimas |
 
 **Nombres por registro** (libres a 2026-10-31 en crates.io, PyPI, npm con y sin scope, y como organización de GitHub; sin marcas ni productos homónimos conocidos). Descartados:
 
@@ -644,6 +645,29 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
   - Conjunto de evaluación (políticas en lenguaje natural → reglas) con métricas de validez y de acierto sobre casos reservados.
 - [ ] O.6 Sistema experto para agentes (tras K): hechos que aportan las herramientas del agente, encadenamiento hacia delante y el árbol de derivación como explicación.
 - [ ] O.7 Seguridad y documentación: modelo de amenazas (inyección de *prompts* a través de los datos, rule sets de origen no confiable, abuso de recursos), una guía por framework y ejemplos en `docs/`.
+- [ ] O.8 Integración con swarmstate (backend de estado y *checkpoints* para agentes, con núcleo en Rust, del mismo autor; [swarmstate.github.io](https://swarmstate.github.io)), como extra opcional `cleanrules[swarmstate]` de carga perezosa. Nada de esto entra en el núcleo (invariantes 11 y 12). Revisado el 2026-11-02 sobre swarmstate 0.12.0.
+  - Enrutado explicable. swarmstate enruta con `HandoffGraph` y condiciones en un minilenguaje propio, de dos valores (un tipo incompatible es `false`) y sin explicación. Un `RuleSet` (política `first`, payload con el destino) hace de router de `HandoffGraph` y de los `add_conditional_edges` de LangGraph, y devuelve por qué se eligió un destino y por qué no los demás. Incluye un conversor de las condiciones de `HandoffGraph` (`category in ['billing'] and user.tier == 'gold'`) a la sintaxis de texto, con la diferencia semántica documentada y probada: en cleanrules un tipo incompatible es `UNKNOWN`, también bajo `not`, y la regla no se dispara.
+  - Registro de auditoría duradero: los documentos de decisión y de explicación de O.3 se guardan en un `Store` de swarmstate por hilo y paso, de modo que la vuelta atrás de swarmstate (instantáneas en O(1)) muestra también qué decidió el *guardrail* y por qué.
+  - Validación del estado: un rule set en modo estricto comprueba el estado antes de que el *checkpointer* de swarmstate lo guarde, o comprueba el `diff` entre dos instantáneas, y rechaza el paso con la explicación y los contrafactuales.
+  - Tests contra una versión fijada de swarmstate y ejemplo con LangGraph en `docs/`.
+  - Idea para valorar con K y O.6: la memoria de trabajo del encadenamiento hacia delante sobre instantáneas de swarmstate, para probar hipótesis y volver atrás sin copiar el estado.
+
+---
+
+### Fase V. Visualización · tamaño M
+
+**Objetivo**: ver condiciones, reglas, tablas, decisiones y explicaciones como diagramas, con el mismo resultado en todos los lenguajes (D14). Propuesta aceptada por el autor el 2026-11-02; V.1 y V.2 pueden empezar en cuanto termine D.3b.
+
+- [ ] V.1 Especificación (`spec/visual.md`) y salida en el núcleo, con *snapshots* de `insta` y vectores.
+  - Condición: el árbol del AST (`all`, `any`, `not` y las comparaciones), con cada hoja en la sintaxis de texto de D.2a.
+  - Explicación: el árbol de causas de cada regla, con cada condición marcada por su valor de verdad (verdadero, falso o desconocido; el grado en lógica difusa) y sus contrafactuales, y la regla elegida resaltada.
+  - Rule set: un nodo por regla con los campos que lee y sus salidas (los datos de `summary()`), y el orden o la prioridad de la política.
+  - Tabla de decisión: la rejilla en HTML, con las filas que se disparan resaltadas cuando se le da una decisión.
+  - Formatos: DOT (Graphviz), Mermaid (se ve en GitHub, GitLab y la documentación) y HTML autónomo, sin JavaScript ni recursos externos y con el texto escapado. Salida determinista y acotada como el texto de D.2b.
+  - Un nodo nuevo del AST también se dibuja (invariante 3): se añade a la skill `/add-operator`.
+- [ ] V.2 Python: `_repr_html_` para Jupyter en condiciones, reglas, rule sets, decisiones, explicaciones, resúmenes y tablas, con el HTML de V.1; `to_dot()`, `to_mermaid()` y `to_html()`; `to_graphviz()` con el paquete `graphviz` como extra opcional `cleanrules[viz]` de carga perezosa. Los demás bindings exponen `to_dot()`, `to_mermaid()` y `to_html()` a medida que existen.
+- [ ] V.3 Estadísticas de un lote (tras I): cuántas veces se dispara cada regla y cuántas falla o queda desconocida cada condición, y la cobertura de un rule set o una tabla sobre un conjunto de datos. Las calcula el núcleo; se dibujan en HTML y, en Python, con matplotlib o plotly opcionales.
+- [ ] V.4 *Playground* en la web (tras F): cleanrules compilado a wasm evalúa y dibuja reglas, tablas y explicaciones en el navegador, sin servidor.
 
 ---
 
@@ -674,11 +698,12 @@ P (hecha) → 0' → A → B → C ─┬→ D → E → F → G → H → N
                             ├→ J (necesita B y D)
                             ├→ K (necesita B y D)
                             ├→ L (necesita C)
-                            └→ O (necesita B, C y D; los adaptadores llegan a cada binding cuando existe)
+                            ├→ O (necesita B, C y D; los adaptadores llegan a cada binding cuando existe)
+                            └→ V (V.1 y V.2 tras D.3b; V.3 tras I; V.4 tras F)
 todas → M
 ```
 
-Los bindings E–H y N siguen el orden decidido (C/C++ → JS → JVM → Go → Erlang); N necesita el núcleo y D.4, no la C ABI. O.1–O.3 pueden empezar en cuanto termine D, porque el servidor MCP solo necesita el núcleo y la carga de reglas; O.5 usa la auditoría de J.4, y O.6, el sistema experto de K. Las letras N y O se añadieron en la v3 del plan; las dos van antes de M. Las fases de funcionalidad I–K se implementan en el núcleo y llegan a todos los bindings existentes.
+Los bindings E–H y N siguen el orden decidido (C/C++ → JS → JVM → Go → Erlang); N necesita el núcleo y D.4, no la C ABI. O.1–O.3 pueden empezar en cuanto termine D, porque el servidor MCP solo necesita el núcleo y la carga de reglas; O.5 usa la auditoría de J.4, y O.6, el sistema experto de K. Las letras N y O se añadieron en la v3 del plan, y V el 2026-11-02; todas van antes de M. Las fases de funcionalidad I–K se implementan en el núcleo y llegan a todos los bindings existentes.
 
 ## 6. Riesgos
 
