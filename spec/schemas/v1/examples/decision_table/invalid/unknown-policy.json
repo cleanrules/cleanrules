@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "decision_table": {
+    "hit_policy": "O",
+    "inputs": [
+      "x"
+    ],
+    "outputs": [],
+    "rows": []
+  }
+}

@@ -34,6 +34,7 @@ from cleanrules._rules import (
     Summary,
     Truth,
 )
+from cleanrules._tables import DecisionTable, TableOutput, TablePolicy, TableRow
 from cleanrules._trees import ResultTree, evaluate_tree, evaluate_value_tree
 from cleanrules.errors import (
     ActionError,
@@ -64,6 +65,7 @@ __all__ = [
     "Const",
     "Counterfactual",
     "Decision",
+    "DecisionTable",
     "EvaluationError",
     "Explanation",
     "Expr",
@@ -92,6 +94,9 @@ __all__ = [
     "Status",
     "StructuralKey",
     "Summary",
+    "TableOutput",
+    "TablePolicy",
+    "TableRow",
     "Truth",
     "TypeMismatchError",
     "UnsupportedError",

@@ -11,6 +11,9 @@ use pyo3::types::{PyList, PyTuple};
 use crate::errors::IntoPyResult;
 use crate::node::PyNode;
 use crate::rules::{PyRule, PyRuleSet};
+use crate::tables::PyDecisionTable;
+use cleanrules::rules::RuleSet;
+use cleanrules::table::DecisionTable;
 
 fn limits(max_size: Option<usize>, max_nesting: Option<usize>, max_depth: Option<usize>) -> Limits {
     let mut limits = Limits::default();
@@ -29,8 +32,36 @@ fn limits(max_size: Option<usize>, max_nesting: Option<usize>, max_depth: Option
     limits
 }
 
-/// Read a document: `("condition", Node)`, `("rule", Rule)` or
-/// `("ruleset", (rules, hit_policy, aggregate, logic, strict))`.
+/// A rule set as `(rules, hit_policy, aggregate, logic, strict)`.
+pub(crate) fn ruleset_parts<'py>(
+    py: Python<'py>,
+    ruleset: &RuleSet,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let rules = PyList::empty(py);
+    for rule in ruleset.rules() {
+        rules.append(PyRule::from(rule.clone()))?;
+    }
+    PyTuple::new(
+        py,
+        [
+            rules.into_any(),
+            ruleset.hit_policy().as_str().into_pyobject(py)?.into_any(),
+            ruleset
+                .aggregate()
+                .map(cleanrules::rules::Aggregate::as_str)
+                .into_pyobject(py)?
+                .into_any(),
+            ruleset.logic().as_str().into_pyobject(py)?.into_any(),
+            pyo3::types::PyBool::new(py, ruleset.strict())
+                .to_owned()
+                .into_any(),
+        ],
+    )
+}
+
+/// Read a document: `("condition", Node)`, `("rule", Rule)`,
+/// `("ruleset", (rules, hit_policy, aggregate, logic, strict))` or
+/// `("decision_table", DecisionTable)`; CSV holds a decision table.
 #[pyfunction]
 #[pyo3(signature = (text, format, max_size=None, max_nesting=None, max_depth=None))]
 pub(crate) fn load_document<'py>(
@@ -46,35 +77,18 @@ pub(crate) fn load_document<'py>(
         "json" => read_document(text, &limits),
         "yaml" => read_yaml_document(text, &limits),
         "text" => cleanrules::text::parse(text, &limits),
+        "csv" => DecisionTable::from_csv(text, &limits).map(Document::DecisionTable),
         other => return Err(PyValueError::new_err(format!("unknown format {other:?}"))),
     }
     .or_raise(py)?;
     Ok(match document {
         Document::Condition(node) => ("condition", PyNode { node }.into_pyobject(py)?.into_any()),
         Document::Rule(rule) => ("rule", PyRule::from(rule).into_pyobject(py)?.into_any()),
-        Document::RuleSet(ruleset) => {
-            let rules = PyList::empty(py);
-            for rule in ruleset.rules() {
-                rules.append(PyRule::from(rule.clone()))?;
-            }
-            let parts = PyTuple::new(
-                py,
-                [
-                    rules.into_any(),
-                    ruleset.hit_policy().as_str().into_pyobject(py)?.into_any(),
-                    ruleset
-                        .aggregate()
-                        .map(cleanrules::rules::Aggregate::as_str)
-                        .into_pyobject(py)?
-                        .into_any(),
-                    ruleset.logic().as_str().into_pyobject(py)?.into_any(),
-                    pyo3::types::PyBool::new(py, ruleset.strict())
-                        .to_owned()
-                        .into_any(),
-                ],
-            )?;
-            ("ruleset", parts.into_any())
-        }
+        Document::RuleSet(ruleset) => ("ruleset", ruleset_parts(py, &ruleset)?.into_any()),
+        Document::DecisionTable(table) => (
+            "decision_table",
+            PyDecisionTable { table }.into_pyobject(py)?.into_any(),
+        ),
         // The core's documents are `#[non_exhaustive]`.
         _ => {
             return Err(PyValueError::new_err(
@@ -100,6 +114,19 @@ pub(crate) fn load_rule(
 }
 
 fn write(py: Python<'_>, document: &Document, format: &str) -> PyResult<String> {
+    match (format, document) {
+        ("csv", Document::DecisionTable(table)) => return Ok(table.to_csv()),
+        ("csv", _) => {
+            return Err(cleanrules::Error::new(
+                cleanrules::ErrorCode::Unsupported,
+                "only decision tables are written as CSV",
+            )
+            .with_hint("write rules and rule sets as JSON, YAML or text")
+            .unsupported("csv", "CSV holds decision tables"))
+            .or_raise(py);
+        }
+        _ => {}
+    }
     match format {
         "json" => Ok(to_string(&write_document(document))),
         "yaml" => Ok(cleanrules::yaml::to_string(&write_document(document))),
@@ -134,6 +161,16 @@ pub(crate) fn dump_ruleset(ruleset: &Bound<'_, PyRuleSet>, format: &str) -> PyRe
     write(
         ruleset.py(),
         &Document::RuleSet(ruleset.get().ruleset().clone()),
+        format,
+    )
+}
+
+/// The document of a decision table, in `format` (`json`, `yaml` or `csv`).
+#[pyfunction]
+pub(crate) fn dump_table(table: &Bound<'_, PyDecisionTable>, format: &str) -> PyResult<String> {
+    write(
+        table.py(),
+        &Document::DecisionTable(table.get().table.clone()),
         format,
     )
 }

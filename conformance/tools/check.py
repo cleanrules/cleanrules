@@ -100,9 +100,9 @@ def check_read(vector: dict[str, Any]) -> list[str]:
     found: list[str] = []
     source = given.get("text")
     document = given.get("document")
-    yaml = given.get("yaml", given.get("rules_text"))
+    yaml = given.get("yaml", given.get("rules_text", given.get("table_csv")))
     if yaml is not None:
-        # YAML and rule texts are not parsed here: only locations are checked.
+        # YAML, rule texts and CSV are not parsed here: only locations are checked.
         source, document = yaml, None
     elif source is not None:
         try:

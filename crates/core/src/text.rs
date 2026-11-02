@@ -74,7 +74,7 @@ fn is_identifier(word: &str) -> bool {
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
-fn is_name(word: &str) -> bool {
+pub(crate) fn is_name(word: &str) -> bool {
     is_identifier(word) && keyword(word).is_none()
 }
 
@@ -310,6 +310,8 @@ enum Shape {
     Arith(ArithOp, Box<Syn>, Box<Syn>),
     Abs(Box<Syn>),
     Neg(Box<Syn>),
+    /// A node already built: the column a decision table's cell tests.
+    Built(Node),
 }
 
 impl Syn {
@@ -324,6 +326,17 @@ impl Syn {
         syn
     }
 
+    /// A node already built, as tall as it is deep.
+    fn built(node: Node, line: u64, column: u64) -> Self {
+        let height = depth(&node);
+        Syn {
+            shape: Shape::Built(node),
+            line,
+            column,
+            height,
+        }
+    }
+
     /// The node, located elsewhere: a parenthesized node starts at its
     /// parenthesis.
     fn relocated(self, line: u64, column: u64) -> Self {
@@ -336,7 +349,7 @@ impl Syn {
 
     fn children(&self) -> Vec<&Syn> {
         match &self.shape {
-            Shape::Field(_) | Shape::Const(_) => vec![],
+            Shape::Field(_) | Shape::Const(_) | Shape::Built(_) => vec![],
             Shape::Compare(_, a, b) | Shape::Arith(_, a, b) => vec![a, b],
             Shape::And(items) | Shape::Or(items) => items.iter().collect(),
             Shape::Not(a)
@@ -375,6 +388,7 @@ impl Syn {
             Shape::Arith(op, a, b) => Node::arith(op, a.build()?, b.build()?).map_err(at),
             Shape::Abs(a) => Node::abs(a.build()?).map_err(at),
             Shape::Neg(a) => Node::neg(a.build()?).map_err(at),
+            Shape::Built(node) => Ok(node),
         }
     }
 }
@@ -403,6 +417,11 @@ fn describe(kind: &Kind) -> String {
         Kind::Invalid(..) => "invalid text".into(),
         Kind::End => "the end of the text".into(),
     }
+}
+
+/// The nodes on the longest path down from `node`, itself included.
+fn depth(node: &Node) -> usize {
+    1 + node.children().into_iter().map(depth).max().unwrap_or(0)
 }
 
 /// `NOT node` when `negated`, located where `node` starts.
@@ -1128,6 +1147,68 @@ impl<'a> Parser<'a> {
             })
     }
 
+    // --- Decision tables (`spec/tables.md`) -------------------------------------------
+
+    fn end(&self, what: &str) -> Result<()> {
+        if matches!(self.peek().kind, Kind::End) {
+            Ok(())
+        } else {
+            Err(self.unexpected(&format!("the end of the {what}")))
+        }
+    }
+
+    /// A whole text that is one expression: a table's input or output.
+    fn expression(&mut self) -> Result<Node> {
+        let syn = self.expr(OR)?;
+        self.end("expression")?;
+        syn.build()
+    }
+
+    /// An input cell testing `subject`: `None` for `-` or nothing, else the
+    /// predicate, or the equality to a bare value.
+    fn cell(&mut self, subject: &Node) -> Result<Option<Node>> {
+        if matches!(self.peek().kind, Kind::End)
+            || (self.is_symbol("-") && matches!(self.following.kind, Kind::End))
+        {
+            return Ok(None);
+        }
+        let start = self.peek().clone();
+        let left = Syn::built(subject.clone(), start.line, start.column);
+        let syn = if self.infix_level() == Some(PREDICATE) {
+            self.predicate(left)?
+        } else {
+            let value = self.expr(SUM)?;
+            Syn::new(
+                Shape::Compare(CompareOp::Eq, Box::new(left), Box::new(value)),
+                start.line,
+                start.column,
+            )
+        };
+        let syn = self.bounded(syn)?;
+        if !matches!(self.peek().kind, Kind::End) {
+            return Err(self
+                .unexpected("the end of the cell")
+                .with_hint("a cell leaves out its column: write > 5, IN ('a', 'b') or a value"));
+        }
+        syn.build().map(Some)
+    }
+
+    /// An output column after `THEN`: its key and its output values.
+    fn output(&mut self) -> Result<(String, Vec<Value>)> {
+        let key = self.label("an output key")?;
+        let mut values = Vec::new();
+        if self.accept_keyword("IN") {
+            self.expect_symbol("(")?;
+            values.push(self.constant()?);
+            while self.accept_symbol(",") {
+                values.push(self.constant()?);
+            }
+            self.expect_symbol(")")?;
+        }
+        self.end("output column")?;
+        Ok((key, values))
+    }
+
     fn condition_document(&mut self) -> Result<Document> {
         let condition = self.expr(OR)?;
         if !matches!(self.peek().kind, Kind::End) {
@@ -1251,6 +1332,24 @@ pub fn parse(text: &str, limits: &Limits) -> Result<Document> {
 pub fn parse_rule(text: &str, limits: &Limits) -> Result<Rule> {
     check_size(text, limits)?;
     Parser::new(text, limits).single_rule()
+}
+
+/// A table's input or output: one expression (`spec/tables.md`).
+pub(crate) fn parse_expression(text: &str, limits: &Limits) -> Result<Node> {
+    check_size(text, limits)?;
+    Parser::new(text, limits).expression()
+}
+
+/// A table's input cell, testing `subject` (`spec/tables.md`, *Input cells*).
+pub(crate) fn parse_cell(text: &str, subject: &Node, limits: &Limits) -> Result<Option<Node>> {
+    check_size(text, limits)?;
+    Parser::new(text, limits).cell(subject)
+}
+
+/// A table's output column, after `THEN`: `key [IN (constant, …)]`.
+pub(crate) fn parse_output(text: &str, limits: &Limits) -> Result<(String, Vec<Value>)> {
+    check_size(text, limits)?;
+    Parser::new(text, limits).output()
 }
 
 fn check_size(text: &str, limits: &Limits) -> Result<()> {
@@ -1410,13 +1509,31 @@ pub(crate) fn literal(value: &Value) -> String {
     }
 }
 
-fn child(node: &Node, min: u8, out: &mut String) {
+/// A string: between single quotes in the style of tables when it holds no
+/// control character, else between double quotes with JSON escapes.
+pub(crate) fn string_text(text: &str, single: bool) -> String {
+    if single && !text.chars().any(|c| c < ' ') {
+        format!("'{}'", text.replace('\'', "''"))
+    } else {
+        crate::json::to_string(&Json::String(text.to_owned()))
+    }
+}
+
+/// A constant, with strings in the given style.
+pub(crate) fn styled(value: &Value, single: bool) -> String {
+    match value {
+        Value::String(text) => string_text(text, single),
+        _ => literal(value),
+    }
+}
+
+fn child(node: &Node, min: u8, single: bool, out: &mut String) {
     if level(node) < min {
         out.push('(');
-        write_node(node, out);
+        write_node(node, single, out);
         out.push(')');
     } else {
-        write_node(node, out);
+        write_node(node, single, out);
     }
 }
 
@@ -1429,12 +1546,12 @@ fn is_number_constant(node: &Node) -> bool {
 
 // One arm per node reads best as a single dispatch.
 #[allow(clippy::too_many_lines)]
-fn write_node(node: &Node, out: &mut String) {
+fn write_node(node: &Node, single: bool, out: &mut String) {
     match node.expr() {
         Expr::Field(segments) => out.push_str(&path(segments)),
-        Expr::Const(value) => out.push_str(&literal(value)),
+        Expr::Const(value) => out.push_str(&styled(value, single)),
         Expr::Compare { op, left, right } => {
-            child(left, 5, out);
+            child(left, 5, single, out);
             let symbol = match op {
                 CompareOp::Eq => " = ",
                 CompareOp::Ne => " != ",
@@ -1444,7 +1561,7 @@ fn write_node(node: &Node, out: &mut String) {
                 CompareOp::Ge => " >= ",
             };
             out.push_str(symbol);
-            child(right, 5, out);
+            child(right, 5, single, out);
         }
         Expr::And(items) | Expr::Or(items) => {
             let (separator, min) = if matches!(node.expr(), Expr::And(_)) {
@@ -1456,17 +1573,17 @@ fn write_node(node: &Node, out: &mut String) {
                 if i > 0 {
                     out.push_str(separator);
                 }
-                child(item, min, out);
+                child(item, min, single, out);
             }
         }
         Expr::Not(operand) => {
             out.push_str("NOT ");
-            child(operand, 3, out);
+            child(operand, 3, single, out);
         }
         Expr::In { operand, values } => {
-            child(operand, 5, out);
+            child(operand, 5, single, out);
             out.push_str(" IN (");
-            let items: Vec<String> = values.iter().map(literal).collect();
+            let items: Vec<String> = values.iter().map(|v| styled(v, single)).collect();
             out.push_str(&items.join(", "));
             out.push(')');
         }
@@ -1476,35 +1593,33 @@ fn write_node(node: &Node, out: &mut String) {
             high,
             closed,
         } => {
-            child(operand, 5, out);
+            child(operand, 5, single, out);
             out.push_str(" BETWEEN ");
-            child(low, 5, out);
+            child(low, 5, single, out);
             out.push_str(" AND ");
-            child(high, 5, out);
+            child(high, 5, single, out);
             if *closed != Closed::Both {
                 out.push_str(" CLOSED ");
                 out.push_str(&closed.as_str().to_ascii_uppercase());
             }
         }
         Expr::IsNull(operand) => {
-            child(operand, 5, out);
+            child(operand, 5, single, out);
             out.push_str(" IS NULL");
         }
         Expr::Matches { operand, pattern } => {
-            child(operand, 5, out);
+            child(operand, 5, single, out);
             out.push_str(" MATCHES ");
-            out.push_str(&crate::json::to_string(&Json::String(
-                pattern.source().into(),
-            )));
+            out.push_str(&string_text(pattern.source(), single));
         }
         Expr::StringTest { op, operand, text } => {
-            child(operand, 5, out);
+            child(operand, 5, single, out);
             out.push_str(match op {
                 StringOp::StartsWith => " STARTS WITH ",
                 StringOp::EndsWith => " ENDS WITH ",
                 StringOp::Contains => " CONTAINS ",
             });
-            out.push_str(&crate::json::to_string(&Json::String(text.clone())));
+            out.push_str(&string_text(text, single));
         }
         Expr::Arith { op, left, right } => {
             let (symbol, own) = match op {
@@ -1513,13 +1628,13 @@ fn write_node(node: &Node, out: &mut String) {
                 ArithOp::Mul => (" * ", 6),
                 ArithOp::Div => (" / ", 6),
             };
-            child(left, own, out);
+            child(left, own, single, out);
             out.push_str(symbol);
-            child(right, own + 1, out);
+            child(right, own + 1, single, out);
         }
         Expr::Abs(operand) => {
             out.push_str("ABS(");
-            child(operand, 5, out);
+            child(operand, 5, single, out);
             out.push(')');
         }
         Expr::Neg(operand) => {
@@ -1527,10 +1642,10 @@ fn write_node(node: &Node, out: &mut String) {
             if is_number_constant(operand) {
                 // `-5` would read back as the constant -5.
                 out.push('(');
-                write_node(operand, out);
+                write_node(operand, single, out);
                 out.push(')');
             } else {
-                child(operand, 7, out);
+                child(operand, 7, single, out);
             }
         }
     }
@@ -1543,9 +1658,78 @@ fn write_node(node: &Node, out: &mut String) {
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut out = String::new();
-        write_node(self, &mut out);
+        write_node(self, false, &mut out);
         f.write_str(&out)
     }
+}
+
+/// An expression in the style of tables: strings between single quotes
+/// (`spec/tables.md`, *Canonical text*).
+pub(crate) fn table_text(node: &Node) -> String {
+    let mut out = String::new();
+    write_node(node, true, &mut out);
+    out
+}
+
+/// An input cell's canonical text, without its column `subject`, or `None` when
+/// the node has no cell form (`spec/tables.md`, *Canonical text*).
+pub(crate) fn cell_text(cell: &Node, subject: &Node) -> Option<String> {
+    let (negated, inner) = match cell.expr() {
+        Expr::Not(operand) => (true, &**operand),
+        _ => (false, cell),
+    };
+    let not = if negated { "NOT " } else { "" };
+    let mut out = String::new();
+    match inner.expr() {
+        Expr::Compare { op, left, right } if !negated && **left == *subject => {
+            if *op != CompareOp::Eq {
+                out.push_str(match op {
+                    CompareOp::Ne => "!= ",
+                    CompareOp::Lt => "< ",
+                    CompareOp::Le => "<= ",
+                    CompareOp::Gt => "> ",
+                    CompareOp::Ge => ">= ",
+                    CompareOp::Eq => "",
+                });
+            }
+            child(right, 5, true, &mut out);
+        }
+        Expr::In { operand, values } if **operand == *subject => {
+            let items: Vec<String> = values.iter().map(|v| styled(v, true)).collect();
+            let _ = write!(out, "{not}IN ({})", items.join(", "));
+        }
+        Expr::Between {
+            operand,
+            low,
+            high,
+            closed,
+        } if **operand == *subject => {
+            let _ = write!(out, "{not}BETWEEN ");
+            child(low, 5, true, &mut out);
+            out.push_str(" AND ");
+            child(high, 5, true, &mut out);
+            if *closed != Closed::Both {
+                out.push_str(" CLOSED ");
+                out.push_str(&closed.as_str().to_ascii_uppercase());
+            }
+        }
+        Expr::IsNull(operand) if **operand == *subject => {
+            out.push_str(if negated { "IS NOT NULL" } else { "IS NULL" });
+        }
+        Expr::Matches { operand, pattern } if **operand == *subject => {
+            let _ = write!(out, "{not}MATCHES {}", string_text(pattern.source(), true));
+        }
+        Expr::StringTest { op, operand, text } if **operand == *subject => {
+            let word = match op {
+                StringOp::StartsWith => "STARTS WITH",
+                StringOp::EndsWith => "ENDS WITH",
+                StringOp::Contains => "CONTAINS",
+            };
+            let _ = write!(out, "{not}{word} {}", string_text(text, true));
+        }
+        _ => return None,
+    }
+    Some(out)
 }
 
 fn rule_text(rule: &Rule) -> Result<String> {
@@ -1590,7 +1774,7 @@ fn rule_text(rule: &Rule) -> Result<String> {
 
 /// A field key with a control character, which a name between backticks
 /// cannot hold.
-fn check_keys(node: &Node) -> Result<()> {
+pub(crate) fn check_keys(node: &Node) -> Result<()> {
     if let Expr::Field(segments) = node.expr() {
         for segment in segments {
             if let Segment::Key(key) = segment
@@ -1617,8 +1801,8 @@ fn check_keys(node: &Node) -> Result<()> {
 ///
 /// # Errors
 ///
-/// `unsupported` for a rule with metadata or a field key with a control
-/// character, which text cannot hold.
+/// `unsupported` for a rule with metadata, a field key with a control
+/// character, which text cannot hold, or a decision table.
 ///
 /// # Examples
 ///
@@ -1633,6 +1817,12 @@ fn check_keys(node: &Node) -> Result<()> {
 /// ```
 pub fn to_string(document: &Document) -> Result<String> {
     match document {
+        Document::DecisionTable(_) => Err(Error::new(
+            ErrorCode::Unsupported,
+            "a decision table has no text form",
+        )
+        .with_hint("write it as CSV, JSON or YAML, or write its rule set as text")
+        .unsupported("text", "decision tables are written as CSV, JSON or YAML")),
         Document::Condition(node) => {
             check_keys(node)?;
             Ok(node.to_string())

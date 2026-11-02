@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "decision_table": {
+    "hit_policy": "output_order",
+    "strict": true,
+    "inputs": [
+      "x"
+    ],
+    "outputs": [
+      {
+        "name": "y",
+        "values": [
+          1,
+          {
+            "$decimal": "2.5"
+          }
+        ]
+      }
+    ],
+    "rows": [
+      {
+        "name": "a",
+        "priority": 3,
+        "description": "first row",
+        "inputs": [
+          ""
+        ],
+        "outputs": [
+          "1"
+        ]
+      }
+    ]
+  }
+}

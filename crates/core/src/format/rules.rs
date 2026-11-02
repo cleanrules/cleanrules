@@ -11,20 +11,24 @@ use crate::logic::LogicName;
 use crate::rules::{Aggregate, Aggregated, Config, Decision, HitPolicy, Rule, RuleSet};
 use crate::value::{Map, Value};
 
-fn format_error(pointer: &str, message: impl Into<String>) -> Error {
+pub(crate) fn format_error(pointer: &str, message: impl Into<String>) -> Error {
     Error::new(ErrorCode::FormatError, message).at_pointer(pointer)
 }
 
-fn at(pointer: &str, key: &str) -> String {
+pub(crate) fn at(pointer: &str, key: &str) -> String {
     format!("{pointer}/{}", pointer_token(key))
 }
 
-fn get<'a>(members: &'a [(String, Json)], key: &str) -> Option<&'a Json> {
+pub(crate) fn get<'a>(members: &'a [(String, Json)], key: &str) -> Option<&'a Json> {
     members.iter().find(|(k, _)| k == key).map(|(_, v)| v)
 }
 
 /// After the known keys: an unknown key is an error, in text order.
-fn no_unknown_keys(members: &[(String, Json)], known: &[&str], pointer: &str) -> Result<()> {
+pub(crate) fn no_unknown_keys(
+    members: &[(String, Json)],
+    known: &[&str],
+    pointer: &str,
+) -> Result<()> {
     match members.iter().find(|(k, _)| !known.contains(&k.as_str())) {
         Some((key, _)) => Err(
             format_error(&at(pointer, key), format!("unknown key {key:?}"))

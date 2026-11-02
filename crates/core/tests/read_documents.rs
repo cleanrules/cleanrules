@@ -8,12 +8,14 @@ mod common;
 
 use cleanrules::Error;
 use cleanrules::format::{
-    read_decision_document, read_document, read_ruleset, write_decision, write_document,
+    Document, read_decision_document, read_document, read_ruleset, write_decision, write_document,
+    write_ruleset,
 };
 use cleanrules::json::{Json, JsonNumber, Limits, to_string};
+use cleanrules::table::DecisionTable;
 use common::{get, int, limits_of, same, text, vectors};
 
-const FILES: [&str; 9] = [
+const FILES: [&str; 10] = [
     "format/documents.json",
     "format/values.json",
     "format/conditions.json",
@@ -23,6 +25,7 @@ const FILES: [&str; 9] = [
     "format/decisions.json",
     "format/yaml.json",
     "format/text.json",
+    "format/tables.json",
 ];
 
 /// A decision as the document it is written in.
@@ -37,14 +40,43 @@ fn decision_document(decision: &cleanrules::rules::Decision<'_>) -> Json {
 }
 
 /// What a vector reads: the document, or its text when it is written as text
-/// (`expect.printed`).
+/// (`expect.printed`), or a decision table's forms.
 enum Read {
     Document(Json),
     Text(String),
+    Table(Table),
+}
+
+/// A decision table as a document, as CSV and as the rule set it compiles into.
+struct Table {
+    document: Json,
+    csv: String,
+    compiled: Json,
+}
+
+fn table_forms(table: &DecisionTable) -> Table {
+    Table {
+        document: write_document(&Document::DecisionTable(table.clone())),
+        csv: table.to_csv(),
+        compiled: write_ruleset(table.ruleset()),
+    }
 }
 
 /// Read the vector's document; write it as text when the vector asks.
 fn read_or_print(given: &Json, expect: &Json, source: &str) -> Result<Read, Error> {
+    if let Some(csv) = text(get(given, "table_csv")) {
+        return DecisionTable::from_csv(csv, &limits_of(given))
+            .map(|t| Read::Table(table_forms(&t)));
+    }
+    if text(get(given, "write")) == Some("csv")
+        || get(expect, "csv").is_some()
+        || get(expect, "compiled").is_some()
+    {
+        return match read_document(source, &limits_of(given))? {
+            Document::DecisionTable(table) => Ok(Read::Table(table_forms(&table))),
+            other => Ok(Read::Document(write_document(&other))),
+        };
+    }
     let document = if let Some(rules_text) = text(get(given, "rules_text")) {
         cleanrules::text::parse(rules_text, &limits_of(given))?
     } else if text(get(given, "write")) == Some("text") {
@@ -95,7 +127,8 @@ fn check(vector: &Json) -> Option<String> {
     let source = match (
         text(get(given, "text"))
             .or(text(get(given, "yaml")))
-            .or(text(get(given, "rules_text"))),
+            .or(text(get(given, "rules_text")))
+            .or(text(get(given, "table_csv"))),
         get(given, "document"),
     ) {
         (Some(source), _) => source.to_owned(),
@@ -108,6 +141,38 @@ fn check(vector: &Json) -> Option<String> {
             let wanted = text(get(expect, "printed")).unwrap();
             (printed != wanted).then(|| format!("printed {printed:?}, expected {wanted:?}"))
         }
+        (Ok(Read::Table(table)), None) => {
+            let mut problems = Vec::new();
+            if let Some(wanted) = get(expect, "document")
+                && !same(&table.document, wanted)
+            {
+                problems.push(format!(
+                    "wrote {}, expected {}",
+                    to_string(&table.document),
+                    to_string(wanted)
+                ));
+            }
+            if let Some(wanted) = text(get(expect, "csv"))
+                && table.csv != wanted
+            {
+                problems.push(format!("wrote CSV {:?}, expected {wanted:?}", table.csv));
+            }
+            if let Some(wanted) = get(expect, "compiled")
+                && !same(&table.compiled, wanted)
+            {
+                problems.push(format!(
+                    "compiled {}, expected {}",
+                    to_string(&table.compiled),
+                    to_string(wanted)
+                ));
+            }
+            (!problems.is_empty()).then(|| problems.join("; "))
+        }
+        (Ok(Read::Table(table)), Some(error)) => Some(format!(
+            "read {}, expected {}",
+            to_string(&table.document),
+            to_string(error)
+        )),
         (Ok(Read::Text(printed)), Some(error)) => Some(format!(
             "printed {printed:?}, expected {}",
             to_string(error)

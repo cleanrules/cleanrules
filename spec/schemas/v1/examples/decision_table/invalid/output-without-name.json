@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "decision_table": {
+    "inputs": [
+      "x"
+    ],
+    "outputs": [
+      {
+        "values": [
+          1
+        ]
+      }
+    ],
+    "rows": []
+  }
+}

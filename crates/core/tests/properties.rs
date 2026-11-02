@@ -11,11 +11,13 @@ use cleanrules::ast::{ArithOp, Closed, CompareOp, Node, StringOp};
 use cleanrules::eval::{Evaluated, Options, Outcome, evaluate_tree};
 use cleanrules::explain::{Requirement, Status, explain};
 use cleanrules::format::{
-    Document, read_decision_document, read_node, write_decision, write_document, write_node,
+    Document, read_decision_document, read_document, read_node, read_parsed_document,
+    write_decision, write_document, write_node,
 };
 use cleanrules::json::{Json, JsonNumber, Limits, same, to_string};
 use cleanrules::logic::{Kleene, Truth};
 use cleanrules::rules::{Config, HitPolicy, Rule, RuleSet};
+use cleanrules::table::DecisionTable;
 use cleanrules::value::{Decimal, Map, NullCause, Value};
 use cleanrules::{ErrorCode, Segment};
 use proptest::prelude::*;
@@ -210,6 +212,138 @@ fn odd_ruleset() -> impl Strategy<Value = RuleSet> {
     )
 }
 
+/// Decision table documents whose names, descriptions and cells CSV must quote.
+// One strategy for the whole document reads best as a single function.
+#[allow(clippy::too_many_lines)]
+fn odd_table() -> impl Strategy<Value = Json> {
+    let string = |text: &str| Json::String(text.to_owned());
+    let cell = prop::sample::select(vec![
+        "-",
+        "",
+        "> 5",
+        "'a,b'",
+        "IN ('x', 'y''z')",
+        "NOT IN (1, 2)",
+        "BETWEEN 1 AND 2 CLOSED NONE",
+        "IS NOT NULL",
+        "\"q\\\"\"",
+        "STARTS WITH 'é'",
+        "-3",
+        "TRUE",
+        "y * 2",
+        "\"tab\\there\"",
+    ]);
+    let output = proptest::option::of(prop::sample::select(vec![
+        "1",
+        "'x'",
+        "y + 1",
+        "'a\"b'",
+        "\"line\\nbreak\"",
+        "1.50",
+        "0.25e0",
+    ]));
+    let label = proptest::option::of(prop::sample::select(vec![
+        "a", "b c", " d", "e,f", "g\"h", "i\nj", "k;l", "é", "row_1", " ", "", "m\rn",
+    ]));
+    // The second output has output values: its cells hold one of them.
+    let ranked = prop::sample::select(vec!["1", "2", "'x'"]);
+    let row = (
+        label.clone(),
+        proptest::option::of(any::<i64>()),
+        label,
+        [cell.clone(), cell],
+        (output, ranked),
+    )
+        .prop_map(
+            move |(name, priority, description, inputs, (output, ranked))| {
+                let outputs = [output, Some(ranked)];
+                let mut members = Vec::new();
+                // An empty name is an error; an empty description is none.
+                if let Some(name) = name.filter(|n| !n.is_empty()) {
+                    members.push(("name".to_owned(), string(name)));
+                }
+                if let Some(priority) = priority {
+                    members.push((
+                        "priority".to_owned(),
+                        Json::Object(vec![("$int".into(), string(&priority.to_string()))]),
+                    ));
+                }
+                if let Some(description) = description {
+                    members.push(("description".to_owned(), string(description)));
+                }
+                members.push((
+                    "inputs".into(),
+                    Json::Array(inputs.iter().map(|c| string(c)).collect()),
+                ));
+                members.push((
+                    "outputs".into(),
+                    Json::Array(
+                        outputs
+                            .iter()
+                            .map(|c| c.map_or(Json::Null, string))
+                            .collect(),
+                    ),
+                ));
+                Json::Object(members)
+            },
+        );
+    let policy = prop::sample::select(vec![
+        "first",
+        "rule_order",
+        "collect",
+        "priority",
+        "output_order",
+    ]);
+    (prop::collection::vec(row, 0..5), policy, any::<bool>()).prop_map(
+        move |(mut rows, policy, strict)| {
+            let mut table = vec![("hit_policy".to_owned(), string(policy))];
+            if policy == "collect" {
+                table.push(("aggregate".into(), string("count")));
+            }
+            if strict {
+                table.push(("strict".into(), Json::Bool(true)));
+            }
+            if matches!(policy, "priority" | "output_order") {
+                // Output values rank the rows: a row priority would be an error.
+                for row in &mut rows {
+                    if let Json::Object(members) = row {
+                        members.retain(|(k, _)| k != "priority");
+                    }
+                }
+            }
+            table.push((
+                "inputs".into(),
+                Json::Array(vec![string("x"), string("`a b`")]),
+            ));
+            table.push((
+                "outputs".into(),
+                Json::Array(vec![
+                    Json::Object(vec![("name".into(), string("y"))]),
+                    Json::Object(vec![
+                        ("name".into(), string("two words")),
+                        (
+                            "values".into(),
+                            Json::Array(vec![
+                                Json::Number(JsonNumber::from_literal("2")),
+                                string("x"),
+                                Json::Number(JsonNumber::from_literal("1")),
+                            ]),
+                        ),
+                    ]),
+                ]),
+            ));
+            table.push(("rows".into(), Json::Array(rows)));
+            Json::Object(vec![
+                (
+                    "version".into(),
+                    Json::Number(JsonNumber::from_literal("1")),
+                ),
+                ("decision_table".into(), Json::Object(table)),
+            ])
+        },
+    )
+}
+
 // --- Helpers -------------------------------------------------------------------------------
 
 fn truth(node: &Node, input: &Value) -> Truth {
@@ -350,6 +484,26 @@ proptest! {
                 _ => {}
             }
         }
+    }
+
+    #[test]
+    fn tables_round_trip_through_csv_and_json(json in odd_table()) {
+        let limits = Limits::default();
+        // Unnamed rows may clash with a row named row_1: such tables are invalid.
+        let read = read_parsed_document(&json, &limits);
+        prop_assume!(read.is_ok(), "{:?}", read.err());
+        let Ok(Document::DecisionTable(table)) = read else {
+            panic!("not a table")
+        };
+        let written = write_document(&Document::DecisionTable(table.clone()));
+        let csv = table.to_csv();
+        let from_csv = DecisionTable::from_csv(&csv, &limits).unwrap();
+        prop_assert!(same(&write_document(&Document::DecisionTable(from_csv.clone())), &written), "{csv}");
+        prop_assert_eq!(from_csv.to_csv(), csv);
+        let Document::DecisionTable(from_json) = read_document(&to_string(&written), &limits).unwrap() else {
+            panic!("not a table")
+        };
+        prop_assert!(same(&write_document(&Document::DecisionTable(from_json)), &written));
     }
 
     #[test]

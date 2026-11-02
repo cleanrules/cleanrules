@@ -8,17 +8,20 @@ use crate::format::decision::read_decision;
 use crate::format::rules::{
     build_rule, build_ruleset, shape_rule, shape_ruleset, write_rule, write_ruleset,
 };
+use crate::format::table::{read_table, write_table};
 use crate::json::{Json, JsonNumber, Limits, parse, pointer_token};
 use crate::rules::{Decision, Rule, RuleSet};
+use crate::table::DecisionTable;
 
 /// The content keys a document may have, in the order of the spec.
-const CONTENT_KEYS: [&str; 6] = [
+const CONTENT_KEYS: [&str; 7] = [
     "condition",
     "rule",
     "ruleset",
     "decision",
     "explanation",
     "summary",
+    "decision_table",
 ];
 
 /// What a document holds.
@@ -31,6 +34,8 @@ pub enum Document {
     Rule(Rule),
     /// A rule set.
     RuleSet(RuleSet),
+    /// A decision table (`spec/tables.md`).
+    DecisionTable(DecisionTable),
 }
 
 impl Document {
@@ -101,6 +106,14 @@ pub fn read_parsed_document(json: &Json, limits: &Limits) -> Result<Document> {
             let raw = shape_ruleset(get("ruleset").unwrap_or(&Json::Null), "/ruleset", limits)?;
             check_top_level()?;
             Ok(Document::RuleSet(build_ruleset(raw)?))
+        }
+        "decision_table" => {
+            check_top_level()?;
+            Ok(Document::DecisionTable(read_table(
+                get("decision_table").unwrap_or(&Json::Null),
+                "/decision_table",
+                limits,
+            )?))
         }
         "explanation" | "summary" => {
             check_top_level()?;
@@ -265,6 +278,10 @@ pub fn write_document(document: &Document) -> Json {
         Document::RuleSet(ruleset) => Json::Object(vec![
             ("version".into(), version),
             ("ruleset".into(), write_ruleset(ruleset)),
+        ]),
+        Document::DecisionTable(table) => Json::Object(vec![
+            ("version".into(), version),
+            ("decision_table".into(), write_table(table)),
         ]),
     }
 }

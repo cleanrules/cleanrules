@@ -20,8 +20,8 @@ other value is a `format_error` at the root) with:
 
 - `"version"`: the format version, the integer literal `1`;
 - exactly one **content key**, which says what the document holds:
-  `"condition"`, `"rule"`, `"ruleset"`, `"decision"`, `"explanation"` or
-  `"summary"`;
+  `"condition"`, `"rule"`, `"ruleset"`, `"decision"`, `"explanation"`,
+  `"summary"` or `"decision_table"`;
 - optionally `"$schema"`, a string that readers ignore, so editors can find the
   schema. Writers do not emit it.
 
@@ -674,6 +674,14 @@ A summary document is the JSON form of `summary()` (`explain.md`,
 | `tags` | yes | array of `{"tag", "rules"}`, sorted by tag |
 
 Every array is written even when it is empty.
+
+## Decision tables
+
+A decision table document has the content key `"decision_table"`. Its keys,
+the order in which it is checked and how it is written are in `tables.md`
+(*JSON*): its headers and cells are strings in the text syntax, and it compiles
+into a rule set. It was added to version 1 (*Versioning*): older readers reject
+it with `format_error`.
 
 ## Writing errors
 

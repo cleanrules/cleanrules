@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "decision_table": {
+    "hit_policy": "first",
+    "aggregate": "sum",
+    "inputs": [
+      "x"
+    ],
+    "outputs": [],
+    "rows": []
+  }
+}

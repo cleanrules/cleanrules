@@ -1,4 +1,4 @@
-"""Loading and dumping conditions, rules and rule sets as JSON, YAML or text.
+"""Loading and dumping conditions, rules, rule sets and decision tables.
 
     rules = cleanrules.load("pricing.yaml")
     text = cleanrules.dumps(rules, format="yaml")
@@ -6,8 +6,9 @@
 
 The documents are the JSON format of `spec/json-format.md`, the contract between
 languages: a rule set written here is read the same way in Rust, Java or Go.
-YAML files hold the same documents (`spec/json-format.md`, *YAML*), and the text
-syntax (`spec/text.md`) the same model, as people write rules on paper. Reading
+YAML files hold the same documents (`spec/json-format.md`, *YAML*), the text
+syntax (`spec/text.md`) the same model, as people write rules on paper, and CSV
+holds decision tables (`spec/tables.md`), as spreadsheets write them. Reading
 is strict and bounded: unknown keys, duplicate keys, malformed values and syntax
 errors are errors with a JSON Pointer or a line and column, and documents larger
 or deeper than the limits are refused.
@@ -22,20 +23,27 @@ from typing import IO, Literal, TypeAlias
 from cleanrules import _cleanrules as _native
 from cleanrules._expr import Expr, _wrap  # pyright: ignore[reportPrivateUsage]
 from cleanrules._rules import Action, Rule, RuleSet
+from cleanrules._tables import DecisionTable
 from cleanrules.errors import ExpressionError, FormatError, UnsupportedError
 
 __all__ = ["Format", "dump", "dumps", "load", "loads", "rule_from_text"]
 
-Format: TypeAlias = Literal["json", "yaml", "text"]
-"""A document format: JSON, YAML or the text syntax of rules."""
+Format: TypeAlias = Literal["json", "yaml", "text", "csv"]
+"""A document format: JSON, YAML, the text syntax of rules, or CSV for decision tables."""
 
-_DEFAULT_SIZES: dict[Format, int] = {"json": 16 << 20, "yaml": 1 << 20, "text": 4 << 20}
+_DEFAULT_SIZES: dict[Format, int] = {
+    "json": 16 << 20,
+    "yaml": 1 << 20,
+    "text": 4 << 20,
+    "csv": 4 << 20,
+}
 
 _SUFFIXES: dict[str, Format] = {
     ".json": "json",
     ".yaml": "yaml",
     ".yml": "yaml",
     ".rules": "text",
+    ".csv": "csv",
 }
 
 
@@ -46,28 +54,29 @@ def loads(
     max_size: int | None = None,
     max_nesting: int | None = None,
     max_depth: int | None = None,
-) -> Expr | Rule | RuleSet:
-    """Read a condition, rule or rule set document.
+) -> Expr | Rule | RuleSet | DecisionTable:
+    """Read a condition, rule, rule set or decision table document.
 
     Args:
-        text: The document, in JSON, YAML or the text syntax; `bytes` are read
-            as UTF-8.
-        format: `"json"`, `"yaml"` or `"text"`.
+        text: The document, in JSON, YAML, the text syntax or CSV; `bytes` are
+            read as UTF-8.
+        format: `"json"`, `"yaml"`, `"text"` or `"csv"` (a decision table,
+            `spec/tables.md`).
         max_size: The largest document, in bytes: 16 MiB by default for JSON,
-            4 MiB for text, which holds up to a node in every two bytes, and
-            1 MiB for YAML, whose parser holds a flow collection whole.
+            4 MiB for text and CSV, which hold up to a node in every two bytes,
+            and 1 MiB for YAML, whose parser holds a flow collection whole.
         max_nesting: The deepest nesting of JSON or YAML objects and arrays
             (1024); text has none.
         max_depth: The deepest condition or payload value, in nodes (256).
 
     Returns:
-        An `Expr` for a condition document, a `Rule` or a `RuleSet`. Rules read
-        from a document have no action.
+        An `Expr` for a condition document, a `Rule`, a `RuleSet` or a
+        `DecisionTable`. Rules read from a document have no action.
 
     Raises:
-        FormatError: For invalid JSON or YAML, an unknown or duplicate key, a
-            wrong type or an unknown version, with a JSON Pointer or a line and
-            column; or a document beyond the limits.
+        FormatError: For invalid JSON, YAML or CSV, an unknown or duplicate
+            key, a wrong type or an unknown version, with a JSON Pointer or a
+            line and column; or a document beyond the limits.
         RuleSyntaxError: For a text that does not follow the syntax, with the
             line and column of the first token that cannot be read.
         ExpressionError: If a condition breaks a construction rule; read from
@@ -81,7 +90,14 @@ def loads(
         return _wrap(content)
     if kind == "rule":
         return _rule(content)
-    rules, hit_policy, aggregate, logic, strict = content
+    if kind == "decision_table":
+        return DecisionTable._from_native(content)  # pyright: ignore[reportPrivateUsage]
+    return _ruleset(content)
+
+
+def _ruleset(parts: tuple[list[_native.Rule], str, str | None, str, bool]) -> RuleSet:
+    """A rule set from the core's parts: rules, policy, aggregate, logic, strict."""
+    rules, hit_policy, aggregate, logic, strict = parts
     return RuleSet(
         [_rule(rule) for rule in rules],
         hit_policy=hit_policy,
@@ -117,17 +133,17 @@ def _rule(native: _native.Rule) -> Rule:
 
 
 def dumps(
-    value: Expr | Rule | RuleSet,
+    value: Expr | Rule | RuleSet | DecisionTable,
     *,
     format: Format = "json",
     omit_actions: bool = False,
 ) -> str:
-    """Write a condition, rule or rule set as a document, in its canonical form.
+    """Write a condition, rule, rule set or decision table, in its canonical form.
 
     Args:
-        value: A condition, a rule or a rule set.
-        format: `"json"` (compact), `"yaml"` (block style) or `"text"` (the
-            canonical text, `IF … THEN …`).
+        value: A condition, a rule, a rule set or a decision table.
+        format: `"json"` (compact), `"yaml"` (block style), `"text"` (the
+            canonical text, `IF … THEN …`) or `"csv"` (decision tables only).
         omit_actions: Write rules without their actions instead of refusing.
             Actions are code, which a document cannot hold.
 
@@ -138,8 +154,12 @@ def dumps(
         ExpressionError: If `value` is a value node, not a condition.
         UnsupportedError: If a rule has an action and `omit_actions` is false;
             its `pointer` locates the rule. In text, also for a rule with
-            metadata, which the text syntax cannot hold.
+            metadata, which the text syntax cannot hold, and for a decision
+            table.
+        UnsupportedError: Also for CSV and anything but a decision table.
     """
+    if isinstance(value, DecisionTable):
+        return _native.dump_table(value._native, format)  # pyright: ignore[reportPrivateUsage]
     if isinstance(value, Expr):
         if value.kind == "value":
             raise ExpressionError(
@@ -153,7 +173,10 @@ def dumps(
     if isinstance(value, RuleSet):  # pyright: ignore[reportUnnecessaryIsInstance]
         _check_actions(list(value), "/ruleset/rules/{}", omit_actions)
         return _native.dump_ruleset(value._native, format)  # pyright: ignore[reportPrivateUsage]
-    raise TypeError(f"dumps takes a condition, a rule or a rule set, not {type(value).__name__}")
+    raise TypeError(
+        "dumps takes a condition, a rule, a rule set or a decision table,"
+        f" not {type(value).__name__}"
+    )
 
 
 def _check_actions(rules: list[Rule], pointer: str, omit_actions: bool) -> None:
@@ -218,12 +241,13 @@ def load(
     max_size: int | None = None,
     max_nesting: int | None = None,
     max_depth: int | None = None,
-) -> Expr | Rule | RuleSet:
+) -> Expr | Rule | RuleSet | DecisionTable:
     """Read a document from a file, as `loads` does.
 
     Args:
-        source: A path (its suffix, `.json`, `.yaml`, `.yml` or `.rules`, gives
-            the format) or an open text file, as `json.load` takes.
+        source: A path (its suffix, `.json`, `.yaml`, `.yml`, `.rules` or
+            `.csv`, gives the format) or an open text file, as `json.load`
+            takes.
         format: The format, when the suffix does not say; required for a file
             object without a known name.
         max_size: As `loads`; a file larger than the limit is not read.
@@ -245,7 +269,9 @@ def load(
                 code="limit_exceeded",
                 hint="raise max_size if the file is trusted",
             )
-        text = file.read_text(encoding="utf-8")
+        # Line breaks are read as written: inside a quoted CSV field they are text.
+        with file.open(encoding="utf-8", newline="") as opened:
+            text = opened.read()
     else:
         chosen = format or _format_of(Path(getattr(source, "name", "")))
         text = source.read()
@@ -259,7 +285,7 @@ def load(
 
 
 def dump(
-    value: Expr | Rule | RuleSet,
+    value: Expr | Rule | RuleSet | DecisionTable,
     target: str | os.PathLike[str] | IO[str],
     *,
     format: Format | None = None,
@@ -267,19 +293,23 @@ def dump(
 ) -> None:
     """Write a document to a path or an open text file, as `dumps` does.
 
-    A path's suffix (`.json`, `.yaml`, `.yml` or `.rules`) gives the format when
-    it is not given. A text file ends with a line break.
+    A path's suffix (`.json`, `.yaml`, `.yml`, `.rules` or `.csv`) gives the
+    format when it is not given. A text file ends with a line break.
     """
     if isinstance(target, str | os.PathLike):
         file = Path(target)
-        file.write_text(_document_text(value, format or _format_of(file), omit_actions), "utf-8")
+        text = _document_text(value, format or _format_of(file), omit_actions)
+        # Line breaks are written as the document has them, on every platform.
+        file.write_text(text, encoding="utf-8", newline="")
     else:
         chosen = format or _format_of(Path(getattr(target, "name", "")))
         target.write(_document_text(value, chosen, omit_actions))
 
 
-def _document_text(value: Expr | Rule | RuleSet, format: Format, omit_actions: bool) -> str:
-    """The text of a file: a rule text ends with a line break."""
+def _document_text(
+    value: Expr | Rule | RuleSet | DecisionTable, format: Format, omit_actions: bool
+) -> str:
+    """The text of a file: a rule text ends with a line break, as CSV does."""
     text = dumps(value, format=format, omit_actions=omit_actions)
     return text + "\n" if format == "text" else text
 
@@ -290,5 +320,5 @@ def _format_of(file: Path) -> Format:
     except KeyError:
         raise ValueError(
             f"cannot tell the format of {file.name!r} from its suffix; pass format='json',"
-            " format='yaml' or format='text'"
+            " format='yaml', format='text' or format='csv'"
         ) from None

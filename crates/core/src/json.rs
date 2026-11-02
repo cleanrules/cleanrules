@@ -115,6 +115,10 @@ pub struct Limits {
     /// The largest text in the rule syntax, in bytes: lower than `max_size`,
     /// because a text holds up to one node in every two bytes (`a|a|…`).
     pub max_text_size: usize,
+    /// The most cells and nodes a decision table may build: one per cell, and
+    /// the nodes of each cell's condition or value, with the copy of its
+    /// column that an input cell holds (`spec/tables.md`, *Limits*).
+    pub max_table_size: usize,
 }
 
 impl Default for Limits {
@@ -125,6 +129,7 @@ impl Default for Limits {
             max_depth: 256,
             max_yaml_size: 1024 * 1024,
             max_text_size: 4 * 1024 * 1024,
+            max_table_size: 2 * 1024 * 1024,
         }
     }
 }

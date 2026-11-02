@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "decision_table": {
+    "hit_policy": "collect",
+    "aggregate": "sum",
+    "inputs": [
+      "x"
+    ],
+    "outputs": [
+      {
+        "name": "points"
+      }
+    ],
+    "rows": [
+      {
+        "inputs": [
+          "> 1"
+        ],
+        "outputs": [
+          "1"
+        ]
+      },
+      {
+        "inputs": [
+          "> 2"
+        ],
+        "outputs": [
+          "2"
+        ]
+      }
+    ]
+  }
+}

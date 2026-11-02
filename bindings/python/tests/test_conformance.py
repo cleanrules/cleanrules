@@ -311,6 +311,36 @@ def run_text(given: dict[str, Any], expect: dict[str, Any], limits: dict[str, in
     )
 
 
+def run_table(given: dict[str, Any], expect: dict[str, Any], limits: dict[str, int]) -> None:
+    """Read a decision table and write it back as a document, as CSV and compiled."""
+    if "table_csv" in given:
+        source, fmt = given["table_csv"], "csv"
+    elif "yaml" in given:
+        source, fmt = given["yaml"], "yaml"
+    else:
+        source, fmt = dumps(given["document"]), "json"
+
+    def read_and_write() -> dict[str, Any]:
+        table = cleanrules.loads(source, format=fmt, **limits)
+        assert isinstance(table, cleanrules.DecisionTable)
+        out: dict[str, Any] = {}
+        if "document" in expect:
+            out["document"] = json.loads(cleanrules.dumps(table))
+        if "csv" in expect:
+            out["csv"] = cleanrules.dumps(table, format="csv")
+        if "compiled" in expect:
+            out["compiled"] = json.loads(cleanrules.dumps(table.ruleset))["ruleset"]
+        return out
+
+    wanted = {key: expect[key] for key in ("document", "csv", "compiled") if key in expect}
+    expect_result(
+        read_and_write,
+        {"error": expect["error"]} if "error" in expect else {"read": wanted},
+        "read",
+        read=True,
+    )
+
+
 def run_json(vector: dict[str, Any]) -> None:
     given, expect = vector["given"], vector["expect"]
     kind = given["kind"]
@@ -318,6 +348,14 @@ def run_json(vector: dict[str, Any]) -> None:
         limits = {k: int(v) for k, v in given.get("limits", {}).items()}
         if "rules_text" in given or given.get("write") == "text":
             run_text(given, expect, limits)
+            return
+        if (
+            "table_csv" in given
+            or given.get("write") == "csv"
+            or "csv" in expect
+            or "compiled" in expect
+        ):
+            run_table(given, expect, limits)
             return
         if "text" in given:
             text = given["text"]
@@ -459,4 +497,4 @@ def test_vector(vector: dict[str, Any], run: str) -> None:
 
 def test_every_vector_is_collected() -> None:
     # 2,135 vectors at the end of phase B; vectors are only ever added.
-    assert len([p for p in collect() if p.id.startswith("json:")]) >= 2246
+    assert len([p for p in collect() if p.id.startswith("json:")]) >= 2358

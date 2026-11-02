@@ -7,7 +7,8 @@ C/C++, Python, JavaScript, Java/Scala, Go and Erlang.
 > **Pre-alpha.** Nothing is published yet. Input data can be dicts, lists,
 > dataclasses, Pydantic models, namedtuples, pandas rows, numpy values and other
 > objects: only the fields the rules read are read. Rules can carry actions,
-> run by `RuleSet.run`, and are read from JSON, YAML or plain text.
+> run by `RuleSet.run`, and are read from JSON, YAML, plain text or CSV decision
+> tables.
 
 ```python
 from decimal import Decimal
@@ -102,6 +103,27 @@ print(cleanrules.dumps(rules["loyal"], format="text"))
 # RULE loyal PRIORITY 5
 # IF customer.years > 2 OR customer.newsletter
 # THEN discount = 0.05
+```
+
+Rules can also be a decision table, read from CSV as spreadsheets write it (or
+from JSON or YAML). Cells use the same syntax, without their column; output
+values in priority order rank the rows, as in DMN. This is
+[`docs/examples/risk.csv`](../../docs/examples/risk.csv):
+
+```text
+HIT POLICY,priority
+RULE,customer.years,order.total,THEN discount,"THEN risk IN ('high', 'medium', 'low')",DESCRIPTION
+new,< 1,> 1000,0,'high',New customers with large orders are checked first
+vip,> 5,-,0.15,'low',Long-standing customers
+big,-,> 5000,0.05,'medium',
+default,-,-,0,'low',
+```
+
+```python
+table = cleanrules.load("docs/examples/risk.csv")
+table.evaluate({"customer": {"years": 0}, "order": {"total": 2000}}).output
+# {'discount': 0, 'risk': 'high'}
+table.ruleset  # the RuleSet it compiles into: one rule per row
 ```
 
 To evaluate one condition and see every step, use `evaluate_tree`:

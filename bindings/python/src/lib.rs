@@ -15,6 +15,7 @@ mod json_api;
 mod node;
 mod read;
 mod rules;
+mod tables;
 mod trees;
 
 use pyo3::prelude::*;
@@ -43,10 +44,12 @@ fn _cleanrules(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<rules::PyRule>()?;
     module.add_class::<rules::PyRuleSet>()?;
     module.add_class::<rules::PyDecision>()?;
+    module.add_class::<tables::PyDecisionTable>()?;
     module.add_function(wrap_pyfunction!(rules::rule, module)?)?;
     module.add_function(wrap_pyfunction!(rules::ruleset, module)?)?;
     module.add_function(wrap_pyfunction!(documents::load_document, module)?)?;
     module.add_function(wrap_pyfunction!(documents::load_rule, module)?)?;
+    module.add_function(wrap_pyfunction!(documents::dump_table, module)?)?;
     module.add_function(wrap_pyfunction!(documents::dump_condition, module)?)?;
     module.add_function(wrap_pyfunction!(documents::dump_rule, module)?)?;
     module.add_function(wrap_pyfunction!(documents::dump_ruleset, module)?)?;

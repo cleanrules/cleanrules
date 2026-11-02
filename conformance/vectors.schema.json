@@ -80,6 +80,10 @@
               "type": "string",
               "description": "A text in the rule syntax (spec/text.md)."
             },
+            "table_csv": {
+              "type": "string",
+              "description": "A decision table as CSV (spec/tables.md, CSV)."
+            },
             "document": {
               "type": "object"
             },
@@ -101,8 +105,11 @@
               }
             },
             "write": {
-              "const": "text",
-              "description": "Write what is read as text, compared with expect.printed."
+              "enum": [
+                "text",
+                "csv"
+              ],
+              "description": "Write what is read as text (compared with expect.printed) or, for a decision table, as CSV (compared with expect.csv)."
             }
           },
           "required": [
@@ -122,6 +129,11 @@
             {
               "required": [
                 "rules_text"
+              ]
+            },
+            {
+              "required": [
+                "table_csv"
               ]
             },
             {
@@ -287,6 +299,14 @@
         "printed": {
           "type": "string",
           "description": "The canonical text (spec/text.md, Printing)."
+        },
+        "csv": {
+          "type": "string",
+          "description": "The canonical CSV of a decision table (spec/tables.md, CSV)."
+        },
+        "compiled": {
+          "$ref": "https://cleanrules.github.io/schemas/v1/ruleset.schema.json#/$defs/ruleset",
+          "description": "The rule set a decision table compiles into (spec/tables.md, Compiling)."
         },
         "error": {
           "type": "object",

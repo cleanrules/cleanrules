@@ -295,8 +295,9 @@ impl RuleSet {
     /// `rule_definition_error` for a repeated rule name (naming it), or an
     /// aggregate without the `collect` policy.
     pub fn new(rules: Vec<Rule>, config: Config) -> Result<Self> {
-        for (i, rule) in rules.iter().enumerate() {
-            if rules[..i].iter().any(|r| r.name == rule.name) {
+        let mut names = std::collections::BTreeSet::new();
+        for rule in &rules {
+            if !names.insert(rule.name.as_str()) {
                 return Err(
                     rule_error(&rule.name, format!("two rules are named {:?}", rule.name))
                         .with_hint("rule names must be unique"),

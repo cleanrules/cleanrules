@@ -81,6 +81,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with an action (`"action": true`), as the spec said. The explanation and
   summary structs are `#[non_exhaustive]`: only `explain` and `summary` build
   them.
+- Decision tables (`spec/tables.md`): inputs, outputs with optional output
+  values, and rows whose cells use the text syntax without their column
+  (`> 5`, `IN ('ES', 'PT')`, `-`). A table is read and written as a JSON or YAML
+  document (`"decision_table"`, added to format version 1 with its JSON
+  Schema) and as CSV (RFC 4180; commas, semicolons or tabs; settings lines
+  `HIT POLICY`, `AGGREGATE`, `LOGIC`, `STRICT`, DMN letters such as `P` and
+  `C+`; `RULE`, `PRIORITY`, `DESCRIPTION` and `THEN` columns), with errors
+  located by line and column or JSON Pointer. It compiles into a rule set: the
+  new `output_order` policy and `priority` rank rows by their output values, as
+  in DMN. Reading a table is bounded by a count of cells and condition nodes
+  (`Limits::max_table_size`, 2²¹ by default), since every input cell holds a
+  copy of its column. 99 conformance vectors. Rust core: `cleanrules::table`
+  (`DecisionTable` with `new`, `from_csv`, `to_csv` and `ruleset`,
+  `TableConfig`, `TablePolicy`, `TableOutput`, `TableRow`),
+  `Document::DecisionTable` and `format::write_table`. `RuleSet::new` checks
+  rule names in `O(n log n)`.
+- Python binding: `DecisionTable`, `TablePolicy`, `TableOutput` and
+  `TableRow`; `format="csv"` and `.csv` files in `load`, `loads`, `dump` and
+  `dumps`, which also read and write tables as JSON and YAML; `table.ruleset`
+  (built on first use), `evaluate`, `evaluate_many` and `summary`. Tables are
+  immutable and pickle. `load` and `dump` keep line breaks as written in every
+  format, on every platform.
 - Python binding: `str()` of an `Explanation`, a `RuleExplanation`, a `Cause`
   and a `Summary` gives that text, and `str()` of a condition its canonical
   text (`x > 5 AND NOT vip`; `repr()` is still the Python that builds it).

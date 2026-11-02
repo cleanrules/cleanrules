@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "decision_table": {
+    "hit_policy": "priority",
+    "logic": "boolean",
+    "inputs": [
+      "customer.years",
+      "order.total"
+    ],
+    "outputs": [
+      {
+        "name": "discount"
+      },
+      {
+        "name": "risk",
+        "values": [
+          "high",
+          "medium",
+          "low"
+        ]
+      }
+    ],
+    "rows": [
+      {
+        "name": "vip",
+        "inputs": [
+          "> 5",
+          "> 1000"
+        ],
+        "outputs": [
+          "0.15",
+          "'low'"
+        ]
+      },
+      {
+        "inputs": [
+          "-",
+          "> 5000"
+        ],
+        "outputs": [
+          null,
+          "'medium'"
+        ]
+      }
+    ]
+  }
+}

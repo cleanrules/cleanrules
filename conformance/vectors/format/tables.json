@@ -1,0 +1,4223 @@
+{
+  "version": 1,
+  "area": "format",
+  "vectors": [
+    {
+      "id": "format/tables/basic",
+      "spec": [
+        "tables.md#csv",
+        "tables.md#compiling"
+      ],
+      "description": "A table read from CSV: rows become rules, cells a conjunction, outputs the payload",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,first\nRULE,customer.years,order.total,THEN discount,THEN label\nvip,> 5,> 1000,0.15,'VIP'\nloyal,> 2,-,0.05,'loyal'\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "customer.years",
+              "order.total"
+            ],
+            "outputs": [
+              {
+                "name": "discount"
+              },
+              {
+                "name": "label"
+              }
+            ],
+            "rows": [
+              {
+                "name": "vip",
+                "inputs": [
+                  "> 5",
+                  "> 1000"
+                ],
+                "outputs": [
+                  "0.15",
+                  "'VIP'"
+                ]
+              },
+              {
+                "name": "loyal",
+                "inputs": [
+                  "> 2",
+                  "-"
+                ],
+                "outputs": [
+                  "0.05",
+                  "'loyal'"
+                ]
+              }
+            ]
+          }
+        },
+        "csv": "HIT POLICY,first\nRULE,customer.years,order.total,THEN discount,THEN label\nvip,> 5,> 1000,0.15,'VIP'\nloyal,> 2,-,0.05,'loyal'\n",
+        "compiled": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "vip",
+              "when": {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "customer",
+                        "years"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 5
+                    }
+                  },
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "order",
+                        "total"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1000
+                    }
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                },
+                "label": {
+                  "op": "const",
+                  "value": "VIP"
+                }
+              }
+            },
+            {
+              "name": "loyal",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "customer",
+                    "years"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 2
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.05"
+                  }
+                },
+                "label": {
+                  "op": "const",
+                  "value": "loyal"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/semicolons-crlf-bom-and-blank-lines",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "Semicolons separate fields when they come first; a byte order mark, CRLF and blank lines are accepted",
+      "given": {
+        "kind": "read",
+        "table_csv": "﻿HIT POLICY;first\r\n\r\nRULE;x;THEN y\r\n;;\r\na;IN ('p', 'q');1\r\n"
+      },
+      "expect": {
+        "csv": "HIT POLICY,first\nRULE,x,THEN y\na,\"IN ('p', 'q')\",1\n"
+      }
+    },
+    {
+      "id": "format/tables/tabs",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "Tabs separate fields when they come first",
+      "given": {
+        "kind": "read",
+        "table_csv": "x\tTHEN y\n> 1\t2\n"
+      },
+      "expect": {
+        "csv": "HIT POLICY,first\nx,THEN y\n> 1,2\n"
+      }
+    },
+    {
+      "id": "format/tables/quoted-fields",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "A quoted field holds commas, line breaks and doubled double quotes",
+      "given": {
+        "kind": "read",
+        "table_csv": "RULE,x,THEN y,DESCRIPTION\na,\"IN ('p', 'q')\",\"\"\"text\"\"\",\"two\nlines, and \"\"quotes\"\"\"\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": "y"
+              }
+            ],
+            "rows": [
+              {
+                "name": "a",
+                "description": "two\nlines, and \"quotes\"",
+                "inputs": [
+                  "IN ('p', 'q')"
+                ],
+                "outputs": [
+                  "'text'"
+                ]
+              }
+            ]
+          }
+        },
+        "csv": "HIT POLICY,first\nRULE,x,THEN y,DESCRIPTION\na,\"IN ('p', 'q')\",'text',\"two\nlines, and \"\"quotes\"\"\"\n"
+      }
+    },
+    {
+      "id": "format/tables/settings",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "Settings come first, in any case; STRICT takes no value",
+      "given": {
+        "kind": "read",
+        "table_csv": "hit policy,COLLECT\nAggregate,SUM\nlogic,boolean\nstrict\nx,THEN n\n> 1,1\n"
+      },
+      "expect": {
+        "csv": "HIT POLICY,collect\nAGGREGATE,sum\nSTRICT\nx,THEN n\n> 1,1\n",
+        "compiled": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "strict": true,
+          "rules": [
+            {
+              "name": "row_1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/dmn-letter-unique-none",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "The DMN letter U is unique",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,U\nx,THEN n\n> 1,1\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "row_1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/dmn-letter-any-none",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "The DMN letter A is any",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,A\nx,THEN n\n> 1,1\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "any",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "row_1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/dmn-letter-first-none",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "The DMN letter F is first",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,F\nx,THEN n\n> 1,1\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "row_1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/dmn-letter-rule-order-none",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "The DMN letter R is rule_order",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,R\nx,THEN n\n> 1,1\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "rule_order",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "row_1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/dmn-letter-collect-none",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "The DMN letter C is collect",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,C\nx,THEN n\n> 1,1\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "collect",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "row_1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/dmn-letter-collect-sum",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "The DMN letter C+ is collect with sum",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,C+\nx,THEN n\n> 1,1\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "row_1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/dmn-letter-collect-min",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "The DMN letter C< is collect with min",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,C<\nx,THEN n\n> 1,1\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "collect",
+          "aggregate": "min",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "row_1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/dmn-letter-collect-max",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "The DMN letter C> is collect with max",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,C>\nx,THEN n\n> 1,1\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "collect",
+          "aggregate": "max",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "row_1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/dmn-letter-collect-count",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "The DMN letter c# is collect with count",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,c#\nx,THEN n\n> 1,1\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "collect",
+          "aggregate": "count",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "row_1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/short-rows-and-trailing-fields",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "A row may have fewer fields than the header, and empty fields end the header and rows",
+      "given": {
+        "kind": "read",
+        "table_csv": "RULE,x,z,THEN y,,\na,> 1\nb,,,2,,\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x",
+              "z"
+            ],
+            "outputs": [
+              {
+                "name": "y"
+              }
+            ],
+            "rows": [
+              {
+                "name": "a",
+                "inputs": [
+                  "> 1",
+                  "-"
+                ],
+                "outputs": [
+                  null
+                ]
+              },
+              {
+                "name": "b",
+                "inputs": [
+                  "-",
+                  "-"
+                ],
+                "outputs": [
+                  "2"
+                ]
+              }
+            ]
+          }
+        },
+        "compiled": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/input-cells",
+      "spec": [
+        "tables.md#input-cells",
+        "tables.md#canonical-text",
+        "tables.md#differences-from-dmn"
+      ],
+      "description": "Every form of input cell, with its node and its canonical text",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "inputs": [
+                  "> 5"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "!= 'ES'"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "<= other.limit"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "= 'ES'"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "== 5"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "'ES'"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "TRUE"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "DATE \"2026-01-01\""
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "-3"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "other.limit * 2"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "IN ('b', 'a')"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "NOT IN (2, 1)"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "BETWEEN 1 AND 10"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "between 1 and 10 closed left"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "NOT BETWEEN 1 AND 2"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "IS NULL"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "IS NOT NULL"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "MATCHES '^a+$'"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "NOT STARTS WITH 'x'"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "ENDS WITH 'it''s'"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "CONTAINS \"a\\nb\""
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "  > 5  "
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  ""
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "-"
+                ],
+                "outputs": []
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "inputs": [
+                  "> 5"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "!= 'ES'"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "<= other.limit"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "'ES'"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "5"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "'ES'"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "TRUE"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "DATE \"2026-01-01\""
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "-3"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "other.limit * 2"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "IN ('a', 'b')"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "NOT IN (1, 2)"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "BETWEEN 1 AND 10"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "BETWEEN 1 AND 10 CLOSED LEFT"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "NOT BETWEEN 1 AND 2"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "IS NULL"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "IS NOT NULL"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "MATCHES '^a+$'"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "NOT STARTS WITH 'x'"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "ENDS WITH 'it''s'"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "CONTAINS \"a\\nb\""
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "> 5"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "-"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "-"
+                ],
+                "outputs": []
+              }
+            ]
+          }
+        },
+        "compiled": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "row_1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            },
+            {
+              "name": "row_2",
+              "when": {
+                "op": "ne",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": "ES"
+                }
+              }
+            },
+            {
+              "name": "row_3",
+              "when": {
+                "op": "le",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "field",
+                  "path": [
+                    "other",
+                    "limit"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "row_4",
+              "when": {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": "ES"
+                }
+              }
+            },
+            {
+              "name": "row_5",
+              "when": {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            },
+            {
+              "name": "row_6",
+              "when": {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": "ES"
+                }
+              }
+            },
+            {
+              "name": "row_7",
+              "when": {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": true
+                }
+              }
+            },
+            {
+              "name": "row_8",
+              "when": {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$date": "2026-01-01"
+                  }
+                }
+              }
+            },
+            {
+              "name": "row_9",
+              "when": {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": -3
+                }
+              }
+            },
+            {
+              "name": "row_10",
+              "when": {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "mul",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "other",
+                      "limit"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            },
+            {
+              "name": "row_11",
+              "when": {
+                "op": "in",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "values": [
+                  "a",
+                  "b"
+                ]
+              }
+            },
+            {
+              "name": "row_12",
+              "when": {
+                "op": "not",
+                "operand": {
+                  "op": "in",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "values": [
+                    1,
+                    2
+                  ]
+                }
+              }
+            },
+            {
+              "name": "row_13",
+              "when": {
+                "op": "between",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "low": {
+                  "op": "const",
+                  "value": 1
+                },
+                "high": {
+                  "op": "const",
+                  "value": 10
+                },
+                "closed": "both"
+              }
+            },
+            {
+              "name": "row_14",
+              "when": {
+                "op": "between",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "low": {
+                  "op": "const",
+                  "value": 1
+                },
+                "high": {
+                  "op": "const",
+                  "value": 10
+                },
+                "closed": "left"
+              }
+            },
+            {
+              "name": "row_15",
+              "when": {
+                "op": "not",
+                "operand": {
+                  "op": "between",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "low": {
+                    "op": "const",
+                    "value": 1
+                  },
+                  "high": {
+                    "op": "const",
+                    "value": 2
+                  },
+                  "closed": "both"
+                }
+              }
+            },
+            {
+              "name": "row_16",
+              "when": {
+                "op": "is_null",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "row_17",
+              "when": {
+                "op": "not",
+                "operand": {
+                  "op": "is_null",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "name": "row_18",
+              "when": {
+                "op": "matches",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "pattern": "^a+$"
+              }
+            },
+            {
+              "name": "row_19",
+              "when": {
+                "op": "not",
+                "operand": {
+                  "op": "starts_with",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "text": "x"
+                }
+              }
+            },
+            {
+              "name": "row_20",
+              "when": {
+                "op": "ends_with",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "text": "it's"
+              }
+            },
+            {
+              "name": "row_21",
+              "when": {
+                "op": "contains",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "text": "a\nb"
+              }
+            },
+            {
+              "name": "row_22",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            },
+            {
+              "name": "row_23",
+              "when": {
+                "op": "const",
+                "value": true
+              }
+            },
+            {
+              "name": "row_24",
+              "when": {
+                "op": "const",
+                "value": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/expression-inputs-and-outputs",
+      "spec": [
+        "tables.md#model",
+        "tables.md#output-cells",
+        "tables.md#canonical-text"
+      ],
+      "description": "Inputs and outputs are expressions; strings print between single quotes, or double quotes with escapes",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "order.total * 1.21",
+              "`first name`"
+            ],
+            "outputs": [
+              {
+                "name": "tax"
+              },
+              {
+                "name": "note"
+              },
+              {
+                "name": "two words"
+              }
+            ],
+            "rows": [
+              {
+                "inputs": [
+                  ">= 100",
+                  "\"Ana\""
+                ],
+                "outputs": [
+                  "order.total * 0.21",
+                  "\"a\\tb\"",
+                  "'x'"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "order.total * 1.21",
+              "`first name`"
+            ],
+            "outputs": [
+              {
+                "name": "tax"
+              },
+              {
+                "name": "note"
+              },
+              {
+                "name": "two words"
+              }
+            ],
+            "rows": [
+              {
+                "inputs": [
+                  ">= 100",
+                  "'Ana'"
+                ],
+                "outputs": [
+                  "order.total * 0.21",
+                  "\"a\\tb\"",
+                  "'x'"
+                ]
+              }
+            ]
+          }
+        },
+        "csv": "HIT POLICY,first\norder.total * 1.21,`first name`,THEN tax,THEN note,THEN 'two words'\n>= 100,'Ana',order.total * 0.21,\"\"\"a\\tb\"\"\",'x'\n",
+        "compiled": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "row_1",
+              "when": {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "ge",
+                    "left": {
+                      "op": "mul",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "total"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$decimal": "1.21"
+                        }
+                      }
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 100
+                    }
+                  },
+                  {
+                    "op": "eq",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "first name"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": "Ana"
+                    }
+                  }
+                ]
+              },
+              "then": {
+                "tax": {
+                  "op": "mul",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.21"
+                    }
+                  }
+                },
+                "note": {
+                  "op": "const",
+                  "value": "a\tb"
+                },
+                "two words": {
+                  "op": "const",
+                  "value": "x"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/rows-without-names-descriptions-and-empty-outputs",
+      "spec": [
+        "tables.md#compiling"
+      ],
+      "description": "Rows without a name are row_<n>; an empty output cell leaves the key out; descriptions pass to rules",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,THEN a,THEN b,DESCRIPTION\n> 1,1,,big\n-,,2,\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "row_1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "a": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "description": "big"
+            },
+            {
+              "name": "row_2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "b": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/priority-from-output-values",
+      "spec": [
+        "tables.md#output-priority"
+      ],
+      "description": "Under priority, output values rank rows: k - r, equal ranks equal priorities",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,P\nRULE,score,\"THEN risk IN ('high', 'medium', 'low')\"\na,< 300,'high'\nb,< 600,'medium'\nc,-,'low'\nd,> 900,'high'\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "inputs": [
+              "score"
+            ],
+            "outputs": [
+              {
+                "name": "risk",
+                "values": [
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              }
+            ],
+            "rows": [
+              {
+                "name": "a",
+                "inputs": [
+                  "< 300"
+                ],
+                "outputs": [
+                  "'high'"
+                ]
+              },
+              {
+                "name": "b",
+                "inputs": [
+                  "< 600"
+                ],
+                "outputs": [
+                  "'medium'"
+                ]
+              },
+              {
+                "name": "c",
+                "inputs": [
+                  "-"
+                ],
+                "outputs": [
+                  "'low'"
+                ]
+              },
+              {
+                "name": "d",
+                "inputs": [
+                  "> 900"
+                ],
+                "outputs": [
+                  "'high'"
+                ]
+              }
+            ]
+          }
+        },
+        "csv": "HIT POLICY,priority\nRULE,score,\"THEN risk IN ('high', 'medium', 'low')\"\na,< 300,'high'\nb,< 600,'medium'\nc,-,'low'\nd,> 900,'high'\n",
+        "compiled": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "lt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "score"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 300
+                }
+              },
+              "then": {
+                "risk": {
+                  "op": "const",
+                  "value": "high"
+                }
+              },
+              "priority": 3
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "lt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "score"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 600
+                }
+              },
+              "then": {
+                "risk": {
+                  "op": "const",
+                  "value": "medium"
+                }
+              },
+              "priority": 2
+            },
+            {
+              "name": "c",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "risk": {
+                  "op": "const",
+                  "value": "low"
+                }
+              },
+              "priority": 1
+            },
+            {
+              "name": "d",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "score"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 900
+                }
+              },
+              "then": {
+                "risk": {
+                  "op": "const",
+                  "value": "high"
+                }
+              },
+              "priority": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/priority-over-two-outputs",
+      "spec": [
+        "tables.md#output-priority"
+      ],
+      "description": "The first output with values decides, the next breaks ties; outputs without values are skipped",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,priority\nx,THEN note,\"THEN level IN (1, 2)\",\"THEN tier IN ('gold', 'silver')\"\n> 1,'a',2,'gold'\n> 2,'b',1,'silver'\n> 3,'c',1,'gold'\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "row_1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "note": {
+                  "op": "const",
+                  "value": "a"
+                },
+                "level": {
+                  "op": "const",
+                  "value": 2
+                },
+                "tier": {
+                  "op": "const",
+                  "value": "gold"
+                }
+              },
+              "priority": 1
+            },
+            {
+              "name": "row_2",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 2
+                }
+              },
+              "then": {
+                "note": {
+                  "op": "const",
+                  "value": "b"
+                },
+                "level": {
+                  "op": "const",
+                  "value": 1
+                },
+                "tier": {
+                  "op": "const",
+                  "value": "silver"
+                }
+              },
+              "priority": 2
+            },
+            {
+              "name": "row_3",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 3
+                }
+              },
+              "then": {
+                "note": {
+                  "op": "const",
+                  "value": "c"
+                },
+                "level": {
+                  "op": "const",
+                  "value": 1
+                },
+                "tier": {
+                  "op": "const",
+                  "value": "gold"
+                }
+              },
+              "priority": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/output-order",
+      "spec": [
+        "tables.md#output-priority"
+      ],
+      "description": "Under output_order, rows are sorted by output priority, stably, and the rule set runs in rule order",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,O\nRULE,score,\"THEN risk IN ('high', 'medium', 'low')\"\na,< 300,'high'\nb,< 600,'medium'\nc,-,'low'\nd,> 900,'high'\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "rule_order",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "lt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "score"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 300
+                }
+              },
+              "then": {
+                "risk": {
+                  "op": "const",
+                  "value": "high"
+                }
+              },
+              "priority": 3
+            },
+            {
+              "name": "d",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "score"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 900
+                }
+              },
+              "then": {
+                "risk": {
+                  "op": "const",
+                  "value": "high"
+                }
+              },
+              "priority": 3
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "lt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "score"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 600
+                }
+              },
+              "then": {
+                "risk": {
+                  "op": "const",
+                  "value": "medium"
+                }
+              },
+              "priority": 2
+            },
+            {
+              "name": "c",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "risk": {
+                  "op": "const",
+                  "value": "low"
+                }
+              },
+              "priority": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/priority-column",
+      "spec": [
+        "tables.md#output-priority",
+        "tables.md#csv"
+      ],
+      "description": "Without output values, rows keep their own priorities; an empty priority is 0",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,priority\nRULE,PRIORITY,x,THEN y\na,5,> 1,1\nb,,> 2,2\nc,-7,> 3,3\n"
+      },
+      "expect": {
+        "csv": "HIT POLICY,priority\nRULE,PRIORITY,x,THEN y\na,5,> 1,1\nb,,> 2,2\nc,-7,> 3,3\n",
+        "compiled": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "priority": 5
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 2
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            },
+            {
+              "name": "c",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 3
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 3
+                }
+              },
+              "priority": -7
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/output-order-by-priority-column",
+      "spec": [
+        "tables.md#output-priority"
+      ],
+      "description": "Under output_order without output values, rows are sorted by their own priorities, higher first",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,output_order\nRULE,PRIORITY,x\na,1,> 1\nb,3,> 2\nc,,> 3\nd,3,> 4\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "rule_order",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 2
+                }
+              },
+              "priority": 3
+            },
+            {
+              "name": "d",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 4
+                }
+              },
+              "priority": 3
+            },
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "priority": 1
+            },
+            {
+              "name": "c",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 3
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-document-to-csv",
+      "spec": [
+        "tables.md#json",
+        "tables.md#csv",
+        "json-format.md#decision-tables"
+      ],
+      "description": "A table document written as CSV; names, priorities and descriptions only when a row has them",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "output_order",
+            "logic": "boolean",
+            "strict": true,
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": "y",
+                "values": [
+                  1,
+                  {
+                    "$decimal": "2.5"
+                  }
+                ]
+              }
+            ],
+            "rows": [
+              {
+                "inputs": [
+                  "> 1"
+                ],
+                "outputs": [
+                  "2.5"
+                ]
+              },
+              {
+                "description": "three",
+                "inputs": [
+                  " 3 "
+                ],
+                "outputs": [
+                  "1"
+                ]
+              }
+            ]
+          }
+        },
+        "write": "csv"
+      },
+      "expect": {
+        "csv": "HIT POLICY,output_order\nSTRICT\nx,\"THEN y IN (1, 2.5)\",DESCRIPTION\n> 1,2.5,\n3,1,three\n"
+      }
+    },
+    {
+      "id": "format/tables/yaml",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "A table document in YAML",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ndecision_table:\n  inputs: [x]\n  outputs: [{name: y}]\n  rows:\n    - {inputs: ['> 1'], outputs: ['2']}\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": "y"
+              }
+            ],
+            "rows": [
+              {
+                "inputs": [
+                  "> 1"
+                ],
+                "outputs": [
+                  "2"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/tables/no-rows",
+      "spec": [
+        "tables.md#model"
+      ],
+      "description": "A table may have no rows and no outputs",
+      "given": {
+        "kind": "read",
+        "table_csv": "x\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": []
+        },
+        "csv": "HIT POLICY,first\nx\n"
+      }
+    },
+    {
+      "id": "format/tables/csv-unclosed-quote",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "A quoted field that is not closed is a format_error where it starts",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,THEN y\n> 1,\"2\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 5
+        }
+      }
+    },
+    {
+      "id": "format/tables/csv-text-after-closing-quote",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "Text after a closing quote is a format_error",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,THEN y\n> 1,\"2\"3\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 8
+        }
+      }
+    },
+    {
+      "id": "format/tables/csv-too-many-fields",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "A row with more fields than the header is a format_error at the first extra field",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,THEN y\n> 1,2,3\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 7
+        }
+      }
+    },
+    {
+      "id": "format/tables/csv-no-header",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "Settings without a header line are a format_error",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,first\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/tables/csv-column-twice",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "RULE, PRIORITY and DESCRIPTION are columns at most once",
+      "given": {
+        "kind": "read",
+        "table_csv": "RULE,x,rule\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 1,
+          "column": 8
+        }
+      }
+    },
+    {
+      "id": "format/tables/csv-column-without-header",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "An empty header field before others is a format_error",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,,THEN y\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 1,
+          "column": 3
+        }
+      }
+    },
+    {
+      "id": "format/tables/csv-setting-twice",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "A setting given twice is a format_error",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,first\nHIT POLICY,any\nx\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/tables/csv-setting-with-extra-field",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "A setting with a field after its value is a format_error",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,first,x\nx\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 1,
+          "column": 18
+        }
+      }
+    },
+    {
+      "id": "format/tables/csv-unknown-policy",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "An unknown policy is a format_error at its field",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,best\nx\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 1,
+          "column": 12
+        }
+      }
+    },
+    {
+      "id": "format/tables/csv-aggregate-twice",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "AGGREGATE after a DMN letter that gives one is a format_error",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,C+\nAGGREGATE,sum\nx\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/tables/csv-priority-not-int",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "A priority that is not an int is a format_error at its field",
+      "given": {
+        "kind": "read",
+        "table_csv": "PRIORITY,x\n1.5,> 1\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/tables/cell-syntax-error",
+      "spec": [
+        "tables.md#input-cells",
+        "tables.md#csv"
+      ],
+      "description": "A syntax error in an unquoted cell is located within it",
+      "given": {
+        "kind": "read",
+        "table_csv": "RULE,x\na,>  \n"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 2,
+          "column": 6
+        }
+      }
+    },
+    {
+      "id": "format/tables/cell-with-its-column",
+      "spec": [
+        "tables.md#input-cells"
+      ],
+      "description": "A cell leaves out its column: x > 5 in a cell is a syntax error after x",
+      "given": {
+        "kind": "read",
+        "table_csv": "x\nx > 5\n"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 2,
+          "column": 3
+        }
+      }
+    },
+    {
+      "id": "format/tables/cell-quoted-error",
+      "spec": [
+        "tables.md#input-cells",
+        "tables.md#csv"
+      ],
+      "description": "An error in a quoted cell is located at the field",
+      "given": {
+        "kind": "read",
+        "table_csv": "x\n\"IN (1,\"\n"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 2,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/tables/cell-construction-error",
+      "spec": [
+        "tables.md#input-cells"
+      ],
+      "description": "A cell breaking a construction rule is an expression_error at the cell",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,y\n-,\"IN (1, 'a')\"\n"
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "line": 2,
+          "column": 3
+        }
+      }
+    },
+    {
+      "id": "format/tables/input-is-a-condition",
+      "spec": [
+        "tables.md#model"
+      ],
+      "description": "An input that is a condition is an expression_error at its header",
+      "given": {
+        "kind": "read",
+        "table_csv": "y,x > 5\n"
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "line": 1,
+          "column": 3
+        }
+      }
+    },
+    {
+      "id": "format/tables/output-is-a-condition",
+      "spec": [
+        "tables.md#output-cells"
+      ],
+      "description": "An output cell that is a condition is a rule_definition_error at the cell",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,THEN y\n> 1,x > 2\n"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 2,
+          "column": 5
+        }
+      }
+    },
+    {
+      "id": "format/tables/output-header-error",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "An output header is THEN, a key and optional values; an error in a quoted header is at its field",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,\"THEN y IN (1,\"\n"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 3
+        }
+      }
+    },
+    {
+      "id": "format/tables/output-value-not-listed",
+      "spec": [
+        "tables.md#output-cells"
+      ],
+      "description": "A cell of an output with values must hold one of them",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,\"THEN y IN ('a', 'b')\"\n> 1,'a'\n> 2,'c'\n"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 3,
+          "column": 5
+        }
+      }
+    },
+    {
+      "id": "format/tables/output-value-must-be-given",
+      "spec": [
+        "tables.md#output-cells"
+      ],
+      "description": "A cell of an output with values cannot be empty",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,\"THEN y IN ('a', 'b')\"\n> 1,\n"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 2,
+          "column": 5
+        }
+      }
+    },
+    {
+      "id": "format/tables/output-values-repeated",
+      "spec": [
+        "tables.md#model"
+      ],
+      "description": "Output values are distinct",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,\"THEN y IN (1, 1.0)\"\n"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 1,
+          "column": 3
+        }
+      }
+    },
+    {
+      "id": "format/tables/outputs-repeated",
+      "spec": [
+        "tables.md#model"
+      ],
+      "description": "Output keys are distinct",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,THEN y,THEN 'y'\n"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 1,
+          "column": 10
+        }
+      }
+    },
+    {
+      "id": "format/tables/priority-next-to-output-values",
+      "spec": [
+        "tables.md#output-priority"
+      ],
+      "description": "Under priority, a row priority next to output values is a rule_definition_error at the priority",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,priority\nPRIORITY,x,\"THEN y IN (1, 2)\"\n,> 1,1\n3,> 2,2\n"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 4,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/tables/names-repeated",
+      "spec": [
+        "tables.md#compiling"
+      ],
+      "description": "Rule names are unique: an unnamed row may clash with a name",
+      "given": {
+        "kind": "read",
+        "table_csv": "RULE,x\nrow_2,> 1\n,> 2\n"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 3,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/tables/aggregate-without-collect",
+      "spec": [
+        "tables.md#model",
+        "tables.md#csv"
+      ],
+      "description": "An aggregate needs collect: the error is at the AGGREGATE line",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,first\nAGGREGATE,sum\nx\n"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 2,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-cell-error",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "In JSON, an error in a cell's text points to the cell",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "inputs": [
+                  "> 1"
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "IN ("
+                ],
+                "outputs": []
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "pointer": "/decision_table/rows/1/inputs/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-wrong-cell-count",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "In JSON, a row with the wrong number of cells is a format_error",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x",
+              "y"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "inputs": [
+                  "> 1"
+                ],
+                "outputs": []
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/rows/0/inputs"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-no-inputs",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "A table has at least one input",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [],
+            "outputs": [],
+            "rows": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/inputs"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-unknown-row-key",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "An unknown key in a row is a format_error",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "inputs": [
+                  "-"
+                ],
+                "outputs": [],
+                "rule": "a"
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/rows/0/rule"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-null-input-cell",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "An input cell is a string: any value is written -",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "inputs": [
+                  null
+                ],
+                "outputs": []
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/rows/0/inputs/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-output-order-policy-name",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "In JSON the policy is a lowercase name, never a DMN letter",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "O",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/hit_policy"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-output-value-error",
+      "spec": [
+        "tables.md#json",
+        "tables.md#output-cells"
+      ],
+      "description": "In JSON, an output cell outside its values points to the cell",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": "y",
+                "values": [
+                  "a"
+                ]
+              }
+            ],
+            "rows": [
+              {
+                "inputs": [
+                  "-"
+                ],
+                "outputs": [
+                  "'b'"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/decision_table/rows/0/outputs/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/tables-have-no-text",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "A decision table has no form in the text syntax",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": []
+          }
+        },
+        "write": "text"
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-inputs-not-array",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: inputs not array",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": "x",
+            "outputs": [],
+            "rows": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/inputs"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-input-not-string",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: input not string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              1
+            ],
+            "outputs": [],
+            "rows": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/inputs/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-hit-policy-not-string",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: hit policy not string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [],
+            "hit_policy": 1
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/hit_policy"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-unknown-aggregate",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: unknown aggregate",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [],
+            "hit_policy": "collect",
+            "aggregate": "avg"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/aggregate"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-logic-not-string",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: logic not string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [],
+            "logic": true
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/logic"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-unknown-logic",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: unknown logic",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [],
+            "logic": "fuzzy"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "registry_error",
+          "pointer": "/decision_table/logic"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-strict-not-boolean",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: strict not boolean",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [],
+            "strict": "yes"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/strict"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-outputs-not-array",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: outputs not array",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": {
+              "name": "y"
+            },
+            "rows": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/outputs"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-output-not-object",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: output not object",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              "y"
+            ],
+            "rows": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/outputs/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-output-name-not-string",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: output name not string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": 1
+              }
+            ],
+            "rows": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/outputs/0/name"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-output-name-missing",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: output name missing",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {}
+            ],
+            "rows": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/outputs/0/name"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-output-values-not-array",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: output values not array",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": "y",
+                "values": "a"
+              }
+            ],
+            "rows": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/outputs/0/values"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-output-value-null",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: output value null",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": "y",
+                "values": [
+                  "a",
+                  null
+                ]
+              }
+            ],
+            "rows": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/outputs/0/values/1"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-unknown-output-key",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: unknown output key",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": "y",
+                "type": "string"
+              }
+            ],
+            "rows": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/outputs/0/type"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-rows-not-array",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: rows not array",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": {}
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/rows"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-row-not-object",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: row not object",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              [
+                "-"
+              ]
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/rows/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-row-name-not-string",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: row name not string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "name": 1,
+                "inputs": [
+                  "-"
+                ],
+                "outputs": []
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/rows/0/name"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-row-priority-not-int",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: row priority not int",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "priority": 1.5,
+                "inputs": [
+                  "-"
+                ],
+                "outputs": []
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/rows/0/priority"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-row-outputs-missing",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: row outputs missing",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "inputs": [
+                  "-"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/rows/0/outputs"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-output-cell-not-string",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: output cell not string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": "y"
+              }
+            ],
+            "rows": [
+              {
+                "inputs": [
+                  "-"
+                ],
+                "outputs": [
+                  1
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/rows/0/outputs/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-too-many-cells",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: too many cells",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "inputs": [
+                  "-",
+                  "> 1"
+                ],
+                "outputs": []
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/rows/0/inputs"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-unknown-table-key",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: unknown table key",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [],
+            "columns": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/columns"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-multi-line-cell-error",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: multi line cell error",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "inputs": [
+                  "\n>"
+                ],
+                "outputs": []
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "pointer": "/decision_table/rows/0/inputs/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-input-header-error",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: input header error",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x +"
+            ],
+            "outputs": [],
+            "rows": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "pointer": "/decision_table/inputs/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-output-cell-error",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "JSON shape: output cell error",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": "y"
+              }
+            ],
+            "rows": [
+              {
+                "inputs": [
+                  "-"
+                ],
+                "outputs": [
+                  "1 +"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "pointer": "/decision_table/rows/0/outputs/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/separator-after-quotes-and-parentheses",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "The separator is the first comma, semicolon or tab outside quotes and parentheses",
+      "given": {
+        "kind": "read",
+        "table_csv": "\"THEN y IN (1, 2)\";THEN z IN (3, 4);x\n1;3;> 0\n"
+      },
+      "expect": {
+        "csv": "HIT POLICY,first\nx,\"THEN y IN (1, 2)\",\"THEN z IN (3, 4)\"\n> 0,1,3\n"
+      }
+    },
+    {
+      "id": "format/tables/csv-size-limit",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "A CSV text has the size limit of texts",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,THEN y\n> 1,2\n",
+        "limits": {
+          "max_size": 10
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded"
+        }
+      }
+    },
+    {
+      "id": "format/tables/size-limit-counts-column-copies",
+      "spec": [
+        "tables.md#limits"
+      ],
+      "description": "Every input cell holds a copy of its column: a long expression in many rows reaches the limit",
+      "given": {
+        "kind": "read",
+        "table_csv": "((((((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x))))) + (((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))))) + ((((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x))))) + (((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x))))))) + (((((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x))))) + (((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))))) + ((((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x))))) + (((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))))))) + ((((((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x))))) + (((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))))) + ((((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x))))) + (((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x))))))) + (((((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x))))) + (((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))))) + ((((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x))))) + (((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x)))) + ((((x + x) + (x + x)) + ((x + x) + (x + x))) + (((x + x) + (x + x)) + ((x + x) + (x + x))))))))\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n"
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "line": 2046,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/tables/two-errors-input-before-cells",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "An input that is a condition is reported before an error in a cell",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x > 5"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "inputs": [
+                  "@@"
+                ],
+                "outputs": []
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/decision_table/inputs/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/two-errors-shape-before-logic",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "The shape is checked before the logic is looked up",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "logic": "fuzzy",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": 5
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/rows"
+        }
+      }
+    },
+    {
+      "id": "format/tables/two-errors-cell-count-before-cells",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "The number of cells is part of the shape, checked before the text of any cell",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "inputs": [
+                  "IN ("
+                ],
+                "outputs": []
+              },
+              {
+                "inputs": [
+                  "> 1",
+                  "> 2"
+                ],
+                "outputs": []
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision_table/rows/1/inputs"
+        }
+      }
+    },
+    {
+      "id": "format/tables/two-errors-output-values-before-cells",
+      "spec": [
+        "tables.md#json"
+      ],
+      "description": "Repeated output values are reported before an error in a cell",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": "y",
+                "values": [
+                  1,
+                  1.0
+                ]
+              }
+            ],
+            "rows": [
+              {
+                "inputs": [
+                  "IN ("
+                ],
+                "outputs": [
+                  "1"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/decision_table/outputs/0/values/1"
+        }
+      }
+    },
+    {
+      "id": "format/tables/two-errors-csv-columns-before-rows",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "In CSV, the inputs and outputs are checked before any row is read",
+      "given": {
+        "kind": "read",
+        "table_csv": "y,x > 5\n@@,1\n"
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "line": 1,
+          "column": 3
+        }
+      }
+    },
+    {
+      "id": "format/tables/csv-aggregate-before-dmn-letter",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "AGGREGATE before a DMN letter that gives one is also a format_error",
+      "given": {
+        "kind": "read",
+        "table_csv": "AGGREGATE,min\nHIT POLICY,C+\nx\n"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/tables/separator-on-a-later-line",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "The separator is found on the first line that has one",
+      "given": {
+        "kind": "read",
+        "table_csv": "STRICT\nRULE;x;THEN y\na;> 1;2\n"
+      },
+      "expect": {
+        "csv": "HIT POLICY,first\nSTRICT\nRULE,x,THEN y\na,> 1,2\n"
+      }
+    },
+    {
+      "id": "format/tables/settings-ignore-case",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "Setting values are case-insensitive, the logic's too",
+      "given": {
+        "kind": "read",
+        "table_csv": "Hit Policy,Rule_Order\nLOGIC,Boolean\nx\n"
+      },
+      "expect": {
+        "csv": "HIT POLICY,rule_order\nx\n"
+      }
+    },
+    {
+      "id": "format/tables/space-only-lines-and-extra-empty-fields",
+      "spec": [
+        "tables.md#csv"
+      ],
+      "description": "Lines of empty or space fields are skipped, and rows may end with extra empty fields",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,THEN y\n  ,\" \"\n> 1,2,, \n"
+      },
+      "expect": {
+        "csv": "HIT POLICY,first\nx,THEN y\n> 1,2\n"
+      }
+    },
+    {
+      "id": "format/tables/empty-description-is-none",
+      "spec": [
+        "tables.md#model"
+      ],
+      "description": "An empty description is none, so it round-trips through CSV",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "description": "",
+                "inputs": [
+                  "-"
+                ],
+                "outputs": []
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "inputs": [
+                  "-"
+                ],
+                "outputs": []
+              }
+            ]
+          }
+        },
+        "csv": "HIT POLICY,first\nx\n-\n"
+      }
+    },
+    {
+      "id": "format/tables/empty-name",
+      "spec": [
+        "tables.md#model"
+      ],
+      "description": "A row name is not empty",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [
+              {
+                "name": "",
+                "inputs": [
+                  "-"
+                ],
+                "outputs": []
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/decision_table/rows/0/name"
+        }
+      }
+    },
+    {
+      "id": "format/tables/output-order-keeps-priorities",
+      "spec": [
+        "tables.md#output-priority"
+      ],
+      "description": "Under output_order with output values, rules keep the priorities they would have under priority",
+      "given": {
+        "kind": "read",
+        "table_csv": "HIT POLICY,O\nx,\"THEN y IN ('a', 'b')\"\n> 1,'b'\n> 2,'a'\n"
+      },
+      "expect": {
+        "compiled": {
+          "hit_policy": "rule_order",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "row_2",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 2
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": "a"
+                }
+              },
+              "priority": 2
+            },
+            {
+              "name": "row_1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": "b"
+                }
+              },
+              "priority": 1
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

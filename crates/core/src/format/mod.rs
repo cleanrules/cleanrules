@@ -6,6 +6,7 @@ mod document;
 mod explain;
 pub mod result;
 mod rules;
+mod table;
 pub mod value;
 
 pub use condition::write_node;
@@ -18,6 +19,7 @@ pub use document::{read_yaml_decision_document, read_yaml_document};
 pub use explain::{write_explanation, write_summary};
 pub use result::{write_path, write_reason, write_result, write_truth};
 pub use rules::{write_decision, write_rule, write_ruleset};
+pub use table::write_table;
 pub use value::{ValueContext, read_value, write_value};
 
 use crate::ast::Node;
