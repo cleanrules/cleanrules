@@ -17,6 +17,7 @@ or deeper than the limits are refused.
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import IO, Literal, TypeAlias
 
@@ -55,6 +56,7 @@ def loads(
     max_nesting: int | None = None,
     max_depth: int | None = None,
     max_table_size: int | None = None,
+    actions: Mapping[str, Action] | None = None,
 ) -> Expr | Rule | RuleSet | DecisionTable:
     """Read a condition, rule, rule set or decision table document.
 
@@ -72,10 +74,15 @@ def loads(
         max_table_size: The most cells and condition nodes a decision table
             may hold, column copies included (2,097,152; `spec/tables.md`,
             *Limits*).
+        actions: An action registry, each name with its callable: a rule or
+            rule set read is bound to it (`RuleSet.bind`). Without it, rules
+            keep the names of their actions, unbound: they evaluate, explain
+            and write, but `run` refuses them.
 
     Returns:
         An `Expr` for a condition document, a `Rule`, a `RuleSet` or a
-        `DecisionTable`. Rules read from a document have no action.
+        `DecisionTable`. A rule's action is the name the document gives it, if
+        any, never code.
 
     Raises:
         FormatError: For invalid JSON, YAML or CSV, an unknown or duplicate
@@ -86,7 +93,8 @@ def loads(
         ExpressionError: If a condition breaks a construction rule; read from
             text, with the line and column where the node starts.
         RuleDefinitionError: If a rule or rule set breaks a construction rule.
-        RegistryError: For an unknown logic.
+        RegistryError: For an unknown logic, or a named action that `actions`
+            lacks.
     """
     text = _text(
         text,
@@ -101,10 +109,12 @@ def loads(
     if kind == "condition":
         return _wrap(content)
     if kind == "rule":
-        return _rule(content)
+        rule = _rule(content)
+        return rule if actions is None else RuleSet([rule]).bind(actions)[0]
     if kind == "decision_table":
         return DecisionTable._from_native(content)  # pyright: ignore[reportPrivateUsage]
-    return _ruleset(content)
+    ruleset = _ruleset(content)
+    return ruleset if actions is None else ruleset.bind(actions)
 
 
 def _ruleset(parts: tuple[list[_native.Rule], str, str | None, str, bool]) -> RuleSet:
@@ -141,6 +151,7 @@ def _rule(native: _native.Rule) -> Rule:
         tags=native.tags,
         description=native.description,
         metadata=native.metadata,
+        do=native.action_name,
     )
 
 
@@ -195,10 +206,12 @@ def _check_actions(rules: list[Rule], pointer: str, omit_actions: bool) -> None:
     if omit_actions:
         return
     for position, rule in enumerate(rules):
-        if rule.do is not None:
+        # A named action is written as its name; only code cannot be.
+        if rule.do is not None and rule.action_name is None:
             raise UnsupportedError(
-                f"the action of rule {rule.name!r} cannot be written: actions are code",
-                hint="pass omit_actions=True to write the rule without it",
+                f"the action of rule {rule.name!r} cannot be written: it is code without a name",
+                hint='name it (do="notify") and bind it with RuleSet.bind, or pass'
+                " omit_actions=True to write the rule without it",
                 pointer=pointer.format(position) + "/do",
                 rule=rule.name,
             )
@@ -208,6 +221,7 @@ def rule_from_text(
     text: str | bytes,
     *,
     do: Action | None = None,
+    actions: Mapping[str, Action] | None = None,
     max_size: int | None = None,
     max_depth: int | None = None,
 ) -> Rule:
@@ -221,7 +235,9 @@ def rule_from_text(
 
     Args:
         text: The rule; `bytes` are read as UTF-8.
-        do: An action for the rule, as `Rule` takes: text holds no code.
+        do: The rule's action, as `Rule` takes: text holds no code. When the
+            text names an action (`DO notify`), `do` is bound to that name.
+        actions: An action registry, as `loads` takes; not with `do`.
         max_size: As `loads`.
         max_depth: As `loads`.
 
@@ -230,11 +246,18 @@ def rule_from_text(
             condition or a rule set instead of one rule.
         ExpressionError: As `loads`.
         RuleDefinitionError: As `loads`.
+        RegistryError: As `loads`.
     """
+    if do is not None and actions is not None:
+        raise TypeError("rule_from_text takes do or actions, not both")
     text = _text(text, max_size=max_size, max_depth=max_depth)
     rule = _rule(_native.load_rule(text, max_size, max_depth))
+    if actions is not None:
+        return RuleSet([rule]).bind(actions)[0]
     if do is None:
         return rule
+    if rule.action_name is not None:
+        return rule._bound(do)  # pyright: ignore[reportPrivateUsage]
     return Rule(
         rule.name,
         rule.when,
@@ -254,6 +277,7 @@ def load(
     max_nesting: int | None = None,
     max_depth: int | None = None,
     max_table_size: int | None = None,
+    actions: Mapping[str, Action] | None = None,
 ) -> Expr | Rule | RuleSet | DecisionTable:
     """Read a document from a file, as `loads` does.
 
@@ -267,6 +291,7 @@ def load(
         max_nesting: As `loads`.
         max_depth: As `loads`.
         max_table_size: As `loads`.
+        actions: As `loads`.
 
     Raises:
         ValueError: If the format is not given and cannot be told.
@@ -296,6 +321,7 @@ def load(
         max_nesting=max_nesting,
         max_depth=max_depth,
         max_table_size=max_table_size,
+        actions=actions,
     )
 
 

@@ -7,6 +7,7 @@ THEN discount = 0
 RULE vip PRIORITY 10 TAGS loyalty
 IF customer.years > 5 AND order.total > 1000
 THEN discount = 0.15
+DO notify_sales
 
 RULE loyal PRIORITY 5 TAGS loyalty
 IF customer.years > 2 OR customer.newsletter

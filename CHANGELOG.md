@@ -113,6 +113,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `DecisionTable::grid` and `GridBuilder` (`push_row`, `finish`), which build a
   table one row at a time, `DecisionTable::from_grid`, `table::HeaderItem` and
   `table::Cell`.
+- Actions by registered name (`spec/rules.md`, *Actions*): a rule may name its
+  action (`"do": "notify"` in JSON and YAML, `DO notify` in text), which is
+  data: read, written and shown in summaries (`"do"` next to `"action": true`;
+  `DO notify` in the text). The core never resolves or runs it. Bindings look
+  names up only in a registry the caller supplies, never as import paths; an
+  unknown name is a `registry_error` raised before anything runs. `DO` is now
+  a keyword of the text syntax: a field named `do` is written `` `do` ``.
+  16 conformance vectors. Rust core: `Rule::action_name`,
+  `Rule::get_action_name` and `RuleSet::check_action_names`, which every
+  binding uses to report an unknown or unbound name the same way.
+- Python binding: `Rule(do="notify")` names an action, and `Rule.action_name`
+  gives the name; `RuleSet.bind(actions)` resolves names in a mapping of callables,
+  and `load`, `loads` and `rule_from_text` take `actions=`. `run` refuses a
+  rule set with unbound names before evaluating. Named actions are written
+  with their rules; only an action given as code without a name needs
+  `omit_actions`. `RuleSummary.action_name` gives the name. A malformed
+  registry is a `TypeError`.
 - Python binding: `DecisionTable(header, rows, ...)` builds a table from rows,
   and `DecisionTable.from_dataframe` from a pandas or polars `DataFrame`
   (neither is imported; missing values are empty cells). A `str` cell is the
@@ -235,6 +252,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Repository skeleton: README, MIT license, changelog, `.gitignore`.
 - Development roadmap (`docs/PLAN.md`) and Claude Code project configuration
   (`CLAUDE.md`, `.claude/`).
+
+### Changed
+
+- The text syntax reserves `DO` (task D.4): a field, key or rule named `do`,
+  in any case, is now written between backticks or quotes.
+- `Summary::with_actions` adds the rules whose action is code to those that
+  name theirs, which the core marks itself, instead of replacing every flag.
 
 ### Removed
 

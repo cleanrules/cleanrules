@@ -23,9 +23,10 @@ use crate::value::{NullCause, Value};
 
 // --- Tokens -----------------------------------------------------------------------------
 
-const KEYWORDS: [&str; 31] = [
+const KEYWORDS: [&str; 32] = [
     "IF",
     "THEN",
+    "DO",
     "RULE",
     "PRIORITY",
     "TAGS",
@@ -1003,6 +1004,12 @@ impl<'a> Parser<'a> {
                 }
             }
         }
+        let action = if self.accept_keyword("DO") {
+            let token = self.peek().clone();
+            Some((self.label("an action name")?, token))
+        } else {
+            None
+        };
         let positions: Vec<(u64, u64)> = std::iter::once(&when)
             .chain(then.iter().map(|(_, value)| value))
             .map(|syn| (syn.line, syn.column))
@@ -1031,6 +1038,9 @@ impl<'a> Parser<'a> {
             .tags(tags);
         if let Some(description) = description {
             rule = rule.description(description);
+        }
+        if let Some((action, token)) = action {
+            rule = rule.action_name(action).map_err(|e| locate(e, &token))?;
         }
         Ok((rule, start))
     }
@@ -1768,6 +1778,9 @@ fn rule_text(rule: &Rule) -> Result<String> {
             .map(|(name, value)| format!("{} = {value}", key(name, '"')))
             .collect();
         let _ = write!(out, "\nTHEN {}", items.join(", "));
+    }
+    if let Some(action) = rule.get_action_name() {
+        let _ = write!(out, "\nDO {}", key(action, '"'));
     }
     Ok(out)
 }

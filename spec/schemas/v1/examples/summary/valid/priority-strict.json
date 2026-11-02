@@ -24,7 +24,8 @@
         "name": "do",
         "priority": 0,
         "outputs": [],
-        "action": true
+        "action": true,
+        "do": "notify"
       }
     ],
     "fields": [

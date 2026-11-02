@@ -282,8 +282,8 @@ days, hours, minutes and seconds, leaving out the zero ones (`1 hour 30 minutes
 `summary()` describes a rule set without evaluating it:
 
 - its configuration: policy, aggregate, logic and strictness;
-- its **rules**, in rule order: name, priority, output keys, and whether the
-  rule has an action;
+- its **rules**, in rule order: name, priority, output keys, whether the rule
+  has an action, and the action's name when it has one;
 - the **fields** it reads, in order of first appearance. Rules are visited in
   rule order; within a rule, the condition first, then the payload values in
   member order; within a node, in depth-first pre-order, with children in the
@@ -304,7 +304,7 @@ snapshot tests:
 Rule set: 2 rules, hit policy priority, logic boolean
   priority  name   condition                             outputs
         10  vip    customer.years > 5 AND since IS NULL  discount, label
-         5  loyal  customer.years > 2                    discount +action
+         5  loyal  customer.years > 2                    discount DO notify
 Fields read (2):
   customer.years  conditions of vip, loyal
   since           conditions of vip
@@ -315,8 +315,9 @@ Tags: gold (vip)
 - A header with the number of rules and the configuration: `hit policy`,
   `aggregate` when there is one, `logic`, and `strict` when set.
 - A table of the rules, with aligned columns: priority, name, condition (cut to
-  60 characters, the last three `...`) and output keys, followed by `+action`
-  when the rule has an action, or `-` when it has neither; `(no rules)` for an
+  60 characters, the last three `...`) and output keys, followed by `DO` and
+  the action's name when the rule names its action, or `+action` when its
+  action is code, or `-` when it has neither; `(no rules)` for an
   empty rule set.
 - `Fields read (<n>):` with, for each field, `conditions of <rules>` and
   `payloads of <rule> (<key>), …`, separated by `;`.

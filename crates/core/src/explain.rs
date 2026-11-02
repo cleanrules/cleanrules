@@ -682,22 +682,27 @@ pub struct Summary<'r> {
     pub outputs: Vec<String>,
     /// Each tag with the rules carrying it, tags sorted.
     pub tags: Vec<(String, Vec<String>)>,
-    /// Whether each rule has an action, in rule order, one per rule. Actions
-    /// are code of the host language, which the core's rules never hold, so
-    /// these start false and a binding sets them with [`Summary::with_actions`].
+    /// Whether each rule has an action, in rule order, one per rule. Rules
+    /// that name their action start true; actions given as code of the host
+    /// language, which the core's rules never hold, are added by a binding
+    /// with [`Summary::with_actions`].
     pub actions: Vec<bool>,
 }
 
 impl Summary<'_> {
-    /// Say which rules have an action, in rule order. Missing entries are false
-    /// and extra ones are dropped, so there is always one per rule.
+    /// Say which rules have an action given as code, in rule order. Rules that
+    /// name their action keep it; missing entries are false and extra ones are
+    /// dropped, so there is always one per rule.
     #[must_use]
     pub fn with_actions(mut self, actions: impl IntoIterator<Item = bool>) -> Self {
-        let count = self.ruleset.rules().len();
-        self.actions = actions
-            .into_iter()
-            .chain(std::iter::repeat(false))
-            .take(count)
+        let named = self
+            .ruleset
+            .rules()
+            .iter()
+            .map(|r| r.get_action_name().is_some());
+        self.actions = named
+            .zip(actions.into_iter().chain(std::iter::repeat(false)))
+            .map(|(named, code)| named || code)
             .collect();
         self
     }
@@ -753,6 +758,10 @@ pub fn summary(ruleset: &RuleSet) -> Summary<'_> {
         fields,
         outputs,
         tags,
-        actions: vec![false; ruleset.rules().len()],
+        actions: ruleset
+            .rules()
+            .iter()
+            .map(|r| r.get_action_name().is_some())
+            .collect(),
     }
 }

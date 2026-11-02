@@ -105,6 +105,26 @@ print(cleanrules.dumps(rules["loyal"], format="text"))
 # THEN discount = 0.05
 ```
 
+`evaluate` never has side effects; `run` evaluates and then calls the actions
+of the selected rules. An action is a function given to `Rule(do=...)`, or a
+name that a rule file gives (`DO notify_sales` in text, `"do"` in JSON) and the
+program resolves in a registry of its own. Names are looked up only there,
+never imported, so a file can only call what the program registered
+([`docs/examples/discounts.rules`](../../docs/examples/discounts.rules)):
+
+```python
+def notify_sales(context: cleanrules.ActionContext) -> None:
+    print(f"{context.rule.name}: {dict(context.output)}")
+
+
+rules = cleanrules.load("docs/examples/discounts.rules", actions={"notify_sales": notify_sales})
+rules.run({"customer": {"years": 9}, "order": {"total": 2000}})
+# vip: {'discount': Decimal('0.15')}
+```
+
+Unbound, the rules still evaluate, explain and write; `run` raises a
+`RegistryError`, as `rules.bind(actions)` does for a name the registry lacks.
+
 Rules can also be a decision table, read from CSV as spreadsheets write it (or
 from JSON or YAML). Cells use the same syntax, without their column; output
 values in priority order rank the rows, as in DMN. This is

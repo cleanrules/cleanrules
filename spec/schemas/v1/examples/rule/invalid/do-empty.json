@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "rule": {
+    "name": "x",
+    "when": {
+      "op": "const",
+      "value": true
+    },
+    "do": ""
+  }
+}

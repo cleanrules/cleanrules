@@ -45,6 +45,7 @@ ruleset:
       priority: 10
       tags:
         - "loyalty"
+      do: "notify_sales"
     - name: "loyal"
       when:
         op: "or"

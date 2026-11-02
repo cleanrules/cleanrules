@@ -17,8 +17,8 @@ A rule has:
   is built, so a payload is defined with scalars and value expressions. A field
   in a payload passes through whatever the data holds, which may be a list, a
   map or an opaque value (type group `other`; `data-model.md`);
-- an **action** (`do`, optional): code of the host language. Actions are not part of the
-  decision (see *Actions*);
+- an **action** (`do`, optional): code of the host language, given directly or
+  by a registered name. Actions are not part of the decision (see *Actions*);
 - a **priority** (a signed 64-bit integer, default 0; not a boolean), **tags**
   (strings), a **description** (a string) and **metadata** (string keys mapped
   to data values, so it can be serialized; `json-format.md`), none
@@ -130,6 +130,23 @@ a mapping, a data frame instead of its rows) is an error raised immediately.
 
 *Not checked by vectors: actions are code of the host language, so each
 binding's tests check `run`.*
+
+A binding takes a rule's action in two ways. It may take code of its language
+directly, which only the program that built the rule holds. Or the rule may
+**name** its action: a non-empty string (`do` in `json-format.md`, `DO` in
+`text.md`), which is data like the rest of the rule: it is read, written and
+shown in summaries, and the core never resolves or runs it.
+
+A binding resolves names in an **action registry**: a mapping from names to
+code that the caller supplies. Names are looked up there and nowhere else, never
+as import paths, files or code to evaluate, so a rule file can only call what
+the program registered. A name has no structure: a dot or a colon in it means
+nothing, and bindings never read a name as a module, function, class or atom.
+Binding a registry to a rule set checks every named
+action, in rule order: an unknown name is a `registry_error` with the rule, the
+name and the registered names. `run` makes the same check before it evaluates,
+so the error never depends on the input. A rule set whose named actions are not
+bound can still be evaluated, explained, summarized and written.
 
 `evaluate` is pure: it never runs actions. A decision can be computed any number
 of times, for explanations, validation or model predictions, without side

@@ -7,7 +7,8 @@ use crate::logic::{Kleene, Logic, LogicName, Truth};
 use crate::value::{Map, NullCause, Number, Value};
 
 /// A rule: a condition, a payload and descriptive data (`spec/rules.md`,
-/// *Rules*). Actions are code of the host language and live in the bindings.
+/// *Rules*). Actions are code of the host language and live in the bindings;
+/// a rule holds only the name of its action, if it names one.
 #[derive(Clone, Debug)]
 pub struct Rule {
     name: String,
@@ -17,6 +18,7 @@ pub struct Rule {
     tags: Vec<String>,
     description: Option<String>,
     metadata: Map,
+    action: Option<String>,
 }
 
 fn rule_error(rule: &str, message: impl Into<String>) -> Error {
@@ -96,6 +98,7 @@ impl Rule {
             tags: Vec::new(),
             description: None,
             metadata: Map::new(),
+            action: None,
         })
     }
 
@@ -128,6 +131,22 @@ impl Rule {
     pub fn metadata(mut self, metadata: Map) -> Self {
         self.metadata = metadata;
         self
+    }
+
+    /// Name the rule's action, which a binding resolves in its action registry
+    /// (`spec/rules.md`, *Actions*). The core never runs it.
+    ///
+    /// # Errors
+    ///
+    /// `rule_definition_error` when the name is empty.
+    pub fn action_name(mut self, name: impl Into<String>) -> Result<Self> {
+        let name = name.into();
+        if name.is_empty() {
+            return Err(rule_error(&self.name, "an action name cannot be empty")
+                .with_hint("leave the action out, or name one the program registers"));
+        }
+        self.action = Some(name);
+        Ok(self)
     }
 
     /// The name.
@@ -170,6 +189,12 @@ impl Rule {
     #[must_use]
     pub fn get_metadata(&self) -> &Map {
         &self.metadata
+    }
+
+    /// The name of the rule's action, if it names one.
+    #[must_use]
+    pub fn get_action_name(&self) -> Option<&str> {
+        self.action.as_deref()
     }
 }
 
@@ -314,6 +339,40 @@ impl RuleSet {
             logic: config.logic.unwrap_or(LogicName::Boolean),
             strict: config.strict,
         })
+    }
+
+    /// Check that every action the rules name is among `registered`, in rule
+    /// order (`spec/rules.md`, *Actions*). Bindings call it when they bind
+    /// their action registry, and before `run`; it only compares names.
+    ///
+    /// # Errors
+    ///
+    /// `registry_error` for the first rule whose action is not registered,
+    /// with the rule, the name and the registered names, sorted.
+    pub fn check_action_names<S: AsRef<str>>(&self, registered: &[S]) -> Result<()> {
+        let Some(rule) = self.rules.iter().find(|rule| {
+            rule.get_action_name()
+                .is_some_and(|name| !registered.iter().any(|r| r.as_ref() == name))
+        }) else {
+            return Ok(());
+        };
+        let name = rule.get_action_name().unwrap_or_default();
+        let mut available: Vec<String> = registered.iter().map(|r| r.as_ref().to_owned()).collect();
+        available.sort();
+        available.dedup();
+        let mut error = Error::new(
+            ErrorCode::RegistryError,
+            format!(
+                "the action {name:?} of rule {:?} is not registered",
+                rule.name()
+            ),
+        )
+        .with_hint("register an action by this name in the program, and bind the rules to it");
+        let context = error.context_mut();
+        context.rule = Some(rule.name().to_owned());
+        context.name = Some(name.to_owned());
+        context.available = available;
+        Err(error)
     }
 
     /// The rules, in rule order.
@@ -765,6 +824,30 @@ mod tests {
         );
         let rule = Rule::new("r", gt()).unwrap().tags(["b", "a", "b"]);
         assert_eq!(rule.get_tags(), ["a", "b"]);
+        assert_eq!(rule.get_action_name(), None);
+        let error = rule.clone().action_name("").unwrap_err();
+        assert_eq!(
+            (error.code(), error.context().rule.as_deref()),
+            (ErrorCode::RuleDefinitionError, Some("r"))
+        );
+        let named = rule.action_name("notify").unwrap();
+        assert_eq!(named.get_action_name(), Some("notify"));
+        let ruleset = RuleSet::new(
+            vec![Rule::new("q", gt()).unwrap(), named],
+            Config::default(),
+        )
+        .unwrap();
+        assert!(ruleset.check_action_names(&["notify"]).is_ok());
+        let error = ruleset
+            .check_action_names(&["zz", "log", "log"])
+            .unwrap_err();
+        let context = error.context();
+        assert_eq!(error.code(), ErrorCode::RegistryError);
+        assert_eq!(
+            (context.rule.as_deref(), context.name.as_deref()),
+            (Some("r"), Some("notify"))
+        );
+        assert_eq!(context.available, ["log", "zz"]);
         let twice = vec![Rule::new("r", gt()).unwrap(), Rule::new("r", gt()).unwrap()];
         assert_eq!(
             RuleSet::new(twice, Config::default()).unwrap_err().code(),

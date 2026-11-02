@@ -99,11 +99,17 @@ impl PyRule {
     fn metadata<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         convert::to_py(py, &Value::Map(self.rule.get_metadata().clone()))
     }
+
+    /// The name of the rule's action, if it names one.
+    #[getter]
+    fn action_name(&self) -> Option<&str> {
+        self.rule.get_action_name()
+    }
 }
 
 /// A rule: `then` holds the payload in order; `metadata` is converted as data.
 #[pyfunction]
-#[pyo3(signature = (name, when, then, priority, tags, description, metadata))]
+#[pyo3(signature = (name, when, then, priority, tags, description, metadata, action=None))]
 #[allow(clippy::needless_pass_by_value, clippy::too_many_arguments)] // PyO3 extracts lists by value; the arguments are `Rule`'s.
 pub(crate) fn rule(
     py: Python<'_>,
@@ -114,6 +120,7 @@ pub(crate) fn rule(
     tags: Vec<String>,
     description: Option<&str>,
     metadata: &Bound<'_, PyDict>,
+    action: Option<&str>,
 ) -> PyResult<PyRule> {
     let payload = then
         .iter()
@@ -125,6 +132,9 @@ pub(crate) fn rule(
         .tags(tags);
     if let Some(description) = description {
         rule = rule.description(description);
+    }
+    if let Some(action) = action {
+        rule = rule.action_name(action).or_raise(py)?;
     }
     let metadata = match convert::metadata(metadata)? {
         Ok(Value::Map(map)) => map,
@@ -230,6 +240,12 @@ impl PyRuleSet {
     /// The summary in the JSON format, as text; `actions` says which rules
     /// have one, in rule order.
     #[allow(clippy::needless_pass_by_value)] // PyO3 extracts lists by value.
+    /// Check that every named action is registered (`spec/rules.md`, *Actions*).
+    #[allow(clippy::needless_pass_by_value)] // PyO3 extracts lists by value.
+    fn check_action_names(&self, py: Python<'_>, registered: Vec<String>) -> PyResult<()> {
+        self.ruleset.check_action_names(&registered).or_raise(py)
+    }
+
     fn summary_json(&self, actions: Vec<bool>) -> String {
         to_string(&write_summary(&self.overview(actions)))
     }

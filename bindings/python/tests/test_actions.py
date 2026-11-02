@@ -1,4 +1,4 @@
-"""Actions, `run`, and pickling of rules and rule sets (task C.4)."""
+"""Actions, `run`, and pickling of rules and rule sets (task C.4); named actions (D.4)."""
 
 import copy
 import pickle
@@ -10,10 +10,17 @@ from cleanrules import (
     ActionContext,
     ActionError,
     F,
+    MissingFieldError,
+    RegistryError,
     Rule,
     RuleDefinitionError,
     RuleSet,
     Truth,
+    UnsupportedError,
+    dumps,
+    load,
+    loads,
+    rule_from_text,
 )
 
 calls: list[tuple[str, object]] = []
@@ -86,9 +93,123 @@ def test_a_failing_action_stops_the_run() -> None:
     assert (clone.rule, clone.executed, clone.decision) == ("loyal", ("vip",), None)
 
 
-def test_actions_must_be_callable() -> None:
+def test_actions_must_be_callable_or_named() -> None:
     with pytest.raises(RuleDefinitionError, match="callable"):
-        Rule("r", F.x > 1, do="print")  # type: ignore[arg-type]
+        Rule("r", F.x > 1, do=5)  # type: ignore[arg-type]
+    # A string is a name for a registry, never something to import.
+    named = Rule("r", F.x > 1, do="print")
+    assert (named.action_name, named.do) == ("print", None)
+    assert repr(named) == "Rule('r', F.x > 1, do='print')"
+    with pytest.raises(RuleDefinitionError, match="empty"):
+        Rule("r", F.x > 1, do="")
+
+
+TEXT = """HIT POLICY rule_order
+RULE vip IF years > 5 THEN discount = 0.15 DO notify
+RULE loyal IF years > 2 THEN discount = 0.05
+RULE audit IF years > 0 DO log"""
+
+
+def test_named_actions_are_data() -> None:
+    rules = loads(TEXT, format="text")
+    assert isinstance(rules, RuleSet)
+    assert [(r.action_name, r.do) for r in rules] == [("notify", None), (None, None), ("log", None)]
+    assert dumps(rules, format="text") == (
+        "HIT POLICY rule_order\n\n"
+        "RULE vip\nIF years > 5\nTHEN discount = 0.15\nDO notify\n\n"
+        "RULE loyal\nIF years > 2\nTHEN discount = 0.05\n\n"
+        "RULE audit\nIF years > 0\nDO log"
+    )
+    document = dumps(rules)
+    assert '"do":"notify"' in document
+    assert dumps(loads(document), format="text") == dumps(rules, format="text")
+    # Unbound, the rules still evaluate and summarize.
+    assert rules.evaluate({"years": 9}).fired == ("vip", "loyal", "audit")
+    summary = rules.summary()
+    assert [(r.action, r.action_name) for r in summary.rules] == [
+        (True, "notify"),
+        (False, None),
+        (True, "log"),
+    ]
+    assert "discount DO notify" in str(summary)
+
+
+def test_bind_resolves_names_in_a_registry() -> None:
+    rules = loads(TEXT, format="text")
+    assert isinstance(rules, RuleSet)
+    bound = rules.bind({"notify": record, "log": record, "unused": fail})
+    assert bound is not rules and rules["vip"].do is None
+    assert [r.do for r in bound] == [record, None, record]
+    bound.run({"years": 9})
+    assert calls == [("vip", {"discount": Decimal("0.15")}), ("audit", {})]
+    # Every named action is checked, whether or not its rule fires.
+    with pytest.raises(RegistryError) as info:
+        rules.bind({"notify": record})
+    error = info.value
+    assert (error.name, error.rule, error.available) == ("log", "audit", ("notify",))
+    assert str(error).startswith('the action "log" of rule "audit" is not registered')
+    with pytest.raises(TypeError, match="not callable"):
+        rules.bind({"notify": record, "log": "record"})  # type: ignore[dict-item]
+    with pytest.raises(TypeError, match="names are str"):
+        rules.bind({"notify": record, 1: record})  # type: ignore[dict-item]
+    with pytest.raises(TypeError, match="mapping"):
+        rules.bind([("notify", record)])  # type: ignore[arg-type]
+    # Code actions are kept; rebinding replaces named ones.
+    mixed = RuleSet([Rule("a", F.x > 1, do=fail), Rule("b", F.x > 1, do="log")])
+    rebound = mixed.bind({"log": record}).bind({"log": fail})
+    assert [r.do for r in rebound] == [fail, fail]
+
+
+def test_run_refuses_unbound_names_before_evaluating() -> None:
+    rules = loads(TEXT, format="text")
+    assert isinstance(rules, RuleSet)
+    strict = RuleSet(list(rules), strict=True)
+    # The missing field would raise in strict mode: the registry is checked first.
+    with pytest.raises(RegistryError) as info:
+        strict.run({})
+    assert (info.value.name, info.value.rule) == ("notify", "vip")
+    with pytest.raises(MissingFieldError):
+        strict.bind({"notify": record, "log": record}).run({})
+    assert calls == []
+
+
+def test_documents_bind_when_they_are_read(tmp_path: Any) -> None:
+    actions = {"notify": record, "log": record}
+    rules = loads(TEXT, format="text", actions=actions)
+    assert isinstance(rules, RuleSet) and rules["audit"].do is record
+    path = tmp_path / "rules.yaml"
+    path.write_text(dumps(rules, format="yaml"), encoding="utf-8")
+    from_file = load(path, actions=actions)
+    assert isinstance(from_file, RuleSet) and from_file["vip"].do is record
+    with pytest.raises(RegistryError):
+        load(path, actions={})
+    one = loads(dumps(rules["vip"]), actions=actions)
+    assert isinstance(one, Rule) and one.do is record
+    assert rule_from_text("IF x > 1 DO notify", actions=actions).do is record
+    # `do` is the code of the action the text names.
+    given = rule_from_text("IF x > 1 DO notify", do=fail)
+    assert (given.action_name, given.do) == ("notify", fail)
+    with pytest.raises(RegistryError):
+        rule_from_text("IF x > 1 DO notify", actions={})
+    with pytest.raises(TypeError, match="not both"):
+        rule_from_text("IF x > 1 DO notify", do=fail, actions=actions)
+
+
+def test_only_code_without_a_name_cannot_be_written() -> None:
+    named = RuleSet([Rule("a", F.x > 1, do="notify")]).bind({"notify": record})
+    assert '"do":"notify"' in dumps(named)
+    with pytest.raises(UnsupportedError) as info:
+        dumps(RuleSet([Rule("a", F.x > 1, do=record)]))
+    assert info.value.pointer == "/ruleset/rules/0/do"
+    assert '"do"' not in dumps(RuleSet([Rule("a", F.x > 1, do=record)]), omit_actions=True)
+
+
+def test_bound_named_actions_pickle() -> None:
+    bound = RuleSet([Rule("a", F.x > 1, do="notify")]).bind({"notify": record})
+    clone = pickle.loads(pickle.dumps(bound))
+    assert (clone["a"].action_name, clone["a"].do) == ("notify", record)
+    unbound = pickle.loads(pickle.dumps(Rule("a", F.x > 1, do="notify")))
+    assert (unbound.action_name, unbound.do) == ("notify", None)
 
 
 def test_rules_and_rule_sets_pickle_and_copy() -> None:

@@ -434,7 +434,13 @@ fn rule_table(summary: &Summary<'_>, lines: &mut Vec<String>) {
             if !outputs.is_empty() {
                 outputs.push(' ');
             }
-            outputs.push_str("+action");
+            match rule.get_action_name() {
+                Some(action) => {
+                    outputs.push_str("DO ");
+                    outputs.push_str(&name(action));
+                }
+                None => outputs.push_str("+action"),
+            }
         }
         if outputs.is_empty() {
             outputs.push('-');

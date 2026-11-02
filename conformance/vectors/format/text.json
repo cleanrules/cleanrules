@@ -3430,6 +3430,240 @@
       "expect": {
         "printed": "HIT POLICY first\n\nRULE r\nIF a"
       }
+    },
+    {
+      "id": "format/text/rule-with-action",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#actions"
+      ],
+      "description": "DO names the rule's action, on its own line",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE vip IF a > 1 THEN x = 1 DO notify"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "vip",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {
+              "x": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "do": "notify"
+          }
+        },
+        "printed": "RULE vip\nIF a > 1\nTHEN x = 1\nDO notify"
+      }
+    },
+    {
+      "id": "format/text/action-without-payload",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#actions"
+      ],
+      "description": "DO without a payload, in a rule without a header",
+      "given": {
+        "kind": "read",
+        "rules_text": "if a > 1 do notify"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "rule_1",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "do": "notify"
+          }
+        },
+        "printed": "RULE rule_1\nIF a > 1\nDO notify"
+      }
+    },
+    {
+      "id": "format/text/action-as-string",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#actions"
+      ],
+      "description": "An action name that is not a name is a string",
+      "given": {
+        "kind": "read",
+        "rules_text": "IF a > 1 DO 'billing.notify'"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "rule_1",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "do": "billing.notify"
+          }
+        },
+        "printed": "RULE rule_1\nIF a > 1\nDO \"billing.notify\""
+      }
+    },
+    {
+      "id": "format/text/actions-in-a-rule-set",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#actions"
+      ],
+      "description": "Each rule names its own action",
+      "given": {
+        "kind": "read",
+        "rules_text": "HIT POLICY rule_order\nRULE a IF a > 1 DO notify\nRULE b IF a > 1 THEN x = 1\nRULE c IF a > 1 DO notify"
+      },
+      "expect": {
+        "printed": "HIT POLICY rule_order\n\nRULE a\nIF a > 1\nDO notify\n\nRULE b\nIF a > 1\nTHEN x = 1\n\nRULE c\nIF a > 1\nDO notify"
+      }
+    },
+    {
+      "id": "format/text/do-is-a-keyword",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "DO is a keyword: a field named do is written between backticks",
+      "given": {
+        "kind": "read",
+        "rules_text": "`do` > 1 AND `DO`.x = 2"
+      },
+      "expect": {
+        "printed": "`do` > 1 AND `DO`.x = 2"
+      }
+    },
+    {
+      "id": "format/text/do-as-a-field",
+      "spec": [
+        "text.md#lexical-structure"
+      ],
+      "description": "A bare do is the keyword",
+      "given": {
+        "kind": "read",
+        "rules_text": "do > 1"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/text/action-empty",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#actions"
+      ],
+      "description": "An empty action name, located at the string",
+      "given": {
+        "kind": "read",
+        "rules_text": "IF a > 1 DO \"\""
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 1,
+          "column": 13
+        }
+      }
+    },
+    {
+      "id": "format/text/action-missing",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#actions"
+      ],
+      "description": "DO needs a name",
+      "given": {
+        "kind": "read",
+        "rules_text": "IF a > 1 DO"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 12
+        }
+      }
+    },
+    {
+      "id": "format/text/action-twice",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#actions"
+      ],
+      "description": "A rule names one action",
+      "given": {
+        "kind": "read",
+        "rules_text": "IF a > 1 DO a DO b"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 15
+        }
+      }
+    },
+    {
+      "id": "format/text/action-before-payload",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#actions"
+      ],
+      "description": "DO comes after THEN",
+      "given": {
+        "kind": "read",
+        "rules_text": "IF a > 1 DO a THEN x = 1"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 15
+        }
+      }
     }
   ]
 }

@@ -274,6 +274,7 @@ A rule is an object with these keys (`rules.md`, *Rules*):
 | `tags` | no | array of strings | `[]` |
 | `description` | no | string | none |
 | `metadata` | no | object: key → data value | `{}` |
+| `do` | no | string, not empty: the name of the rule's action | none |
 
 ```json
 {
@@ -300,9 +301,9 @@ A rule is an object with these keys (`rules.md`, *Rules*):
 - **`metadata`** is an object whose keys are taken literally (a key starting
   with `$` is an ordinary key here) and whose member values are data values
   (*Values*). Member order is kept.
-- **Actions** (`do`) are code of the host language and are not part of this
-  version of the format. Actions referenced by a registered name are planned
-  as an optional key (task D.4).
+- **`do`** names the rule's action, which a binding resolves in its action
+  registry (`rules.md`, *Actions*). An action given as code has no name, and
+  cannot be written (*Writing errors*).
 
 **Member order.** JSON objects are unordered for many tools: Go's
 `map[string]any`, PostgreSQL's `jsonb` and `jq -S` sort their keys, and
@@ -668,7 +669,7 @@ A summary document is the JSON form of `summary()` (`explain.md`,
 | `aggregate` | with an aggregate | the aggregate |
 | `logic` | yes | the rule set's logic |
 | `strict` | when `true` | `true` |
-| `rules` | yes | array of `{"name", "priority", "outputs"}` in rule order, plus `"action": true` for a rule with an action |
+| `rules` | yes | array of `{"name", "priority", "outputs"}` in rule order, plus `"action": true` for a rule with an action and `"do"` with its name when it has one |
 | `fields` | yes | array of `{"path", "conditions", "payloads"}`: `conditions` is an array of rule names, and `payloads` an array of `{"rule", "key"}` |
 | `outputs` | yes | array of payload keys |
 | `tags` | yes | array of `{"tag", "rules"}`, sorted by tag |
@@ -693,8 +694,9 @@ the format cannot hold. It reports the first problem found in rule order, and
 within a rule in the order of the table, with a JSON Pointer to where the value
 would have been written:
 
-- a rule with an action (pointer to `…/rules/<i>/do`), unless the caller passes
-  the option `omit_actions`, which every binding names the same way;
+- a rule with an action given as code, without a name (pointer to
+  `…/rules/<i>/do`), unless the caller passes the option `omit_actions`, which
+  every binding names the same way; a named action is written as its name;
 - a metadata value that is not a data value, or a float NaN in metadata, which
   would otherwise silently become null;
 - a logic that is not one of the core's named logics, or one configured with

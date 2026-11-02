@@ -585,42 +585,6 @@
       }
     },
     {
-      "id": "format/rules/action-key",
-      "spec": [
-        "json-format.md#rules"
-      ],
-      "description": "actions are not part of the format",
-      "given": {
-        "kind": "read",
-        "document": {
-          "version": 1,
-          "rule": {
-            "name": "r",
-            "when": {
-              "op": "gt",
-              "left": {
-                "op": "field",
-                "path": [
-                  "a"
-                ]
-              },
-              "right": {
-                "op": "const",
-                "value": 1
-              }
-            },
-            "do": "notify"
-          }
-        }
-      },
-      "expect": {
-        "error": {
-          "code": "format_error",
-          "pointer": "/rule/do"
-        }
-      }
-    },
-    {
       "id": "format/rules/bare-payload-scalar",
       "spec": [
         "json-format.md#rules"
@@ -783,6 +747,332 @@
               "😀"
             ]
           }
+        }
+      }
+    },
+    {
+      "id": "format/rules/named-action",
+      "spec": [
+        "json-format.md#rules",
+        "rules.md#actions"
+      ],
+      "description": "A rule names its action: data, kept and written after metadata",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "do": "notify",
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "metadata": {
+              "owner": "sales"
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "metadata": {
+              "owner": "sales"
+            },
+            "do": "notify"
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rules/named-action-any-text",
+      "spec": [
+        "json-format.md#rules",
+        "rules.md#actions"
+      ],
+      "description": "An action name is any non-empty string, read literally",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "rule_order",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "do": "billing.notify"
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "do": "send email ✉"
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "rule_order",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "do": "billing.notify"
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "do": "send email ✉"
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rules/named-action-empty",
+      "spec": [
+        "json-format.md#rules",
+        "rules.md#actions"
+      ],
+      "description": "An empty action name",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "do": ""
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/rule/do"
+        }
+      }
+    },
+    {
+      "id": "format/rules/named-action-not-string",
+      "spec": [
+        "json-format.md#rules",
+        "rules.md#actions"
+      ],
+      "description": "An action is named, never given as a module and function",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "do": {
+              "module": "billing",
+              "function": "notify"
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/do"
+        }
+      }
+    },
+    {
+      "id": "format/rules/named-action-in-a-rule-set",
+      "spec": [
+        "json-format.md#rules",
+        "rules.md#actions"
+      ],
+      "description": "Errors in a rule set point to the rule's do",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "do": 5
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset/rules/1/do"
         }
       }
     }

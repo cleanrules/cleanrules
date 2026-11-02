@@ -29,7 +29,7 @@ import zoneinfo
 from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 
 import cleanrules
 import pytest
@@ -270,6 +270,7 @@ def build_ruleset(content: dict[str, Any]) -> RuleSet:
             tags=rule.get("tags", ()),
             description=rule.get("description"),
             metadata=native(rule.get("metadata", {})),
+            do=rule.get("do"),
         )
         for rule in content["rules"]
     ]
@@ -285,7 +286,16 @@ def build_ruleset(content: dict[str, Any]) -> RuleSet:
 # --- Running ---------------------------------------------------------------------------
 
 
-def run_text(given: dict[str, Any], expect: dict[str, Any], limits: dict[str, int]) -> None:
+class Limits(TypedDict, total=False):
+    """A vector's limits, as `loads` takes them."""
+
+    max_size: int
+    max_nesting: int
+    max_depth: int
+    max_table_size: int
+
+
+def run_text(given: dict[str, Any], expect: dict[str, Any], limits: Limits) -> None:
     """Read a rule text, or write a document as text (`spec/text.md`)."""
     source, fmt = (
         (given["rules_text"], "text")
@@ -311,7 +321,7 @@ def run_text(given: dict[str, Any], expect: dict[str, Any], limits: dict[str, in
     )
 
 
-def run_table(given: dict[str, Any], expect: dict[str, Any], limits: dict[str, int]) -> None:
+def run_table(given: dict[str, Any], expect: dict[str, Any], limits: Limits) -> None:
     """Read or build a decision table and write it back as a document, as CSV and compiled."""
     if "table_csv" in given:
         source, fmt = given["table_csv"], "csv"
@@ -361,7 +371,7 @@ def run_json(vector: dict[str, Any]) -> None:
     given, expect = vector["given"], vector["expect"]
     kind = given["kind"]
     if kind == "read":
-        limits = {k: int(v) for k, v in given.get("limits", {}).items()}
+        limits = cast(Limits, {k: int(v) for k, v in given.get("limits", {}).items()})
         if "rules_text" in given or given.get("write") == "text":
             run_text(given, expect, limits)
             return
@@ -388,7 +398,9 @@ def run_json(vector: dict[str, Any]) -> None:
                         dumps(given["ruleset"]),
                         text,
                         "yaml" if "yaml" in given else "json",
-                        **limits,
+                        max_size=limits.get("max_size"),
+                        max_nesting=limits.get("max_nesting"),
+                        max_depth=limits.get("max_depth"),
                     )
                 )  # pyright: ignore[reportPrivateUsage]
                 return {"version": 1, "decision": content}
@@ -514,4 +526,4 @@ def test_vector(vector: dict[str, Any], run: str) -> None:
 
 def test_every_vector_is_collected() -> None:
     # 2,135 vectors at the end of phase B; vectors are only ever added.
-    assert len([p for p in collect() if p.id.startswith("json:")]) >= 2386
+    assert len([p for p in collect() if p.id.startswith("json:")]) >= 2401

@@ -343,6 +343,100 @@
           "tags": []
         }
       }
+    },
+    {
+      "id": "explain/summaries/named-actions",
+      "spec": [
+        "explain.md#summaries",
+        "rules.md#actions"
+      ],
+      "description": "A summary marks rules with an action and gives the names of named ones",
+      "given": {
+        "kind": "summary",
+        "ruleset": {
+          "hit_policy": "rule_order",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "x": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "do": "notify"
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "summary": {
+          "hit_policy": "rule_order",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "priority": 0,
+              "outputs": [
+                "x"
+              ],
+              "action": true,
+              "do": "notify"
+            },
+            {
+              "name": "b",
+              "priority": 0,
+              "outputs": []
+            }
+          ],
+          "fields": [
+            {
+              "path": [
+                "a"
+              ],
+              "conditions": [
+                "a",
+                "b"
+              ],
+              "payloads": []
+            }
+          ],
+          "outputs": [
+            "x"
+          ],
+          "tags": []
+        }
+      }
     }
   ]
 }

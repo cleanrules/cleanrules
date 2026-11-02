@@ -195,6 +195,9 @@ pub fn write_summary(summary: &Summary<'_>) -> Json {
             if summary.actions.get(i).copied().unwrap_or(false) {
                 fields.push(("action".into(), Json::Bool(true)));
             }
+            if let Some(action) = rule.get_action_name() {
+                fields.push(("do".into(), string(action)));
+            }
             Json::Object(fields)
         })
         .collect();

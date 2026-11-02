@@ -48,9 +48,10 @@ pub(crate) struct RawRule {
     tags: Vec<String>,
     description: Option<String>,
     metadata: Map,
+    action: Option<String>,
 }
 
-const RULE_KEYS: [&str; 7] = [
+const RULE_KEYS: [&str; 8] = [
     "name",
     "when",
     "then",
@@ -58,6 +59,7 @@ const RULE_KEYS: [&str; 7] = [
     "tags",
     "description",
     "metadata",
+    "do",
 ];
 
 /// Check a rule's shape: keys in table order, then unknown keys.
@@ -170,6 +172,16 @@ pub(crate) fn shape_rule(json: &Json, pointer: &str, limits: &Limits) -> Result<
             ));
         }
     };
+    let action = match get(members, "do") {
+        None => None,
+        Some(Json::String(name)) => Some(name.clone()),
+        Some(_) => {
+            return Err(format_error(
+                &at(pointer, "do"),
+                "\"do\" must be a string: the name of an action",
+            ));
+        }
+    };
     no_unknown_keys(members, &RULE_KEYS, pointer)?;
     Ok(RawRule {
         pointer: pointer.to_owned(),
@@ -180,6 +192,7 @@ pub(crate) fn shape_rule(json: &Json, pointer: &str, limits: &Limits) -> Result<
         tags,
         description,
         metadata,
+        action,
     })
 }
 
@@ -222,14 +235,19 @@ pub(crate) fn build_rule(raw: RawRule) -> Result<Rule> {
         )
         .at_pointer(at(&at(&pointer, "then"), key)));
     }
-    let rule = Rule::with_payload(raw.name, when, then)?
+    let mut rule = Rule::with_payload(raw.name, when, then)?
         .priority(raw.priority)
         .tags(raw.tags)
         .metadata(raw.metadata);
-    Ok(match raw.description {
-        Some(description) => rule.description(description),
-        None => rule,
-    })
+    if let Some(description) = raw.description {
+        rule = rule.description(description);
+    }
+    match raw.action {
+        Some(action) => rule
+            .action_name(action)
+            .map_err(|e| e.at_pointer(at(&pointer, "do"))),
+        None => Ok(rule),
+    }
 }
 
 /// A rule set whose shape is valid, not yet built.
@@ -406,6 +424,9 @@ pub fn write_rule(rule: &Rule) -> Json {
             .map(|(k, v)| (k.to_owned(), write_value(v)))
             .collect();
         members.push(("metadata".into(), Json::Object(metadata)));
+    }
+    if let Some(action) = rule.get_action_name() {
+        members.push(("do".into(), Json::String(action.into())));
     }
     Json::Object(members)
 }

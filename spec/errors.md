@@ -57,7 +57,7 @@ its cause.
 | `expression_error` | a condition node breaks a construction rule (`ast.md`) | `rule`, `node`; **`pointer`** when read from JSON; **`line`** and **`column`** when read from text (`text.md`) |
 | `rule_definition_error` | a rule or rule set breaks a construction rule (`rules.md`, `json-format.md`) | **`rule`** when known; **`pointer`** when read from JSON; **`line`** and **`column`** when read from text |
 | `rule_syntax_error` | a text in the rule syntax cannot be parsed (`text.md`) | **`line`**, **`column`** |
-| `registry_error` | a name is not registered (a logic; later, an action) | **`name`**, `available`; **`pointer`** when read from JSON, **`line`** and **`column`** when read from text |
+| `registry_error` | a name is not registered: a logic, or an action when a rule set's named actions are bound (`rules.md`, *Actions*) | **`name`**, `available`; for a logic, **`pointer`** when read from JSON, **`line`** and **`column`** when read from text; for an action, **`rule`** |
 | `rule_not_found` | a rule is looked up by a name the rule set does not have | **`name`**, `available` |
 | `evaluation_error` | strict mode met a value it cannot read (`read_error`), or a batch was given something that is not a collection of inputs (`rules.md`) | **`rule`**, **`path`**, `node`, **`row`** |
 | `missing_field` | strict mode met a field whose path cannot be resolved | **`rule`**, **`path`**, `node`, **`row`**, `available` |

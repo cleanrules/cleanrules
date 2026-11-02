@@ -166,9 +166,9 @@ fn the_summary_of_the_spec() {
         r#"HIT POLICY priority
          RULE vip PRIORITY 10 TAGS gold IF customer.years > 5 AND since IS NULL
          THEN discount = 0.15, label = "VIP"
-         RULE loyal PRIORITY 5 IF customer.years > 2 THEN discount = 0.05"#,
+         RULE loyal PRIORITY 5 IF customer.years > 2 THEN discount = 0.05 DO notify"#,
     );
-    let overview = summary(&ruleset).with_actions([false, true]);
+    let overview = summary(&ruleset);
     insta::assert_snapshot!(overview.to_string());
 }
 
@@ -182,6 +182,13 @@ fn actions_are_one_per_rule() {
     );
     assert_eq!(
         summary(&ruleset).with_actions([true, true, true]).actions,
+        [true, true]
+    );
+    // A named action is the core's to report, whatever a binding says.
+    let ruleset = rules("HIT POLICY first\nRULE a IF x > 1 DO notify\nRULE b IF x > 2");
+    assert_eq!(summary(&ruleset).actions, [true, false]);
+    assert_eq!(
+        summary(&ruleset).with_actions([false, true]).actions,
         [true, true]
     );
 }

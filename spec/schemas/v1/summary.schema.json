@@ -56,7 +56,16 @@
               },
               "action": {
                 "const": true
+              },
+              "do": {
+                "type": "string",
+                "minLength": 1
               }
+            },
+            "dependentRequired": {
+              "do": [
+                "action"
+              ]
             },
             "required": [
               "name",

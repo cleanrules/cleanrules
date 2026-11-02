@@ -138,7 +138,11 @@ class Rule:
         description: A human-readable description.
         metadata: Free-form data (owner, ticket, version, ...).
         do: An action: a callable that `RuleSet.run` calls with an
-            `ActionContext` when the rule is selected (never `evaluate`).
+            `ActionContext` when the rule is selected (never `evaluate`), or
+            the name of one, which `RuleSet.bind` (or `load` and `loads` with
+            `actions=`) resolves in a registry the program supplies. A named
+            action is data: it is written with the rule (`"do"` in JSON, `DO`
+            in text), where a callable cannot be.
 
     Rules pickle and copy when their action does.
 
@@ -167,7 +171,7 @@ class Rule:
         tags: Iterable[str] = (),
         description: str | None = None,
         metadata: Mapping[str, object] | None = None,
-        do: Action | None = None,
+        do: Action | str | None = None,
     ) -> None:
         if not isinstance(name, str) or not name:  # pyright: ignore[reportUnnecessaryIsInstance]
             raise RuleDefinitionError(f"a rule name must be a non-empty string, got {name!r}")
@@ -196,11 +200,14 @@ class Rule:
             raise RuleDefinitionError(
                 f"description must be a string, got {type(description).__name__}", rule=name
             )
-        if do is not None and not callable(do):
+        action: str | None = None
+        if isinstance(do, str):
+            action, do = do, None
+        elif do is not None and not callable(do):
             raise RuleDefinitionError(
-                f"do must be a callable, got {type(do).__name__} {do!r}",
+                f"do must be a callable or an action's name, got {type(do).__name__} {do!r}",
                 rule=name,
-                hint="pass a function that takes an ActionContext",
+                hint="pass a function that takes an ActionContext, or a registered name",
             )
         payload = _payload(name, then)
         frozen_metadata = _mapping(name, "metadata", metadata)
@@ -212,6 +219,7 @@ class Rule:
             tag_list,
             description,
             frozen_metadata,
+            action,
         )
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "_when", when)
@@ -256,8 +264,21 @@ class Rule:
 
     @property
     def do(self) -> Action | None:
-        """The action, if any."""
+        """The action's code: given directly, or bound to the action's name; `None` if none."""
         return self._do
+
+    @property
+    def action_name(self) -> str | None:
+        """The name of the rule's action, if it names one (bound or not)."""
+        return self._native.action_name
+
+    def _bound(self, do: Action) -> Rule:
+        """This rule with `do` as the code of its named action."""
+        rule = object.__new__(Rule)
+        for slot in Rule.__slots__:
+            object.__setattr__(rule, slot, getattr(self, slot))
+        object.__setattr__(rule, "_do", do)
+        return rule
 
     def __reduce__(self) -> tuple[Any, tuple[Any, ...]]:
         return (
@@ -271,12 +292,14 @@ class Rule:
                 self._description,
                 dict(self.metadata),
                 self._do,
+                self.action_name,
             ),
         )
 
     def __repr__(self) -> str:
         then = "" if not self._then else f", {dict(self._then)!r}"
-        return f"Rule({self.name!r}, {self._when!r}{then})"
+        do = "" if self.action_name is None else f", do={self.action_name!r}"
+        return f"Rule({self.name!r}, {self._when!r}{then}{do})"
 
 
 # Pickles store these functions by name: keep the names.
@@ -289,8 +312,9 @@ def _make_rule(
     description: str | None,
     metadata: dict[str, object],
     do: Action | None,
+    action: str | None = None,
 ) -> Rule:
-    return Rule(
+    rule = Rule(
         name,
         when,
         then,
@@ -298,8 +322,9 @@ def _make_rule(
         tags=tags,
         description=description,
         metadata=metadata,
-        do=do,
+        do=do if action is None else action,
     )
+    return rule if action is None or do is None else rule._bound(do)  # pyright: ignore[reportPrivateUsage]
 
 
 def _make_ruleset(
@@ -491,6 +516,52 @@ class RuleSet(Sequence[Rule]):
         """
         return Decision(self, self._native.evaluate(data))
 
+    def bind(self, actions: Mapping[str, Action]) -> RuleSet:
+        """This rule set with its named actions resolved in a registry (`spec/rules.md`, *Actions*).
+
+            rules = cleanrules.load("pricing.json").bind({"notify": notify})
+
+        The registry is the only place names are looked up: never as import
+        paths or code, so a rule file can only call what the program registers.
+        Every named action is checked, in rule order, whether or not its rule
+        would fire. Rules whose action is a callable keep it. To bind a single
+        rule, put it in a rule set, or pass `actions=` when reading it.
+
+        Args:
+            actions: Each action's name and its callable, which takes an
+                `ActionContext`.
+
+        Returns:
+            A new rule set; this one is unchanged.
+
+        Raises:
+            RegistryError: For a named action the registry lacks, with the
+                rule, the name and the registered names.
+            TypeError: For a registry that is not a mapping of names to
+                callables.
+        """
+        if not isinstance(actions, Mapping):  # pyright: ignore[reportUnnecessaryIsInstance]
+            raise TypeError(
+                f"actions are a mapping of names to callables, got {type(actions).__name__}"
+            )
+        for name, action in actions.items():
+            if not isinstance(name, str):  # pyright: ignore[reportUnnecessaryIsInstance]
+                raise TypeError(f"action names are str, got {type(name).__name__} {name!r}")
+            if not callable(action):
+                raise TypeError(f"the action {name!r} is not callable: {action!r}")
+        self._native.check_action_names(list(actions))
+        rules = [
+            rule if rule.action_name is None else rule._bound(actions[rule.action_name])  # pyright: ignore[reportPrivateUsage]
+            for rule in self._rules
+        ]
+        return RuleSet(
+            rules,
+            hit_policy=self._hit_policy,
+            aggregate=self._aggregate,
+            logic=self._logic,
+            strict=self._strict,
+        )
+
     def run(self, data: object) -> Decision:
         """Evaluate like `evaluate`, then run the actions of the selected rules.
 
@@ -504,10 +575,15 @@ class RuleSet(Sequence[Rule]):
             ActionError: If an action raised; the original exception is its
                 `__cause__`, and it carries the `decision` and the rules whose
                 actions had already run (`executed`). Later actions do not run.
+            RegistryError: If a rule names an action that is not bound
+                (`bind`); checked before evaluating, so nothing runs.
             EvaluationError: As `evaluate`.
         """
         from cleanrules._trees import _tree  # pyright: ignore[reportPrivateUsage]
 
+        # Named actions must be bound: the core reports the first that is not.
+        bound = [r.action_name for r in self._rules if r.action_name and r.do is not None]
+        self._native.check_action_names(bound)
         decision = self.evaluate(data)
         executed: list[str] = []
         for result in decision.selected:
@@ -1007,12 +1083,13 @@ class FieldUsage:
 
 @dataclass(frozen=True, slots=True)
 class RuleSummary:
-    """A rule in a summary: its name, priority, payload keys and whether it has an action."""
+    """A rule in a summary: name, priority, payload keys, and whether and how it acts."""
 
     name: str
     priority: int
     outputs: tuple[str, ...]
     action: bool = False
+    action_name: str | None = None
 
 
 class Summary:
@@ -1068,6 +1145,7 @@ class Summary:
                 _int(rule["priority"]),
                 tuple(rule["outputs"]),
                 rule.get("action", False),
+                rule.get("do"),
             )
             for rule in data["rules"]
         )

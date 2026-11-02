@@ -34,8 +34,8 @@ Rule files written as text use the suffix `.rules`.
 - Whitespace (spaces, tabs and line breaks, nothing else) separates tokens and
   is otherwise insignificant; a `#` starts a comment that runs to the end of the
   line. A byte order mark may start the text.
-- **Keywords** are case-insensitive: `IF`, `THEN`, `RULE`, `PRIORITY`, `TAGS`,
-  `DESCRIPTION`, `HIT`, `POLICY`, `AGGREGATE`, `LOGIC`, `STRICT`, `AND`, `OR`,
+- **Keywords** are case-insensitive: `IF`, `THEN`, `DO`, `RULE`, `PRIORITY`,
+  `TAGS`, `DESCRIPTION`, `HIT`, `POLICY`, `AGGREGATE`, `LOGIC`, `STRICT`, `AND`, `OR`,
   `NOT`, `IN`, `BETWEEN`, `CLOSED`, `IS`, `NULL`, `TRUE`, `FALSE`, `MATCHES`,
   `STARTS`, `ENDS`, `WITH`, `CONTAINS`, `ABS`, `DATE`, `DATETIME`, `DECIMAL`,
   `FLOAT`.
@@ -105,6 +105,7 @@ and `or`, and sorts `in` values (`ast.md`), so `a AND (b AND c)` reads as one
 RULE <name> [PRIORITY <int>] [TAGS <name or string>, …] [DESCRIPTION <string>]
 IF <condition>
 [THEN <key> = <value>, …]
+[DO <name or string>]
 ```
 
 - The name is a name or a string. Without a `RULE` header, a rule is named
@@ -114,6 +115,10 @@ IF <condition>
   values are value expressions (`THEN tax = order.total * 0.21`). A condition
   there is a `rule_definition_error`, as in JSON (`rules.md`), located at the
   value; so is a key written twice, located at its second occurrence.
+- `DO` names the rule's action (`rules.md`, *Actions*): a name or a non-empty
+  string, such as `DO notify_billing` or `DO "notify billing"`. Like every
+  keyword, `do` in any case is no longer a name: a field, key or rule named
+  `do` is written between backticks or quotes (`` `do` > 1 ``).
 - Metadata cannot be written as text: rules with metadata are written as JSON or
   YAML.
 
@@ -176,8 +181,8 @@ which reads back as the same model:
   and keys after a `.` when they are identifiers; field keys between backticks
   and the others as strings otherwise;
 - a rule as its `RULE` header (with `PRIORITY` when it is not 0, `TAGS` and
-  `DESCRIPTION` when there are any), its `IF` line and its `THEN` line, each on
-  its own line; a rule set as its header lines (`HIT POLICY`, then `AGGREGATE`,
+  `DESCRIPTION` when there are any), its `IF` line, its `THEN` line and its `DO` line
+  when it has a named action, each on its own line; a rule set as its header lines (`HIT POLICY`, then `AGGREGATE`,
   `LOGIC` when it is not `boolean`, and `STRICT` when set), a blank line, and its
   rules separated by blank lines;
 - no line break at the end; a file ends with one.
