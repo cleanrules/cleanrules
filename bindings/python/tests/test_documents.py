@@ -228,6 +228,7 @@ def test_text_round_trip() -> None:
 @given(tree=conditions)
 def test_conditions_round_trip_through_text(tree: Expr) -> None:
     text = dumps(tree, format="text")
+    assert str(tree) == text
     back = loads(text, format="text")
     assert isinstance(back, Expr)
     assert back.same_as(tree), text

@@ -1,0 +1,22 @@
+---
+source: crates/core/tests/explain_text.rs
+expression: text
+---
+HIT POLICY first: selected no rule
+[?] missing (unknown): country = "ES" AND vip
+    Spanish VIPs.
+
+    Needs both fields.
+    would fire if all of these changed:
+    - country = "ES" is unknown: missing field country
+    - vip is unknown: missing field vip
+[?] mismatch (unknown): age > 18
+    - age > 18 is unknown (age = "old"): type mismatch: string vs number
+[?] nulls (unknown): score >= 0.5e0
+    - score >= 0.5e0 is unknown: score is null
+[?] division (unknown): total / count > 10
+    - total / count > 10 is unknown (total = 250.5e0, count = 0): division by zero
+[?] overflow (unknown): big * 2 > 0
+    - big * 2 > 0 is unknown (big = 9223372036854775807): integer overflow in big
+[?] input (unknown): [0] = 1
+    - [0] = 1 is unknown: missing field [0]

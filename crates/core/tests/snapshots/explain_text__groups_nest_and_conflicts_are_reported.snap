@@ -1,0 +1,24 @@
+---
+source: crates/core/tests/explain_text.rs
+expression: text
+---
+HIT POLICY rule_order: selected fired, either
+[ ] both (not fired): (a > 1 OR b > 1) AND (c > 1 OR d > 1)
+    would fire if all of these changed:
+    - any of:
+      - a > 1 is false (a = 0); short by 1
+      - b > 1 is false (b = 0); short by 1
+    - any of:
+      - c > 1 is false (c = 0); short by 1
+      - d > 1 is false (d = 0); short by 1
+[x] fired (selected): (a < 1 OR b > 1) AND c < 1
+    because all of these hold:
+    - a < 1 is true (a = 0)
+    - c < 1 is true (c = 0)
+[x] either (selected): a < 1 OR b < 1
+    because any of these hold:
+    - a < 1 is true (a = 0)
+    - b < 1 is true (b = 0)
+[ ] conflict (not fired): a > 1 AND NOT a > 1
+    cannot fire by changing these conditions alone; they conflict:
+    - a > 1 is false (a = 0); short by 1

@@ -1,0 +1,13 @@
+---
+source: crates/core/tests/explain_text.rs
+expression: overview.to_string()
+---
+Rule set: 2 rules, hit policy priority, logic boolean
+  priority  name   condition                             outputs
+        10  vip    customer.years > 5 AND since IS NULL  discount, label
+         5  loyal  customer.years > 2                    discount +action
+Fields read (2):
+  customer.years  conditions of vip, loyal
+  since           conditions of vip
+Outputs: discount, label
+Tags: gold (vip)

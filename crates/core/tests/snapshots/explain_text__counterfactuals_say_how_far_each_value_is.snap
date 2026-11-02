@@ -1,0 +1,25 @@
+---
+source: crates/core/tests/explain_text.rs
+expression: text
+---
+HIT POLICY first: selected no rule
+[ ] limit (not fired): x > 5
+    - x > 5 is false (x = 5); at the limit (needs x > 5)
+[ ] not_equal (not fired): NOT code = "A"
+    - code = "A" is true (code = "A"), but the rule needs it false; needs code != "A"
+[ ] equal (not fired): code = "B"
+    - code = "B" is false (code = "A")
+[ ] price (not fired): price <= 9.90
+    - price <= 9.90 is false (price = 10.05); over by 0.15
+[ ] ratio (not fired): ratio > 0.7e0
+    - ratio > 0.7e0 is false (ratio = 0.65e0); short by 0.05
+[ ] day (not fired): day >= DATE "2026-11-01"
+    - day >= DATE "2026-11-01" is false (day = DATE "2026-10-29"); short by 3 days
+[ ] moment (not fired): at < DATETIME "2026-11-02T09:00:00"
+    - at < DATETIME "2026-11-02T09:00:00" is false (at = DATETIME "2026-11-02T10:30:00.500000"); over by 1 hour 30 minutes 0.5 seconds
+[ ] flipped (not fired): 10 < x
+    - 10 < x is false (x = 5); short by 5
+[ ] negated (not fired): NOT y < 3
+    - y < 3 is true (y = 1), but the rule needs it false; needs y >= 3 (short by 2)
+[ ] nothing (not fired): x > 100
+    - x > 100 is false (x = 5); short by 95

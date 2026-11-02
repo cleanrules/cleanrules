@@ -126,7 +126,7 @@ pub fn write_explanation(explanation: &Explanation<'_, '_>) -> Json {
         .iter()
         .map(|entry| {
             let mut members = vec![
-                ("rule".to_owned(), string(entry.rule)),
+                ("rule".to_owned(), string(entry.rule.name())),
                 ("status".to_owned(), string(entry.status.as_str())),
             ];
             if let Some(note) = &entry.note {
@@ -179,18 +179,23 @@ pub fn write_summary(summary: &Summary<'_>) -> Json {
     let rules = ruleset
         .rules()
         .iter()
-        .map(|rule| {
-            Json::Object(vec![
-                ("name".into(), string(rule.name())),
+        .enumerate()
+        .map(|(i, rule)| {
+            let mut fields = vec![
+                ("name".to_owned(), string(rule.name())),
                 (
-                    "priority".into(),
+                    "priority".to_owned(),
                     write_value(&Value::Int(rule.get_priority())),
                 ),
                 (
-                    "outputs".into(),
+                    "outputs".to_owned(),
                     Json::Array(rule.then().iter().map(|(k, _)| string(k)).collect()),
                 ),
-            ])
+            ];
+            if summary.actions.get(i).copied().unwrap_or(false) {
+                fields.push(("action".into(), Json::Bool(true)));
+            }
+            Json::Object(fields)
         })
         .collect();
     members.push(("rules".into(), Json::Array(rules)));

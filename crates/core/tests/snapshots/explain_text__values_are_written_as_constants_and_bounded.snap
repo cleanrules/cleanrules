@@ -1,0 +1,19 @@
+---
+source: crates/core/tests/explain_text.rs
+expression: text
+---
+HIT POLICY first: selected no rule
+[ ] named (not fired): name STARTS WITH "Z"
+    - name STARTS WITH "Z" is false (name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...")
+[ ] listed (not fired): labels IS NULL
+    - labels IS NULL is false (labels = [0, 1, 2, 3, 4, 5, ...])
+[ ] mapped (not fired): profile IS NULL
+    - profile IS NULL is false (profile = {"a": [1, [...]], "b": "x\ny"})
+[ ] typed (not fired): day = DATE "2026-01-01" OR rate = 0.5e0 OR price = 1.50 OR ok = FALSE
+    would fire if any of these changed:
+    - day = DATE "2026-01-01" is false (day = DATE "2026-02-03")
+    - rate = 0.5e0 is false (rate = 0.25e0)
+    - price = 1.50 is false (price = 1.25)
+    - ok = FALSE is false (ok = TRUE)
+[ ] "odd name" (not fired): `first name` = "Ana"
+    - `first name` = "Ana" is false (`first name` = "Eva")

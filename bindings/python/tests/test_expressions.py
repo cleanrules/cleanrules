@@ -509,6 +509,28 @@ def test_field_paths_in_first_appearance_order() -> None:
 )
 def test_repr_is_python(node: Expr, text: str) -> None:
     assert repr(node) == text
+
+
+@pytest.mark.parametrize(
+    ("node", "text"),
+    [
+        (F.customer.age, "customer.age"),
+        (F["key with spaces"], "`key with spaces`"),
+        (F.orders[0]["kind"], "orders[0].kind"),
+        (F["class"].date, "class.date"),
+        (F["and"], "`and`"),
+        (F.x > 5, "x > 5"),
+        (((F.a > 1) | (F.b < 2)) & ~F.vip, "(a > 1 OR b < 2) AND NOT vip"),
+        ((F.a + F.b) * 2 > 10, "(a + b) * 2 > 10"),
+        (-(F.a - 1), "-(a - 1)"),
+        (F.x.between(0, float("inf")), 'x BETWEEN 0 AND FLOAT "inf"'),
+        (F.d >= dt.date(2026, 1, 1), 'd >= DATE "2026-01-01"'),
+        (F.p == Decimal("1.50"), "p = 1.50"),
+        (F.r < 0.035, "r < 0.035e0"),
+        (F.n.is_in(["b", "a"]), 'n IN ("a", "b")'),
+    ],
+)
+def test_str_is_the_canonical_text(node: Expr, text: str) -> None:
     assert str(node) == text
 
 

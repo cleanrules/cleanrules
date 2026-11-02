@@ -166,8 +166,10 @@ which reads back as the same model:
   writes `NOT x IN (…)`, as the tree is;
 - constants as in *Lexical structure*: ints as digits; decimals in plain
   notation with their scale, and `DECIMAL "…"` when the scale is 0 or the value
-  infinite; floats in exponent notation with the shortest digits that read back
-  (`1.5e0`, `1e-7`, `-0e0`), and `FLOAT "…"` when infinite; a negative constant
+  infinite; floats with the shortest digits that read back, as plain digits
+  followed by `e0` when the magnitude is 0 or at least `1e-4` and below `1e16`
+  (`0.7e0`, `42500e0`, `-0e0`), in exponent notation otherwise (`1e-7`,
+  `1e16`), and `FLOAT "…"` when infinite; a negative constant
   with its sign (`-5`), and the negation of a number constant with parentheses
   (`-(5)`, `-(-5)`); strings between double quotes with JSON escapes;
 - field keys, rule names, tags and payload keys as names when they are names,
@@ -181,7 +183,10 @@ which reads back as the same model:
 - no line break at the end; a file ends with one.
 
 A field key with a control character has no text (a name cannot hold it):
-writing it is `unsupported`, like a rule with metadata.
+writing it is `unsupported`, like a rule with metadata. Where a condition is
+only displayed (explanations, summaries, `str()` in a binding), such a key is
+written between backticks with its control characters as JSON escapes
+(`` `k\u000ay` ``), which keeps the text on one line but does not read back.
 
 The text of explanations and summaries (`explain.md`) writes conditions in this
 canonical form.

@@ -1,0 +1,7 @@
+---
+source: crates/core/tests/explain_text.rs
+expression: explain(&decision).to_string()
+---
+HIT POLICY collect AGGREGATE sum: selected no rule
+[ ] a (not fired): k IS NULL
+    - k IS NULL is false (k = {"ééééééééééééééééééééééééééééééééééééééééééééééééééééééééé...": 1})

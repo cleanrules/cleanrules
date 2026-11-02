@@ -1,0 +1,6 @@
+---
+source: crates/core/tests/explain_text.rs
+expression: "summary(&rules(\"HIT POLICY first\")).to_string()"
+---
+Rule set: 0 rules, hit policy first, logic boolean
+  (no rules)

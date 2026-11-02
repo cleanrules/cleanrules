@@ -1292,17 +1292,30 @@ fn level(node: &Node) -> u8 {
     }
 }
 
-fn key(text: &str, quote: char) -> String {
+pub(crate) fn key(text: &str, quote: char) -> String {
     if is_name(text) {
         text.to_owned()
     } else if quote == '`' {
-        format!("`{}`", text.replace('`', "``"))
+        // A control character cannot be in a name: written with a JSON escape,
+        // which keeps the text on one line but does not read back.
+        let mut out = String::from("`");
+        for c in text.chars() {
+            match c {
+                '`' => out.push_str("``"),
+                c if c < ' ' => {
+                    let _ = write!(out, "\\u{:04x}", u32::from(c));
+                }
+                c => out.push(c),
+            }
+        }
+        out.push('`');
+        out
     } else {
         crate::json::to_string(&Json::String(text.to_owned()))
     }
 }
 
-fn path(segments: &[Segment]) -> String {
+pub(crate) fn path(segments: &[Segment]) -> String {
     let mut out = String::new();
     for (i, segment) in segments.iter().enumerate() {
         match segment {
@@ -1325,7 +1338,43 @@ fn path(segments: &[Segment]) -> String {
     out
 }
 
-fn literal(value: &Value) -> String {
+/// A finite float with the shortest digits that read back: plain digits and
+/// `e0` when its magnitude is 0 or within [1e-4, 1e16) (`0.7e0`, `42500e0`), as
+/// `{:e}` writes it otherwise (`1e-7`).
+fn float_literal(value: f64) -> String {
+    match positional(value) {
+        Some(plain) => plain + "e0",
+        None => format!("{value:e}"),
+    }
+}
+
+/// A finite float in plain positional notation, with the shortest digits that
+/// read back, when its magnitude is 0 or within [1e-4, 1e16).
+pub(crate) fn positional(value: f64) -> Option<String> {
+    let scientific = format!("{value:e}");
+    let (mantissa, exponent) = scientific.split_once('e')?;
+    let exponent: i32 = exponent.parse().ok()?;
+    if !(-4..16).contains(&exponent) {
+        return None;
+    }
+    let (sign, mantissa) = match mantissa.strip_prefix('-') {
+        Some(rest) => ("-", rest),
+        None => ("", mantissa),
+    };
+    let digits = mantissa.replace('.', "");
+    let point = usize::try_from(exponent + 1).unwrap_or(0);
+    let body = if exponent < 0 {
+        let zeros = "0".repeat(usize::try_from(-exponent - 1).unwrap_or(0));
+        format!("0.{zeros}{digits}")
+    } else if digits.len() <= point {
+        format!("{digits}{}", "0".repeat(point - digits.len()))
+    } else {
+        format!("{}.{}", &digits[..point], &digits[point..])
+    };
+    Some(format!("{sign}{body}"))
+}
+
+pub(crate) fn literal(value: &Value) -> String {
     let typed = |name: &str| {
         let Json::Object(ref members) = write_value(value) else {
             return String::new();
@@ -1341,7 +1390,7 @@ fn literal(value: &Value) -> String {
         Value::Bool(true) => "TRUE".into(),
         Value::Bool(false) => "FALSE".into(),
         Value::Int(i) => i.to_string(),
-        Value::Float(f) if f.is_finite() => format!("{f:e}"),
+        Value::Float(f) if f.is_finite() => float_literal(*f),
         Value::Float(_) => typed("FLOAT"),
         Value::Decimal(d) => {
             let text = d.to_string();
@@ -1488,7 +1537,9 @@ fn write_node(node: &Node, out: &mut String) {
 }
 
 /// A condition's canonical text (`spec/text.md`, *Printing*). A field key with
-/// a control character, which [`to_string`] refuses, is written as it is.
+/// a control character, which [`to_string`] refuses, is written with JSON
+/// escapes (`` `k\u000ay` ``), so the text stays on one line but does not read
+/// back.
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut out = String::new();

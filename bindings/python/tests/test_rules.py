@@ -6,11 +6,13 @@ check the Python API: construction, validation, results and errors.
 
 import datetime as dt
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import pytest
 from cleanrules import (
     Aggregate,
+    Cause,
     Const,
     Counterfactual,
     EvaluationError,
@@ -345,6 +347,64 @@ def test_summaries() -> None:
     )
     assert summary.outputs == ("discount",)
     assert summary.tags == {"gold": ("vip", "loyal"), "mail": ("loyal",)}
+
+
+def test_explanations_and_summaries_have_text() -> None:
+    decision = shop(hit_policy="priority").evaluate(CUSTOMER)
+    explanation = decision.explain()
+    lines = str(explanation).splitlines()
+    assert lines[0] == "HIT POLICY priority: selected loyal"
+    vip = explanation.for_rule("vip")
+    assert str(vip).splitlines() == lines[1:5]
+    assert lines[1] == "[ ] vip (not fired): customer.years > 5 AND order.total > 1000"
+    assert str(vip.causes[0]) == "customer.years > 5 is false (customer.years = 3); short by 2"
+    assert "    - customer.blocked is unknown: missing field customer.blocked" in lines
+    assert str(shop().summary()).splitlines()[:3] == [
+        "Rule set: 3 rules, hit policy first, logic boolean",
+        "  priority  name     condition                                  outputs",
+        "        10  vip      customer.years > 5 AND order.total > 1000  discount",
+    ]
+
+
+def test_the_readme_shows_the_real_explanation() -> None:
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+    shown = readme.split("```text\n", 1)[1].split("```", 1)[0]
+    assert shown == str(shop(hit_policy="priority").evaluate(CUSTOMER).explain()) + "\n"
+
+
+def test_explanation_text_writes_python_values_as_constants() -> None:
+    rules = RuleSet([Rule("cheap", (F.rate < 0.035) & (F.day >= dt.date(2026, 11, 1)))])
+    text = str(rules.evaluate({"rate": 0.04, "day": dt.date(2026, 10, 29)}).explain())
+    assert text.splitlines()[2:] == [
+        "    would fire if all of these changed:",
+        "    - rate < 0.035e0 is false (rate = 0.04e0); over by 0.005",
+        '    - day >= DATE "2026-11-01" is false (day = DATE "2026-10-29"); short by 3 days',
+    ]
+
+
+def test_causes_have_text_and_hand_made_ones_fall_back_to_repr() -> None:
+    import dataclasses
+
+    rules = RuleSet([Rule("a", ~(F.y < 3) & F.missing)])
+    explanation = rules.evaluate({"y": 1}).explain()
+    negated, unknown = explanation.rules[0].causes
+    assert str(negated) == (
+        "y < 3 is true (y = 1), but the rule needs it false; needs y >= 3 (short by 2)"
+    )
+    assert str(unknown) == "missing is unknown: missing field missing"
+    assert "_text" not in Cause.__match_args__
+    changed = dataclasses.replace(negated, holds=True)
+    assert str(changed) == repr(changed)
+    rule = explanation.rules[0]
+    assert str(dataclasses.replace(rule, note=None)) == repr(dataclasses.replace(rule, note=None))
+
+
+def test_summaries_say_which_rules_have_actions() -> None:
+    rules = RuleSet([Rule("a", F.x > 1, {"y": 1}), Rule("b", F.x > 2, do=lambda context: None)])
+    summary = rules.summary()
+    assert [rule.action for rule in summary.rules] == [False, True]
+    assert [rule.get("action") for rule in summary.to_dict()["summary"]["rules"]] == [None, True]
+    assert str(summary).splitlines()[3] == "         0  b     x > 2      +action"
 
 
 def test_one_rule_set_is_shared_by_threads() -> None:

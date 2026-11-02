@@ -351,4 +351,29 @@ proptest! {
             }
         }
     }
+
+    #[test]
+    fn the_text_lists_every_rule_and_cause(conditions in prop::collection::vec(condition(), 1..4), data in input()) {
+        let rules = ruleset(conditions, HitPolicy::RuleOrder);
+        let decision = rules.evaluate(&data).unwrap();
+        let explanation = explain(&decision);
+        let text = explanation.to_string();
+        let mut listed = 0;
+        for entry in &explanation.rules {
+            let mut found = Vec::new();
+            causes(&entry.requirement, &mut found);
+            listed += found.len();
+            for cause in found {
+                let line = format!("- {cause}");
+                prop_assert!(text.lines().any(|l| l.trim_start() == line), "{line} in\n{text}");
+            }
+        }
+        let cause_lines = text
+            .lines()
+            .map(str::trim_start)
+            .filter(|l| l.starts_with("- ") && *l != "- all of:" && *l != "- any of:")
+            .count();
+        prop_assert_eq!(cause_lines, listed);
+        prop_assert_eq!(text.lines().filter(|l| l.starts_with('[')).count(), explanation.rules.len());
+    }
 }

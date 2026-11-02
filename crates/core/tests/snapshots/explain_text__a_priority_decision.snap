@@ -1,0 +1,19 @@
+---
+source: crates/core/tests/explain_text.rs
+expression: text
+---
+HIT POLICY priority: selected e
+[ ] a (not fired): x > 10 AND NOT y <= 3
+    would fire if all of these changed:
+    - x > 10 is false (x = 8); short by 2
+    - y <= 3 is true (y = 2), but the rule needs it false; needs y > 3 (short by 1)
+[ ] b (not fired): x BETWEEN 0 AND 5
+    - x <= 5 is false (x = 8); over by 3
+[ ] c (not fired): x > 1 AND NOT x > 1
+    cannot fire by changing these conditions alone; they conflict:
+    - x > 1 is true (x = 8), but the rule needs it false; needs x <= 1 (over by 7)
+[x] d (fired, not selected): x > 1
+    fired, but e has a higher priority (5 > 1)
+    - x > 1 is true (x = 8)
+[x] e (selected): x > 0
+    - x > 0 is true (x = 8)

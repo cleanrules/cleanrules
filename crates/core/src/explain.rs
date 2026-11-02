@@ -1,13 +1,37 @@
 //! Explanations and summaries (`spec/explain.md`).
 //!
 //! An explanation is built only from a decision's result trees and its rule set:
-//! nothing is evaluated again. Explanations support Kleene truth values.
+//! nothing is evaluated again. Explanations support Kleene truth values. Both
+//! explanations and summaries display as text, the same in every language:
+//!
+//! ```
+//! use cleanrules::explain::{explain, summary};
+//! use cleanrules::format::Document;
+//! use cleanrules::json::Limits;
+//! use cleanrules::{Map, Value};
+//!
+//! let text = "HIT POLICY first\nRULE adult IF age >= 18 THEN ok = TRUE";
+//! let Document::RuleSet(rules) = cleanrules::text::parse(text, &Limits::default())? else {
+//!     unreachable!()
+//! };
+//! let mut person = Map::new();
+//! person.insert("age", Value::Int(16));
+//! let decision = rules.evaluate(&Value::Map(person))?;
+//! assert_eq!(
+//!     explain(&decision).to_string(),
+//!     "HIT POLICY first: selected no rule\n\
+//!      [ ] adult (not fired): age >= 18\n\
+//!      \x20   - age >= 18 is false (age = 16); short by 2"
+//! );
+//! assert!(summary(&rules).to_string().starts_with("Rule set: 1 rule, hit policy first"));
+//! # Ok::<(), cleanrules::Error>(())
+//! ```
 
 use crate::ast::{CompareOp, Expr, Node};
 use crate::error::Segment;
 use crate::eval::{Evaluated, Outcome, Reason};
 use crate::logic::Truth;
-use crate::rules::{Decision, HitPolicy, RuleResult, RuleSet};
+use crate::rules::{Decision, HitPolicy, Rule, RuleResult, RuleSet};
 use crate::value::{Number, Value};
 
 /// How a rule ended up (`spec/explain.md`, *Rule status*).
@@ -47,6 +71,7 @@ pub enum GroupKind {
 
 /// What a field would have to satisfy, and how far it is from it.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct Counterfactual {
     /// The field's path.
     pub path: Vec<Segment>,
@@ -69,8 +94,11 @@ pub enum Gap {
     Microseconds(i64),
 }
 
+mod text;
+
 /// One elementary condition behind a rule's outcome.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct Cause<'d, 'a> {
     /// The condition's result, in the decision.
     pub result: &'d Evaluated<'a, Truth>,
@@ -148,6 +176,7 @@ impl NoteKind {
 
 /// The note of a rule that fired but was not selected.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct Note {
     /// Why.
     pub kind: NoteKind,
@@ -159,9 +188,11 @@ pub struct Note {
 
 /// One rule's explanation.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct RuleExplanation<'d, 'a> {
-    /// The rule's name.
-    pub rule: &'a str,
+    /// The rule. Formats and bindings write its name (the JSON `rule` member is
+    /// `rule.name()`).
+    pub rule: &'a Rule,
     /// How it ended up.
     pub status: Status,
     /// For a rule that fired but was not selected.
@@ -175,6 +206,7 @@ pub struct RuleExplanation<'d, 'a> {
 
 /// The explanation of a decision, one entry per rule in rule order.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct Explanation<'d, 'a> {
     /// The decision explained.
     pub decision: &'d Decision<'a>,
@@ -215,7 +247,7 @@ pub fn explain<'d, 'a>(decision: &'d Decision<'a>) -> Explanation<'d, 'a> {
                 None
             };
             RuleExplanation {
-                rule: result.rule.name(),
+                rule: result.rule,
                 status,
                 note,
                 achievable,
@@ -628,6 +660,7 @@ fn gap(a: &Value, b: &Value) -> Option<Gap> {
 
 /// Where one field is read.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct FieldUsage {
     /// The field's path.
     pub path: Vec<Segment>,
@@ -639,6 +672,7 @@ pub struct FieldUsage {
 
 /// A static overview of a rule set (`spec/explain.md`, *Summaries*).
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct Summary<'r> {
     /// The rule set.
     pub ruleset: &'r RuleSet,
@@ -648,6 +682,25 @@ pub struct Summary<'r> {
     pub outputs: Vec<String>,
     /// Each tag with the rules carrying it, tags sorted.
     pub tags: Vec<(String, Vec<String>)>,
+    /// Whether each rule has an action, in rule order, one per rule. Actions
+    /// are code of the host language, which the core's rules never hold, so
+    /// these start false and a binding sets them with [`Summary::with_actions`].
+    pub actions: Vec<bool>,
+}
+
+impl Summary<'_> {
+    /// Say which rules have an action, in rule order. Missing entries are false
+    /// and extra ones are dropped, so there is always one per rule.
+    #[must_use]
+    pub fn with_actions(mut self, actions: impl IntoIterator<Item = bool>) -> Self {
+        let count = self.ruleset.rules().len();
+        self.actions = actions
+            .into_iter()
+            .chain(std::iter::repeat(false))
+            .take(count)
+            .collect();
+        self
+    }
 }
 
 /// Summarize a rule set without evaluating it.
@@ -700,5 +753,6 @@ pub fn summary(ruleset: &RuleSet) -> Summary<'_> {
         fields,
         outputs,
         tags,
+        actions: vec![false; ruleset.rules().len()],
     }
 }

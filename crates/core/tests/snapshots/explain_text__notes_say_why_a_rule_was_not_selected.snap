@@ -1,0 +1,35 @@
+---
+source: crates/core/tests/explain_text.rs
+expression: "text.join(\"\\n\\n\")"
+---
+HIT POLICY priority: selected high
+[x] low (fired, not selected): x > 1
+    fired, but high has a higher priority (7 > 2)
+    - x > 1 is true (x = 5)
+[x] high (selected): x > 0
+    - x > 0 is true (x = 5)
+
+HIT POLICY priority: selected first
+[x] first (selected): x > 1
+    - x > 1 is true (x = 5)
+[x] second (fired, not selected): x > 0
+    fired, but first has the same priority (2) and comes first
+    - x > 0 is true (x = 5)
+
+HIT POLICY any: selected a
+[x] a (selected): x > 1
+    - x > 1 is true (x = 5)
+[x] b (fired, not selected): x > 0
+    fired; its output agrees with a, which comes first
+    - x > 0 is true (x = 5)
+
+HIT POLICY first: selected a
+[x] a (selected): x > 1
+    - x > 1 is true (x = 5)
+[x] b (fired, not selected): x > 0
+    fired, but a comes first
+    - x > 0 is true (x = 5)
+
+HIT POLICY first: selected no rule
+[ ] a (not fired): x > 100
+    - x > 100 is false (x = 5); short by 95

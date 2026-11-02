@@ -1,0 +1,18 @@
+---
+source: crates/core/tests/explain_text.rs
+expression: overview.to_string()
+---
+Rule set: 4 rules, hit policy collect, aggregate sum, logic boolean, strict
+  priority  name         condition                                                     outputs
+        10  vip          customer.years > 5 AND customer.`first name` STARTS WITH "A"  discount
+        -1  "big order"  order.total > 1000 AND order.lines[0].sku IN ("a", "b", "...  discount +action
+         0  always       TRUE                                                          -
+         0  acting       FALSE                                                         +action
+Fields read (5):
+  customer.years         conditions of vip
+  customer.`first name`  conditions of vip
+  order.total            conditions of "big order"; payloads of vip (discount)
+  order.lines[0].sku     conditions of "big order"
+  order.country          conditions of "big order"
+Outputs: discount
+Tags: gold (vip); loyalty (vip, "big order"); "two words" ("big order")

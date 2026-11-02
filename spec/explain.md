@@ -190,44 +190,82 @@ core, so it is the same in every language, and its exact form is fixed by
 snapshot tests of the core, not by this document. Its layout:
 
 ```text
-PRIORITY decision: selected 'e'
-[ ] a (not fired): (F.x > 10) & ~(F.y <= 3)
+HIT POLICY priority: selected e
+[ ] a (not fired): x > 10 AND NOT y <= 3
     would fire if all of these changed:
-    - F.x > 10 is false (x = 8); short by 2
-    - F.y <= 3 is true (y = 2), but the rule needs it false; needs y > 3 (short by 1)
-[ ] b (not fired): F.x.between(0, 5)
-    - F.x <= 5 is false (x = 8); over by 3
-[ ] c (not fired): (F.x > 1) & ~(F.x > 1)
+    - x > 10 is false (x = 8); short by 2
+    - y <= 3 is true (y = 2), but the rule needs it false; needs y > 3 (short by 1)
+[ ] b (not fired): x BETWEEN 0 AND 5
+    - x <= 5 is false (x = 8); over by 3
+[ ] c (not fired): x > 1 AND NOT x > 1
     cannot fire by changing these conditions alone; they conflict:
-    - F.x > 1 is true (x = 8), but the rule needs it false; needs x <= 1 (over by 7)
-[x] d (fired, not selected): F.x > 1
-    fired, but 'e' has a higher priority (5 > 1)
-    - F.x > 1 is true (x = 8)
-[x] e (selected): F.x > 0
-    - F.x > 0 is true (x = 8)
+    - x > 1 is true (x = 8), but the rule needs it false; needs x <= 1 (over by 7)
+[x] d (fired, not selected): x > 1
+    fired, but e has a higher priority (5 > 1)
+    - x > 1 is true (x = 8)
+[x] e (selected): x > 0
+    - x > 0 is true (x = 8)
 ```
 
-(Output of the Python v1 for `{"x": 8, "y": 2}`, which writes conditions in its
-own Python syntax.)
+(The decision of `{"x": 8, "y": 2}` under the rule set
+`HIT POLICY priority`, `RULE a IF x > 10 AND NOT y <= 3`,
+`RULE b IF x BETWEEN 0 AND 5`, `RULE c IF x > 1 AND NOT x > 1`,
+`RULE d PRIORITY 1 IF x > 1` and `RULE e PRIORITY 5 IF x > 0`.)
 
-- A header with the policy and the selected rules, or `nothing`.
-- Per rule, in rule order: the mark, the name, the status and the condition,
-  then the rule's description, the note, and the requirement. A single cause
-  is listed alone. A group is introduced by `because all of these hold:` (or
-  `any`) for a rule that fired, and by `would fire if all of these changed:`
-  (or `any`) otherwise, and nested groups read `- all of:` or `- any of:`. A rule
-  that is not achievable says
+- A header with the policy (and `AGGREGATE <aggregate>` when there is one) and
+  the selected rules, or `no rule`: `HIT POLICY collect AGGREGATE sum: selected
+  a, b`.
+- Per rule, in rule order: the mark, the name, the status (`selected`,
+  `fired, not selected`, `not fired` or `unknown`) and the condition, then the
+  rule's description, the note, and the requirement, each indented by four
+  spaces. A single cause is listed alone. A group is introduced by
+  `because all of these hold:` (or `any`) for a rule that fired, and by
+  `would fire if all of these changed:` (or `any`) otherwise, and nested groups
+  read `- all of:` or `- any of:`, their items indented by two more spaces. A
+  rule that is not achievable says
   `cannot fire by changing these conditions alone; they conflict:`.
+- A note reads `fired, but <winner> has a higher priority (<p> > <q>)`,
+  `fired, but <winner> has the same priority (<p>) and comes first`,
+  `fired; its output agrees with <winner>, which comes first` (`any`) or
+  `fired, but <winner> comes first`.
 - A cause reads `<condition> is <true|false|unknown>`, with the values read in
-  parentheses, then the reason when it is unknown, or `, but the rule needs it
-  false` when it does not hold and is `negated`, then the counterfactual:
-  `short by <gap>` or `over by <gap>`, `at the limit (needs …)` for a gap of
-  zero, and `needs <field> <op> <target>` when there is no gap or the cause is
-  `negated`.
+  parentheses (`path = value`), then the reason after a colon when it is
+  unknown, or `, but the rule needs it false` when it does not hold and is
+  `negated`, then the counterfactual after a semicolon: `short by <gap>`
+  (`gt`, `ge`) or `over by <gap>` (`lt`, `le`), `at the limit (needs …)` for a
+  gap of zero, and `needs <field> <op> <target>` when there is no gap or the
+  cause is `negated` (`needs y > 3 (short by 1)`).
+- A reason reads `missing field <path>`, `<path> is null` (`null value` without
+  a path), `type mismatch: <detail>` or `type mismatch: <group> vs <group>`,
+  `cannot order booleans`, `division by zero`, `integer overflow in <path>`,
+  `decimal out of range in <path>`, `NaN result` or `cannot read <path>:
+  <detail>`.
 
-How conditions and values are written in the text (the condition syntax, the
-number of digits of a float gap, durations) is defined with the core's
-display of nodes (task B.3) and the text DSL (task D.2).
+Conditions, field paths, rule names, tags, output keys and constants are written
+as the canonical text writes them (`text.md`, *Printing*), so a condition
+copied from an explanation reads back as the rule's own. The empty path is
+written `the input`. Values read from the data are written as constants
+(`x = 8`, `rate = 0.25e0`, `day = DATE "2026-10-29"`, `name = "Ana"`), lists as
+`[…]` and maps as `{"key": …}`, and an opaque value as its type between angle
+brackets (`<bytes>`). They are bounded so that one input cannot flood the text: a
+string or map key longer than 60 characters shows its first 57 and `...` before
+the closing quote, a list or map its first 6 items and `...`, and a list or map
+nested two deep is written `[...]` or `{...}`. Text from outside the rules (an
+opaque value's type name, the detail of a reason, such as the message of the
+error that reading a field raised) is cut in the same way and written with the
+escapes of JSON strings, without the quotes, so it stays on one line. A field key
+with a control character, which has no canonical text, is written with JSON
+escapes between backticks (`text.md`, *Printing*). Every line of the text is
+therefore one rule, one line of its description, a note, a group header or a
+cause.
+
+Gaps are numbers, not constants: an int as digits, a decimal with its scale
+(`0.15`), and a float rounded to 12 significant digits so that float noise does
+not show (`0.05`, not `0.05000000000000004`), in plain notation when its
+magnitude is 0 or at least `1e-4` and below `1e16` and in exponent notation
+otherwise. A gap between dates is `<n> day` or `<n> days`; between datetimes,
+days, hours, minutes and seconds, leaving out the zero ones (`1 hour 30 minutes
+0.5 seconds`).
 
 ## Differences from the Python v1
 
@@ -260,4 +298,26 @@ display of nodes (task B.3) and the text DSL (task D.2).
   that carry it, in rule order.
 
 Its text form is, like the explanation's, generated by the core and fixed by
-snapshot tests.
+snapshot tests:
+
+```text
+Rule set: 2 rules, hit policy priority, logic boolean
+  priority  name   condition                             outputs
+        10  vip    customer.years > 5 AND since IS NULL  discount, label
+         5  loyal  customer.years > 2                    discount +action
+Fields read (2):
+  customer.years  conditions of vip, loyal
+  since           conditions of vip
+Outputs: discount, label
+Tags: gold (vip)
+```
+
+- A header with the number of rules and the configuration: `hit policy`,
+  `aggregate` when there is one, `logic`, and `strict` when set.
+- A table of the rules, with aligned columns: priority, name, condition (cut to
+  60 characters, the last three `...`) and output keys, followed by `+action`
+  when the rule has an action, or `-` when it has neither; `(no rules)` for an
+  empty rule set.
+- `Fields read (<n>):` with, for each field, `conditions of <rules>` and
+  `payloads of <rule> (<key>), …`, separated by `;`.
+- `Outputs:` and `Tags:` (each tag with its rules), when there are any.

@@ -43,7 +43,26 @@ why.status
 # 'not_fired'
 [(c.counterfactual.path, c.counterfactual.gap) for c in why.causes]
 # [(('customer', 'years'), 2), (('order', 'total'), 200)]: short by 2 and by 200
+
+print(decision.explain())
 ```
+
+```text
+HIT POLICY priority: selected loyal
+[ ] vip (not fired): customer.years > 5 AND order.total > 1000
+    would fire if all of these changed:
+    - customer.years > 5 is false (customer.years = 3); short by 2
+    - order.total > 1000 is false (order.total = 800); short by 200
+[x] loyal (selected): customer.years > 2 OR customer.newsletter
+    - customer.years > 2 is true (customer.years = 3)
+[?] blocked (unknown): customer.blocked
+    - customer.blocked is unknown: missing field customer.blocked
+```
+
+The text is the same in every language, and writes conditions in the text
+syntax below; `str()` of a condition gives that text too, and `repr()` the Python
+that builds it. `print(rules.summary())` describes the rule set without
+evaluating it: its rules, the fields they read, their outputs and tags.
 
 `blocked` is unknown, not false: the input has no `customer.blocked`, and
 cleanrules uses three-valued logic instead of guessing. Pass `strict=True` to

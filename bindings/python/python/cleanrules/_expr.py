@@ -38,6 +38,9 @@ class Expr:
     """A node of a condition tree, immutable.
 
     Build nodes with `F`, `Const`, operators and methods, never directly.
+    `repr()` gives the Python expression that builds the node
+    (`(F.x > 5) & ~F.vip`) and `str()` its text (`x > 5 AND NOT vip`), as
+    explanations and `dumps(..., format="text")` write it.
     """
 
     __slots__ = ("_node",)
@@ -97,6 +100,9 @@ class Expr:
 
     def __repr__(self) -> str:
         return _render(self)
+
+    def __str__(self) -> str:
+        return self._node.text()
 
     def _repr_pretty_(self, printer: Any, cycle: bool) -> None:
         # Used by IPython and by hypothesis when it shows a failing example.

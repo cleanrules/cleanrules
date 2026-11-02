@@ -315,7 +315,120 @@
             ]
           }
         },
-        "printed": "a = 42 AND b = 2.50 AND c = 1.5e0 AND d = 1e-7 AND e = 2e3"
+        "printed": "a = 42 AND b = 2.50 AND c = 1.5e0 AND d = 1e-7 AND e = 2000e0"
+      }
+    },
+    {
+      "id": "format/text/float-printing",
+      "spec": [
+        "text.md#printing"
+      ],
+      "description": "A float prints with its shortest digits: plain with e0 when its magnitude is within [1e-4, 1e16), with an exponent otherwise",
+      "given": {
+        "kind": "read",
+        "rules_text": "a = 7e-1 OR b = 1e-4 OR c = 9.5e-5 OR d = 1e16 OR e = 9999999999999998e0 OR f = -4.25e4 OR g = 0e0"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "or",
+            "operands": [
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0.7
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0.0001
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "c"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 9.5e-05
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "d"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1e+16
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "e"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 9999999999999998.0
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "f"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": -42500.0
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "g"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0.0
+                }
+              }
+            ]
+          }
+        },
+        "printed": "a = 0.7e0 OR b = 0.0001e0 OR c = 9.5e-5 OR d = 1e16 OR e = 9999999999999998e0 OR f = -42500e0 OR g = 0e0"
       }
     },
     {
@@ -2802,7 +2915,7 @@
       "spec": [
         "text.md#printing"
       ],
-      "description": "Floats print in exponent notation with the shortest digits",
+      "description": "Floats print with the shortest digits that read back, and FLOAT \"…\" when infinite",
       "given": {
         "kind": "read",
         "document": {
@@ -2872,7 +2985,7 @@
         "write": "text"
       },
       "expect": {
-        "printed": "a = 1e0 AND b = 1e-1 AND c = 1.23456789e5 AND d = FLOAT \"inf\""
+        "printed": "a = 1e0 AND b = 0.1e0 AND c = 123456.789e0 AND d = FLOAT \"inf\""
       }
     },
     {

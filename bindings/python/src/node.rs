@@ -102,6 +102,11 @@ impl PyNode {
         Ok(details)
     }
 
+    /// The canonical text (`spec/text.md`, *Printing*).
+    fn text(&self) -> String {
+        self.node.to_string()
+    }
+
     fn __repr__(&self) -> String {
         format!("<Node {}>", self.to_json())
     }

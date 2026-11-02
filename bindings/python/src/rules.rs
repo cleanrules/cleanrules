@@ -9,7 +9,7 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
-use cleanrules::explain::{Cause, Gap, GroupKind, Requirement, explain, summary};
+use cleanrules::explain::{Cause, Gap, GroupKind, Requirement, Summary, explain, summary};
 use cleanrules::format::{write_decision, write_explanation, write_summary};
 use cleanrules::json::to_string;
 use cleanrules::logic::{LogicName, Truth};
@@ -227,9 +227,23 @@ impl PyRuleSet {
             .collect())
     }
 
-    /// The summary in the JSON format, as text.
-    fn summary_json(&self) -> String {
-        to_string(&write_summary(&summary(&self.ruleset)))
+    /// The summary in the JSON format, as text; `actions` says which rules
+    /// have one, in rule order.
+    #[allow(clippy::needless_pass_by_value)] // PyO3 extracts lists by value.
+    fn summary_json(&self, actions: Vec<bool>) -> String {
+        to_string(&write_summary(&self.overview(actions)))
+    }
+
+    /// The summary's text (`spec/explain.md`, *Summaries*).
+    #[allow(clippy::needless_pass_by_value)] // PyO3 extracts lists by value.
+    fn summary_text(&self, actions: Vec<bool>) -> String {
+        self.overview(actions).to_string()
+    }
+}
+
+impl PyRuleSet {
+    fn overview(&self, actions: Vec<bool>) -> Summary<'_> {
+        summary(&self.ruleset).with_actions(actions)
     }
 }
 
@@ -406,7 +420,7 @@ impl PyDecision {
         let list = PyList::empty(py);
         for entry in explain(&decision).rules {
             let dict = PyDict::new(py);
-            dict.set_item("rule", entry.rule)?;
+            dict.set_item("rule", entry.rule.name())?;
             dict.set_item("status", entry.status.as_str())?;
             match &entry.note {
                 Some(note) => {
@@ -451,6 +465,34 @@ impl PyDecision {
     fn explanation_json(&self, py: Python<'_>) -> PyResult<String> {
         let decision = self.rebuild(py)?;
         Ok(to_string(&write_explanation(&explain(&decision))))
+    }
+
+    /// The explanation's text (`spec/explain.md`, *Text*), and per rule its
+    /// text and its causes' texts in pre-order, as `explanation` lists them.
+    #[allow(clippy::type_complexity)]
+    fn explanation_texts(&self, py: Python<'_>) -> PyResult<(String, Vec<(String, Vec<String>)>)> {
+        fn causes(requirement: &Requirement<'_, '_>, out: &mut Vec<String>) {
+            match requirement {
+                Requirement::Cause(cause) => out.push(cause.to_string()),
+                Requirement::Group(_, items) => {
+                    for item in items {
+                        causes(item, out);
+                    }
+                }
+            }
+        }
+        let decision = self.rebuild(py)?;
+        let explanation = explain(&decision);
+        let rules = explanation
+            .rules
+            .iter()
+            .map(|entry| {
+                let mut found = Vec::new();
+                causes(&entry.requirement, &mut found);
+                (entry.to_string(), found)
+            })
+            .collect();
+        Ok((explanation.to_string(), rules))
     }
 }
 

@@ -22,7 +22,7 @@ from __future__ import annotations
 import enum
 import json
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, NoReturn, TypeAlias, overload
 
@@ -548,7 +548,8 @@ class RuleSet(Sequence[Rule]):
 
     def summary(self) -> Summary:
         """Describe the rule set without evaluating it: rules, fields read, outputs, tags."""
-        return Summary(json.loads(self._native.summary_json()))
+        actions = [rule.do is not None for rule in self._rules]
+        return Summary(json.loads(self._native.summary_json(actions)), self._native, actions)
 
     def __len__(self) -> int:
         return len(self._rules)
@@ -798,9 +799,17 @@ class Cause:
     values: tuple[tuple[tuple[str | int, ...], object], ...]
     reason: Reason | None
     counterfactual: Counterfactual | None
+    _text: _Text | None = field(default=None, init=False, repr=False, compare=False)
 
     def __repr__(self) -> str:
         return f"<Cause {self.node!r}: {self.truth.value}>"
+
+    def __str__(self) -> str:
+        """The cause's line in the explanation: `x > 10 is false (x = 8); short by 2`.
+
+        A cause built or changed by hand has no text, and gives its `repr`.
+        """
+        return self._text.get() if self._text is not None else repr(self)
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -846,6 +855,15 @@ class RuleExplanation:
     requirement: Cause | CauseGroup
     note: Note | None
     achievable: bool | None
+    _text: _Text | None = field(default=None, init=False, repr=False, compare=False)
+
+    def __str__(self) -> str:
+        """The rule's part of the explanation's text (`spec/explain.md`, *Text*).
+
+        A rule explanation built or changed by hand has no text, and gives its
+        `repr`.
+        """
+        return self._text.get() if self._text is not None else repr(self)
 
     @property
     def causes(self) -> tuple[Cause, ...]:
@@ -879,6 +897,34 @@ def _requirement(data: dict[str, Any]) -> Cause | CauseGroup:
     )
 
 
+class _Texts:
+    """The texts of an explanation, made by the core on first use and shared."""
+
+    __slots__ = ("_native", "_value")
+
+    def __init__(self, native: _native.Decision) -> None:
+        self._native = native
+        self._value: tuple[str, list[tuple[str, list[str]]]] | None = None
+
+    def get(self) -> tuple[str, list[tuple[str, list[str]]]]:
+        if self._value is None:
+            self._value = self._native.explanation_texts()
+        return self._value
+
+
+class _Text:
+    """The text of one rule of an explanation, or of one of its causes."""
+
+    __slots__ = ("_cause", "_rule", "_texts")
+
+    def __init__(self, texts: _Texts, rule: int, cause: int | None = None) -> None:
+        self._texts, self._rule, self._cause = texts, rule, cause
+
+    def get(self) -> str:
+        rule, causes = self._texts.get()[1][self._rule]
+        return rule if self._cause is None else causes[self._cause]
+
+
 class Explanation:
     """The explanation of a decision (`spec/explain.md`).
 
@@ -887,7 +933,7 @@ class Explanation:
         selected: The names of the selected rules.
     """
 
-    __slots__ = ("_native", "rules", "selected")
+    __slots__ = ("_native", "_texts", "rules", "selected")
 
     rules: tuple[RuleExplanation, ...]
     selected: tuple[str, ...]
@@ -904,6 +950,11 @@ class Explanation:
             )
             for entry in native.explanation()
         )
+        self._texts = _Texts(native)
+        for position, entry in enumerate(self.rules):
+            object.__setattr__(entry, "_text", _Text(self._texts, position))
+            for index, cause in enumerate(entry.causes):
+                object.__setattr__(cause, "_text", _Text(self._texts, position, index))
         self.selected = tuple(e.rule for e in self.rules if e.status is Status.SELECTED)
 
     def for_rule(self, name: str) -> RuleExplanation:
@@ -924,6 +975,16 @@ class Explanation:
     def __repr__(self) -> str:
         statuses = ", ".join(f"{entry.rule}: {entry.status.value}" for entry in self.rules)
         return f"<Explanation: {statuses}>"
+
+    def __str__(self) -> str:
+        """The explanation as text, the same in every language (`spec/explain.md`, *Text*).
+
+        A header names the policy and the selected rules; then each rule has a
+        line with its mark (`[x]` fired, `[ ]` not fired, `[?]` unknown), status
+        and condition, followed by its causes, such as
+        `- customer.years > 5 is false (customer.years = 3); short by 2`.
+        """
+        return self._texts.get()[0]
 
 
 # --- Summaries ------------------------------------------------------------------------
@@ -946,11 +1007,12 @@ class FieldUsage:
 
 @dataclass(frozen=True, slots=True)
 class RuleSummary:
-    """A rule in a summary: its name, priority and payload keys."""
+    """A rule in a summary: its name, priority, payload keys and whether it has an action."""
 
     name: str
     priority: int
     outputs: tuple[str, ...]
+    action: bool = False
 
 
 class Summary:
@@ -961,14 +1023,17 @@ class Summary:
         aggregate: The `COLLECT` aggregate, if any.
         logic: The logic's name.
         strict: Whether evaluation is strict.
-        rules: Each rule's name, priority and payload keys, in rule order.
+        rules: Each rule's name, priority, payload keys and whether it has an
+            action, in rule order.
         fields: Every field read, in first-appearance order, with where it is read.
         outputs: The payload keys, in first-appearance order.
         tags: Each tag with the names of its rules.
     """
 
     __slots__ = (
+        "_actions",
         "_data",
+        "_native",
         "aggregate",
         "fields",
         "hit_policy",
@@ -988,23 +1053,31 @@ class Summary:
     outputs: tuple[str, ...]
     tags: Mapping[str, tuple[str, ...]]
 
-    def __init__(self, data: dict[str, Any]) -> None:
+    def __init__(self, data: dict[str, Any], native: _native.RuleSet, actions: list[bool]) -> None:
+        """Internal: `RuleSet.summary()` builds summaries."""
         self._data = data
+        self._native = native
+        self._actions = actions
         self.hit_policy = HitPolicy(data["hit_policy"])
         self.aggregate = Aggregate(data["aggregate"]) if "aggregate" in data else None
         self.logic = data["logic"]
         self.strict = bool(data.get("strict", False))
         self.rules = tuple(
-            RuleSummary(rule["name"], _int(rule["priority"]), tuple(rule["outputs"]))
+            RuleSummary(
+                rule["name"],
+                _int(rule["priority"]),
+                tuple(rule["outputs"]),
+                rule.get("action", False),
+            )
             for rule in data["rules"]
         )
         self.fields = tuple(
             FieldUsage(
-                tuple(field["path"]),
-                tuple(field["conditions"]),
-                tuple((use["rule"], use["key"]) for use in field["payloads"]),
+                tuple(usage["path"]),
+                tuple(usage["conditions"]),
+                tuple((use["rule"], use["key"]) for use in usage["payloads"]),
             )
-            for field in data["fields"]
+            for usage in data["fields"]
         )
         self.outputs = tuple(data["outputs"])
         self.tags = MappingProxyType({e["tag"]: tuple(e["rules"]) for e in data["tags"]})
@@ -1015,6 +1088,10 @@ class Summary:
 
     def __repr__(self) -> str:
         return f"<Summary: {len(self.rules)} rules, {len(self.fields)} fields>"
+
+    def __str__(self) -> str:
+        """The summary as text, the same in every language (`spec/explain.md`, *Summaries*)."""
+        return self._native.summary_text(self._actions)
 
 
 def _document(key: str, content: dict[str, Any]) -> dict[str, Any]:
