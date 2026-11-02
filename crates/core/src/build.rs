@@ -405,4 +405,39 @@ mod tests {
         assert!((field("a") + "x").gt(1).build().is_err());
         assert!((field("a").gt(1) & (field("b") + 1)).build().is_err());
     }
+
+    #[test]
+    fn an_error_passes_through_every_builder() {
+        let bad = || constant(f64::NAN);
+        for build in [
+            bad().get("x"),
+            !bad(),
+            bad().between(1, 2),
+            field("a").between(bad(), 2),
+            field("a").between(1, bad()),
+            bad().ends_with("x"),
+            bad().contains("x"),
+            bad().abs(),
+            1.5 - bad(),
+        ] {
+            let error = build.build().unwrap_err();
+            assert_eq!(error.code(), ErrorCode::ExpressionError);
+            assert!(error.hint().unwrap().contains("is_null"));
+        }
+    }
+
+    #[test]
+    fn the_remaining_builders() {
+        let tree = (field("a").le(1)
+            | field("s").ends_with(".pdf")
+            | field("s").contains("@")
+            | (field("x").abs() * 2.5).gt(1)
+            | field("n").eq(7_u32))
+        .build()
+        .unwrap();
+        let tags: Vec<&str> = tree.children().iter().map(|c| c.tag()).collect();
+        assert_eq!(tags, ["le", "ends_with", "contains", "gt", "eq"]);
+        assert!(matches!(Value::from(0.5), Value::Float(x) if x.to_bits() == 0.5_f64.to_bits()));
+        assert!(matches!(Value::from(7_u32), Value::Int(7)));
+    }
 }

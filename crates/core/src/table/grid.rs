@@ -567,6 +567,79 @@ mod tests {
     }
 
     #[test]
+    fn conversions_build_cells_and_headers() {
+        let x = Node::field(vec![Segment::Key("x".into())]).unwrap();
+        let one = Node::constant(Value::Int(1)).unwrap();
+        let header: Vec<HeaderItem> = vec![
+            "RULE".into(),
+            x.clone().into(),
+            TableOutput::new("a").into(),
+            String::from("PRIORITY").into(),
+        ];
+        let rows: Vec<Vec<Cell>> = vec![vec![
+            String::from("r").into(),
+            Node::compare(CompareOp::Gt, x, one).unwrap().into(),
+            Value::Int(2).into(),
+            " ".into(),
+        ]];
+        let built = build(header, rows).unwrap();
+        assert_eq!(built.to_csv(), "HIT POLICY,first\nRULE,x,THEN a\nr,> 1,2\n");
+    }
+
+    #[test]
+    fn cells_show_what_they_hold() {
+        let x = Node::field(vec![Segment::Key("x".into())]).unwrap();
+        assert_eq!(text("> 1").to_string(), "\"> 1\"");
+        assert_eq!(Cell::Value(Value::Int(1)).to_string(), "1");
+        assert_eq!(
+            Cell::Value(Value::List(vec![])).to_string(),
+            "a list, map or opaque value"
+        );
+        assert_eq!(Cell::Node(x).to_string(), "the expression x");
+        assert!(!Cell::Node(Node::constant(Value::Int(1)).unwrap()).is_empty());
+        let error = build(
+            headers(&["RULE", "x"]),
+            vec![vec![Cell::Value(Value::List(vec![])), text("1")]],
+        )
+        .unwrap_err();
+        assert!(
+            error.message().ends_with("a list, map or opaque value"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn output_values_are_constants_within_the_budget() {
+        let error = build(
+            headers(&["x", "THEN a"]),
+            vec![vec![text("1"), Cell::Value(Value::List(vec![]))]],
+        )
+        .unwrap_err();
+        assert_eq!(error.code(), ErrorCode::ExpressionError);
+        assert_eq!(pointer(&error), "/rows/0/1");
+        let limits = Limits {
+            max_table_size: 3,
+            ..Limits::default()
+        };
+        let rows = [vec![text("-"), text("1 + 1")]];
+        let error = DecisionTable::from_grid(
+            TableConfig::default(),
+            headers(&["x", "THEN a"]),
+            rows,
+            &limits,
+        )
+        .unwrap_err();
+        assert_eq!(error.code(), ErrorCode::LimitExceeded);
+        assert_eq!(pointer(&error), "/rows/0/1");
+    }
+
+    #[test]
+    fn an_error_without_a_pointer_is_kept() {
+        let error = Columns(Vec::new()).locate(Error::new(ErrorCode::FormatError, "bad"));
+        assert!(error.context().pointer.is_none());
+    }
+
+    #[test]
     fn an_unquoted_string_gets_a_hint() {
         let header = headers(&["x", "THEN risk IN ('high', 'low')"]);
         let error = build(header, vec![vec![text("1"), text("high")]]).unwrap_err();
@@ -576,6 +649,12 @@ mod tests {
         );
         let header = headers(&["x", "THEN risk IN ('high', 'low')"]);
         let error = build(header, vec![vec![text("1"), text("medium")]]).unwrap_err();
+        assert_eq!(
+            error.hint(),
+            Some("write one of the values listed in the output's header")
+        );
+        let header = headers(&["x", "THEN risk IN ('high', 'low')"]);
+        let error = build(header, vec![vec![text("1"), text("high.level")]]).unwrap_err();
         assert_eq!(
             error.hint(),
             Some("write one of the values listed in the output's header")

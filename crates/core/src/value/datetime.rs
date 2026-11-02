@@ -209,4 +209,23 @@ mod tests {
         assert_eq!(zone(Some("Mars/Olympus"), one), Zone::Fixed(one));
         assert_eq!(zone(None, Offset::UTC), Zone::Fixed(Offset::UTC));
     }
+
+    #[test]
+    fn aware_order_precision_and_display() {
+        let early: Timestamp = "2026-11-02T09:00:00Z".parse().unwrap();
+        let late: Timestamp = "2026-11-02T09:00:01Z".parse().unwrap();
+        let a = AwareDateTime::new(early, Zone::Named("Europe/Madrid".into())).unwrap();
+        let b = AwareDateTime::new(late, Zone::Fixed(Offset::UTC)).unwrap();
+        assert!(a < b);
+        assert_eq!(a.cmp(&b), std::cmp::Ordering::Less);
+        let fine: Timestamp = "2026-11-02T09:00:00.000000001Z".parse().unwrap();
+        assert_eq!(
+            AwareDateTime::new(fine, Zone::Fixed(Offset::UTC)),
+            Err(DateTimeError::TooPrecise)
+        );
+        assert_eq!(
+            a.to_string(),
+            "2026-11-02T09:00:00Z (Named(\"Europe/Madrid\"))"
+        );
+    }
 }

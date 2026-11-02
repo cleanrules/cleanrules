@@ -526,4 +526,4 @@ def test_vector(vector: dict[str, Any], run: str) -> None:
 
 def test_every_vector_is_collected() -> None:
     # 2,135 vectors at the end of phase B; vectors are only ever added.
-    assert len([p for p in collect() if p.id.startswith("json:")]) >= 2401
+    assert len([p for p in collect() if p.id.startswith("json:")]) >= 2508

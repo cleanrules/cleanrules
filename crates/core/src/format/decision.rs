@@ -381,11 +381,10 @@ fn match_tree<'a>(
             return Err(mismatch(&at(&tree.pointer, "path"), "not the rule's field"));
         }
         Expr::Const(constant) if !truth => {
-            let recorded = match &tree.outcome {
-                Outcome::Value(value) => Node::constant(value.clone()).ok(),
-                Outcome::Truth(_) => None,
-            };
-            if recorded != Node::constant(constant.clone()).ok() {
+            // Without a truth value, the outcome is a value (checked above).
+            if let Outcome::Value(value) = &tree.outcome
+                && Node::constant(value.clone()).ok() != Node::constant(constant.clone()).ok()
+            {
                 return Err(mismatch(
                     &at(&tree.pointer, "value"),
                     "not the rule's constant",

@@ -3001,6 +3001,389 @@
           }
         }
       }
+    },
+    {
+      "id": "format/values/decimal-not-string",
+      "spec": [
+        "json-format.md#numbers"
+      ],
+      "description": "$decimal takes a string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": 1.5
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$decimal"
+        }
+      }
+    },
+    {
+      "id": "format/values/date-not-string",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "$date takes a string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$date": 20261102
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$date"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-not-string",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "$datetime takes a string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": 0
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/date-slashes",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a date is written with hyphens",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$date": "2026/11/02"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$date"
+        }
+      }
+    },
+    {
+      "id": "format/values/date-letter",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a date is written with digits",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$date": "2026-1x-02"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$date"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-time-separators",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a time is written with colons",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-11-02T09-00-00"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-empty-fraction",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "a point is followed by digits",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-11-02T09:00:00.Z"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-offset-without-colon",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "an offset is written +hh:mm",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-11-02T09:00:00+0100"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/datetime-offset-minutes",
+      "spec": [
+        "json-format.md#dates-and-datetimes"
+      ],
+      "description": "an offset's minutes are below 60",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$datetime": "2026-11-02T09:00:00+01:60"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$datetime"
+        }
+      }
+    },
+    {
+      "id": "format/values/map-not-object",
+      "spec": [
+        "json-format.md#lists-and-maps",
+        "data-model.md#constants"
+      ],
+      "description": "$map takes an object",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$map": [
+                  [
+                    "k",
+                    1
+                  ]
+                ]
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$map"
+        }
+      }
+    },
+    {
+      "id": "format/values/map-as-constant",
+      "spec": [
+        "json-format.md#lists-and-maps",
+        "data-model.md#constants"
+      ],
+      "description": "a constant is a scalar, not a map",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$map": {
+                  "k": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value"
+        }
+      }
     }
   ]
 }

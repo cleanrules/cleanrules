@@ -1006,4 +1006,84 @@ mod tests {
             paths[0].contains("\"b\"") && paths[1].contains("\"a\"") && paths[2].contains("\"c\"")
         );
     }
+
+    fn hash(node: &Node) -> u64 {
+        use std::hash::{BuildHasher, BuildHasherDefault, DefaultHasher};
+        BuildHasherDefault::<DefaultHasher>::default().hash_one(node)
+    }
+
+    #[test]
+    fn equal_nodes_hash_alike() {
+        use jiff::civil::date;
+        use jiff::tz::Offset;
+
+        use crate::value::{AwareDateTime, Zone};
+
+        let instant = "2026-11-02T09:00:00Z".parse().unwrap();
+        let aware = |zone| Value::AwareDateTime(AwareDateTime::new(instant, zone).unwrap());
+        let pairs = [
+            (c(Value::Float(0.0)), c(Value::Float(-0.0))),
+            (c(Value::Bool(true)), c(Value::Bool(true))),
+            (
+                c(Value::Decimal(Decimal::parse("1.5").unwrap())),
+                c(Value::Decimal(Decimal::parse("1.5").unwrap())),
+            ),
+            (c(Value::String("a".into())), c(Value::String("a".into()))),
+            (
+                c(Value::Date(date(2026, 11, 2))),
+                c(Value::Date(date(2026, 11, 2))),
+            ),
+            (
+                c(Value::NaiveDateTime(date(2026, 11, 2).at(9, 0, 0, 0))),
+                c(Value::NaiveDateTime(date(2026, 11, 2).at(9, 0, 0, 0))),
+            ),
+            (
+                c(aware(Zone::Fixed(Offset::UTC))),
+                c(aware(Zone::Named("Europe/Madrid".into()))),
+            ),
+            (
+                c(Value::Null(NullCause::Null)),
+                c(Value::Null(NullCause::Null)),
+            ),
+            (
+                Node::is_in(f("a"), vec![Value::Int(1), Value::Int(2)]).unwrap(),
+                Node::is_in(f("a"), vec![Value::Int(2), Value::Int(1)]).unwrap(),
+            ),
+            (
+                Node::between(f("a"), c(Value::Int(1)), c(Value::Int(2)), Closed::Left).unwrap(),
+                Node::between(f("a"), c(Value::Int(1)), c(Value::Int(2)), Closed::Left).unwrap(),
+            ),
+            (
+                Node::matches(f("a"), "^x").unwrap(),
+                Node::matches(f("a"), "^x").unwrap(),
+            ),
+            (
+                Node::string_test(super::StringOp::EndsWith, f("a"), "x").unwrap(),
+                Node::string_test(super::StringOp::EndsWith, f("a"), "x").unwrap(),
+            ),
+            (gt("a", 1), gt("a", 1)),
+        ];
+        for (a, b) in &pairs {
+            assert_eq!(a, b);
+            assert_eq!(hash(a), hash(b), "{a}");
+        }
+        assert_ne!(
+            Node::between(f("a"), c(Value::Int(1)), c(Value::Int(2)), Closed::Left).unwrap(),
+            Node::between(f("a"), c(Value::Int(1)), c(Value::Int(2)), Closed::Right).unwrap()
+        );
+    }
+
+    #[test]
+    fn a_constant_is_not_an_unreadable_value() {
+        for cause in [
+            NullCause::IntOverflow,
+            NullCause::DecimalOverflow,
+            NullCause::ReadError("boom".into()),
+        ] {
+            assert_eq!(
+                code(Node::constant(Value::Null(cause))),
+                ErrorCode::ExpressionError
+            );
+        }
+    }
 }

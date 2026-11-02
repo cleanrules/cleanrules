@@ -1075,6 +1075,528 @@
           "pointer": "/ruleset/rules/1/do"
         }
       }
+    },
+    {
+      "id": "format/rules/not-object",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "a rule is an object",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": [
+            "r"
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule"
+        }
+      }
+    },
+    {
+      "id": "format/rules/name-missing",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "a rule needs a name",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/name"
+        }
+      }
+    },
+    {
+      "id": "format/rules/name-not-string",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "a name is a string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": 1,
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/name"
+        }
+      }
+    },
+    {
+      "id": "format/rules/when-missing",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "a rule needs a condition",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/when"
+        }
+      }
+    },
+    {
+      "id": "format/rules/then-not-object",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "then is an object of nodes",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": [
+              {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/then"
+        }
+      }
+    },
+    {
+      "id": "format/rules/priority-not-int",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "a priority is an int, not a string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "priority": "1"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/priority"
+        }
+      }
+    },
+    {
+      "id": "format/rules/priority-float",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "a priority is an int, not a float",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "priority": 1.5
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/priority"
+        }
+      }
+    },
+    {
+      "id": "format/rules/tags-not-array",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "tags is an array",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "tags": "pricing"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/tags"
+        }
+      }
+    },
+    {
+      "id": "format/rules/tag-not-string",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "each tag is a string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "tags": [
+              "pricing",
+              1
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/tags/1"
+        }
+      }
+    },
+    {
+      "id": "format/rules/description-not-string",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "a description is a string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "description": [
+              "x"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/description"
+        }
+      }
+    },
+    {
+      "id": "format/rules/metadata-not-object",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "metadata is an object",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "metadata": [
+              1
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/metadata"
+        }
+      }
+    },
+    {
+      "id": "format/rules/metadata-bad-value",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "metadata values are data values",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "metadata": {
+              "at": {
+                "$date": "2026-13-01"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/metadata/at/$date"
+        }
+      }
+    },
+    {
+      "id": "format/rules/unknown-key",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "an unknown key in a rule",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "owner": "sales"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/owner"
+        }
+      }
+    },
+    {
+      "id": "format/rules/description",
+      "spec": [
+        "json-format.md#rules"
+      ],
+      "description": "a description is kept and written after tags",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "description": "Large orders",
+            "tags": [
+              "b",
+              "a"
+            ],
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "tags": [
+              "a",
+              "b"
+            ],
+            "description": "Large orders"
+          }
+        }
+      }
     }
   ]
 }

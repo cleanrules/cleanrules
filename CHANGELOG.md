@@ -259,6 +259,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in any case, is now written between backticks or quotes.
 - `Summary::with_actions` adds the rules whose action is code to those that
   name theirs, which the core marks itself, instead of replacing every flag.
+- Strict-mode errors write a field's path as the text syntax does
+  (`missing field items[2].price`, not `items.[2].price`), as explanations
+  already did (task D.5).
 
 ### Removed
 

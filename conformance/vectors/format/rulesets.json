@@ -451,6 +451,304 @@
           "pointer": "/ruleset/aggregate"
         }
       }
+    },
+    {
+      "id": "format/rulesets/not-object",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "a rule set is an object",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": [
+            {
+              "name": "r",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/hit-policy-not-string",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "a hit policy is a name",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": 1,
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset/hit_policy"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/aggregate-not-string",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "an aggregate is a name",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "collect",
+            "aggregate": true,
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset/aggregate"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/aggregate-unknown",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "an unknown aggregate",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "collect",
+            "aggregate": "avg",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset/aggregate"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/strict-not-boolean",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "strict is a boolean",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "strict": "yes",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset/strict"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/rules-missing",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "a rule set needs its rules",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset/rules"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/rules-not-array",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "rules is an array",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": {
+              "name": "r",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset/rules"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/rule-not-object",
+      "spec": [
+        "json-format.md#rule-sets"
+      ],
+      "description": "each rule is an object",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              "s"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset/rules/1"
+        }
+      }
     }
   ]
 }

@@ -665,6 +665,7 @@ mod tests {
         assert_eq!(numbers[2].as_i128(), Some(0));
         assert_eq!(numbers[3].as_i128(), Some(9_223_372_036_854_775_808));
         assert!(numbers[4].as_f64().is_infinite());
+        assert_eq!(numbers[1].as_i128(), None);
     }
 
     #[test]
@@ -705,6 +706,28 @@ mod tests {
         assert_eq!(at("[1.]"), (ErrorCode::FormatError, Some(1), Some(4)));
         assert_eq!(at("[\"a\tb\"]"), (ErrorCode::FormatError, Some(1), Some(4)));
         assert_eq!(at("[tru]"), (ErrorCode::FormatError, Some(1), Some(5)));
+        assert_eq!(at(r#"{"a" 1}"#), (ErrorCode::FormatError, Some(1), Some(6)));
+        assert_eq!(
+            at(r#"{"a":1 "b":2}"#),
+            (ErrorCode::FormatError, Some(1), Some(8))
+        );
+        assert_eq!(at("[1e]"), (ErrorCode::FormatError, Some(1), Some(4)));
+        assert_eq!(at("[1e+]"), (ErrorCode::FormatError, Some(1), Some(5)));
+        assert_eq!(
+            at(r#"["\u12g4"]"#),
+            (ErrorCode::FormatError, Some(1), Some(3))
+        );
+        assert_eq!(
+            at(r#"["\ud800\u0041"]"#),
+            (ErrorCode::FormatError, Some(1), Some(3))
+        );
+    }
+
+    #[test]
+    fn control_characters_are_escaped() {
+        let text = r#""\b\f\u0001""#;
+        assert_eq!(ok(text), Json::String("\u{8}\u{c}\u{1}".into()));
+        assert_eq!(to_string(&ok(text)), text);
     }
 
     #[test]
@@ -752,6 +775,20 @@ mod tests {
         assert_eq!(
             (error.code(), error.context().column),
             (ErrorCode::FormatError, Some(4))
+        );
+        let error = parse_bytes(b"[\n\"\xff\"]", &Limits::default()).unwrap_err();
+        assert_eq!(
+            (error.context().line, error.context().column),
+            (Some(2), Some(2))
+        );
+        assert_eq!(parse_bytes(b"[1]", &Limits::default()).unwrap(), ok("[1]"));
+        let small = Limits {
+            max_size: 2,
+            ..Limits::default()
+        };
+        assert_eq!(
+            parse_bytes(b"[1]", &small).unwrap_err().code(),
+            ErrorCode::LimitExceeded
         );
     }
 

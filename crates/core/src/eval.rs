@@ -631,7 +631,7 @@ impl<L: Logic> Evaluator<'_, '_, L> {
         if self.options.strict {
             return Err(self.error(
                 ErrorCode::EvaluationError,
-                format!("cannot read {}: {detail}", display_path(path)),
+                format!("cannot read {}: {detail}", crate::text::path(path)),
                 Some(path.to_vec()),
             ));
         }
@@ -672,7 +672,7 @@ impl<L: Logic> Evaluator<'_, '_, L> {
                 if self.options.strict {
                     return Err(self.error(
                         ErrorCode::MissingField,
-                        format!("missing field {}", display_path(path)),
+                        format!("missing field {}", crate::text::path(path)),
                         Some(path.to_vec()),
                     ));
                 }
@@ -853,7 +853,9 @@ pub(crate) fn recompute<L: Logic>(
         Expr::Or(_) => connective(logic.any(&children.iter().map(truth_of).collect::<Vec<_>>())),
         Expr::Not(_) => connective(logic.not(truth_of(child(0)?))),
         Expr::Between { .. } => connective(logic.and(truth_of(child(0)?), truth_of(child(1)?))),
-        Expr::Field(path) => {
+        // A field or constant in a condition position (a constant there is a
+        // boolean or null; a field may hold anything).
+        Expr::Field(_) | Expr::Const(_) => {
             let value = child(0)?;
             let read = value
                 .value()
@@ -863,23 +865,11 @@ pub(crate) fn recompute<L: Logic>(
                 Ok(Some(truth)) => (Outcome::Truth(truth), None),
                 Ok(None) => (Outcome::Truth(logic.unknown()), value.reason.clone()),
                 Err(group) => {
-                    let mut reason = Reason::new(ReasonCode::TypeMismatch, vec![path.clone()]);
-                    reason.types = vec![group, Group::Boolean];
-                    (Outcome::Truth(logic.unknown()), Some(reason))
-                }
-            }
-        }
-        Expr::Const(_) => {
-            let value = child(0)?;
-            let read = value
-                .value()
-                .cloned()
-                .unwrap_or(Value::Null(NullCause::Null));
-            match logic.value_truth(&read) {
-                Ok(Some(truth)) => (Outcome::Truth(truth), None),
-                Ok(None) => (Outcome::Truth(logic.unknown()), value.reason.clone()),
-                Err(group) => {
-                    let mut reason = Reason::new(ReasonCode::TypeMismatch, Vec::new());
+                    let paths = match node.expr() {
+                        Expr::Field(path) => vec![path.clone()],
+                        _ => Vec::new(),
+                    };
+                    let mut reason = Reason::new(ReasonCode::TypeMismatch, paths);
                     reason.types = vec![group, Group::Boolean];
                     (Outcome::Truth(logic.unknown()), Some(reason))
                 }
@@ -922,16 +912,6 @@ fn float_result(value: f64, paths: impl Fn() -> Vec<Vec<Segment>>) -> (Value, Op
     }
 }
 
-fn display_path(path: &[Segment]) -> String {
-    path.iter()
-        .map(|s| match s {
-            Segment::Key(k) => k.clone(),
-            Segment::Index(i) => format!("[{i}]"),
-        })
-        .collect::<Vec<_>>()
-        .join(".")
-}
-
 /// The `index`-th child of a node: borrowed for a borrowed node, cloned for the
 /// owned halves of a `between`. Callers pass an index below the child count.
 fn child<'a>(node: &Cow<'a, Node>, index: usize) -> Cow<'a, Node> {
@@ -943,7 +923,7 @@ fn child<'a>(node: &Cow<'a, Node>, index: usize) -> Cow<'a, Node> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Options, ReasonCode, evaluate_tree};
+    use super::{Options, ReasonCode, evaluate_tree, evaluate_value_tree};
     use crate::build::field;
     use crate::error::ErrorCode;
     use crate::logic::{Kleene, Truth};
@@ -1081,5 +1061,33 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(error.code(), ErrorCode::ExpressionError);
+    }
+
+    #[test]
+    fn a_result_has_a_truth_value_or_a_value() {
+        let data = input("a", Value::Int(2));
+        let condition = field("a").gt(1).build().unwrap();
+        let result = evaluate_tree(&condition, &data, &Kleene, Options::default()).unwrap();
+        assert!(result.value().is_none());
+        let value = (field("a") + 1).build().unwrap();
+        let result = evaluate_value_tree(&value, &data, &Kleene, Options::default()).unwrap();
+        assert!(result.truth().is_none());
+        assert!(matches!(result.value(), Some(Value::Int(3))));
+        let error =
+            evaluate_value_tree(&condition, &data, &Kleene, Options::default()).unwrap_err();
+        assert_eq!(error.code(), ErrorCode::ExpressionError);
+    }
+
+    #[test]
+    fn strict_errors_show_indexes() {
+        let node = field("items").index(2).get("price").gt(1).build().unwrap();
+        let strict = Options {
+            strict: true,
+            rule: None,
+        };
+        let data = input("items", Value::List(vec![]));
+        let error = evaluate_tree(&node, &data, &Kleene, strict).unwrap_err();
+        assert_eq!(error.code(), ErrorCode::MissingField);
+        assert_eq!(error.message(), "missing field items[2].price");
     }
 }

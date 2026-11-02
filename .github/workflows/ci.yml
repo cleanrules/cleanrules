@@ -40,6 +40,21 @@ jobs:
       - run: cargo nextest run --workspace --features cleanrules/yaml
       - run: cargo test --workspace --doc --features cleanrules/yaml
 
+  coverage:
+    name: Core coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      # The definition of done asks for 95 % of the core's lines.
+      - run: cargo llvm-cov -p cleanrules --features yaml --fail-under-lines 95
+
   msrv:
     name: Rust 1.95 (MSRV)
     runs-on: ubuntu-latest

@@ -1293,6 +1293,108 @@
           ]
         }
       }
+    },
+    {
+      "id": "ast/nodes/abs-overflow",
+      "spec": [
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
+      ],
+      "description": "abs of the smallest int is null with reason int_overflow",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "abs",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$int": "-9223372036854775808"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "abs",
+          "value": null,
+          "reason": {
+            "code": "int_overflow",
+            "paths": [
+              [
+                "a"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$int": "-9223372036854775808"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/nodes/neg-overflow",
+      "spec": [
+        "ast.md#node-semantics",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
+      ],
+      "description": "neg of the smallest int is null with reason int_overflow",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "neg",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$int": "-9223372036854775808"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "neg",
+          "value": null,
+          "reason": {
+            "code": "int_overflow",
+            "paths": [
+              [
+                "a"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$int": "-9223372036854775808"
+              }
+            }
+          ]
+        }
+      }
     }
   ]
 }

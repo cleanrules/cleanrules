@@ -568,6 +568,71 @@
           ]
         }
       }
+    },
+    {
+      "id": "ast/reading/tagged-int-overflow-in-data",
+      "spec": [
+        "data-model.md#nulls-with-a-reason",
+        "ast.md#evaluating-one-node",
+        "json-format.md#result-trees"
+      ],
+      "description": "a tagged integer outside 64 bits in the data is null with reason int_overflow",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "gt",
+          "left": {
+            "op": "field",
+            "path": [
+              "x"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": 1
+          }
+        },
+        "input": {
+          "x": {
+            "$int": "1180591620717411303424"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "gt",
+          "truth": null,
+          "reason": {
+            "code": "int_overflow",
+            "paths": [
+              [
+                "x"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "x"
+              ],
+              "value": null,
+              "reason": {
+                "code": "int_overflow",
+                "paths": [
+                  [
+                    "x"
+                  ]
+                ]
+              }
+            },
+            {
+              "op": "const",
+              "value": 1
+            }
+          ]
+        }
+      }
     }
   ]
 }
