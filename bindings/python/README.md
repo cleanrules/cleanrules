@@ -126,6 +126,26 @@ table.evaluate({"customer": {"years": 0}, "order": {"total": 2000}}).output
 table.ruleset  # the RuleSet it compiles into: one rule per row
 ```
 
+A table can also be built from rows, or from a pandas or polars `DataFrame`
+whose column names are the header. Cells are read as in the CSV file: a `str`
+is the text syntax (`"> 5"`, `"-"`, and `"'VIP'"` for the string, since `"VIP"`
+is the field named `VIP`), any other value is a constant, and `None` is an
+empty cell
+([`docs/examples/risk_table.py`](../../docs/examples/risk_table.py)):
+
+```python
+from cleanrules import DecisionTable
+
+table = DecisionTable(
+    ["RULE", "customer.years", "order.total", "THEN discount", "THEN label"],
+    [
+        ["vip", "> 5", "> 1000", 0.15, "'VIP'"],
+        ["loyal", "> 2", None, 0.05, "'loyal'"],
+    ],
+)
+table = DecisionTable.from_dataframe(frame, hit_policy="priority")
+```
+
 To evaluate one condition and see every step, use `evaluate_tree`:
 
 ```python

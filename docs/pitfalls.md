@@ -124,6 +124,22 @@ Arrays, Series and DataFrames are not constants. `np.array([1, 2]) == F.x`
 and `df["a"] > F.x` raise instead of comparing element by element. To check
 whole columns, use vectorized validation (phase I of the roadmap).
 
+## Strings in table cells are quoted
+
+A decision table's cells are text in the rule syntax, as in its CSV file, also
+when the table is built from Python rows or a `DataFrame`. `"> 5"` is a test,
+`"'ES'"` the string ES, and `"ES"` the field named `ES`: under an input
+`country`, the cell `"ES"` compares `country` with that field and never
+matches when there is none. Write `"'ES'"` or `"IN ('ES', 'PT')"`. An output
+column with listed values catches the mistake (`high is a field; the string
+is written between single quotes`); others do not.
+
+A `DataFrame` also keeps the types pandas or polars gave its columns: read
+from a table file, `0.15` is a float, not the CSV's decimal, and a `RULE`
+column of digits holds ints, which are not names. Read table files with
+`cleanrules.load`, or with `dtype=str, keep_default_na=False` (pandas) or
+`infer_schema=False` (polars).
+
 ## fuzzytool terms go on the right
 
 Until fuzzytool 0.8, `score["poor"] & (F.x > 2)` builds a fuzzytool node

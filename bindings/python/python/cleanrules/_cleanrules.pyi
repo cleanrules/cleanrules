@@ -1,5 +1,6 @@
 """Type stubs of the native module (`bindings/python/src`)."""
 
+from collections.abc import Iterable
 from typing import Any, Final, final
 
 __version__: Final[str]
@@ -124,12 +125,24 @@ def load_document(
     max_size: int | None = None,
     max_nesting: int | None = None,
     max_depth: int | None = None,
+    max_table_size: int | None = None,
 ) -> tuple[str, Any]: ...
 def load_rule(text: str, max_size: int | None = None, max_depth: int | None = None) -> Rule: ...
 def dump_condition(node: Node, format: str) -> str: ...
 def dump_rule(rule: Rule, format: str) -> str: ...
 def dump_ruleset(ruleset: RuleSet, format: str) -> str: ...
 def dump_table(table: DecisionTable, format: str) -> str: ...
+def table_from_grid(
+    header: list[object],
+    rows: Iterable[list[object]],
+    hit_policy: str,
+    aggregate: str | None,
+    logic: str | None,
+    strict: bool,
+    max_size: int | None = None,
+    max_depth: int | None = None,
+    max_table_size: int | None = None,
+) -> DecisionTable: ...
 
 @final
 class DecisionTable:

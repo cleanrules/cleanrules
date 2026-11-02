@@ -84,6 +84,41 @@
               "type": "string",
               "description": "A decision table as CSV (spec/tables.md, CSV)."
             },
+            "table_grid": {
+              "type": "object",
+              "description": "A decision table as a grid (spec/tables.md, Grids): the settings as in JSON, a header of texts, and rows whose strings are text and whose other items are values in the JSON encoding (null for an empty cell).",
+              "properties": {
+                "hit_policy": {
+                  "type": "string"
+                },
+                "aggregate": {
+                  "type": "string"
+                },
+                "logic": {
+                  "type": "string"
+                },
+                "strict": {
+                  "type": "boolean"
+                },
+                "header": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "array"
+                  }
+                }
+              },
+              "required": [
+                "header",
+                "rows"
+              ],
+              "additionalProperties": false
+            },
             "document": {
               "type": "object"
             },
@@ -96,7 +131,8 @@
                 "enum": [
                   "max_size",
                   "max_nesting",
-                  "max_depth"
+                  "max_depth",
+                  "max_table_size"
                 ]
               },
               "additionalProperties": {
@@ -134,6 +170,11 @@
             {
               "required": [
                 "table_csv"
+              ]
+            },
+            {
+              "required": [
+                "table_grid"
               ]
             },
             {

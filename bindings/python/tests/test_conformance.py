@@ -312,24 +312,40 @@ def run_text(given: dict[str, Any], expect: dict[str, Any], limits: dict[str, in
 
 
 def run_table(given: dict[str, Any], expect: dict[str, Any], limits: dict[str, int]) -> None:
-    """Read a decision table and write it back as a document, as CSV and compiled."""
+    """Read or build a decision table and write it back as a document, as CSV and compiled."""
     if "table_csv" in given:
         source, fmt = given["table_csv"], "csv"
     elif "yaml" in given:
         source, fmt = given["yaml"], "yaml"
     else:
-        source, fmt = dumps(given["document"]), "json"
+        source, fmt = dumps(given.get("document", {})), "json"
+
+    def table() -> cleanrules.DecisionTable:
+        grid = given.get("table_grid")
+        if grid is None:
+            read = cleanrules.loads(source, format=fmt, **limits)
+            assert isinstance(read, cleanrules.DecisionTable)
+            return read
+        # Strings are text and other items values (`spec/tables.md`, *Grids*).
+        settings = {
+            key: grid[key] for key in ("hit_policy", "aggregate", "logic", "strict") if key in grid
+        }
+        return cleanrules.DecisionTable(
+            grid["header"],
+            [[native(cell) for cell in row] for row in grid["rows"]],
+            **settings,
+            max_table_size=limits.get("max_table_size"),
+        )
 
     def read_and_write() -> dict[str, Any]:
-        table = cleanrules.loads(source, format=fmt, **limits)
-        assert isinstance(table, cleanrules.DecisionTable)
+        table_read = table()
         out: dict[str, Any] = {}
         if "document" in expect:
-            out["document"] = json.loads(cleanrules.dumps(table))
+            out["document"] = json.loads(cleanrules.dumps(table_read))
         if "csv" in expect:
-            out["csv"] = cleanrules.dumps(table, format="csv")
+            out["csv"] = cleanrules.dumps(table_read, format="csv")
         if "compiled" in expect:
-            out["compiled"] = json.loads(cleanrules.dumps(table.ruleset))["ruleset"]
+            out["compiled"] = json.loads(cleanrules.dumps(table_read.ruleset))["ruleset"]
         return out
 
     wanted = {key: expect[key] for key in ("document", "csv", "compiled") if key in expect}
@@ -351,6 +367,7 @@ def run_json(vector: dict[str, Any]) -> None:
             return
         if (
             "table_csv" in given
+            or "table_grid" in given
             or given.get("write") == "csv"
             or "csv" in expect
             or "compiled" in expect
@@ -497,4 +514,4 @@ def test_vector(vector: dict[str, Any], run: str) -> None:
 
 def test_every_vector_is_collected() -> None:
     # 2,135 vectors at the end of phase B; vectors are only ever added.
-    assert len([p for p in collect() if p.id.startswith("json:")]) >= 2358
+    assert len([p for p in collect() if p.id.startswith("json:")]) >= 2386

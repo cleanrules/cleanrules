@@ -146,3 +146,17 @@ impl<T> IntoPyResult<T> for cleanrules::Result<T> {
         self.map_err(|error| to_py(py, &error))
     }
 }
+
+/// `error`, located at `pointer` when it is a cleanrules error without a
+/// location (one raised while converting a Python value).
+pub(crate) fn with_pointer(py: Python<'_>, error: PyErr, pointer: &str) -> PyErr {
+    let value = error.value(py);
+    if value
+        .getattr("pointer")
+        .is_ok_and(|current| current.is_none())
+    {
+        // A failure here leaves the error as it was, which is still right.
+        let _ = value.setattr("pointer", pointer);
+    }
+    error
+}

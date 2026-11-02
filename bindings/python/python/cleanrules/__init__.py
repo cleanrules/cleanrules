@@ -34,7 +34,7 @@ from cleanrules._rules import (
     Summary,
     Truth,
 )
-from cleanrules._tables import DecisionTable, TableOutput, TablePolicy, TableRow
+from cleanrules._tables import DecisionTable, HeaderItem, TableOutput, TablePolicy, TableRow
 from cleanrules._trees import ResultTree, evaluate_tree, evaluate_value_tree
 from cleanrules.errors import (
     ActionError,
@@ -75,6 +75,7 @@ __all__ = [
     "FieldUsage",
     "Format",
     "FormatError",
+    "HeaderItem",
     "HitPolicy",
     "HitPolicyError",
     "Kind",

@@ -195,12 +195,25 @@ fn keyword(field: &Field) -> String {
         .to_ascii_uppercase()
 }
 
-enum Column {
+/// What a column holds; inputs and outputs by position.
+#[derive(Debug)]
+pub(super) enum Column {
     Name,
     Priority,
     Description,
     Input(usize),
     Output(usize),
+}
+
+impl Column {
+    fn keyword(&self) -> Option<&'static str> {
+        match self {
+            Self::Name => Some("RULE"),
+            Self::Priority => Some("PRIORITY"),
+            Self::Description => Some("DESCRIPTION"),
+            _ => None,
+        }
+    }
 }
 
 /// Where each part of the table was read, to locate errors.
@@ -375,57 +388,98 @@ fn settings<'f>(
     Ok((config, at))
 }
 
+/// What a header field names (`spec/tables.md`, *CSV*).
+pub(super) enum Heading {
+    Name,
+    Priority,
+    Description,
+    Input(Node),
+    Output(TableOutput),
+    /// Nothing: an empty or space-only field.
+    Empty,
+}
+
+impl Heading {
+    /// The keyword of a special column, for messages.
+    pub(super) fn keyword(&self) -> Option<&'static str> {
+        match self {
+            Self::Name => Some("RULE"),
+            Self::Priority => Some("PRIORITY"),
+            Self::Description => Some("DESCRIPTION"),
+            _ => None,
+        }
+    }
+}
+
+/// Read a header field's text; errors in it are located within `text`.
+pub(super) fn heading(text: &str, limits: &Limits) -> Result<Heading> {
+    let word = text
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_uppercase();
+    Ok(match word.as_str() {
+        "RULE" => Heading::Name,
+        "PRIORITY" => Heading::Priority,
+        "DESCRIPTION" => Heading::Description,
+        "" => Heading::Empty,
+        _ if word == "THEN" || word.starts_with("THEN ") => {
+            // The text after THEN, with errors located from the text's start.
+            let start = text.len() - text.trim_start().len() + 4;
+            let shift = u64::try_from(text[..start].chars().count()).unwrap_or(0);
+            let (name, values) = parse_output(&text[start..], limits).map_err(|mut e| {
+                let context = e.context_mut();
+                if let (Some(1), Some(column)) = (context.line, context.column) {
+                    context.column = Some(column + shift);
+                }
+                e
+            })?;
+            Heading::Output(TableOutput { name, values })
+        }
+        _ => Heading::Input(parse_expression(text, limits)?),
+    })
+}
+
+/// The column of a heading, or the error of a repeated special column or an
+/// empty heading, which `fail` locates.
+pub(super) fn column(
+    heading: Heading,
+    columns: &[Column],
+    inputs: &mut Vec<Node>,
+    outputs: &mut Vec<TableOutput>,
+    fail: impl Fn(String) -> Error,
+) -> Result<Column> {
+    if let Some(word) = heading.keyword()
+        && columns.iter().any(|c| c.keyword() == Some(word))
+    {
+        return Err(fail(format!("{word} is a column twice")));
+    }
+    Ok(match heading {
+        Heading::Name => Column::Name,
+        Heading::Priority => Column::Priority,
+        Heading::Description => Column::Description,
+        Heading::Input(node) => {
+            inputs.push(node);
+            Column::Input(inputs.len() - 1)
+        }
+        Heading::Output(output) => {
+            outputs.push(output);
+            Column::Output(outputs.len() - 1)
+        }
+        Heading::Empty => {
+            return Err(fail("a column has no header".into())
+                .with_hint("name an input expression, or write THEN and an output key"));
+        }
+    })
+}
+
 fn header(fields: &[Field], limits: &Limits) -> Result<(Vec<Column>, Vec<Node>, Vec<TableOutput>)> {
     let (mut columns, mut inputs, mut outputs) = (Vec::new(), Vec::new(), Vec::new());
     for field in fields {
-        let text = field.text.trim();
-        let word = keyword(field);
-        let special = match word.as_str() {
-            "RULE" => Some(Column::Name),
-            "PRIORITY" => Some(Column::Priority),
-            "DESCRIPTION" => Some(Column::Description),
-            _ => None,
-        };
-        if let Some(special) = special {
-            let repeated = columns
-                .iter()
-                .any(|c| std::mem::discriminant(c) == std::mem::discriminant(&special));
-            if repeated {
-                return Err(format_error(
-                    field.line,
-                    field.column,
-                    format!("{word} is a column twice"),
-                ));
-            }
-            columns.push(special);
-        } else if text.is_empty() {
-            return Err(
-                format_error(field.line, field.column, "a column has no header")
-                    .with_hint("name an input expression, or write THEN and an output key"),
-            );
-        } else if word == "THEN" || word.starts_with("THEN ") {
-            // The text after THEN, located from the field's start.
-            let start = field.text.len() - field.text.trim_start().len() + 4;
-            let rest = &field.text[start..];
-            let shifted = Field {
-                text: rest.to_owned(),
-                line: field.line,
-                // In a quoted field, errors are located at the field.
-                column: if field.quoted {
-                    field.column
-                } else {
-                    field.column + u64::try_from(field.text[..start].chars().count()).unwrap_or(0)
-                },
-                quoted: field.quoted,
-            };
-            let (name, values) = parse_output(rest, limits).map_err(|e| locate(e, &shifted))?;
-            columns.push(Column::Output(outputs.len()));
-            outputs.push(TableOutput { name, values });
-        } else {
-            let input = parse_expression(&field.text, limits).map_err(|e| locate(e, field))?;
-            columns.push(Column::Input(inputs.len()));
-            inputs.push(input);
-        }
+        let heading = heading(&field.text, limits).map_err(|e| locate(e, field))?;
+        let fail = |message: String| format_error(field.line, field.column, message);
+        let column = column(heading, &columns, &mut inputs, &mut outputs, fail)?;
+        columns.push(column);
     }
     Ok((columns, inputs, outputs))
 }

@@ -217,6 +217,48 @@ row has a description; then the rows. Fields are separated by commas and
 enclosed in double quotes only when they hold a comma, a double quote, a line
 break, or space at either end. Every line ends with `\n`.
 
+## Grids
+
+A table can also be built from a **grid**: a header and rows of cells, as a
+spreadsheet or a data frame holds them in memory. A grid is the CSV of a table
+without its text layer. The settings are given apart, as in JSON (hit policy,
+aggregate, logic and strictness), and each cell is text, read as a CSV field,
+or a value. Bindings read their language's strings as text (in Erlang,
+binaries), so `'VIP'` is a string and `VIP` the field named `VIP`, as in the
+CSV file. A data frame keeps the types its library gave each column, so it
+builds the table of the CSV file it was read from only when it was read as
+text: a library that reads `0.15` as a float makes it a float, where CSV reads
+a decimal.
+
+- **Header**: one item per column. A text item is read as a CSV header field
+  (`RULE`, `PRIORITY`, `DESCRIPTION`, `THEN <key> [IN (…)]`, or an input
+  expression); an empty one is a `format_error`. A host language may also give
+  an input as an expression it built, and an output as a key with its output
+  values.
+- **Rows**: each a list of cells in column order. A row may have fewer cells
+  than the header, which are then empty, and more only when the extra cells
+  are empty.
+- **Cells**: text is read as an unquoted CSV field: `-`, `> 5`, `'VIP'`, names
+  and descriptions without the space around them, and nothing or only space
+  for an empty cell. Null is an empty cell. Any other value `v` is, under an
+  input `x`, the condition `x = v`; under an output, the value `v`; under
+  `RULE` or `DESCRIPTION`, a string is read as text; and under `PRIORITY`, an
+  int, or a float with an integral value (data frames store ints with missing
+  values as floats), is the priority. Any other value under `RULE`,
+  `PRIORITY` or `DESCRIPTION` is a `format_error`. A host language may also
+  give a cell as a node it built: under an input, the cell's condition, which
+  must test its column (*Canonical text*); under an output, its value.
+
+Errors are reported as for CSV: the header first, its columns checked before
+any row is read, then each row in order, and the rules of *Compiling* last.
+They point into the grid, counting from 0: `/header` for the whole header
+(a table without inputs), `/header/<c>` for a column,
+`/rows/<r>/<c>` for a cell, `/rows/<r>` for a whole row, and `/aggregate` for
+an aggregate without `collect`. The settings are not part of the grid: an
+unknown logic, policy or aggregate has no pointer. For an error in the text of a header or a cell, the message
+gives its column within the text, as in JSON. Each text has the size limit of
+texts, and the grid the limits below.
+
 ## Limits
 
 Tables have the limits of documents (`json-format.md`, *Errors and limits*):
@@ -226,7 +268,7 @@ the condition of every input cell that is not `-` holds a copy of its column's
 expression. So readers count, as they read, one for every cell and the nodes of
 every cell's condition or value, copies included, and stop with
 `limit_exceeded` once the count goes over **2,097,152** (2²¹) by default: at the
-row (JSON) or the field (CSV) where it does. The limit keeps the memory a table
+row (JSON), the row or cell (grids) or the field (CSV) where it does. The limit keeps the memory a table
 takes to about that of the largest JSON document; a long input expression
 copied into many rows reaches it sooner.
 

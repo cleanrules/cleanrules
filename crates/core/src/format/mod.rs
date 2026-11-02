@@ -6,7 +6,7 @@ mod document;
 mod explain;
 pub mod result;
 mod rules;
-mod table;
+pub(crate) mod table;
 pub mod value;
 
 pub use condition::write_node;

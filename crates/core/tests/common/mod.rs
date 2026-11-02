@@ -83,6 +83,9 @@ pub fn limits_of(given: &Json) -> Limits {
         if let Some(depth) = int(get(custom, "max_depth")) {
             limits.max_depth = usize::try_from(depth).unwrap();
         }
+        if let Some(size) = int(get(custom, "max_table_size")) {
+            limits.max_table_size = usize::try_from(size).unwrap();
+        }
     }
     limits
 }

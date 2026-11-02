@@ -11,8 +11,11 @@ use cleanrules::format::{
     Document, read_decision_document, read_document, read_ruleset, write_decision, write_document,
     write_ruleset,
 };
+use cleanrules::format::{ValueContext, read_value};
 use cleanrules::json::{Json, JsonNumber, Limits, to_string};
-use cleanrules::table::DecisionTable;
+use cleanrules::logic::LogicName;
+use cleanrules::rules::Aggregate;
+use cleanrules::table::{Cell, DecisionTable, TableConfig, TablePolicy};
 use common::{get, int, limits_of, same, text, vectors};
 
 const FILES: [&str; 10] = [
@@ -62,8 +65,51 @@ fn table_forms(table: &DecisionTable) -> Table {
     }
 }
 
+/// A table from a vector's grid: its settings as in JSON, strings as text and
+/// other items as values (`spec/tables.md`, *Grids*).
+fn from_grid(grid: &Json, limits: &Limits) -> Result<DecisionTable, Error> {
+    let mut config = TableConfig::default();
+    if let Some(policy) = text(get(grid, "hit_policy")) {
+        config.hit_policy = TablePolicy::from_name(policy).unwrap();
+    }
+    if let Some(aggregate) = text(get(grid, "aggregate")) {
+        config.aggregate = Some(Aggregate::from_name(aggregate).unwrap());
+    }
+    if let Some(logic) = text(get(grid, "logic")) {
+        config.logic = Some(LogicName::from_name(logic)?);
+    }
+    config.strict = matches!(get(grid, "strict"), Some(Json::Bool(true)));
+    let Some(Json::Array(header)) = get(grid, "header") else {
+        panic!("a grid has a header")
+    };
+    let header = header.iter().map(|h| text(Some(h)).unwrap().into());
+    let mut table = DecisionTable::grid(config, header, limits)?;
+    let Some(Json::Array(rows)) = get(grid, "rows") else {
+        panic!("a grid has rows")
+    };
+    for (r, row) in rows.iter().enumerate() {
+        let Json::Array(cells) = row else {
+            panic!("a row is an array")
+        };
+        let cells = cells
+            .iter()
+            .enumerate()
+            .map(|(c, cell)| match cell {
+                Json::String(text) => Ok(Cell::Text(text.clone())),
+                other => read_value(other, &format!("/rows/{r}/{c}"), ValueContext::Data)
+                    .map(Cell::Value),
+            })
+            .collect::<Result<Vec<_>, Error>>()?;
+        table.push_row(cells)?;
+    }
+    table.finish()
+}
+
 /// Read the vector's document; write it as text when the vector asks.
 fn read_or_print(given: &Json, expect: &Json, source: &str) -> Result<Read, Error> {
+    if let Some(grid) = get(given, "table_grid") {
+        return from_grid(grid, &limits_of(given)).map(|t| Read::Table(table_forms(&t)));
+    }
     if let Some(csv) = text(get(given, "table_csv")) {
         return DecisionTable::from_csv(csv, &limits_of(given))
             .map(|t| Read::Table(table_forms(&t)));
@@ -129,7 +175,7 @@ fn check(vector: &Json) -> Option<String> {
             .or(text(get(given, "yaml")))
             .or(text(get(given, "rules_text")))
             .or(text(get(given, "table_csv"))),
-        get(given, "document"),
+        get(given, "document").or(get(given, "table_grid")),
     ) {
         (Some(source), _) => source.to_owned(),
         (None, Some(document)) => to_string(document),

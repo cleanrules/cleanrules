@@ -18,6 +18,7 @@
 //! ```
 
 mod csv;
+mod grid;
 
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
@@ -29,6 +30,8 @@ use crate::logic::LogicName;
 use crate::rules::{Aggregate, Config, HitPolicy, Rule, RuleSet};
 use crate::text::{cell_text, check_keys};
 use crate::value::Value;
+
+pub use grid::{Cell, GridBuilder, HeaderItem};
 
 /// A decision table's hit policy: the rule set policies and `output_order`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -221,6 +224,7 @@ pub(crate) fn size(node: &Node) -> usize {
 /// What reading a table may build, in cells and nodes (`spec/tables.md`,
 /// *Limits*): every cell costs one, and every cell that is not empty also the
 /// nodes of its condition (with its copy of the column) or value.
+#[derive(Debug)]
 pub(crate) struct Budget {
     left: usize,
     limit: usize,
@@ -539,10 +543,30 @@ fn check_row(
                     label(r, row)
                 ),
             )
-            .with_hint("write one of the values listed in the output's header"));
+            .with_hint(match unquoted(cell.as_ref(), &output.values) {
+                Some(name) => format!(
+                    "{name} is a field; the string is written between single quotes: '{name}'"
+                ),
+                None => "write one of the values listed in the output's header".into(),
+            }));
         }
     }
     Ok(())
+}
+
+/// The name of a field cell that is one of the string values when quoted:
+/// `high` for `'high'`.
+fn unquoted<'c>(cell: Option<&'c Node>, values: &[Value]) -> Option<&'c str> {
+    let crate::ast::Expr::Field(path) = cell?.expr() else {
+        return None;
+    };
+    let [crate::Segment::Key(name)] = path.as_slice() else {
+        return None;
+    };
+    values
+        .iter()
+        .any(|v| matches!(v, Value::String(s) if s == name))
+        .then_some(name.as_str())
 }
 
 /// The position of an output cell's constant in its column's values.

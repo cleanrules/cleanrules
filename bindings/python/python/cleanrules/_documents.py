@@ -54,6 +54,7 @@ def loads(
     max_size: int | None = None,
     max_nesting: int | None = None,
     max_depth: int | None = None,
+    max_table_size: int | None = None,
 ) -> Expr | Rule | RuleSet | DecisionTable:
     """Read a condition, rule, rule set or decision table document.
 
@@ -68,6 +69,9 @@ def loads(
         max_nesting: The deepest nesting of JSON or YAML objects and arrays
             (1024); text has none.
         max_depth: The deepest condition or payload value, in nodes (256).
+        max_table_size: The most cells and condition nodes a decision table
+            may hold, column copies included (2,097,152; `spec/tables.md`,
+            *Limits*).
 
     Returns:
         An `Expr` for a condition document, a `Rule`, a `RuleSet` or a
@@ -84,8 +88,16 @@ def loads(
         RuleDefinitionError: If a rule or rule set breaks a construction rule.
         RegistryError: For an unknown logic.
     """
-    text = _text(text, max_size=max_size, max_nesting=max_nesting, max_depth=max_depth)
-    kind, content = _native.load_document(text, format, max_size, max_nesting, max_depth)
+    text = _text(
+        text,
+        max_size=max_size,
+        max_nesting=max_nesting,
+        max_depth=max_depth,
+        max_table_size=max_table_size,
+    )
+    kind, content = _native.load_document(
+        text, format, max_size, max_nesting, max_depth, max_table_size
+    )
     if kind == "condition":
         return _wrap(content)
     if kind == "rule":
@@ -241,6 +253,7 @@ def load(
     max_size: int | None = None,
     max_nesting: int | None = None,
     max_depth: int | None = None,
+    max_table_size: int | None = None,
 ) -> Expr | Rule | RuleSet | DecisionTable:
     """Read a document from a file, as `loads` does.
 
@@ -253,6 +266,7 @@ def load(
         max_size: As `loads`; a file larger than the limit is not read.
         max_nesting: As `loads`.
         max_depth: As `loads`.
+        max_table_size: As `loads`.
 
     Raises:
         ValueError: If the format is not given and cannot be told.
@@ -281,6 +295,7 @@ def load(
         max_size=max_size,
         max_nesting=max_nesting,
         max_depth=max_depth,
+        max_table_size=max_table_size,
     )
 
 

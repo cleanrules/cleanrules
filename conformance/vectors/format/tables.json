@@ -4218,6 +4218,801 @@
           ]
         }
       }
+    },
+    {
+      "id": "format/tables/grid-basic",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "A grid of text cells builds the table its CSV would",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "RULE",
+            "customer.years",
+            "order.total",
+            "THEN discount",
+            "THEN label"
+          ],
+          "rows": [
+            [
+              "vip",
+              "> 5",
+              "> 1000",
+              "0.15",
+              "'VIP'"
+            ],
+            [
+              "loyal",
+              "> 2",
+              "-",
+              "0.05",
+              "'loyal'"
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "csv": "HIT POLICY,first\nRULE,customer.years,order.total,THEN discount,THEN label\nvip,> 5,> 1000,0.15,'VIP'\nloyal,> 2,-,0.05,'loyal'\n"
+      }
+    },
+    {
+      "id": "format/tables/grid-value-cells",
+      "spec": [
+        "tables.md#grids",
+        "tables.md#input-cells"
+      ],
+      "description": "Values in cells: equality under an input, the value under an output, an integral float as a priority, null as empty",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "RULE",
+            "PRIORITY",
+            "country",
+            "active",
+            "since",
+            "THEN rate",
+            "THEN code"
+          ],
+          "rows": [
+            [
+              "es",
+              2.0,
+              "'ES'",
+              true,
+              {
+                "$date": "2026-01-01"
+              },
+              0.21,
+              "'A'"
+            ],
+            [
+              "other",
+              null,
+              null,
+              false,
+              null,
+              1,
+              {
+                "$decimal": "0.10"
+              }
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "csv": "HIT POLICY,first\nRULE,PRIORITY,country,active,since,THEN rate,THEN code\nes,2,'ES',TRUE,\"DATE \"\"2026-01-01\"\"\",0.21e0,'A'\nother,,-,FALSE,-,1,0.10\n"
+      }
+    },
+    {
+      "id": "format/tables/grid-short-rows-and-empty-extra-cells",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "Missing cells are empty; extra cells may be null or space",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "x",
+            "THEN a",
+            "THEN b"
+          ],
+          "rows": [
+            [
+              "1"
+            ],
+            [
+              "2",
+              "'two'",
+              "'b'",
+              null,
+              "  "
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "csv": "HIT POLICY,first\nx,THEN a,THEN b\n1,,\n2,'two','b'\n"
+      }
+    },
+    {
+      "id": "format/tables/grid-names-and-descriptions-trimmed",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "Names and descriptions lose the space around them; empty ones are none",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "RULE",
+            "x",
+            "DESCRIPTION"
+          ],
+          "rows": [
+            [
+              "  vip ",
+              "1",
+              " the best  "
+            ],
+            [
+              "",
+              "2",
+              ""
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "csv": "HIT POLICY,first\nRULE,x,DESCRIPTION\nvip,1,the best\n,2,\n"
+      }
+    },
+    {
+      "id": "format/tables/grid-settings",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "The settings are given apart, as in JSON",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "strict": true,
+          "header": [
+            "x",
+            "THEN a"
+          ],
+          "rows": [
+            [
+              "> 1",
+              "1"
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "csv": "HIT POLICY,collect\nAGGREGATE,sum\nSTRICT\nx,THEN a\n> 1,1\n"
+      }
+    },
+    {
+      "id": "format/tables/grid-header-empty",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "An empty header item is a format error",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "x",
+            ""
+          ],
+          "rows": []
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/header/1"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-column-twice",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "A special column given twice, in any case",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "RULE",
+            "x",
+            "Rule"
+          ],
+          "rows": []
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/header/2"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-no-inputs",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "A table without inputs points to the header",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "RULE",
+            "THEN a"
+          ],
+          "rows": []
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/header"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-header-syntax-error",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "A header's text follows the text syntax",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "order.total >"
+          ],
+          "rows": []
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "pointer": "/header/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-output-header-error",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "An output header's text follows the text syntax",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "x",
+            "THEN a IN (1,"
+          ],
+          "rows": []
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "pointer": "/header/1"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-input-is-a-condition",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "An input is a value, not a condition",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "x > 5"
+          ],
+          "rows": []
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/header/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-outputs-repeated",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "Output keys are distinct",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "x",
+            "THEN a",
+            "THEN a"
+          ],
+          "rows": []
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/header/2"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-too-many-cells",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "Cells past the header must be empty",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "x"
+          ],
+          "rows": [
+            [
+              "1",
+              " ",
+              "2"
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rows/0/2"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-name-not-text",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "A name is text",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "RULE",
+            "x"
+          ],
+          "rows": [
+            [
+              1,
+              "1"
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rows/0/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-priority-not-integral",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "A float priority has an integral value",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "x",
+            "PRIORITY"
+          ],
+          "rows": [
+            [
+              "1",
+              1.5
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rows/0/1"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-priority-text-not-int",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "A text priority is an int",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "x",
+            "PRIORITY"
+          ],
+          "rows": [
+            [
+              "1",
+              "high"
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rows/0/1"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-description-not-text",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "A description is text",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "x",
+            "DESCRIPTION"
+          ],
+          "rows": [
+            [
+              "1",
+              true
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rows/0/1"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-cell-syntax-error",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "A text cell follows the text syntax",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "x"
+          ],
+          "rows": [
+            [
+              "> )"
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "pointer": "/rows/0/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-value-cell-not-scalar",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "A value cell is a scalar",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "x"
+          ],
+          "rows": [
+            [
+              [
+                1,
+                2
+              ]
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/rows/0/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-output-value-unquoted",
+      "spec": [
+        "tables.md#grids",
+        "tables.md#output-cells"
+      ],
+      "description": "A string in a text cell is quoted: high is the field high",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "x",
+            "THEN risk IN ('high', 'low')"
+          ],
+          "rows": [
+            [
+              "1",
+              "high"
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/rows/0/1"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-names-repeated",
+      "spec": [
+        "tables.md#grids",
+        "tables.md#compiling"
+      ],
+      "description": "Rule names are unique",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "RULE",
+            "x"
+          ],
+          "rows": [
+            [
+              "a",
+              "1"
+            ],
+            [
+              "a",
+              "2"
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/rows/1/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-default-name-repeated",
+      "spec": [
+        "tables.md#grids",
+        "tables.md#compiling"
+      ],
+      "description": "A row without a name is row_<n>, which may repeat a name; the error points to the row",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "RULE",
+            "x"
+          ],
+          "rows": [
+            [
+              "row_2",
+              "1"
+            ],
+            [
+              null,
+              "2"
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/rows/1"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-priority-next-to-output-values",
+      "spec": [
+        "tables.md#grids",
+        "tables.md#output-priority"
+      ],
+      "description": "A row priority and output values under priority",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "hit_policy": "priority",
+          "header": [
+            "x",
+            "PRIORITY",
+            "THEN r IN ('a', 'b')"
+          ],
+          "rows": [
+            [
+              "1",
+              1,
+              "'a'"
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/rows/0/1"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-aggregate-without-collect",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "An aggregate needs collect",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "aggregate": "sum",
+          "header": [
+            "x"
+          ],
+          "rows": []
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/aggregate"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-unknown-logic",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "The logic is looked up by name",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "logic": "nope",
+          "header": [
+            "x"
+          ],
+          "rows": []
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "registry_error"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-size-limit",
+      "spec": [
+        "tables.md#grids",
+        "tables.md#limits"
+      ],
+      "description": "The table size limit counts cells and condition nodes, copies included",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "x"
+          ],
+          "rows": [
+            [
+              "> 1"
+            ],
+            [
+              "> 2"
+            ],
+            [
+              "> 3"
+            ]
+          ]
+        },
+        "limits": {
+          "max_table_size": 5
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "pointer": "/rows/1/0"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-columns-before-rows",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "The columns are checked before any row",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "x",
+            "THEN a",
+            "THEN a"
+          ],
+          "rows": [
+            [
+              "> )"
+            ]
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/header/2"
+        }
+      }
+    },
+    {
+      "id": "format/tables/grid-header-in-order",
+      "spec": [
+        "tables.md#grids"
+      ],
+      "description": "Header items are read in order",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "header": [
+            "order.total >",
+            "x > 5"
+          ],
+          "rows": []
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "pointer": "/header/0"
+        }
+      }
     }
   ]
 }

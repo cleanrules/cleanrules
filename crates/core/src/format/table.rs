@@ -250,7 +250,7 @@ fn rows_shape<'j>(
 
 /// An error in the text of a header or cell, located by the string's pointer;
 /// its position within the text goes into the message.
-fn in_text(error: &Error, pointer: &str) -> Error {
+pub(crate) fn in_text(error: &Error, pointer: &str) -> Error {
     let context = error.context();
     let message = match (context.line, context.column) {
         (Some(1), Some(column)) => format!("{} (column {column} of the text)", error.message()),

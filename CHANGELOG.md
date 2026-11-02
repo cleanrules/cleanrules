@@ -103,6 +103,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (built on first use), `evaluate`, `evaluate_many` and `summary`. Tables are
   immutable and pickle. `load` and `dump` keep line breaks as written in every
   format, on every platform.
+- Decision tables from grids (`spec/tables.md`, *Grids*): a header and rows of
+  cells, as spreadsheets and data frames hold them. Text cells are read as CSV
+  fields, other values as constants (equality under an input), and nodes built
+  in a host language as they are; errors point into the grid (`/header/<c>`,
+  `/rows/<r>/<c>`). An output cell written as a bare name that is one of its
+  column's string values (`high` for `'high'`) gets a hint to quote it. 28
+  conformance vectors, with the new `table_grid` input. Rust core:
+  `DecisionTable::grid` and `GridBuilder` (`push_row`, `finish`), which build a
+  table one row at a time, `DecisionTable::from_grid`, `table::HeaderItem` and
+  `table::Cell`.
+- Python binding: `DecisionTable(header, rows, ...)` builds a table from rows,
+  and `DecisionTable.from_dataframe` from a pandas or polars `DataFrame`
+  (neither is imported; missing values are empty cells). A `str` cell is the
+  text syntax, as in the table's CSV. `HeaderItem` types a header. `TableOutput`
+  values default to none, and `load`, `loads` and the constructors take
+  `max_table_size`.
 - Python binding: `str()` of an `Explanation`, a `RuleExplanation`, a `Cause`
   and a `Summary` gives that text, and `str()` of a condition its canonical
   text (`x > 5 AND NOT vip`; `repr()` is still the Python that builds it).

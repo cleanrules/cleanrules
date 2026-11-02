@@ -63,7 +63,7 @@ pub(crate) fn ruleset_parts<'py>(
 /// `("ruleset", (rules, hit_policy, aggregate, logic, strict))` or
 /// `("decision_table", DecisionTable)`; CSV holds a decision table.
 #[pyfunction]
-#[pyo3(signature = (text, format, max_size=None, max_nesting=None, max_depth=None))]
+#[pyo3(signature = (text, format, max_size=None, max_nesting=None, max_depth=None, max_table_size=None))]
 pub(crate) fn load_document<'py>(
     py: Python<'py>,
     text: &str,
@@ -71,8 +71,12 @@ pub(crate) fn load_document<'py>(
     max_size: Option<usize>,
     max_nesting: Option<usize>,
     max_depth: Option<usize>,
+    max_table_size: Option<usize>,
 ) -> PyResult<(&'static str, Bound<'py, PyAny>)> {
-    let limits = limits(max_size, max_nesting, max_depth);
+    let mut limits = limits(max_size, max_nesting, max_depth);
+    if let Some(size) = max_table_size {
+        limits.max_table_size = size;
+    }
     let document = match format {
         "json" => read_document(text, &limits),
         "yaml" => read_yaml_document(text, &limits),

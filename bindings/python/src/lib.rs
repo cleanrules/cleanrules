@@ -50,6 +50,7 @@ fn _cleanrules(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(documents::load_document, module)?)?;
     module.add_function(wrap_pyfunction!(documents::load_rule, module)?)?;
     module.add_function(wrap_pyfunction!(documents::dump_table, module)?)?;
+    module.add_function(wrap_pyfunction!(tables::table_from_grid, module)?)?;
     module.add_function(wrap_pyfunction!(documents::dump_condition, module)?)?;
     module.add_function(wrap_pyfunction!(documents::dump_rule, module)?)?;
     module.add_function(wrap_pyfunction!(documents::dump_ruleset, module)?)?;
