@@ -1,0 +1,1 @@
+{"code":"invalid_argument","message":"cr_document_read: format 0 is not a CR_FORMAT_* constant","hint":"use CR_FORMAT_JSON (1), CR_FORMAT_YAML (2), CR_FORMAT_TEXT (3) or CR_FORMAT_CSV (4)"}

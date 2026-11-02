@@ -1,0 +1,1 @@
+{"code":"expression_error","message":"a null constant cannot be an operand of 'eq'","hint":"test for missing values with is_null","pointer":"/condition","node":{"op":"const","value":null}}

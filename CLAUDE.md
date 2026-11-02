@@ -38,6 +38,9 @@ cargo test -p cleanrules --test conformance
 
 # Bindings, cuando existan
 (cd bindings/python && uv run pytest && uv run pyright)   # uv compila la extensión con maturin
+cargo test -p cleanrules-ffi                                # C ABI: sus tests y los vectores a través de ella
+cargo +nightly miri test -p cleanrules-ffi --lib --test abi
+(cd crates/ffi && cbindgen --config cbindgen.toml --output include/cleanrules.h)   # regenera la cabecera C
 cmake -S bindings/cpp -B build/cpp && ctest --test-dir build/cpp
 npm --prefix bindings/js test
 (cd bindings/jvm && ./gradlew test)

@@ -3,6 +3,7 @@
 mod condition;
 mod decision;
 mod document;
+mod error;
 mod explain;
 pub mod result;
 mod rules;
@@ -11,11 +12,13 @@ pub mod value;
 
 pub use condition::write_node;
 pub use document::{
-    Document, read_decision_document, read_document, read_parsed_decision_document,
-    read_parsed_document, write_document,
+    Document, DocumentFormat, parse_as, read_decision_document, read_decision_document_as,
+    read_document, read_document_as, read_parsed_decision_document, read_parsed_document,
+    write_decision_as, write_document, write_document_as, write_explanation_as, write_summary_as,
 };
 #[cfg(feature = "yaml")]
 pub use document::{read_yaml_decision_document, read_yaml_document};
+pub use error::write_error;
 pub use explain::{write_explanation, write_summary};
 pub use result::{write_path, write_reason, write_result, write_truth};
 pub use rules::{write_decision, write_rule, write_ruleset};

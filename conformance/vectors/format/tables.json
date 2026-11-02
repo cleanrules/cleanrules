@@ -3193,6 +3193,7 @@
       "expect": {
         "error": {
           "code": "registry_error",
+          "name": "fuzzy",
           "pointer": "/decision_table/logic"
         }
       }
@@ -4923,7 +4924,8 @@
       },
       "expect": {
         "error": {
-          "code": "registry_error"
+          "code": "registry_error",
+          "name": "nope"
         }
       }
     },

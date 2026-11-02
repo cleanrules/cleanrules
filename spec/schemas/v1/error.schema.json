@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanrules.github.io/schemas/v1/error.schema.json",
+  "title": "cleanrules error, JSON form",
+  "description": "An error as the core writes it for the C ABI, logs and agents. Not a document: it has no version. See spec/errors.md, section JSON form, which is normative. Member names and meanings are stable; message, hint and cause are free text.",
+  "type": "object",
+  "properties": {
+    "code": {
+      "enum": [
+        "format_error",
+        "unsupported_version",
+        "limit_exceeded",
+        "decision_mismatch",
+        "expression_error",
+        "rule_definition_error",
+        "rule_syntax_error",
+        "registry_error",
+        "rule_not_found",
+        "evaluation_error",
+        "missing_field",
+        "type_mismatch",
+        "hit_policy_error",
+        "action_error",
+        "unsupported",
+        "invalid_argument",
+        "internal_error"
+      ]
+    },
+    "message": { "type": "string" },
+    "hint": { "type": "string" },
+    "pointer": { "type": "string" },
+    "line": { "type": "integer", "minimum": 1 },
+    "column": { "type": "integer", "minimum": 1 },
+    "rule": { "type": "string" },
+    "rules": { "$ref": "#/$defs/names" },
+    "path": { "$ref": "decision.schema.json#/$defs/reason/properties/paths/items" },
+    "types": { "$ref": "decision.schema.json#/$defs/reason/properties/types" },
+    "row": { "type": "integer", "minimum": 0 },
+    "name": { "type": "string" },
+    "available": { "$ref": "#/$defs/names" },
+    "executed": { "$ref": "#/$defs/names" },
+    "node": {
+      "anyOf": [
+        { "$ref": "condition.schema.json#/$defs/condition" },
+        { "$ref": "condition.schema.json#/$defs/operand" },
+        { "$ref": "condition.schema.json#/$defs/constNull" }
+      ]
+    },
+    "operation": { "type": "string" },
+    "reason": { "type": "string" },
+    "cause": { "type": "string" }
+  },
+  "required": ["code", "message"],
+  "additionalProperties": false,
+  "$defs": {
+    "names": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    }
+  }
+}

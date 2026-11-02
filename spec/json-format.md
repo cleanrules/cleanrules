@@ -53,6 +53,20 @@ Readers are strict:
   (such as `"\ud800"`) are `format_error`s. Strings are never
   Unicode-normalized: they are kept exactly as written.
 
+**Formats.** Documents are also read and written in YAML (*YAML*); the
+documents of conditions, rules and rule sets in the rule syntax (`text.md`);
+and those of decision tables in CSV (`tables.md`). Decisions are read and
+written in JSON or YAML only, and explanations and summaries are written in
+JSON, YAML or as their text (`explain.md`). Any other combination is
+`unsupported`. Read from bytes, text that is not UTF-8 is a `format_error` at
+the line and column of the first invalid byte, in every format.
+
+**A rule set from a document.** Where an API asks for a rule set (the C ABI's
+`cr_ruleset_read`, for one), a rule set document gives it, a decision table
+gives the rule set it compiles to (`tables.md`), and a rule gives a rule set of
+that one rule with the default settings (*Rule sets*: `first`, `boolean`, not
+strict). A condition is a `format_error`: it is not a rule.
+
 **Versioning.** Adding a node, a content key or an optional key keeps the
 version, and so does accepting a new JSON form for an existing key, as long as
 existing documents never use that form. Any other change (renaming, removing,

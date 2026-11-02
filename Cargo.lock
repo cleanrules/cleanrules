@@ -210,6 +210,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cleanrules-ffi"
+version = "0.0.0"
+dependencies = [
+ "cleanrules",
+]
+
+[[package]]
 name = "cleanrules-python"
 version = "0.0.0"
 dependencies = [

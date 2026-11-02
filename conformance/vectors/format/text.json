@@ -2430,6 +2430,7 @@
       "expect": {
         "error": {
           "code": "registry_error",
+          "name": "fuzzy",
           "line": 1,
           "column": 7
         }

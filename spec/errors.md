@@ -43,7 +43,7 @@ its cause.
 | JavaScript, TypeScript | `Error` subclasses with the names above and a `code` property. The cause is `cause`. |
 | C++ | exceptions with the names above, deriving from `std::runtime_error`, with `code()`. |
 | Go | one type, `*cleanrules.Error`, with a `Code` field and the context. Each parent of the hierarchy is a sentinel (`ErrEvaluation`, `ErrFormat`, …), and the type's `Is` method matches its own code's sentinel and its parent's, so `errors.Is(err, cleanrules.ErrEvaluation)` is true for a `missing_field`. The cause is returned by `Unwrap`. |
-| C | functions return a `cr_status`: `CR_OK` or a `cr_error_code`, an enum with one stable numeric value per code (part of the ABI). `cr_error_parent(code)` gives the parent's code. The message, the context and the cause's message are read from the last error of the handle. |
+| C | functions return a `cr_status` (`int32_t`): `CR_OK` (0), the numeric value of an error code (*Numeric codes*, part of the ABI), or a negative status for a misuse that only C can make: `CR_INVALID_ARGUMENT` (-1: a null pointer where one is required, an unknown format or limit) and `CR_INTERNAL_ERROR` (-2: a bug in cleanrules, caught at the boundary). A fallible function takes a last argument `cr_error **error`, which may be `NULL` and otherwise points to `NULL`; on failure it receives a new `cr_error`, which the caller frees with `cr_error_free`, with the code, the message, the hint and the error's *JSON form*, and on success it is left alone. Out-parameters are `NULL` after a failure. `cr_error_parent(code)` gives the parent's code, 0 for a root. Texts are passed as bytes and a length: bytes that are not UTF-8 are a `format_error` at the line and column of the first invalid byte, in every format, as for JSON (`json-format.md`, *Errors and limits*). The cause's message is the `cause` of the JSON form. |
 | Rust | a `#[non_exhaustive]` `Error` with `code()`, accessors for the context, and `source()` for the cause. |
 
 ## Codes
@@ -88,6 +88,51 @@ Context fields:
 different outputs (every rule that fired), when an aggregate meets a value that
 is not a number (the rules whose payloads hold one), and when a multi-hit
 decision is asked for its single `output` (`rules` is empty).
+
+### Numeric codes
+
+*Not checked by vectors: the C ABI's tests check them.*
+
+The C ABI gives each code a stable number, which never changes and is never
+reused; a new code takes the next one.
+
+| Code | C constant | Value |
+|---|---|---|
+| `format_error` | `CR_FORMAT_ERROR` | 1 |
+| `unsupported_version` | `CR_UNSUPPORTED_VERSION` | 2 |
+| `limit_exceeded` | `CR_LIMIT_EXCEEDED` | 3 |
+| `decision_mismatch` | `CR_DECISION_MISMATCH` | 4 |
+| `expression_error` | `CR_EXPRESSION_ERROR` | 5 |
+| `rule_definition_error` | `CR_RULE_DEFINITION_ERROR` | 6 |
+| `rule_syntax_error` | `CR_RULE_SYNTAX_ERROR` | 7 |
+| `registry_error` | `CR_REGISTRY_ERROR` | 8 |
+| `rule_not_found` | `CR_RULE_NOT_FOUND` | 9 |
+| `evaluation_error` | `CR_EVALUATION_ERROR` | 10 |
+| `missing_field` | `CR_MISSING_FIELD` | 11 |
+| `type_mismatch` | `CR_TYPE_MISMATCH` | 12 |
+| `hit_policy_error` | `CR_HIT_POLICY_ERROR` | 13 |
+| `action_error` | `CR_ACTION_ERROR` | 14 |
+| `unsupported` | `CR_UNSUPPORTED` | 15 |
+
+### JSON form
+
+*Not checked by vectors: the core's tests check it.*
+
+For the C ABI, logs and agents, the core writes an error as a JSON object with
+these members, in this order, each only when it applies: `code`, `message`,
+`hint`; then the context fields `pointer`, `line`, `column`, `rule`, `rules`,
+`path` (a path as in `json-format.md`), `types`, `row`, `name`, `available`,
+`executed`, `node` (a node in JSON form, as in `json-format.md`, even a null constant), `operation` and `reason`,
+leaving out empty arrays; and `cause`, the message of the error that caused it.
+The C ABI's own statuses are written with the codes `invalid_argument` and
+`internal_error`. JSON Schema: `schemas/v1/error.schema.json`.
+
+The member names and what they hold are stable, like the format's
+(`json-format.md`, *Versioning*): a new version may add members, never change or
+remove one. Bindings built on the C ABI (Go, the JVM) and agents read the code
+and the context from it. `message`, `hint` and `cause` are free text for people,
+whose wording may change. Conformance vectors still compare only the fields of
+*Comparing errors*.
 
 ### Comparing errors
 

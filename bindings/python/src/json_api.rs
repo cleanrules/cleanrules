@@ -6,12 +6,14 @@ use cleanrules::Value;
 use cleanrules::eval::{Options, evaluate_tree, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
-    ValueContext, read_decision_document, read_document, read_node, read_ruleset, read_value,
-    write_decision, write_document, write_explanation, write_result, write_summary,
+    DocumentFormat, ValueContext, read_decision_document_as, read_document, read_node,
+    read_ruleset, read_value, write_decision, write_document, write_explanation, write_result,
+    write_summary,
 };
 use cleanrules::json::{Json, Limits, parse, to_string};
 use cleanrules::logic::{Kleene, LogicName};
 use cleanrules::rules::RuleSet;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 use crate::errors::IntoPyResult;
@@ -19,9 +21,7 @@ use crate::errors::IntoPyResult;
 fn limits(max_size: Option<usize>, max_nesting: Option<usize>, max_depth: Option<usize>) -> Limits {
     let mut limits = Limits::default();
     if let Some(size) = max_size {
-        limits.max_size = size;
-        limits.max_yaml_size = size;
-        limits.max_text_size = size;
+        limits = limits.with_max_size(size);
     }
     if let Some(nesting) = max_nesting {
         limits.max_nesting = nesting;
@@ -74,12 +74,10 @@ pub(crate) fn _read_decision(
 ) -> PyResult<String> {
     let rules = ruleset(py, ruleset_json)?;
     let limits = limits(max_size, max_nesting, max_depth);
-    let decision = if format == "yaml" {
-        cleanrules::format::read_yaml_decision_document(text, &rules, &limits)
-    } else {
-        read_decision_document(text, &rules, &limits)
-    }
-    .or_raise(py)?;
+    let format = DocumentFormat::from_name(format)
+        .ok_or_else(|| PyValueError::new_err(format!("unknown format {format:?}")))?;
+    let decision =
+        read_decision_document_as(text.as_bytes(), format, &rules, &limits).or_raise(py)?;
     Ok(to_string(&write_decision(&decision)))
 }
 

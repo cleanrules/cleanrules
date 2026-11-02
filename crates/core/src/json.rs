@@ -121,6 +121,20 @@ pub struct Limits {
     pub max_table_size: usize,
 }
 
+impl Limits {
+    /// The same limits with `size` as the largest text of every format: JSON,
+    /// YAML, and the rule syntax and CSV (`max_text_size`). YAML's own limit
+    /// is lower by default; raising it lets the YAML parser hold a larger flow
+    /// collection whole.
+    #[must_use]
+    pub fn with_max_size(mut self, size: usize) -> Self {
+        self.max_size = size;
+        self.max_yaml_size = size;
+        self.max_text_size = size;
+        self
+    }
+}
+
 impl Default for Limits {
     fn default() -> Self {
         Self {
@@ -144,16 +158,23 @@ pub fn parse_bytes(bytes: &[u8], limits: &Limits) -> Result<Json> {
     if bytes.len() > limits.max_size {
         return Err(too_large(bytes.len(), limits));
     }
-    match std::str::from_utf8(bytes) {
-        Ok(text) => parse(text, limits),
-        Err(error) => {
-            let valid = &bytes[..error.valid_up_to()];
-            // The valid prefix is UTF-8 by construction.
-            let prefix = std::str::from_utf8(valid).unwrap_or_default();
-            let (line, column) = position_after(prefix);
-            Err(syntax(line, column, "the document is not valid UTF-8"))
-        }
-    }
+    parse(utf8_text(bytes)?, limits)
+}
+
+/// Bytes as UTF-8 text, for every format read from bytes (`spec/errors.md`,
+/// *In each language*).
+///
+/// # Errors
+///
+/// `format_error` at the line and column of the first byte that is not UTF-8.
+pub fn utf8_text(bytes: &[u8]) -> Result<&str> {
+    std::str::from_utf8(bytes).map_err(|error| {
+        let valid = &bytes[..error.valid_up_to()];
+        // The valid prefix is UTF-8 by construction.
+        let prefix = std::str::from_utf8(valid).unwrap_or_default();
+        let (line, column) = position_after(prefix);
+        syntax(line, column, "the text is not valid UTF-8")
+    })
 }
 
 /// Read a JSON text.

@@ -55,6 +55,45 @@ jobs:
       # The definition of done asks for 95 % of the core's lines.
       - run: cargo llvm-cov -p cleanrules --features yaml --fail-under-lines 95
 
+  c-abi:
+    name: C ABI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cbindgen@0.29.4
+      # The committed header is the one cbindgen writes.
+      - run: cbindgen --config cbindgen.toml --verify --output include/cleanrules.h
+        working-directory: crates/ffi
+      - run: c++ -fsyntax-only -x c++ -std=c++17 -Wall -Werror crates/ffi/include/cleanrules.h
+      - run: cargo build -p cleanrules-ffi
+      # The example is strict C11 and runs under the address and undefined
+      # behaviour sanitizers.
+      - run: >
+          cc -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -g
+          -I crates/ffi/include docs/examples/discounts.c
+          target/debug/libcleanrules_ffi.a -lm -lpthread -ldl -o discounts
+      - run: ./discounts docs/examples/discounts.rules
+
+  miri:
+    name: Miri (C ABI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+      - uses: Swatinem/rust-cache@v2
+      # Every `unsafe` block of the boundary, under the interpreter.
+      - run: cargo miri test -p cleanrules-ffi --lib --test abi
+
   msrv:
     name: Rust 1.95 (MSRV)
     runs-on: ubuntu-latest

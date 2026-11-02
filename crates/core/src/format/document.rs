@@ -6,7 +6,7 @@ use crate::error::{Error, ErrorCode, Result};
 use crate::format::condition::{build, shape, write_node};
 use crate::format::decision::read_decision;
 use crate::format::rules::{
-    build_rule, build_ruleset, shape_rule, shape_ruleset, write_rule, write_ruleset,
+    build_rule, build_ruleset, shape_rule, shape_ruleset, write_decision, write_rule, write_ruleset,
 };
 use crate::format::table::{read_table, write_table};
 use crate::json::{Json, JsonNumber, Limits, parse, pointer_token};
@@ -39,6 +39,26 @@ pub enum Document {
 }
 
 impl Document {
+    /// The rule set the document gives (`spec/json-format.md`, *A rule set from
+    /// a document*): its rule set, the one its decision table compiles to, or a
+    /// rule set of its one rule with the default settings.
+    ///
+    /// # Errors
+    ///
+    /// `format_error` for a condition, which is not a rule.
+    pub fn into_ruleset(self) -> Result<RuleSet> {
+        match self {
+            Document::RuleSet(ruleset) => Ok(ruleset),
+            Document::DecisionTable(table) => Ok(table.ruleset().clone()),
+            Document::Rule(rule) => RuleSet::new(vec![rule], crate::rules::Config::default()),
+            Document::Condition(_) => Err(Error::new(
+                ErrorCode::FormatError,
+                "this document holds a condition, not rules",
+            )
+            .with_hint("make it the condition of a rule (RULE name IF ...)")),
+        }
+    }
+
     /// The condition, if the document holds one.
     #[must_use]
     pub fn into_condition(self) -> Option<Node> {
@@ -284,4 +304,222 @@ pub fn write_document(document: &Document) -> Json {
             ("decision_table".into(), write_table(table)),
         ]),
     }
+}
+
+/// A syntax documents are read from and written in (`spec/json-format.md`,
+/// `spec/text.md`, `spec/tables.md`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum DocumentFormat {
+    /// JSON (`.json`).
+    Json,
+    /// YAML (`.yaml`), with the `yaml` feature.
+    Yaml,
+    /// The rule syntax (`.rules`).
+    Text,
+    /// CSV, for decision tables only (`.csv`).
+    Csv,
+}
+
+impl DocumentFormat {
+    /// The format named `json`, `yaml`, `text` or `csv`.
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "json" => Self::Json,
+            "yaml" => Self::Yaml,
+            "text" => Self::Text,
+            "csv" => Self::Csv,
+            _ => return None,
+        })
+    }
+
+    /// The format's name.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Json => "json",
+            Self::Yaml => "yaml",
+            Self::Text => "text",
+            Self::Csv => "csv",
+        }
+    }
+}
+
+/// Read a document from bytes in `format`.
+///
+/// # Errors
+///
+/// `format_error` for bytes that are not UTF-8, at the first invalid byte;
+/// then the errors of that format's reader; `unsupported` for YAML in a build
+/// without the `yaml` feature.
+pub fn read_document_as(bytes: &[u8], format: DocumentFormat, limits: &Limits) -> Result<Document> {
+    match format {
+        DocumentFormat::Json => {
+            read_parsed_document(&crate::json::parse_bytes(bytes, limits)?, limits)
+        }
+        #[cfg(feature = "yaml")]
+        DocumentFormat::Yaml => read_yaml_document(crate::json::utf8_text(bytes)?, limits),
+        #[cfg(not(feature = "yaml"))]
+        DocumentFormat::Yaml => Err(no_yaml()),
+        DocumentFormat::Text => crate::text::parse(crate::json::utf8_text(bytes)?, limits),
+        DocumentFormat::Csv => DecisionTable::from_csv(crate::json::utf8_text(bytes)?, limits)
+            .map(Document::DecisionTable),
+    }
+}
+
+/// Write a document in `format`.
+///
+/// # Errors
+///
+/// `unsupported` for a document the format cannot hold: CSV holds decision
+/// tables only, and text has no metadata, actions given as code or NaN
+/// (`spec/text.md`); also for YAML in a build without the `yaml` feature.
+pub fn write_document_as(document: &Document, format: DocumentFormat) -> Result<String> {
+    match (format, document) {
+        (DocumentFormat::Json, _) => Ok(crate::json::to_string(&write_document(document))),
+        #[cfg(feature = "yaml")]
+        (DocumentFormat::Yaml, _) => Ok(crate::yaml::to_string(&write_document(document))),
+        #[cfg(not(feature = "yaml"))]
+        (DocumentFormat::Yaml, _) => Err(no_yaml()),
+        (DocumentFormat::Text, _) => crate::text::to_string(document),
+        (DocumentFormat::Csv, Document::DecisionTable(table)) => Ok(table.to_csv()),
+        (DocumentFormat::Csv, _) => Err(Error::new(
+            ErrorCode::Unsupported,
+            "only decision tables are written as CSV",
+        )
+        .with_hint("write rules and rule sets as JSON, YAML or text")
+        .unsupported("csv", "CSV holds decision tables")),
+    }
+}
+
+#[cfg(not(feature = "yaml"))]
+fn no_yaml() -> Error {
+    Error::new(
+        ErrorCode::Unsupported,
+        "this build of cleanrules has no YAML",
+    )
+    .with_hint("build the core with its `yaml` feature")
+    .unsupported("yaml", "the `yaml` feature is off")
+}
+
+fn unsupported_as(what: &str, format: DocumentFormat, formats: &str) -> Error {
+    Error::new(
+        ErrorCode::Unsupported,
+        format!("a {what} is not written in {}", format.as_str()),
+    )
+    .with_hint(format!("use {formats}"))
+    .unsupported(
+        format.as_str(),
+        format!("a {what} has no {} form", format.as_str()),
+    )
+}
+
+/// Parse a document's text in JSON or YAML into JSON values, for the documents
+/// that only these formats hold (decisions).
+///
+/// # Errors
+///
+/// As [`crate::json::parse_bytes`] or [`crate::yaml::parse`]; `unsupported`
+/// for the rule syntax and CSV, and for YAML without the `yaml` feature.
+pub fn parse_as(bytes: &[u8], format: DocumentFormat, limits: &Limits) -> Result<Json> {
+    match format {
+        DocumentFormat::Json => crate::json::parse_bytes(bytes, limits),
+        #[cfg(feature = "yaml")]
+        DocumentFormat::Yaml => crate::yaml::parse(crate::json::utf8_text(bytes)?, limits),
+        #[cfg(not(feature = "yaml"))]
+        DocumentFormat::Yaml => Err(no_yaml()),
+        DocumentFormat::Text | DocumentFormat::Csv => {
+            Err(unsupported_as("decision", format, "JSON or YAML"))
+        }
+    }
+}
+
+/// Read a decision document in `format` (JSON or YAML) with the rule set that
+/// produced it.
+///
+/// # Errors
+///
+/// As [`parse_as`], then as [`read_parsed_decision_document`].
+pub fn read_decision_document_as<'a>(
+    bytes: &[u8],
+    format: DocumentFormat,
+    ruleset: &'a RuleSet,
+    limits: &Limits,
+) -> Result<Decision<'a>> {
+    read_parsed_decision_document(&parse_as(bytes, format, limits)?, ruleset, limits)
+}
+
+/// An output-only document, `{"version": 1, <key>: <content>}`.
+fn output_document(key: &str, content: Json) -> Json {
+    Json::Object(vec![
+        (
+            "version".into(),
+            Json::Number(JsonNumber::from_literal(FORMAT_VERSION.to_string())),
+        ),
+        (key.into(), content),
+    ])
+}
+
+fn write_output_as(
+    key: &str,
+    content: impl FnOnce() -> Json,
+    text: Option<&dyn Fn() -> String>,
+    format: DocumentFormat,
+) -> Result<String> {
+    match (format, text) {
+        (DocumentFormat::Json, _) => Ok(crate::json::to_string(&output_document(key, content()))),
+        #[cfg(feature = "yaml")]
+        (DocumentFormat::Yaml, _) => Ok(crate::yaml::to_string(&output_document(key, content()))),
+        #[cfg(not(feature = "yaml"))]
+        (DocumentFormat::Yaml, _) => Err(no_yaml()),
+        (DocumentFormat::Text, Some(text)) => Ok(text()),
+        (format, Some(_)) => Err(unsupported_as(key, format, "JSON, YAML or text")),
+        (format, None) => Err(unsupported_as(key, format, "JSON or YAML")),
+    }
+}
+
+/// Write a decision document in JSON or YAML.
+///
+/// # Errors
+///
+/// `unsupported` for the rule syntax and CSV: a decision has no text form.
+pub fn write_decision_as(decision: &Decision<'_>, format: DocumentFormat) -> Result<String> {
+    write_output_as("decision", || write_decision(decision), None, format)
+}
+
+/// Write an explanation document in JSON or YAML, or its text
+/// (`spec/explain.md`, *Text*) for [`DocumentFormat::Text`].
+///
+/// # Errors
+///
+/// `unsupported` for CSV.
+pub fn write_explanation_as(
+    explanation: &crate::explain::Explanation<'_, '_>,
+    format: DocumentFormat,
+) -> Result<String> {
+    write_output_as(
+        "explanation",
+        || crate::format::write_explanation(explanation),
+        Some(&|| explanation.to_string()),
+        format,
+    )
+}
+
+/// Write a summary document in JSON or YAML, or its text (`spec/explain.md`,
+/// *Summaries*) for [`DocumentFormat::Text`].
+///
+/// # Errors
+///
+/// `unsupported` for CSV.
+pub fn write_summary_as(
+    summary: &crate::explain::Summary<'_>,
+    format: DocumentFormat,
+) -> Result<String> {
+    write_output_as(
+        "summary",
+        || crate::format::write_summary(summary),
+        Some(&|| summary.to_string()),
+        format,
+    )
 }
