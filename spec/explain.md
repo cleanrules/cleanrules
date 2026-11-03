@@ -1,8 +1,7 @@
 # Explanations and summaries
 
-**Status:** draft, normative for every implementation. It is derived from the
-Python v1 (`rulepy.core.explain` and `rulepy.core.summary`, in the git tag
-`python-reference`). The JSON form of both is in
+**Status:** draft, normative for every implementation. The JSON form of both
+is in
 [`json-format.md`](json-format.md) (*Explanations*, *Summaries*).
 
 Every decision explains itself (`CLAUDE.md`, invariant 8). An explanation is
@@ -266,16 +265,6 @@ magnitude is 0 or at least `1e-4` and below `1e16` and in exponent notation
 otherwise. A gap between dates is `<n> day` or `<n> days`; between datetimes,
 days, hours, minutes and seconds, leaving out the zero ones (`1 hour 30 minutes
 0.5 seconds`).
-
-## Differences from the Python v1
-
-- A gap between two ints that overflows 64 bits has none; the v1 had
-  unbounded ints.
-- A decimal gap is exact or absent; the v1 rounded it to 28 significant digits
-  (Python's default decimal context).
-- A gap between two aware datetimes in the same named zone is the difference
-  between instants; the v1 subtracted wall-clock times across a daylight saving
-  change (01:00 to 04:00 in Europe/Madrid on 2026-10-25 gave 3 hours, not 4).
 
 ## Summaries
 

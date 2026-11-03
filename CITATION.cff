@@ -18,7 +18,7 @@ authors:
   - family-names: "Salmeron"
     given-names: "Jose L."
     orcid: "https://orcid.org/0000-0001-7811-3716"
-license: MIT
+license: Apache-2.0
 repository-code: "https://github.com/cleanrules/cleanrules"
 url: "https://cleanrules.github.io/"
 keywords:

@@ -11,7 +11,7 @@ Before writing code, read `CLAUDE.md` (invariants and conventions), the task's p
 
 Rules:
 
-- **Spec first.** Behaviour comes from `spec/` and the vectors. If the spec is silent or ambiguous, stop and report it with a proposed wording; do not invent semantics in code. During phase B the retired Python v1 (git tag `python-reference`) is a secondary reference only.
+- **Spec first.** Behaviour comes from `spec/` and the vectors. If the spec is silent or ambiguous, stop and report it with a proposed wording; do not invent semantics in code.
 - **Crate split.** `crates/core` (crate `cleanrules`) is pure Rust: no FFI, no PyO3, no `unsafe`. `crates/ffi` holds the C ABI only: opaque handles, explicit ownership, error codes plus messages, JSON and binary `Value` in/out. Binding crates convert data and errors and run host-language actions; they never evaluate, explain or decide.
 - **Determinism.** No iteration over `HashMap`/`HashSet` where order is observable; use `BTreeMap`, `IndexMap` or sorted vectors. Same inputs, same decision, firing order and explanation on every platform.
 - **Logic through the trait.** Truth values are combined only through `Logic`; never with `&&`, `||` or `!`.

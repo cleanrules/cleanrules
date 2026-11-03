@@ -719,22 +719,6 @@ would have been written:
 Decisions and explanations can always be written: a native value with no
 equivalent is recorded as an opaque value (*Values*).
 
-## Differences from the Python v1
-
-The format is stricter than the v1 API in a few deliberate ways:
-
-- policy, aggregate and logic names are matched exactly, in lowercase (the v1
-  ignored case);
-- an unknown policy or aggregate is a `format_error`, not a
-  `RuleDefinitionError`;
-- an invalid constant in a payload is an `expression_error`; the v1 wrapped it
-  in a `RuleDefinitionError`;
-- metadata values must be data values; the v1 accepted any object;
-- a null constant is rejected as a rule's condition and under `and`, `or` and
-  `not` (`ast.md`);
-- type groups in reasons are written in snake case (`naive_datetime`); the v1
-  wrote `naive datetime`.
-
 ## YAML
 
 Rule files may also be written in YAML 1.2. A YAML document is read into

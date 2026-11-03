@@ -4,7 +4,7 @@ Motor de reglas con **un único núcleo en Rust** y bindings para Rust, C/C++, P
 
 - **Hoja de ruta y estado**: [docs/PLAN.md](docs/PLAN.md) es la fuente de verdad. Antes de empezar cualquier tarea, léela y localiza la fase y la tarea.
 - **Contratos**: la especificación ([spec/](spec/)) y la batería de conformidad (`conformance/`) definen la semántica. Si cambia el comportamiento, primero se actualizan la especificación y los vectores.
-- **Fase actual**: A, B, C y D completadas (especificación, formato JSON v1 y vectores de conformidad; núcleo Rust en `crates/core`, con CI que exige el 95 % de cobertura de líneas; binding de Python en `bindings/python`, que pasa todos los vectores por JSON y con datos nativos; reglas como datos: YAML, texto, tablas de decisión y acciones por nombre). La implementación Python v1 (`rulepy`) se retiró en A.4 y queda en el tag `python-reference` como referencia secundaria. Siguiente: fase E (C ABI y bindings C/C++); O.1–O.3 y V.1–V.2 ya pueden empezar.
+- **Fase actual**: A, B, C y D completadas (especificación, formato JSON v1 y vectores de conformidad; núcleo Rust en `crates/core`, con CI que exige el 95 % de cobertura de líneas; binding de Python en `bindings/python`, que pasa todos los vectores por JSON y con datos nativos; reglas como datos: YAML, texto, tablas de decisión y acciones por nombre). Siguiente: fase E (C ABI y bindings C/C++); O.1–O.3 y V.1–V.2 ya pueden empezar.
 
 ## Estructura
 
@@ -107,7 +107,6 @@ Un detalle para el binding de Python: `fuzzytool.sets.Antecedent.__and__` no dev
 - Añadir dependencias sin preguntar (`cargo add`, `uv add`, `npm install <paquete>`, `go get` y Gradle piden confirmación). En el núcleo, solo con un motivo fuerte.
 - Publicar en cualquier registro, crear tags o hacer push: los comandos de publicación están denegados en `.claude/settings.json`.
 - Poner lógica de evaluación en un binding, o "arreglar" en un binding una diferencia que debe corregirse en el núcleo.
-- Ampliar la implementación Python v1: solo se toca para extraer vectores en la fase A.
 - Cambiar la semántica sin actualizar `spec/` y los vectores.
 - Afirmar una mejora de rendimiento sin benchmark (`/bench`).
 

@@ -1,8 +1,6 @@
 """Conditions built with `F`, constants and operators (task C.2a).
 
-Ported from the Python v1's tests (git tag `python-reference`): the API and the
-pitfall guards behave as there, and every construction rule is now checked by
-the core.
+The API, the pitfall guards, and the construction rules that the core checks.
 """
 
 import copy
@@ -222,7 +220,7 @@ def test_decimals_are_exact(value: Decimal) -> None:
     [(True, "any"), (None, "value"), (3, "value"), ("x", "value"), (dt.date(2026, 1, 1), "value")],
 )
 def test_constant_kind_depends_on_the_value(value: object, kind: str) -> None:
-    # `any` is for fields and booleans only; the v1 also gave it to None (spec/ast.md).
+    # `any` is for fields and booleans only, never for None (spec/ast.md).
     assert Const(value).kind == kind
 
 

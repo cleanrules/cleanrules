@@ -63,8 +63,8 @@ binary64.
 ### Datetimes
 
 Datetimes have microsecond precision. A native value with a finer precision is
-**truncated** toward the past to the microsecond, as the Python v1 did with
-`numpy.datetime64`.
+**truncated** toward the past to the microsecond, as `numpy.datetime64` values
+are in Python.
 
 A native date or datetime outside years 1 to 9999 is opaque. An aware datetime
 is opaque too when its UTC instant falls outside those years, or its offset is
@@ -222,7 +222,7 @@ segment reads through it. Anything not listed is opaque.
 
 #### Python
 
-The Python binding reads exactly as the v1 did. A string segment reads:
+In Python, a string segment reads:
 
 - on a `Mapping`, the value under that key if `key in obj` (checked first, so
   `__missing__` is never triggered, and subclasses are read through their own
@@ -351,20 +351,3 @@ negative scales, `Date64`, zone strings that are offsets, and dictionary-encoded
 strings. Columns with no equivalent, such as `Binary` or `Duration`, are
 rejected when the batch's schema is checked, because there is no native object
 to give back.
-
-## Differences from the Python v1
-
-The Python binding reads data as the v1 did, except:
-
-- a `pandas.Timestamp` with nanoseconds is truncated to the microsecond;
-- a string with a lone surrogate is opaque, because it is not valid Unicode
-  text;
-- a datetime with a sub-second offset, or whose UTC instant falls outside years
-  1 to 9999, is opaque instead of an aware datetime;
-- a date or datetime is opaque when it falls outside years 1 to 9999;
-- a decimal with more than 38 digits is null with `decimal_overflow`;
-- two equal but distinct opaque objects (two `bytes` objects with the same
-  content) are different under `ANY`;
-- getters and properties on every path the rule set reads run for each input,
-  including payloads of rules that are not selected, which the v1 read only
-  when needed.

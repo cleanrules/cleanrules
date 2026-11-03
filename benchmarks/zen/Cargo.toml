@@ -4,7 +4,7 @@ description = "Compares cleanrules with zen-engine on the core's benchmark workl
 version = "0.0.0"
 edition = "2024"
 publish = false
-license = "MIT"
+license = "Apache-2.0"
 
 # Outside the cleanrules workspace, so that the core never depends on zen-engine.
 [workspace]

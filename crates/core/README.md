@@ -8,4 +8,6 @@ fuzzy logic. Every result explains itself.
 > **Pre-alpha.** The core is being built against the specification and the
 > conformance vectors in <https://github.com/cleanrules/cleanrules>.
 
-MIT licensed.
+Apache License 2.0, created by Jose L. Salmeron: redistributions keep the
+[NOTICE](https://github.com/cleanrules/cleanrules/blob/main/NOTICE) with its
+attribution of authorship.

@@ -11,9 +11,9 @@ the context fields that apply (`rule`, `path`, `pointer`, ...):
         print(err)  # the message, the rule and the hint
         err.code  # "missing_field", ...
 
-The classes keep the builtin bases of the Python v1, so existing `except`
-clauses still work: `ExpressionError` is also a `TypeError` and a `ValueError`,
-for example. Errors pickle with their attributes, so they can cross process
+The classes also derive from Python's builtin exceptions, so `except`
+clauses written for those work: `ExpressionError` is also a `TypeError` and a
+`ValueError`, for example. Errors pickle with their attributes, so they can cross process
 boundaries.
 """
 

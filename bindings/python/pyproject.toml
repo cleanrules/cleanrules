@@ -7,8 +7,8 @@ name = "cleanrules"
 description = "Explainable rules engine: one Rust core with the same semantics in every language"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Jose L. Salmeron" }]
 keywords = ["rules-engine", "business-rules", "expert-system", "validation", "explainable"]
 classifiers = [

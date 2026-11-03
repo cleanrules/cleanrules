@@ -333,14 +333,6 @@ with `strict` (Python names; `evaluateTree` and `evaluateValueTree` where
 camel case is the idiom). The conformance vectors of kinds `condition` and
 `value` use them.
 
-## Differences from the Python v1
-
-- A null constant under `and`, `or` and `not` was accepted by the v1; it was a
-  gap, not semantics.
-- Patterns follow the Rust `regex` syntax. Python's `re` accepted some patterns
-  this syntax rejects, and its `$` also matched before a trailing newline.
-  Vectors taken from the v1 skip those cases.
-
 ## Notes for the Arrow mode (phase I)
 
 *Informative.* Columnar engines cast implicitly where this spec does not, so

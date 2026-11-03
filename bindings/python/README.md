@@ -193,4 +193,6 @@ uv run pytest          # builds the extension with maturin, then runs the tests
 uv run pyright
 ```
 
-MIT licensed.
+Apache License 2.0, created by Jose L. Salmeron: redistributions keep the
+[NOTICE](https://github.com/cleanrules/cleanrules/blob/main/NOTICE) with its
+attribution of authorship.

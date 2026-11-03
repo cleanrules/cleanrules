@@ -596,7 +596,7 @@ impl RuleSet {
     }
 }
 
-/// One key's aggregate over its non-null values, as the Python v1 computed it.
+/// One key's aggregate over its non-null values (`spec/rules.md`, *`COLLECT` aggregates*).
 fn reduce(aggregate: Aggregate, values: &[Value]) -> Value {
     if aggregate == Aggregate::Count {
         return Value::Int(i64::try_from(values.len()).unwrap_or(i64::MAX));

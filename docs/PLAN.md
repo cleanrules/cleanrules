@@ -1,10 +1,10 @@
-# Plan de desarrollo (v3: núcleo Rust, bindings multilenguaje, agentes de IA)
+# Plan de desarrollo (núcleo Rust, bindings multilenguaje, agentes de IA)
 
 > Documento vivo y fuente de verdad del roadmap. Cada tarea es una casilla; al completarla se marca y se anotan debajo las desviaciones. Claude lo sigue con `/plan-task`.
 >
-> v1 (2026-10-30): implementación en Python con Rust como acelerador opcional. **v2 (2026-10-31)**: decisión del autor de poner **Rust en el centro** y ofrecer bindings para **Rust, C/C++, Python, JavaScript, Java/Scala y Go**. La implementación Python de la v1 se **descarta**; su valor se conserva en la especificación y en los vectores de conformidad que se extraen de ella (fase A). El plan v1 completo está en el historial de git.
+> **2026-10-31**: decisión del autor de poner **Rust en el centro** y ofrecer bindings para **Rust, C/C++, Python, JavaScript, Java/Scala y Go**.
 >
-> **v3 (2026-11-01)**: decisión del autor de añadir **Erlang** (fase N) y la **conexión con IA agéntica y frameworks de agentes** (fase O).
+> **2026-11-01**: decisión del autor de añadir **Erlang** (fase N) y la **conexión con IA agéntica y frameworks de agentes** (fase O).
 
 ## 0. Visión
 
@@ -28,14 +28,14 @@ Lo que nos diferencia es la combinación: **condiciones como AST serializable** 
 | D1 | El **núcleo en Rust** (`crates/core`) es la única implementación de la semántica | Un solo motor, mismo comportamiento en todos los lenguajes |
 | D2 | Los bindings son **capas finas**: construcción idiomática de reglas, conversión de datos y ejecución de acciones; ninguna lógica de evaluación | Evita divergencias entre lenguajes |
 | D3 | El **contrato entre lenguajes** es el formato JSON del AST, de las reglas, de los datos y de las decisiones y explicaciones (`spec/`), versionado | Una regla escrita en Java se evalúa igual en Go |
-| D4 | La semántica la definen la **especificación** y la **batería de conformidad** (`conformance/`), que todos los bindings ejecutan | Sustituye al oráculo Python de la v1 |
+| D4 | La semántica la definen la **especificación** y la **batería de conformidad** (`conformance/`), que todos los bindings ejecutan | Una sola fuente de verdad |
 | D5 | **Modelo de datos neutro** (`Value`: null, bool, int64, float64, decimal, string, date, datetime, lista, mapa) más **lotes Arrow** para el modo vectorizado | Cruzar la frontera de lenguajes una vez por entrada o por lote, no por campo |
-| D6 | Las **acciones** se ejecutan en el lenguaje anfitrión; el núcleo es puro (`evaluate`), y `run` es del binding | Ya validado en la v1; sin callbacks en el camino crítico |
+| D6 | Las **acciones** se ejecutan en el lenguaje anfitrión; el núcleo es puro (`evaluate`), y `run` es del binding | Sin callbacks en el camino crítico |
 | D7 | **C ABI** estable (`crates/ffi`, cabecera con cbindgen) como base de C/C++, Go y Java (FFM). Bindings dedicados donde aportan: PyO3 (Python), napi-rs y wasm-bindgen (JavaScript) | Un solo punto de FFI para la mayoría de lenguajes |
 | D8 | **Lógica difusa**: t-normas, s-normas y complementos en el núcleo Rust (con fuzzytool como referencia de comportamiento); lo avanzado (ANFIS, tipo 2, clustering) sigue en fuzzytool, desde Python | Difusa básica en todos los lenguajes sin duplicar fuzzytool entero |
 | D9 | Regex con el crate `regex` (tiempo lineal, sin *lookaround* ni *backreferences*): su semántica es la de referencia | Desaparece el problema de compatibilidad Python/Rust; sin ReDoS |
 | D10 | Monorepo: workspace de Cargo + un paquete por lenguaje, CI única | Versiones sincronizadas y conformidad en cada cambio |
-| D11 | El proyecto se llama **cleanrules** (decidido el 2026-10-31; *clean* ≈ *Kleene*) | "RulePy" no encaja fuera de Python |
+| D11 | El proyecto se llama **cleanrules** (decidido el 2026-10-31; *clean* ≈ *Kleene*) | Un nombre neutro respecto al lenguaje |
 | D12 | **Erlang** con un NIF en Rust hecho con `rustler` directamente sobre `crates/core` (no sobre la C ABI); los rule sets son recursos inmutables que comparten los procesos, y el trabajo largo va a *dirty schedulers* | rustler convierte términos y captura *panics*, y es el estándar de la BEAM; un NIF que bloquea o falla tumbaría la VM |
 | D13 | **La IA usa el motor, no forma parte de él**: ni el núcleo ni los bindings llaman a modelos de lenguaje. Los agentes llegan por un servidor MCP (`crates/mcp`) y por adaptadores finos y opcionales para cada framework | Determinismo y dependencias mínimas; MCP sirve a la mayoría de frameworks con una sola implementación |
 | D14 | **Visualización como texto**: el núcleo escribe diagramas en DOT, Mermaid y HTML autónomo, sin dependencias; ninguna biblioteca gráfica entra en el núcleo, y en los bindings dibujar o mostrar es un extra opcional de carga perezosa | El mismo diagrama en todos los lenguajes, probado con *snapshots*; dependencias mínimas |
@@ -59,11 +59,11 @@ Lo que nos diferencia es la combinación: **condiciones como AST serializable** 
 
 ### Decisiones pendientes (confirmar con el autor)
 
-- [x] **Nombre del proyecto**: `cleanrules`. La implementación Python de la v1 conserva `rulepy` hasta su retirada en la fase A.
+- [x] **Nombre del proyecto**: `cleanrules`.
 - [ ] Java: FFM (Java 22+, sin código nativo propio) frente a JNI (Java 8+). Propuesto: FFM, con JNI solo si hace falta soportar Java antiguo.
 - [ ] JavaScript: napi-rs (Node, más rápido) y wasm (navegador, Deno). Propuesto: los dos, con la misma API TypeScript.
 - [x] MSRV de Rust y edición: edición 2024 y MSRV 1.95, la estable menos dos (decidido el 2026-10-31).
-- [ ] UNKNOWN en lógica difusa como intervalo `[0, 1]` (propuesta de la v1, ver `spec/ast.md`).
+- [ ] UNKNOWN en lógica difusa como intervalo `[0, 1]` (ver `spec/ast.md`).
 - [ ] Erlang: cómo se distribuye el NIF (binarios precompilados por plataforma frente a compilarlo con Rust al instalar) y si hay además una capa Elixir. Propuesto: precompilados; Elixir y Gleam usan el módulo Erlang directamente, y una capa propia solo si se pide.
 - [ ] Agentes: SDK de MCP en Rust (propuesto: `rmcp`, el oficial) y frameworks con adaptador propio. Propuesto: Claude Agent SDK, OpenAI Agents SDK, LangChain/LangGraph y Pydantic AI en Python; Vercel AI SDK en JavaScript; LangChain4j y Spring AI en la JVM; los demás, por MCP.
 - [x] Organización de GitHub: `cleanrules` (la crea el autor el 2026-10-31). La necesitan el groupId de Maven y la ruta del módulo Go.
@@ -99,34 +99,21 @@ Cada fase termina en algo publicable o verificable. Tamaños relativos (S/M/L/XL
 
 ---
 
-### Fase P. Implementación Python de referencia (v1) — ✅ completada, se retira en la fase A
-
-Se hizo en Python, con 676 tests y un 100 % de cobertura, todo lo que hoy define la semántica:
-- AST, `F` y trampas de Python (`docs/pitfalls.md`);
-- lógica de Kleene, evaluador con motivos estructurados y lectura segura de datos;
-- `Rule`, `RuleSet` y políticas DMN, `Decision`, acciones con `run`;
-- `explain()` con requisitos `all`/`any`, contrafactuales y validación de opciones;
-- `summary()`, `field_paths()`, `Decimal` exacto.
-
-El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-reference`). Las lecciones de sus revisiones (seguridad de la lectura de atributos, igualdad en `ANY`, agregados con aritmética normalizada, salidas inmutables, explicaciones con conflictos) son requisitos de la reimplementación y están en `spec/`.
-
----
-
 ### Fase 0'. Adaptar las especificaciones para Claude · tamaño S
 
 - [x] 0'.1 Reescribir `CLAUDE.md` para la nueva arquitectura (invariantes, comandos, estructura).
-  - Se añadieron dos invariantes: memoria segura (sin `unsafe` en el núcleo) y dependencias mínimas con *features*. "Python es el oráculo" pasa a "la especificación y la conformidad son el oráculo".
+  - Se añadieron dos invariantes: memoria segura (sin `unsafe` en el núcleo) y dependencias mínimas con *features*. La especificación y la conformidad son el oráculo.
 - [x] 0'.2 `.claude/`: `rust-engineer` pasa a ser el agente principal; `parity-tester` pasa a `conformance-tester`; `api-reviewer` revisa la API en todos los lenguajes; `/add-operator` recorre núcleo, especificación, vectores y bindings; permisos para cargo, maturin, npm, gradle/sbt y go (instalar dependencias pide confirmación).
   - Los permisos de `.claude/settings.json` y el hook `format.sh` (que añade gofmt, clang-format y prettier) los aplicó el autor el 2026-10-31, porque Claude no puede modificar sus propios permisos ni hooks.
 
 ---
 
-### Fase A. Contrato entre lenguajes y retirada de Python · tamaño M
+### Fase A. Contrato entre lenguajes · tamaño M
 
-**Objetivo**: que la especificación y los vectores contengan todo el conocimiento de la v1 antes de borrar el código.
+**Objetivo**: que la especificación y los vectores fijen toda la semántica como contrato entre lenguajes.
 
 - [x] A.1 Mover `docs/spec/` a `spec/` y escribir `spec/json-format.md` y los JSON Schemas (antes tarea 3.1): AST con `"version": 1`, reglas y rule sets, valores (`Decimal` como texto, `inf`/`-inf`, fechas ISO 8601, zonas horarias), decisiones, motivos (`Reason`), explicaciones (requisitos, `Counterfactual`) y resúmenes.
-  - La v1 no serializaba nada: el formato se diseña aquí, a partir de sus estructuras. Se divide en:
+  - El formato se diseña aquí. Se divide en:
   - [x] A.1a Mover `docs/spec/` a `spec/`; `spec/json-format.md` con el documento (`"version": 1`), los valores y las condiciones, y sus JSON Schemas.
     - Hecho el 2026-10-31 y revisado por `api-reviewer`. Decisiones tomadas:
       - Valores: JSON sin envolver donde no hay ambigüedad, y objetos `$int`, `$float`, `$decimal`, `$date`, `$datetime` y `$map` en el resto.
@@ -137,7 +124,7 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - `format_error` cubre la forma y `expression_error` las reglas de construcción, con un orden de errores fijado.
       - Límites: 16 MiB, anidamiento JSON 1024 y profundidad de nodos 256.
       - Los documentos se comparan como árboles tipados, no como texto.
-      - `Const(None)` solo se admite bajo `is_null`; la v1 lo aceptaba bajo `and`, `or` y `not`, y se considera un fallo de la v1.
+      - `Const(None)` solo se admite bajo `is_null`.
       - Las regex usan la sintaxis del crate `regex` con sus opciones por defecto (D9).
       - Los esquemas están en `spec/schemas/v1/`, con ejemplos que comprueba `spec/schemas/check.py`.
   - [x] A.1b Reglas y rule sets (lógica, modo estricto, política, agregado, payloads).
@@ -149,7 +136,6 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - Una lógica desconocida da `registry_error`. Una lógica que existe pero falta en esta compilación da `unsupported`.
       - La forma de objeto de `logic`, con parámetros, y la clave `alpha` quedan reservadas para añadirlas sin cambiar de versión.
       - Los metadatos deben ser valores de datos.
-      - Las diferencias con la v1 están en `json-format.md`, sección *Differences from the Python v1*.
   - [x] A.1c Decisiones y motivos (`Reason`, árbol de resultados).
     - Hecho el 2026-10-31 y revisado por `api-reviewer`, con un hallazgo grave corregido: no estaba definido cómo se lee una decisión. Decisiones tomadas:
       - La decisión guarda el árbol de resultados de cada regla, con `truth` para las condiciones y `value` para los valores, y los motivos estructurados.
@@ -159,7 +145,7 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - El orden y los duplicados de `paths` y `types` en los motivos quedan fijados en `ast.md`.
       - Los grupos de tipo se escriben en *snake case*.
   - [x] A.1d Explicaciones (requisitos, `Counterfactual`) y resúmenes; `spec/explain.md`, que aún no existe.
-    - Hecho el 2026-10-31 y revisado por `api-reviewer`, que confirmó que los algoritmos coinciden con la v1 línea a línea. Decisiones tomadas:
+    - Hecho el 2026-10-31 y revisado por `api-reviewer`. Decisiones tomadas:
       - `spec/explain.md` especifica los estados, los requisitos `all`/`any`, la simplificación, la comprobación de opciones (con tope de 64), los contrafactuales y las notas.
       - El texto de `explain()` no es normativo: lo fijan los *snapshots* del núcleo, y la sintaxis de las condiciones en el texto se decide en B.3 y D.2.
       - Explicaciones y resúmenes son documentos JSON solo de salida.
@@ -170,7 +156,7 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
   - [x] A.2a `spec/data-model.md`.
     - Hecho el 2026-10-31. Decisiones tomadas:
       - Decimales de 38 dígitos con un tipo propio en el núcleo: coeficiente i128 y escala de 0 a 38, como Arrow `Decimal128`, con infinitos. Lo eligió el autor frente a `rust_decimal`, que llega a 28 dígitos, y a la precisión arbitraria.
-      - Los valores sin equivalente pasan a ser **opacos**, del grupo `other`: se comportan como en la v1 y la salida devuelve el objeto nativo.
+      - Los valores sin equivalente pasan a ser **opacos**, del grupo `other`, y la salida devuelve el objeto nativo.
       - Los datos fuera de rango dan un nulo con motivo: `int_overflow` y el nuevo `decimal_overflow`.
       - Las fechas con hora se truncan al microsegundo.
       - Los mapas sin orden definido se ordenan por clave.
@@ -178,31 +164,29 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
       - Revisado por `api-reviewer`, con dos hallazgos graves corregidos:
         - Las listas y los mapas al final de una ruta siguen siendo el objeto nativo, que se devuelve tal cual en las salidas, y solo se convierten cuando hace falta.
         - La igualdad bajo `ANY` queda definida: listas elemento a elemento, mapas sin importar el orden y opacos por identidad.
-      - El binding de Python lee exactamente como la v1; lo que no se puede conservar está en *Differences from the Python v1*.
       - Las zonas horarias se resuelven con la base de datos del núcleo, con un desfase fijo como alternativa.
       - Los opacos se escriben como `{"$opaque": "<tipo>"}`, y solo en decisiones y explicaciones.
-  - [x] A.2b Reescribir `ast.md` en términos neutros: quedan clases Python, la columna de tareas de la v1 y notas de polars.
+  - [x] A.2b Reescribir `ast.md` en términos neutros: quedan clases Python, una columna de tareas y notas de polars.
     - Hecho el 2026-10-31:
-      - Sin nombres de clase ni tareas de la v1.
+      - Sin nombres de clase ni columna de tareas.
       - La lectura de datos se expresa sobre valores, y los detalles de Python pasan a `data-model.md`.
       - Se añade el grupo `other` a los tipos.
       - Las notas de polars pasan a ser notas informativas para el modo Arrow.
-      - Las diferencias con la v1 quedan en una sección propia.
       - Revisado por `api-reviewer`, sin hallazgos graves y sin reglas perdidas. Se corrigieron tres incoherencias:
         - `type_mismatch` cubre también el grupo `other`.
         - Las constantes nulas se admiten bajo `is_null`, y las fechas con hora más finas que el microsegundo se rechazan.
-        - Los namedtuples y las filas de pandas son **registros**: mapas con posiciones, indexables por entero como en la v1. La sección "Reading data" de `ast.md` (mapas, registros, atributos **públicos**, nunca privados ni de módulos o clases) pasa a ser una obligación de cada binding.
-- [x] A.3 Exportador temporal en Python (`conformance/tools/`) que, con la implementación de la v1, genera **vectores de conformidad**: árboles y errores de construcción, evaluaciones con motivos, modo estricto, decisiones de las 6 políticas, agregados, explicaciones y resúmenes. Las propiedades de hypothesis se convierten en miles de casos fijados.
+        - Los namedtuples y las filas de pandas son **registros**: mapas con posiciones, indexables por entero. La sección "Reading data" de `ast.md` (mapas, registros, atributos **públicos**, nunca privados ni de módulos o clases) pasa a ser una obligación de cada binding.
+- [x] A.3 Exportador temporal en Python (`conformance/tools/`) que genera **vectores de conformidad**: árboles y errores de construcción, evaluaciones con motivos, modo estricto, decisiones de las 6 políticas, agregados, explicaciones y resúmenes. Las propiedades de hypothesis se convierten en miles de casos fijados.
   - Se divide en:
-  - [x] A.3a Formato de los vectores (`conformance/README.md` y `conformance/vectors.schema.json`), catálogo de errores (`spec/errors.md`) y exportador (`conformance/tools/`), con los codificadores de la v1 al formato JSON y una primera tanda de 122 vectores elegidos a mano: tablas de Kleene, lectura, ausentes, tipos, nodos, motivos, políticas, agregados, payloads, modo estricto, lotes, explicaciones y resúmenes.
+  - [x] A.3a Formato de los vectores (`conformance/README.md` y `conformance/vectors.schema.json`), catálogo de errores (`spec/errors.md`) y exportador (`conformance/tools/`), con los codificadores al formato JSON y una primera tanda de 122 vectores elegidos a mano: tablas de Kleene, lectura, ausentes, tipos, nodos, motivos, políticas, agregados, payloads, modo estricto, lotes, explicaciones y resúmenes.
     - Hecho el 2026-10-31. El exportador es determinista: ejecutarlo dos veces deja los vectores igual. `conformance/tools/check.py` valida cada documento contra los esquemas de la especificación y comprueba que las secciones citadas existen. Las herramientas de `conformance/tools/` no pasan por pyright estricto, porque son temporales y se borran en A.4.
     - Revisado por `api-reviewer`, con un hallazgo grave corregido: la distancia entre fechas con hora se codificaba en días cuando era de días enteros.
-      - El exportador recalcula cada distancia con la aritmética de la especificación y salta los casos en que la v1 discrepa, como el cambio de hora.
+      - El exportador recalcula cada distancia con la aritmética de la especificación y salta los que no coinciden, como el cambio de hora.
       - Las entradas se codifican de forma estricta.
       - Los vectores de explicación incluyen su decisión.
-      - `spec/errors.md` define cómo se comparan los errores, la ruta completa en `missing_field` y la forma idiomática en cada lenguaje: `*Exception` en Java, un solo `*Error` con código en Go, un `enum` en C y `Error` en Rust. Python conserva las bases de la v1.
+      - `spec/errors.md` define cómo se comparan los errores, la ruta completa en `missing_field` y la forma idiomática en cada lenguaje: `*Exception` en Java, un solo `*Error` con código en Go, un `enum` en C y `Error` en Rust.
       - Quedaron definidos en la especificación la API para evaluar un nodo (`evaluate_tree`), la escala de las distancias decimales, el resultado de `min`/`max` y qué no lanza el modo estricto.
-  - [x] A.3b Vectores de lectura de documentos (léxicos, errores con su puntero y orden, límites), escritos desde la especificación, porque la v1 no tiene lector.
+  - [x] A.3b Vectores de lectura de documentos (léxicos, errores con su puntero y orden, límites), escritos desde la especificación.
     - Hecho el 2026-10-31: 148 vectores en `conformance/vectors/format/`, generados por `conformance/tools/read_cases.py`.
       - Cubren documentos, números y sus bordes, decimales, fechas y zonas, valores con tipo, condiciones, reglas, rule sets, decisiones leídas con su rule set y límites.
       - `check.py` comprueba que cada puntero de error existe en el documento dado y que cada línea y columna cae dentro del texto.
@@ -228,11 +212,11 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
   - [x] A.3d Script de cobertura: cada sección normativa citada por al menos un vector, y CI.
     - Hecho el 2026-10-31.
       - `check.py` exige que cada sección normativa esté citada por al menos un vector, ella o una subsección.
-      - Las secciones que los vectores no pueden comprobar llevan la marca *Not checked by vectors* con el motivo: datos nativos, jerarquía de excepciones, texto de `explain()`, escritura con acciones, YAML, lógica difusa y lotes Arrow. Las diferencias con la v1 también quedan exentas.
+      - Las secciones que los vectores no pueden comprobar llevan la marca *Not checked by vectors* con el motivo: datos nativos, jerarquía de excepciones, texto de `explain()`, escritura con acciones, YAML, lógica difusa y lotes Arrow.
       - Las citas que faltaban se asignan en `export.py` por patrones de id.
-      - Hay dos vectores nuevos de datos fuera de rango: `int_overflow` y `decimal_overflow`; este último está escrito desde la especificación, porque la v1 no lo detecta.
+      - Hay dos vectores nuevos de datos fuera de rango: `int_overflow` y `decimal_overflow`; este último está escrito desde la especificación.
       - El CI tiene un trabajo `conformance` que regenera los vectores, exige que no cambien y ejecuta las comprobaciones.
-  - Vectores de lectura que hacen falta aunque la v1 no los pueda generar:
+  - Vectores de lectura que hacen falta:
     - números: `-0`, `9223372036854775808`, `-9223372036854775809`, `18446744073709551616`, `{"$int": 1.0}`, `{"$int": 1e2}` y flotantes difíciles de redondear;
     - claves duplicadas en nodos, en mapas de datos y en `$map`;
     - claves de payload `"b"`, `"a"`, `"10"` y `"2"`, en ese orden, para comprobar que se conserva el orden;
@@ -243,18 +227,11 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
     - surrogates sueltos;
     - el orden de errores;
     - los límites, exactamente en el borde.
-  - Casos de la v1 que **no** se toman como vectores:
-    - `Const(None)` bajo `and`, `or` y `not`;
-    - patrones regex que Python acepta y `regex` no, y `$` antes de un salto de línea final;
-    - la deduplicación de `in` con dos instantes distintos en la misma zona durante un cambio de hora, que la v1 fusiona porque Python compara horas locales cuando comparten `tzinfo`;
-    - los huecos de contrafactuales que la v1 calculaba distinto (`explain.md`, *Differences from the Python v1*): enteros de más de 64 bits, decimales redondeados a 28 dígitos y fechas con hora restadas como hora local durante un cambio de hora.
-- [x] A.4 Retirada: tag `python-reference` y eliminación de `src/rulepy` y de sus tests. Se conservan `spec/`, `docs/pitfalls.md` (pasa a la documentación del binding de Python) y los vectores.
+- [x] A.4 Eliminación del código del prototipo anterior y de sus tests. Se conservan `spec/`, `docs/pitfalls.md` (pasa a la documentación del binding de Python) y los vectores.
   - Hecho el 2026-10-31.
-    - El autor crea el tag `python-reference` sobre `09001aa`, el último commit con la v1, porque crear tags está denegado para Claude.
-    - Se borran `src/rulepy`, `tests/`, la web de documentación (`mkdocs.yml`, `docs/index.md`, `docs/reference/`), `pyproject.toml`, `uv.lock` y el exportador de `conformance/tools/`. Se conserva `check.py`.
+    - Se borran el código del prototipo, `tests/`, la web de documentación (`mkdocs.yml`, `docs/index.md`, `docs/reference/`), `pyproject.toml`, `uv.lock` y el exportador de `conformance/tools/`. Se conserva `check.py`.
     - La configuración de ruff pasa a `ruff.toml`.
     - El CI se queda con el lint de las herramientas en Python y la comprobación de esquemas y vectores; el de Rust llega en B.1.
-    - En el CHANGELOG, lo de la v1 pasa a una sección `python-reference`.
     - `docs/pitfalls.md` se queda en `docs/` hasta el binding de Python (fase C).
 
 **Aceptación**: el conjunto de vectores cubre cada sección de la especificación; un script comprueba que cada regla normativa de `spec/` cita al menos un vector.
@@ -263,7 +240,7 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
 
 ### Fase B. Núcleo Rust · tamaño XL · v0.1 (crate)
 
-**Objetivo**: toda la funcionalidad de la fase P, en Rust, superando los vectores de conformidad.
+**Objetivo**: toda la semántica de la especificación, en Rust, superando los vectores de conformidad.
 
 - [x] B.1 Andamiaje: workspace, edición y MSRV, `clippy` pedante, `rustfmt`, `cargo-deny`, `cargo-nextest`, CI (Linux, macOS, Windows), `miri` en las partes con `unsafe` (idealmente ninguna en `core`).
   - Hecho el 2026-10-31.
@@ -336,7 +313,7 @@ El historial está en git hasta el commit que cierra la 2.12 (y un tag `python-r
   - Se divide en:
   - [x] B.7a Reglas, rule sets, las 6 políticas, payloads, agregados, lotes y `Decision`, con sus documentos JSON (reglas y rule sets en lectura y escritura, decisiones en escritura).
     - Hecho el 2026-11-01: `cleanrules::rules` y `format::{read_ruleset, write_rule, write_ruleset, write_decision}`.
-      - Mismo orden que la v1:
+      - Orden:
         1. todas las condiciones;
         2. con `any`, los payloads de las reglas que dispararon;
         3. la selección, donde `unique` lanza su error;
@@ -394,28 +371,28 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
     - CI: un trabajo `python` en `ci.yml` (pytest en Linux, macOS y Windows con 3.11, 3.14t, 3.15 y 3.15t, y pyright) y `wheels.yml`, que construye las wheels (manylinux y musllinux x86_64/aarch64, macOS arm64 y x86_64, Windows x64 y arm64) y el sdist y prueba cada wheel instalada. Aún no se han ejecutado en GitHub: lo harán con el primer push.
     - Dependencias: `pyo3` (aprobada) y, como herramientas de desarrollo del paquete, `pytest` y `pyright` (`uv.lock` en `bindings/python`).
     - Desviación: el `strip` de Xcode 27 corrompe a veces bibliotecas Mach-O (la wheel `abi3t` no cargaba: «mis-aligned LINKEDIT string pool»), así que el perfil release del workspace no hace `strip`, también en `build-override`. Cuesta un 8 % de tamaño (37 KB).
-- C.2 API Python con la ergonomía de la v1: `F`, operadores, protección contra trampas (`docs/pitfalls.md`), `Rule`, `RuleSet`, `Decision`, `explain`, `summary`. Se divide en dos subtareas:
+- C.2 API Python: `F`, operadores, protección contra trampas (`docs/pitfalls.md`), `Rule`, `RuleSet`, `Decision`, `explain`, `summary`. Se divide en dos subtareas:
   - [x] C.2a Expresiones y errores: `F`, `Field`, `Const`, operadores y métodos, guardas de las trampas, `repr` como código Python, y la jerarquía de excepciones de `spec/errors.md`.
-    - Hecho el 2026-11-01: cada nodo lo construye el núcleo, que aplica las reglas de construcción. En Python quedan los operadores, las guardas y el `repr`, portados de la v1 (`python/cleanrules/_expr.py`); las excepciones están en `python/cleanrules/errors.py`, y el módulo nativo elige la clase por código y pasa el contexto.
+    - Hecho el 2026-11-01: cada nodo lo construye el núcleo, que aplica las reglas de construcción. En Python quedan los operadores, las guardas y el `repr` (`python/cleanrules/_expr.py`); las excepciones están en `python/cleanrules/errors.py`, y el módulo nativo elige la clase por código y pasa el contexto.
     - Las constantes se convierten en Rust según la tabla de Python de `spec/data-model.md`: enteros de 64 bits, decimales exactos de hasta 38 dígitos (nunca redondeados), NaN rechazado, fechas, datetimes con zona IANA o desplazamiento fijo, y subclases (`StrEnum`, `IntEnum`).
     - Núcleo: `AwareDateTime::from_native`, que conserva la zona IANA solo si la base de datos del núcleo la conoce y coincide el desplazamiento, y la reexportación de `jiff`, cuyos tipos ya forman parte de la API pública.
     - Los nodos se copian como sí mismos y se serializan con pickle a través del formato JSON (`node_from_json`).
-    - 166 tests (los de la v1, adaptados, y propiedades con hypothesis: el `repr` se reevalúa al mismo árbol, pickle conserva el árbol y la clase). Pasan en 3.11, 3.14 y 3.14t; pyright estricto y ruff limpios.
-    - Desviaciones: los nodos son una sola familia (`Field`, `Const` y un nodo genérico hermano), no una clase por operador; las comparaciones entre nodos conservan su orientación. Siguiendo la especificación, la constante nula es de tipo `value` (la v1 decía `any`). Dependencia de desarrollo nueva: `hypothesis`.
+    - 166 tests (con propiedades de hypothesis: el `repr` se reevalúa al mismo árbol, pickle conserva el árbol y la clase). Pasan en 3.11, 3.14 y 3.14t; pyright estricto y ruff limpios.
+    - Desviaciones: los nodos son una sola familia (`Field`, `Const` y un nodo genérico hermano), no una clase por operador; las comparaciones entre nodos conservan su orientación. Siguiendo la especificación, la constante nula es de tipo `value`. Dependencia de desarrollo nueva: `hypothesis`.
   - [x] C.2b `Rule`, `RuleSet`, `Decision`, `explain` y `summary`, con una conversión provisional de los datos de entrada (la definitiva es C.3).
     - Hecho el 2026-11-01: `python/cleanrules/_rules.py` (`HitPolicy`, `Truth`, `Rule`, `RuleSet` como secuencia por posición y por nombre, `RuleResult`, `Decision`, `Explanation`, `RuleExplanation`, `Summary`) sobre las clases nativas de `src/rules.rs`.
     - Una `Decision` del núcleo toma prestado su rule set, así que la de Python guarda el rule set (compartido con `Arc`) y la entrada convertida, con lo que se lee de inmediato (resultados, seleccionadas, salidas). `explain()` y `to_dict()` evalúan otra vez la entrada: la evaluación es determinista (invariante 7).
     - `explain()` devuelve la explicación estructurada (la forma JSON de la especificación, con accesos por regla y `causes`); su texto llega en D.2, con el DSL. `to_dict()` devuelve documentos completos (`version` más `decision`, `explanation` o `summary`), así que los punteros `at` de una explicación se resuelven en el documento de la decisión (hay un test).
     - Conversión provisional de la entrada: dicts, listas, tuplas y escalares; enteros fuera de 64 bits, decimales que no caben y NaN pasan a nulos con su motivo; lo demás es opaco. La lectura dispersa de la especificación llega en C.3.
     - 202 tests en 3.11, 3.14 y 3.14t (uno evalúa el mismo rule set desde 8 hilos); pyright estricto, ruff y clippy limpios.
-    - Desviaciones respecto a la v1: `evaluate_many` devuelve una lista (los errores llevan `row`), no un iterador; `Rule` aún no tiene `do` (acciones, C.4) y aún no se serializa con pickle (C.4).
+    - Desviaciones: `evaluate_many` devuelve una lista (los errores llevan `row`), no un iterador; `Rule` aún no tiene `do` (acciones, C.4) y aún no se serializa con pickle (C.4).
     - Revisión de la API (subagente `api-reviewer`), aplicada:
       - Bloqueante: convertir datos que se contienen a sí mismos o con 200.000 niveles tumbaba el intérprete. Ahora la conversión tiene un límite de 256 niveles y detecta ciclos; lo que pasa de ahí es opaco, como cualquier elemento que no se puede convertir. Las fichas de los valores opacos se numeran por orden de aparición, nunca por dirección de memoria (invariante 7).
       - `evaluate_many` rechaza cadenas, mapas y data frames (`spec/rules.md`).
       - `explain()` devuelve objetos con valores de Python (`Cause` con su nodo, `Truth`, `holds`, los valores leídos, `Reason` y `Counterfactual`, con huecos `Decimal` o `timedelta`; `CauseGroup`; `Note`; `Status`), no la codificación JSON, que sigue en `to_dict()`.
       - `Summary` expone `FieldUsage` (qué reglas y qué cargas leen cada campo), `rules` y la configuración.
       - Los metadatos se validan como datos (sin NaN ni valores opacos, con la ruta de la clave en el error) y `Rule.metadata` devuelve lo que guarda el núcleo.
-      - Salidas y decisiones de solo lectura; los errores de constantes de la carga nombran la regla y la clave; se permiten claves vacías, como en el formato; `hit_policy` y `aggregate` aceptan cualquier capitalización, como la v1; `Aggregate` es un `StrEnum`; la evaluación suelta el GIL en las compilaciones con GIL; un código de error nuevo se traduce a `CleanRulesError`; la pista del núcleo para salidas múltiples ya no usa sintaxis de método.
+      - Salidas y decisiones de solo lectura; los errores de constantes de la carga nombran la regla y la clave; se permiten claves vacías, como en el formato; `hit_policy` y `aggregate` aceptan cualquier capitalización; `Aggregate` es un `StrEnum`; la evaluación suelta el GIL en las compilaciones con GIL; un código de error nuevo se traduce a `CleanRulesError`; la pista del núcleo para salidas múltiples ya no usa sintaxis de método.
       - Pendiente (tarea propia, abajo): los campos de contexto `node`, `operation`, `reason` y `decision` de `spec/errors.md` no existen aún en el `Context` del núcleo.
   - [x] C.2c Campos de contexto de error que faltan en el núcleo (`node` en `expression_error` y en los errores de evaluación, `operation` y `reason` en `unsupported`, `decision` en `action_error`), y su paso a Python (`node` como `Expr`). No se comparan en los vectores.
     - Hecho el 2026-11-01: el `Context` del núcleo tiene `node`, `operation` y `reason`, y `Error::with_node`.
@@ -442,7 +419,7 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
   - `Rule` y `RuleSet` se serializan con pickle y se copian cuando su acción también (las condiciones viajan en el formato JSON); el `decision` de un `ActionError` no se serializa.
   - Tipos: `pyright --verifytypes` da un 100 % de completitud en la API pública (antes un 83 %, por dos asignaciones de métodos sin anotar) y se comprueba en CI.
   - 258 tests en 3.11, 3.14, 3.14t y 3.15t.
-  - Desviación respecto a la v1: el `ActionContext` lleva el `RuleResult` de la regla (`result`) en vez del árbol de resultados de su condición (`tree`), que Python aún no expone; y añade `decision`.
+  - Desviación: el `ActionContext` lleva el `RuleResult` de la regla (`result`) en vez del árbol de resultados de su condición (`tree`), que Python aún no expone; y añade `decision`.
 - [x] C.5 Runner de conformidad en Python.
   - Hecho el 2026-11-01: `bindings/python/tests/test_conformance.py`, con pytest, un caso por vector y pasada. Cada vector corre dos veces, como pide `conformance/README.md`:
     - `json`: por las entradas JSON del binding (`_cleanrules._read_document`, `_evaluate`, `_explain`, …; privadas hasta D.1). Comprueba que documentos y errores llegan a Python intactos.
@@ -460,7 +437,7 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
     - `ActionContext.tree` (el árbol de resultados de la condición, sin volver a leer los datos); el mensaje de `ActionError` ya no repite la regla; `evaluate_tree` elige la lógica con un `match`; `ResultTree` no expone su JSON en el constructor; `node` y `decision` de los errores tienen tipo; el docstring de `Rule.tags` dice que van ordenadas, como hace el núcleo.
     - Desviaciones anotadas: donde termina una ruta, las listas y mapas se convierten enteros en el momento (la especificación permite referencias nativas perezosas; queda como optimización); las claves no textuales de un mapa se descartan en vez de volverse opacas, porque una ruta no puede leerlas.
 
-**Cumplida la fase C el 2026-11-01**: el binding de Python tiene la API de la v1, lee datos nativos como dice la especificación, ejecuta acciones, se serializa con pickle, tiene tipos completos y pasa todos los vectores en sus dos pasadas. La publicación en PyPI (la «primera versión pública») la hace el autor cuando decida; antes conviene la revisión de la API de la v0.1.
+**Cumplida la fase C el 2026-11-01**: el binding de Python tiene su API completa, lee datos nativos como dice la especificación, ejecuta acciones, se serializa con pickle, tiene tipos completos y pasa todos los vectores en sus dos pasadas. La publicación en PyPI (la «primera versión pública») la hace el autor cuando decida; antes conviene la revisión de la API de la v0.1.
 
 ---
 
@@ -502,7 +479,7 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
     - 12 vectores nuevos (85 en total) y una propiedad nueva sobre reglas y rule sets con nombres, etiquetas, claves y descripciones raras.
 - [x] D.2b Texto legible de `explain()` y `summary()` en el núcleo con la sintaxis canónica, *snapshots* con `insta` y `str()` en Python, también de las condiciones (`str(expr)` da hoy el `repr` de Python; fuzzytool muestra sus reglas como texto).
   - Hecho el 2026-11-02. Decisión del autor: los floats del texto canónico se escriben con dígitos normales y `e0` cuando su magnitud es 0 o está en [1e-4, 1e16) (`0.7e0`, `42500e0`) y con exponente fuera (`1e-7`), en lugar de `7e-1`; los datos y constantes de Python son floats y aparecen en casi todas las explicaciones. Cambia la impresión de D.2a (un vector actualizado y uno nuevo, `format/text/float-printing`).
-  - Núcleo: módulo `explain::text` con `Display` para `Explanation`, `RuleExplanation`, `Cause` y `Summary`. Las condiciones, rutas, nombres y constantes salen como en el texto canónico; los valores de los datos, como constantes y acotados (cadenas de más de 60 caracteres, listas y mapas de más de 6 elementos, anidamiento de 2); los *gaps*, como números (floats a 12 cifras significativas, sin ruido), días o duraciones (`1 hour 30 minutes 0.5 seconds`). El formato sigue al de la v1 con la sintaxis nueva; `spec/explain.md` (*Text* y *Summaries*) lo describe con ejemplos que son salida real (un *snapshot* fija el del resumen).
+  - Núcleo: módulo `explain::text` con `Display` para `Explanation`, `RuleExplanation`, `Cause` y `Summary`. Las condiciones, rutas, nombres y constantes salen como en el texto canónico; los valores de los datos, como constantes y acotados (cadenas de más de 60 caracteres, listas y mapas de más de 6 elementos, anidamiento de 2); los *gaps*, como números (floats a 12 cifras significativas, sin ruido), días o duraciones (`1 hour 30 minutes 0.5 seconds`). `spec/explain.md` (*Text* y *Summaries*) describe el formato con ejemplos que son salida real (un *snapshot* fija el del resumen).
   - Cambios de API: `RuleExplanation::rule` pasa a ser la regla (`&Rule`) y no su nombre, porque el texto necesita su condición y su descripción; `Summary::actions` (una por regla, `false` en el núcleo, que no tiene acciones; la ponen los bindings). El JSON del resumen escribe `"action": true`, como ya decía la especificación y no se hacía.
   - Tests: 9 *snapshots* con `insta` (dependencia de desarrollo aprobada en D.2a) que cubren todos los estados, notas, grupos anidados, conflictos, motivos, contrafactuales de cada tipo y resúmenes; tests unitarios de duraciones, *gaps*, motivos y valores acotados; propiedad nueva (`the_text_lists_every_rule_and_cause`). Cobertura de `explain/text.rs`: más del 96 % de líneas, 100 % de funciones.
   - Python: `str()` de `Explanation`, `RuleExplanation`, `Cause` y `Summary` da ese texto (los genera el núcleo), y `str(expr)` el texto canónico (`repr` sigue siendo Python). `RuleSummary.action`. El README muestra la explicación real y un test comprueba que no se desfasa.
@@ -779,7 +756,6 @@ Los bindings E–H y N siguen el orden decidido (C/C++ → JS → JVM → Go →
 |---|---|---|
 | Ocho ecosistemas que empaquetar y mantener | Alto | Bindings finos, C ABI común, conformidad compartida y CI única desde E.1 |
 | Divergencias entre lenguajes | Alto | Sin lógica en los bindings; vectores obligatorios |
-| Perder conocimiento al retirar Python | Medio | Fase A antes de borrar; tag en git |
 | Fallos de memoria en la frontera FFI | Alto | Handles opacos, propiedad explícita, sanitizers y `miri` |
 | Coste de convertir datos entre lenguajes | Medio | `Value` y lotes Arrow; benchmarks por binding |
 | Lógica difusa duplicada respecto a fuzzytool | Bajo | Solo las normas; tests contra fuzzytool como referencia |

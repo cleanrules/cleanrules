@@ -35,8 +35,8 @@ def uncovered(cited: set[str]) -> list[str]:
     """Normative spec sections that no vector cites (`conformance/README.md`, *Coverage*).
 
     A section is covered when a vector cites it or one of its subsections. It is
-    exempt when it, or a section containing it, is a *Differences from the Python v1*
-    section or starts with a line marked *Informative* or *Not checked by vectors*.
+    exempt when it, or a section containing it, starts with a line marked
+    *Informative* or *Not checked by vectors*.
     Document titles (level 1) are not sections.
     """
     missing: list[str] = []
@@ -48,9 +48,7 @@ def uncovered(cited: set[str]) -> list[str]:
         for i, line in enumerate(lines):
             if heading := re.match(r"^(#{1,6}) (.+)$", line):
                 following = next((x for x in lines[i + 1 :] if x.strip()), "")
-                exempt = heading[2] == "Differences from the Python v1" or following.startswith(
-                    EXEMPT_MARKS
-                )
+                exempt = following.startswith(EXEMPT_MARKS)
                 anchor = re.sub(r"[^\w\- ]", "", heading[2].lower()).replace(" ", "-")
                 headings.append((len(heading[1]), f"{path.name}#{anchor}", exempt))
         for i, (level, ref, exempt) in enumerate(headings):

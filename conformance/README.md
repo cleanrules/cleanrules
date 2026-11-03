@@ -8,7 +8,7 @@ implementation disagree, the spec decides which one is wrong.
 ```text
 conformance/
   vectors/<area>/<topic>.json   the vectors, grouped by spec area
-  tools/                        the temporary exporter from the Python v1 (phase A)
+  tools/check.py                the vector checker
 ```
 
 ## Vector files
@@ -103,12 +103,10 @@ output, never stopping at the first one.
 ## Coverage
 
 Every section of a normative spec document is cited by at least one vector,
-directly or through one of its subsections. Exempt are the *Differences from
-the Python v1* sections and those whose first line is marked *Informative* or
-*Not checked by vectors* with the reason (binding tests, the core's snapshot
-tests, a later phase); the exemption covers their subsections. `check.py`
-checks this, and CI runs it together with the export, which must leave the
-vectors unchanged.
+directly or through one of its subsections. Exempt are the sections whose first
+line is marked *Informative* or *Not checked by vectors* with the reason
+(binding tests, the core's snapshot tests, a later phase); the exemption covers
+their subsections. `check.py` checks this, and CI runs it.
 
 ## Tools
 
@@ -123,11 +121,7 @@ locations of `read` vectors.
 
 ## Where the vectors come from
 
-In phase A, an exporter ran the Python v1 on hand-picked cases and on cases
-generated with hypothesis (`vectors/generated/`, one vector per line), skipping
-the cases where the spec deviates from the v1 on purpose; the `read` vectors
-(`vectors/format/`) were written from the spec, because the v1 had no reader.
-The v1 and the exporter were retired in task A.4; both remain in the git tag
-`python-reference`. From now on, vectors are added by hand, from the spec, and
-from the core's property tests: a counterexample that `proptest` finds becomes
-a new vector.
+The vectors in `vectors/generated/` (one vector per line) come from
+hand-picked cases and cases generated with hypothesis; the others were written
+from the spec. Vectors are added by hand, from the spec, and from the core's
+property tests: a counterexample that `proptest` finds becomes a new vector.

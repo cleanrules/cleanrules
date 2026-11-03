@@ -38,7 +38,7 @@ its cause.
 
 | Language | Form |
 |---|---|
-| Python | exception classes with the names above, under `cleanrules.CleanRulesError`. They keep the builtin bases of the v1, so existing `except` clauses still work: `ExpressionError` is also a `TypeError` and a `ValueError`; `RuleSyntaxError` and `RuleDefinitionError` are `ValueError`s; `RegistryError` is a `LookupError`; `RuleNotFoundError` a `KeyError`; `UnsupportedError` a `NotImplementedError`. The cause is `__cause__`. |
+| Python | exception classes with the names above, under `cleanrules.CleanRulesError`. They also derive from Python's builtin exceptions, so `except` clauses written for those work: `ExpressionError` is also a `TypeError` and a `ValueError`; `RuleSyntaxError` and `RuleDefinitionError` are `ValueError`s; `RegistryError` is a `LookupError`; `RuleNotFoundError` a `KeyError`; `UnsupportedError` a `NotImplementedError`. The cause is `__cause__`. |
 | Java, Scala | unchecked exceptions named with `Exception` instead of `Error` (`CleanRulesException`, `MissingFieldException`, …), with a `code()` method. The cause is `getCause()`. |
 | JavaScript, TypeScript | `Error` subclasses with the names above and a `code` property. The cause is `cause`. |
 | C++ | exceptions with the names above, deriving from `std::runtime_error`, with `code()`. |
@@ -154,12 +154,3 @@ only, and compares the two objects without regard to member order:
   `unorderable` (as `type_mismatch`) and `read_error`; nulls, division by zero,
   overflows and NaN results stay nulls with their reasons.
 - In a batch, the first input in order that fails; its `row` says which.
-
-## Differences from the Python v1
-
-- The base class is `CleanRulesError` (the v1's was `RulePyError`), and the
-  format errors gain a class, `FormatError`.
-- `UnsupportedOperation` becomes `UnsupportedError`, and names the operation,
-  not a backend: there is one engine.
-- `TypeMismatchError.types` are written in snake case (`naive_datetime`); the
-  v1 wrote `naive datetime`.

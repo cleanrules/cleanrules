@@ -168,3 +168,9 @@ uses, which `cargo rustc -p cleanrules-ffi --lib --crate-type staticlib --
 macOS, and import libraries such as `kernel32.lib` and `ntdll.lib` on Windows,
 where the program uses the same C runtime (`cl /MD`) and passes them after
 `/link`. CI builds and runs the example on Linux, macOS and Windows (MSVC).
+
+## License
+
+Apache License 2.0, created by Jose L. Salmeron: redistributions keep the
+[NOTICE](https://github.com/cleanrules/cleanrules/blob/main/NOTICE) with its
+attribution of authorship.

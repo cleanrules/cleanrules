@@ -45,9 +45,8 @@ A rule as the engine reads it, in the JSON format:
 }
 ```
 
-Each language will build such rules idiomatically, as the Python prototype did
-with `(F.customer.years > 5) & (F.order.total > 1000)`. That prototype, which
-defined the semantics, is kept in the git tag `python-reference`.
+Each language builds such rules idiomatically: in Python,
+`(F.customer.years > 5) & (F.order.total > 1000)`.
 
 ## Citing
 
@@ -67,4 +66,6 @@ then, cite the repository:
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Apache License 2.0, created by Jose L. Salmeron. See [LICENSE](LICENSE) and
+[NOTICE](NOTICE): anyone who redistributes cleanrules, or a work derived from
+it, must keep the NOTICE with its attribution of authorship.
