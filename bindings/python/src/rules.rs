@@ -10,8 +10,11 @@
 use std::sync::{Arc, Mutex, PoisonError};
 
 use cleanrules::explain::{Cause, Gap, GroupKind, Requirement, Summary, explain, summary};
-use cleanrules::format::{write_decision, write_explanation, write_summary};
-use cleanrules::json::to_string;
+use cleanrules::format::{
+    DocumentFormat, parse_as, read_parsed_decision_document, write_decision, write_explanation,
+    write_summary,
+};
+use cleanrules::json::{Json, Limits, to_string};
 use cleanrules::logic::{LogicName, Truth};
 use cleanrules::rules::{Aggregate, Aggregated, Config, Decision, HitPolicy, Rule, RuleSet};
 use cleanrules::{Error, ErrorCode, Map, Value};
@@ -209,6 +212,40 @@ impl PyRuleSet {
         Ok(PyDecision::new(&self.ruleset, &decision, native))
     }
 
+    /// Read a recorded decision, in `json` or `yaml`, with this rule set
+    /// (`spec/json-format.md`, *Reading a decision*).
+    #[pyo3(signature = (text, format, max_size=None, max_nesting=None, max_depth=None))]
+    fn read_decision(
+        &self,
+        py: Python<'_>,
+        text: &[u8],
+        format: &str,
+        max_size: Option<usize>,
+        max_nesting: Option<usize>,
+        max_depth: Option<usize>,
+    ) -> PyResult<PyDecision> {
+        let format = DocumentFormat::from_name(format)
+            .ok_or_else(|| PyValueError::new_err(format!("unknown format {format:?}")))?;
+        let mut limits = Limits::default();
+        if let Some(size) = max_size {
+            limits = limits.with_max_size(size);
+        }
+        if let Some(nesting) = max_nesting {
+            limits.max_nesting = nesting;
+        }
+        if let Some(depth) = max_depth {
+            limits.max_depth = depth;
+        }
+        let json = parse_as(text, format, &limits).or_raise(py)?;
+        let decision = read_parsed_decision_document(&json, &self.ruleset, &limits).or_raise(py)?;
+        Ok(PyDecision::made(
+            &self.ruleset,
+            &decision,
+            Source::Recorded(json, limits),
+            Vec::new(),
+        ))
+    }
+
     /// Evaluate a batch: errors name the input's position (`row`).
     #[allow(clippy::needless_pass_by_value)] // PyO3 extracts lists by value.
     fn evaluate_many(
@@ -288,7 +325,7 @@ struct RuleOutcome {
 #[pyclass(frozen, name = "Decision", module = "cleanrules._cleanrules")]
 pub(crate) struct PyDecision {
     ruleset: Arc<RuleSet>,
-    input: Value,
+    source: Source,
     /// The native objects of the input's opaque values, given back in outputs.
     /// Behind a lock so that the garbage collector can clear them (`__clear__`)
     /// in a frozen class: an object may hold its own decision.
@@ -298,6 +335,16 @@ pub(crate) struct PyDecision {
     output: Result<Option<Value>, Error>,
     /// The aggregate's values, when there is an aggregate and something was selected.
     aggregated: Option<Map>,
+}
+
+/// Where a decision comes from: it is made again from this when it is written
+/// or explained.
+enum Source {
+    /// An input the rule set evaluated.
+    Input(Value),
+    /// A recorded decision the rule set accepted, with the limits it was read
+    /// under.
+    Recorded(Json, Limits),
 }
 
 fn truth_name(truth: Option<Truth>) -> &'static str {
@@ -310,6 +357,20 @@ fn truth_name(truth: Option<Truth>) -> &'static str {
 
 impl PyDecision {
     fn new(ruleset: &Arc<RuleSet>, decision: &Decision<'_>, native: Native) -> Self {
+        Self::made(
+            ruleset,
+            decision,
+            Source::Input(native.value),
+            native.objects,
+        )
+    }
+
+    fn made(
+        ruleset: &Arc<RuleSet>,
+        decision: &Decision<'_>,
+        source: Source,
+        objects: Vec<Py<PyAny>>,
+    ) -> Self {
         let outcomes = decision
             .results()
             .iter()
@@ -326,8 +387,8 @@ impl PyDecision {
         };
         Self {
             ruleset: Arc::clone(ruleset),
-            input: native.value,
-            objects: Mutex::new(native.objects),
+            source,
+            objects: Mutex::new(objects),
             outcomes,
             selected,
             output: decision.output(),
@@ -342,9 +403,15 @@ impl PyDecision {
         objects.iter().map(|object| object.clone_ref(py)).collect()
     }
 
-    /// Evaluate the input again; it succeeded before, so it succeeds now.
+    /// Make the decision again; it succeeded before, so it succeeds now.
     fn rebuild(&self, py: Python<'_>) -> PyResult<Decision<'_>> {
-        self.ruleset.evaluate(&self.input).or_raise(py)
+        match &self.source {
+            Source::Input(input) => self.ruleset.evaluate(input),
+            Source::Recorded(json, limits) => {
+                read_parsed_decision_document(json, &self.ruleset, limits)
+            }
+        }
+        .or_raise(py)
     }
 }
 

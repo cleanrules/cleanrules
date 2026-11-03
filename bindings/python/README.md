@@ -65,6 +65,11 @@ syntax below; `str()` of a condition gives that text too, and `repr()` the Pytho
 that builds it. `print(rules.summary())` describes the rule set without
 evaluating it: its rules, the fields they read, their outputs and tags.
 
+A decision can be kept for audits and explained later without the input:
+`json.dumps(decision.to_dict())` records it, and `rules.read_decision(text)`
+reads it back, checked node by node against the rule set that made it (a
+decision from another rule set is refused with `decision_mismatch`).
+
 `blocked` is unknown, not false: the input has no `customer.blocked`, and
 cleanrules uses three-valued logic instead of guessing. Pass `strict=True` to
 `RuleSet` to raise a `MissingFieldError` instead. Conditions are data, so some

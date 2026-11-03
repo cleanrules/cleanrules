@@ -179,6 +179,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   trees); and batches (`cr_ruleset_evaluate_many`, `cr_batch_len`,
   `cr_batch_get`), which report the first input that fails. Every
   conformance vector now runs through the C ABI.
+- Python binding: `RuleSet.read_decision(text, format="json")` reads a
+  recorded decision back, checked against the rule set (`decision_mismatch`
+  otherwise), as `cr_ruleset_read_decision` does in C (task E.1d); it explains
+  and writes like an evaluated one.
+- CI builds and runs the C example on Windows with MSVC too (task E.1d).
 - Core: `TableConfig::from_names` (a grid's settings by name, with a hint
   listing the valid names, now also used by Python) and `text::parse_node`
   (one expression of any kind).

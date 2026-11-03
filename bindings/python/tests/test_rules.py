@@ -5,10 +5,12 @@ check the Python API: construction, validation, results and errors.
 """
 
 import datetime as dt
+import json
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+import cleanrules
 import pytest
 from cleanrules import (
     Aggregate,
@@ -505,3 +507,42 @@ def test_messages_name_the_rule_once() -> None:
     with pytest.raises(RuleDefinitionError) as info:
         RuleSet([Rule("a", F.x > 1), Rule("a", F.x > 2)])
     assert str(info.value).count("a") == str(info.value).replace("rule 'a': ", "").count("a")
+
+
+def test_a_recorded_decision_is_read_with_its_rule_set() -> None:
+    rules = cleanrules.loads(
+        "RULE vip\nIF years > 5\nTHEN discount = 0.15\n\nRULE other\nIF years > 1",
+        format="text",
+    )
+    assert isinstance(rules, cleanrules.RuleSet)
+    decision = rules.evaluate({"years": 7})
+    text = json.dumps(decision.to_dict())
+    read = rules.read_decision(text)
+    assert read.to_dict() == decision.to_dict()
+    assert read.output == decision.output
+    assert [r.fired for r in read.results] == [True, True]
+    assert str(read.explain()) == str(decision.explain())
+    assert rules.read_decision(text.encode()).to_dict() == decision.to_dict()
+    # JSON is YAML too; a rule set document is not a decision.
+    assert rules.read_decision(text, format="yaml").to_dict() == decision.to_dict()
+    with pytest.raises(cleanrules.FormatError):
+        rules.read_decision(cleanrules.dumps(rules, format="yaml"), format="yaml")
+
+
+def test_a_decision_from_another_rule_set_is_refused() -> None:
+    rule, other_rule = (
+        cleanrules.loads(f"RULE {name}\nIF x > 1", format="text") for name in ("a", "b")
+    )
+    assert isinstance(rule, cleanrules.Rule) and isinstance(other_rule, cleanrules.Rule)
+    rules, other = cleanrules.RuleSet([rule]), cleanrules.RuleSet([other_rule])
+    text = json.dumps(other.evaluate({"x": 2}).to_dict())
+    with pytest.raises(cleanrules.FormatError) as caught:
+        rules.read_decision(text)
+    assert caught.value.code == "decision_mismatch"
+    with pytest.raises(cleanrules.UnsupportedError):
+        rules.read_decision(text, format="text")  # pyright: ignore[reportArgumentType]
+    with pytest.raises(ValueError, match="max_depth"):
+        rules.read_decision(text, max_depth=0)
+    with pytest.raises(cleanrules.FormatError) as caught:
+        rules.read_decision(b'{"version": 1, "decision": "\\xff"}'.replace(b"\\xff", b"\xff"))
+    assert caught.value.line == 1

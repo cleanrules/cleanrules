@@ -82,6 +82,31 @@ jobs:
           target/debug/libcleanrules_ffi.a -lm -lpthread -ldl -o discounts
       - run: ./discounts docs/examples/discounts.rules
 
+  c-abi-windows:
+    name: C ABI (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build -p cleanrules-ffi
+      # The system libraries the static library needs, as Rust lists them.
+      - shell: bash
+        run: |
+          libs=$(cargo rustc -q -p cleanrules-ffi --lib --crate-type staticlib -- \
+            --print native-static-libs 2>&1 | sed -n 's/.*native-static-libs: //p' | tail -1)
+          echo "native-static-libs: $libs"
+          echo "NATIVE_LIBS=$libs" >> "$GITHUB_ENV"
+      # MSVC, found with vswhere: the header as C++, and the example as C11
+      # linked to the static library with its C runtime (/MD).
+      - shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VS=%%i
+          call "%VS%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
+          cl /nologo /std:c++17 /W4 /WX /Zs /I crates\ffi\include /Tp crates\ffi\include\cleanrules.h || exit /b 1
+          cl /nologo /std:c11 /W3 /MD /D_CRT_SECURE_NO_WARNINGS /I crates\ffi\include docs\examples\discounts.c /Fe:discounts.exe /link target\debug\cleanrules_ffi.lib %NATIVE_LIBS% || exit /b 1
+          discounts.exe docs\examples\discounts.rules
+
   miri:
     name: Miri (C ABI)
     runs-on: ubuntu-latest

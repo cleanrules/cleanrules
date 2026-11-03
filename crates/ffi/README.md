@@ -165,4 +165,6 @@ they become `CR_INTERNAL_ERROR`.
 The static library needs the system libraries that Rust's standard library
 uses, which `cargo rustc -p cleanrules-ffi --lib --crate-type staticlib --
 --print native-static-libs` lists: `-lm -lpthread -ldl` on Linux, `-lm` on
-macOS. Windows is not tested yet.
+macOS, and import libraries such as `kernel32.lib` and `ntdll.lib` on Windows,
+where the program uses the same C runtime (`cl /MD`) and passes them after
+`/link`. CI builds and runs the example on Linux, macOS and Windows (MSVC).

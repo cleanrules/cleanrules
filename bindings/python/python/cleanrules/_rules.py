@@ -24,7 +24,7 @@ import json
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, NoReturn, TypeAlias, overload
+from typing import TYPE_CHECKING, Any, Literal, NoReturn, TypeAlias, overload
 
 from cleanrules import _cleanrules as _native
 from cleanrules._expr import Const, Expr, _wrap  # pyright: ignore[reportPrivateUsage]
@@ -515,6 +515,49 @@ class RuleSet(Sequence[Rule]):
                 mismatch; or a `HitPolicyError` when the policy cannot decide.
         """
         return Decision(self, self._native.evaluate(data))
+
+    def read_decision(
+        self,
+        text: str | bytes,
+        *,
+        format: Literal["json", "yaml"] = "json",
+        max_size: int | None = None,
+        max_nesting: int | None = None,
+        max_depth: int | None = None,
+    ) -> Decision:
+        """Read a decision this rule set made, recorded as JSON or YAML.
+
+            decision = rules.read_decision(path.read_text())
+            print(decision.explain())
+
+        The decision is checked against the rule set node by node, so one that
+        belongs to another rule set, or that the rule set could not have made,
+        is refused (`spec/json-format.md`, *Reading a decision*). It explains
+        and writes like an evaluated one. Opaque values come back as `None`: a
+        recorded decision keeps their type's name, not the object.
+
+        Args:
+            text: The document, as `dumps(decision)` or `decision.to_dict()`
+                wrote it; `bytes` are UTF-8.
+            format: `"json"` or `"yaml"`.
+            max_size: The largest text, in bytes.
+            max_nesting: The deepest nesting of objects and arrays.
+            max_depth: The deepest result tree, in nodes.
+
+        Raises:
+            FormatError: For invalid JSON or YAML, with its line and column; a
+                document that is not a decision; one beyond the limits; and,
+                with the code `decision_mismatch`, a decision that does not
+                belong to the rule set.
+            UnsupportedError: For a format other than JSON or YAML.
+        """
+        limits = (("max_size", max_size), ("max_nesting", max_nesting), ("max_depth", max_depth))
+        for name, limit in limits:
+            if limit is not None and limit < 1:
+                raise ValueError(f"{name} must be at least 1, got {limit}")
+        data = text.encode("utf-8") if isinstance(text, str) else text
+        native = self._native.read_decision(data, format, max_size, max_nesting, max_depth)
+        return Decision(self, native)
 
     def bind(self, actions: Mapping[str, Action]) -> RuleSet:
         """This rule set with its named actions resolved in a registry (`spec/rules.md`, *Actions*).
