@@ -167,7 +167,7 @@ fn type_name(value: &Value) -> &'static str {
 fn wrong(value: &Value, wanted: &str) -> Failure {
     Failure::Invalid(
         format!("the value is {}, not {wanted}", type_name(value)),
-        "check cr_value_kind first",
+        "check the value's kind first (cr_value_kind)",
     )
 }
 
@@ -653,6 +653,33 @@ pub unsafe extern "C" fn cr_value_from_json(
     unsafe { call("cr_value_from_json", error, body) }
 }
 
+/// A deep copy of a value, freed with `cr_value_free`: the same value, null
+/// reasons and opaque tokens included, which JSON would not keep.
+///
+/// # Safety
+///
+/// `value` is `NULL` or a live `cr_value`; `out` is `NULL` or points to a
+/// writable `cr_value *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_value_clone(
+    value: *const cr_value,
+    out: *mut *mut cr_value,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `value` is NULL or live (# Safety).
+        let value = unsafe { value_of(value, "value") }?.clone();
+        // SAFETY: `out` passed `clear`.
+        unsafe { give_value(out, value) };
+        Ok(())
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_value_clone", error, body) }
+}
+
 /// Write a value as JSON (`spec/json-format.md`, *Values*), freed with
 /// `cr_string_free`.
 ///
@@ -772,53 +799,149 @@ pub unsafe extern "C" fn cr_value_get_null(
     unsafe { call("cr_value_get_null", error, body) }
 }
 
-macro_rules! getter {
-    ($(#[$doc:meta])* $name:ident, $out:ty, $wanted:literal, $pattern:pat => $read:expr) => {
-        $(#[$doc])*
-        ///
-        /// # Safety
-        ///
-        /// `value` is `NULL` or a live `cr_value`; `out` points to a writable
-        /// value of its type (`NULL` is `CR_INVALID_ARGUMENT`); `error` is
-        /// `NULL` or points to a writable `cr_error *` set to `NULL`.
-        #[unsafe(no_mangle)]
-        pub unsafe extern "C" fn $name(
-            value: *const cr_value,
-            out: *mut $out,
-            error: *mut *mut cr_error,
-        ) -> cr_status {
-            let body = || {
-                // SAFETY: `value` is NULL or live (# Safety).
-                let value = unsafe { value_of(value, "value") }?;
-                let read = match value {
-                    $pattern => $read,
-                    other => return Err(wrong(other, $wanted)),
-                };
-                // SAFETY: `out` is NULL or writable (# Safety).
-                unsafe { write_out(out, read, "out") }
-            };
-            // SAFETY: `error` is NULL or writable (# Safety).
-            unsafe { call(stringify!($name), error, body) }
-        }
+/// Read one scalar of a value through `out`: `read` gives it, or `None` when
+/// the value is not `wanted`.
+///
+/// # Safety
+///
+/// As the exported getters below.
+unsafe fn get<T>(
+    name: &str,
+    value: *const cr_value,
+    out: *mut T,
+    error: *mut *mut cr_error,
+    wanted: &str,
+    read: impl FnOnce(&Value) -> Option<T>,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `value` is NULL or live (# Safety).
+        let value = unsafe { value_of(value, "value") }?;
+        let read = read(value).ok_or_else(|| wrong(value, wanted))?;
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { write_out(out, read, "out") }
     };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call(name, error, body) }
 }
 
-getter!(
-    /// A boolean's value.
-    cr_value_get_bool, bool, "a boolean", Value::Bool(b) => *b
-);
-getter!(
-    /// An int's value.
-    cr_value_get_int, i64, "an int", Value::Int(i) => *i
-);
-getter!(
-    /// A float's value.
-    cr_value_get_float, f64, "a float", Value::Float(f) => *f
-);
-getter!(
-    /// An opaque value's token.
-    cr_value_get_opaque_token, u64, "an opaque value", Value::Opaque(o) => o.token
-);
+// The getters are written out, not made by a macro, so that cbindgen sees
+// them and the header declares them.
+
+/// A boolean's value.
+///
+/// # Safety
+///
+/// `value` is `NULL` or a live `cr_value`; `out` points to a writable `bool`
+/// (`NULL` is `CR_INVALID_ARGUMENT`); `error` is `NULL` or points to a
+/// writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_value_get_bool(
+    value: *const cr_value,
+    out: *mut bool,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    // SAFETY: the caller's promises are `get`'s.
+    unsafe {
+        get(
+            "cr_value_get_bool",
+            value,
+            out,
+            error,
+            "a boolean",
+            |v| match v {
+                Value::Bool(b) => Some(*b),
+                _ => None,
+            },
+        )
+    }
+}
+
+/// An int's value.
+///
+/// # Safety
+///
+/// `value` is `NULL` or a live `cr_value`; `out` points to a writable
+/// `int64_t` (`NULL` is `CR_INVALID_ARGUMENT`); `error` is `NULL` or points to
+/// a writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_value_get_int(
+    value: *const cr_value,
+    out: *mut i64,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    // SAFETY: the caller's promises are `get`'s.
+    unsafe {
+        get(
+            "cr_value_get_int",
+            value,
+            out,
+            error,
+            "an int",
+            |v| match v {
+                Value::Int(i) => Some(*i),
+                _ => None,
+            },
+        )
+    }
+}
+
+/// A float's value.
+///
+/// # Safety
+///
+/// `value` is `NULL` or a live `cr_value`; `out` points to a writable
+/// `double` (`NULL` is `CR_INVALID_ARGUMENT`); `error` is `NULL` or points to
+/// a writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_value_get_float(
+    value: *const cr_value,
+    out: *mut f64,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    // SAFETY: the caller's promises are `get`'s.
+    unsafe {
+        get(
+            "cr_value_get_float",
+            value,
+            out,
+            error,
+            "a float",
+            |v| match v {
+                Value::Float(f) => Some(*f),
+                _ => None,
+            },
+        )
+    }
+}
+
+/// An opaque value's token.
+///
+/// # Safety
+///
+/// `value` is `NULL` or a live `cr_value`; `out` points to a writable
+/// `uint64_t` (`NULL` is `CR_INVALID_ARGUMENT`); `error` is `NULL` or points
+/// to a writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_value_get_opaque_token(
+    value: *const cr_value,
+    out: *mut u64,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    // SAFETY: the caller's promises are `get`'s.
+    unsafe {
+        get(
+            "cr_value_get_opaque_token",
+            value,
+            out,
+            error,
+            "an opaque value",
+            |v| match v {
+                Value::Opaque(o) => Some(o.token),
+                _ => None,
+            },
+        )
+    }
+}
 
 /// A decimal's canonical text (`spec/json-format.md`, *Numbers*), such as
 /// `0.15`: an owned text, freed with `cr_string_free`.

@@ -183,6 +183,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   otherwise), as `cr_ruleset_read_decision` does in C (task E.1d); it explains
   and writes like an evaluated one.
 - CI builds and runs the C example on Windows with MSVC too (task E.1d).
+- C++ (`bindings/cpp`, task E.2a): `cleanrules.hpp`, a header-only C++17
+  layer over the C ABI. RAII handles (`ruleset`, `document`, `decision`,
+  `batch`, `node`, `grid`, `actions`, `limits`) that move, and values
+  (`value`) that also copy; borrowed views (`value_ref`, `decision_ref`).
+  Values build from C++ data (`value::map({{"years", 7}})`, dates, opaque
+  values) and read back with `as_int`, `as_string`, ... Errors as in
+  `std::filesystem`: every call that can fail throws an exception of the
+  hierarchy of `spec/errors.md` (`cleanrules::error`, `format_error`,
+  `missing_field_error`, ...), or fills an `error_info &` and never throws;
+  built without exceptions, only the second exists. Actions are C++
+  callables, and one that throws stops the run with an `action_error`
+  nested over its exception. Read from a temporary, views are owned copies.
+  A CMake package (`find_package(cleanrules)`, targets `cleanrules::c` and
+  `cleanrules::cleanrules`) that builds the C library with cargo, statically
+  or shared, for the platform CMake builds for (`CLEANRULES_RUST_TARGET`),
+  and installs both headers. The
+  example `docs/examples/discounts.cpp`; CI builds and tests it on Linux and
+  macOS under ASan and UBSan, and on Windows with MSVC.
+- C ABI: `cr_value_clone`, a deep copy of a value that keeps null reasons and
+  opaque tokens, and `cr_decision_clone`, which keeps a decision borrowed from
+  a batch, an action call or an error.
 - Core: `TableConfig::from_names` (a grid's settings by name, with a hint
   listing the valid names, now also used by Python) and `text::parse_node`
   (one expression of any kind).
@@ -337,3 +358,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Strict-mode errors write a field's path as the text syntax does
   (`missing field items[2].price`, not `items.[2].price`), as explanations
   already did (task D.5).
+### Fixed
+
+- The C header now declares `cr_value_get_bool`, `cr_value_get_int`,
+  `cr_value_get_float` and `cr_value_get_opaque_token`, which the library
+  exported but cbindgen skipped, since a macro defined them; a test now checks
+  that the header declares every exported function.
+- The shared C library names itself for the dynamic loader as it is found once
+  installed: `@rpath/libcleanrules_ffi.dylib` on macOS (it was the absolute
+  path of the build) and the SONAME `libcleanrules_ffi.so` on Linux (it had
+  none).
+

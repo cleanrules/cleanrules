@@ -63,7 +63,7 @@ its cause.
 | `missing_field` | strict mode met a field whose path cannot be resolved | **`rule`**, **`path`**, `node`, **`row`**, `available` |
 | `type_mismatch` | strict mode met values of incompatible groups or a value of the `other` group, ordered booleans, or a non-boolean used as a condition | **`rule`**, **`path`**, **`types`**, `node`, **`row`** |
 | `hit_policy_error` | the hit policy cannot decide (below) | **`rules`**, **`row`** |
-| `action_error` | an action raised during `run` (task D.4) | **`rule`**, **`executed`**, `decision` |
+| `action_error` | an action raised during `run` | **`rule`**, **`executed`**, `decision` |
 | `unsupported` | this build, this logic or this version of the format cannot do the operation (`json-format.md`, `explain.md`) | `operation`, `reason` |
 
 Context fields:

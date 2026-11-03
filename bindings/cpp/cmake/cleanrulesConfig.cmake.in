@@ -1,0 +1,38 @@
+# The cleanrules package: find_package(cleanrules CONFIG REQUIRED) gives
+#
+#   cleanrules::c           the C library and cleanrules.h
+#   cleanrules::cleanrules  the C++ header cleanrules.hpp (C++17), over it
+
+@PACKAGE_INIT@
+
+if(NOT TARGET cleanrules::c)
+  add_library(cleanrules::c @CLEANRULES_LIBRARY_KIND@ IMPORTED)
+  set_target_properties(cleanrules::c PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@"
+    IMPORTED_LINK_INTERFACE_LANGUAGES C)
+  if(WIN32 AND "@CLEANRULES_LIBRARY_KIND@" STREQUAL "SHARED")
+    set_target_properties(cleanrules::c PROPERTIES
+      IMPORTED_LOCATION "@PACKAGE_CMAKE_INSTALL_BINDIR@/@CLEANRULES_LIB_NAME@"
+      IMPORTED_IMPLIB "@PACKAGE_CMAKE_INSTALL_LIBDIR@/@CLEANRULES_LINK_NAME@")
+  else()
+    set_target_properties(cleanrules::c PROPERTIES
+      IMPORTED_LOCATION "@PACKAGE_CMAKE_INSTALL_LIBDIR@/@CLEANRULES_LIB_NAME@")
+  endif()
+  # The name the dynamic loader looks for: an @rpath install name or a SONAME.
+  if(NOT "@CLEANRULES_SONAME@" STREQUAL "")
+    set_target_properties(cleanrules::c PROPERTIES IMPORTED_SONAME "@CLEANRULES_SONAME@")
+  endif()
+  # The system libraries a Rust static library needs.
+  set(_cleanrules_native_libs "@CLEANRULES_INSTALLED_NATIVE_LIBS@")
+  if(_cleanrules_native_libs)
+    set_property(TARGET cleanrules::c PROPERTY INTERFACE_LINK_LIBRARIES "${_cleanrules_native_libs}")
+  endif()
+  unset(_cleanrules_native_libs)
+
+  add_library(cleanrules::cleanrules INTERFACE IMPORTED)
+  set_target_properties(cleanrules::cleanrules PROPERTIES
+    INTERFACE_COMPILE_FEATURES cxx_std_17
+    INTERFACE_LINK_LIBRARIES cleanrules::c)
+endif()
+
+check_required_components(cleanrules)

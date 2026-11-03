@@ -108,6 +108,38 @@ jobs:
           cl /nologo /std:c11 /W3 /MD /D_CRT_SECURE_NO_WARNINGS /I crates\ffi\include docs\examples\discounts.c /Fe:discounts.exe /link target\debug\cleanrules_ffi.lib %NATIVE_LIBS% || exit /b 1
           discounts.exe docs\examples\discounts.rules
 
+  cpp:
+    name: C++ (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Debug under the address and undefined behaviour sanitizers.
+          - os: ubuntu-latest
+            config: Debug
+            options: -DCLEANRULES_SANITIZERS=address,undefined
+          - os: macos-latest
+            config: Debug
+            options: -DCLEANRULES_SANITIZERS=address,undefined
+          # MSVC, with the release C runtime the Rust objects use.
+          - os: windows-latest
+            config: Release
+            options: ""
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # The static library, then the shared one; ctest builds first.
+      - run: >
+          cmake -S bindings/cpp -B build/cpp -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+          -DCLEANRULES_CARGO_TARGET_DIR=${{ github.workspace }}/target ${{ matrix.options }}
+      - run: ctest --test-dir build/cpp -C ${{ matrix.config }} --output-on-failure
+      - run: >
+          cmake -S bindings/cpp -B build/cpp-shared -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+          -DCLEANRULES_SHARED=ON -DCLEANRULES_CARGO_TARGET_DIR=${{ github.workspace }}/target
+      - run: ctest --test-dir build/cpp-shared -C ${{ matrix.config }} --output-on-failure
+
   miri:
     name: Miri (C ABI)
     runs-on: ubuntu-latest

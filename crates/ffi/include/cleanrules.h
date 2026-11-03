@@ -380,6 +380,20 @@ const struct cr_decision *cr_batch_get(const struct cr_batch *batch,
 // `batch` is `NULL` or a live `cr_batch`.
 size_t cr_batch_len(const struct cr_batch *batch);
 
+// A copy of a decision that the caller owns, freed with `cr_decision_free`:
+// to keep a decision borrowed from a batch, an action call or an error after
+// what lends it is freed. It shares the rule set and holds its own copy of
+// the input.
+//
+// # Safety
+//
+// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to
+// a writable `cr_decision *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_decision_clone(const struct cr_decision *decision,
+                            struct cr_decision **out,
+                            struct cr_error **error);
+
 // The decision's explanation (`spec/explain.md`) as a JSON or YAML document,
 // or as text (`CR_FORMAT_TEXT`).
 //
@@ -1074,6 +1088,18 @@ const char *cr_status_name(cr_status status);
 // not freed before.
 void cr_string_free(char *text);
 
+// A deep copy of a value, freed with `cr_value_free`: the same value, null
+// reasons and opaque tokens included, which JSON would not keep.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; `out` is `NULL` or points to a
+// writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_value_clone(const struct cr_value *value,
+                         struct cr_value **out,
+                         struct cr_error **error);
+
 // Free a value made by a `cr_value_new_*` function, `cr_value_from_json` or a
 // decision. `NULL` is ignored. Never free a value moved into a list or map,
 // or one borrowed from another value.
@@ -1118,6 +1144,17 @@ cr_status cr_value_get_aware_datetime(const struct cr_value *value,
                                       size_t *len,
                                       struct cr_error **error);
 
+// A boolean's value.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; `out` points to a writable `bool`
+// (`NULL` is `CR_INVALID_ARGUMENT`); `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_value_get_bool(const struct cr_value *value,
+                            bool *out,
+                            struct cr_error **error);
+
 // The parts of a date. Every out-parameter may be `NULL`.
 //
 // # Safety
@@ -1143,6 +1180,28 @@ cr_status cr_value_get_decimal(const struct cr_value *value,
                                char **out,
                                size_t *len,
                                struct cr_error **error);
+
+// A float's value.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; `out` points to a writable
+// `double` (`NULL` is `CR_INVALID_ARGUMENT`); `error` is `NULL` or points to
+// a writable `cr_error *` set to `NULL`.
+cr_status cr_value_get_float(const struct cr_value *value,
+                             double *out,
+                             struct cr_error **error);
+
+// An int's value.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; `out` points to a writable
+// `int64_t` (`NULL` is `CR_INVALID_ARGUMENT`); `error` is `NULL` or points to
+// a writable `cr_error *` set to `NULL`.
+cr_status cr_value_get_int(const struct cr_value *value,
+                           int64_t *out,
+                           struct cr_error **error);
 
 // The parts of a datetime without a zone. Every out-parameter may be `NULL`.
 //
@@ -1176,6 +1235,17 @@ cr_status cr_value_get_null(const struct cr_value *value,
                             const char **detail,
                             size_t *len,
                             struct cr_error **error);
+
+// An opaque value's token.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; `out` points to a writable
+// `uint64_t` (`NULL` is `CR_INVALID_ARGUMENT`); `error` is `NULL` or points
+// to a writable `cr_error *` set to `NULL`.
+cr_status cr_value_get_opaque_token(const struct cr_value *value,
+                                    uint64_t *out,
+                                    struct cr_error **error);
 
 // An opaque value's type name, borrowed from the value and not NUL-terminated.
 //

@@ -787,3 +787,52 @@ fn a_rule_set_names_its_aggregate() {
         assert!(!cr_ruleset_strict(plain.0));
     }
 }
+
+#[test]
+fn a_clone_keeps_what_json_loses() {
+    let detail = "getter raised";
+    let (p, n) = arg(detail.as_bytes());
+    // SAFETY: the detail outlives the call.
+    let null =
+        made(|o, e| unsafe { cr_value_new_null_reason(CR_REASON_READ_ERROR, p, n, o, e) }).unwrap();
+    let (p, n) = arg(b"handle");
+    // SAFETY: the type name outlives the call.
+    let opaque = made(|o, e| unsafe { cr_value_new_opaque(p, n, 7, o, e) }).unwrap();
+    let list = Value(cr_value_new_list(2));
+    // SAFETY: live values, each moved into the list once.
+    unsafe {
+        assert_eq!(cr_value_list_set(list.0, 0, null.0, ptr::null_mut()), CR_OK);
+        assert_eq!(
+            cr_value_list_set(list.0, 1, opaque.0, ptr::null_mut()),
+            CR_OK
+        );
+    }
+    std::mem::forget((null, opaque));
+    // SAFETY: a live value.
+    let copy = made(|o, e| unsafe { cr_value_clone(list.0, o, e) }).unwrap();
+    drop(list);
+    // SAFETY: the copy is live; its items are borrowed from it.
+    unsafe {
+        let (mut reason, mut token) = (0, 0);
+        let first = cr_value_list_get(copy.0, 0);
+        let status = cr_value_get_null(
+            first,
+            &raw mut reason,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+        );
+        assert_eq!((status, reason), (CR_OK, CR_REASON_READ_ERROR));
+        let second = cr_value_list_get(copy.0, 1);
+        assert_eq!(
+            cr_value_get_opaque_token(second, &raw mut token, ptr::null_mut()),
+            CR_OK
+        );
+        assert_eq!(token, 7);
+    }
+    // SAFETY: NULL is refused, and the out-parameter stays NULL.
+    let Err(refused) = made(|o, e| unsafe { cr_value_clone(ptr::null(), o, e) }) else {
+        panic!("a NULL value was cloned");
+    };
+    assert_eq!(refused.code(), "invalid_argument");
+}

@@ -1,0 +1,209 @@
+# cleanrules for C++
+
+`cleanrules.hpp` is a header-only C++17 layer over the C ABI
+([`crates/ffi`](../../crates/ffi/README.md)): the same engine and the same
+concepts (`ruleset`, `decision`, `explain`, `summary`), with handles that free
+themselves, values you build from C++ data, and errors as exceptions or as
+values.
+
+## Example
+
+```cpp
+#include <cleanrules.hpp>
+#include <iostream>
+
+namespace cr = cleanrules;
+
+int main() {
+    auto rules = cr::ruleset::read(R"(
+        HIT POLICY priority
+        RULE vip PRIORITY 10
+        IF customer.years > 5 AND order.total > 1000
+        THEN discount = 0.15
+        RULE loyal PRIORITY 5
+        IF customer.years > 2
+        THEN discount = 0.05)", cr::format::text);
+
+    auto decision = rules.evaluate(cr::value::map({
+        {"customer", cr::value::map({{"years", 7}})},
+        {"order", cr::value::map({{"total", 1500}})},
+    }));
+    std::cout << decision.output()["discount"].as_decimal() << "\n";  // 0.15
+    std::cout << decision.explain();
+}
+```
+
+[`docs/examples/discounts.cpp`](../../docs/examples/discounts.cpp) does more:
+JSON input, which rules fired, an action, and an error both ways.
+
+## Building
+
+The CMake project builds the C library with cargo, so it needs a Rust
+toolchain (1.95 or later) and CMake 3.21:
+
+```sh
+cmake -S bindings/cpp -B build/cpp            # Debug; -DCMAKE_BUILD_TYPE=Release
+ctest --test-dir build/cpp                    # builds, then runs the tests
+cmake --install build/cpp --prefix /opt/cleanrules
+```
+
+Then, in your project:
+
+```cmake
+find_package(cleanrules CONFIG REQUIRED)   # with CMAKE_PREFIX_PATH=/opt/cleanrules
+target_link_libraries(app PRIVATE cleanrules::cleanrules)   # C++; cleanrules::c for C
+```
+
+Or add the directory to your build (`add_subdirectory(path/to/bindings/cpp)`),
+which gives the same two targets.
+
+Options:
+
+| Option | Default | |
+| --- | --- | --- |
+| `CLEANRULES_SHARED` | `OFF` | link the shared library instead of the static one |
+| `CLEANRULES_BUILD_TESTS` | on at the top level | the tests and the example |
+| `CLEANRULES_INSTALL` | on at the top level | the install rules and the CMake package |
+| `CLEANRULES_RUST_TARGET` | the host's, or derived | the Rust target triple, such as `aarch64-linux-android` |
+| `CLEANRULES_SANITIZERS` | empty | sanitizers for the tests, such as `address,undefined` |
+| `CLEANRULES_CARGO_TARGET_DIR` | `<build>/cargo` | where cargo builds; the workspace's `target` reuses its builds |
+| `CLEANRULES_NATIVE_LIBS` | asked of rustc | the system libraries of the static library |
+| `CARGO` | found on `PATH` | the cargo to use (also from the environment) |
+
+Debug builds use cargo's `dev` profile, the others `release`. When CMake
+builds for another platform (cross-compiling, one `CMAKE_OSX_ARCHITECTURES`
+that is not the host's, or MinGW), cargo builds for the matching Rust target,
+which `rustup target add` must have installed; set `CLEANRULES_RUST_TARGET`
+when it cannot be told. One architecture at a time: join macOS ones with
+`lipo`. `CMAKE_OSX_DEPLOYMENT_TARGET` reaches cargo too.
+
+With MSVC, the Rust objects use the release C runtime (`/MD`): build your
+program with it too (`CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`). A shared
+library on Windows is a DLL that must sit next to your program or on `PATH`;
+on macOS its install name is `@rpath/libcleanrules_ffi.dylib`, and on Linux
+its SONAME `libcleanrules_ffi.so`, so it works wherever it is installed.
+
+## Errors
+
+Each call that can fail has two overloads, as in `std::filesystem`:
+
+```cpp
+try {
+    auto decision = rules.evaluate(input);           // throws on failure
+} catch (const cr::missing_field_error &e) {         // or evaluation_error, or error
+    std::cerr << e.what() << "\n" << e.json() << "\n";
+}
+
+cr::error_info error;
+auto decision = rules.evaluate(input, error);        // never throws a cleanrules::error
+if (error) {
+    std::cerr << cr::name(error.code()) << ": " << error.message() << "\n";
+}
+```
+
+The exceptions follow the hierarchy of [`spec/errors.md`](../../spec/errors.md):
+`cleanrules::error` (a `std::runtime_error`) above `format_error`
+(also for `unsupported_version`, `limit_exceeded` and `decision_mismatch`),
+`expression_error`, `rule_definition_error`, `rule_syntax_error`,
+`registry_error`, `rule_not_found_error`, `evaluation_error` (above
+`missing_field_error`, `type_mismatch_error` and `hit_policy_error`),
+`action_error`, `unsupported_error`, and, for a misuse of the API such as a
+moved-from handle, `invalid_argument_error`; `internal_error` is a bug in
+cleanrules. Each gives its `code()`, `hint()`, `json()` (spec/errors.md,
+*JSON form*) and `info()`.
+
+An `error_info` is false when nothing failed; a call clears it on success. A
+failed call returns an empty handle (false), an empty text or a zero.
+
+Built without exceptions (`-fno-exceptions`, `/EHs-c-`, or with
+`CLEANRULES_NO_EXCEPTIONS` defined), only the `error_info` overloads exist,
+`value::map({...}, error)` and `value::record({...}, error)` among them. The
+value constructors then turn what they cannot build (a string that is not
+UTF-8, an impossible date) into a null with the reason `read_error` and the
+message, as native data that cannot be read; `value::make(..., error)` reports
+it instead. With exceptions, the constructors throw a `format_error` (a string)
+or an `invalid_argument_error` (a date, a datetime, an offset), and
+`value::map` and `value::record` a `format_error` for a key that is not UTF-8.
+Both kinds of translation unit may share a program: the header puts each in
+its own inline namespace.
+
+## Values
+
+```cpp
+auto input = cr::value::record({
+    {"name", "Ada"},                                  // string (UTF-8)
+    {"years", 7},                                     // int
+    {"score", 0.5},                                   // float
+    {"price", cr::value::decimal("19.90")},           // exact decimal
+    {"born", cr::date{1815, 12, 10}},
+    {"seen", cr::aware_datetime{1762156800, 0, 3600, "Europe/Madrid"}},
+    {"handle", cr::opaque{"socket", 42}},              // a token of your own
+    {"tags", cr::value::list({"vip", "beta"})},
+    {"note", nullptr},                                // a plain null
+});
+input["years"].as_int();            // 7; a value_ref borrowed from input
+input["tags"][0].as_string();       // "vip", a string_view
+input["missing"];                   // an empty value_ref: false
+```
+
+Values copy deeply (null reasons and opaque tokens included) and move
+cheaply. `value::list({...})` holds its items, `value::list_of_size(n)` has
+`n` nulls to `set`, `value::map().insert("a", 1).insert("b", 2)` builds in
+place, and `value::from_json` and `to_json` convert to and from JSON. Strings
+are UTF-8; other pointers and character types (`char32_t`, `unsigned char`,
+...) are not values.
+
+A `value_ref` (and a `std::string_view` read from one) is valid until the
+value it comes from changes, moves or is destroyed; `clone()` makes it a
+`value`. Read from a temporary, they are owned instead, so
+`auto label = decision.output()["label"].as_string();` is a `std::string`.
+
+## Decisions
+
+`decision.fired(i)`, `truth(i)`, `selected()`, `rule_name(i)`,
+`rule_output(i)`, `output()` and `outputs()` (or `output_json()`), `write()`
+(JSON by default, as every `write`) and `explain()` (text by default, as
+`summary()`). A decision keeps its rule set alive and a copy of its input.
+`ruleset::evaluate_many` returns a `batch`, whose `decision_ref`s live as long
+as it, and `clone()` keeps one longer; `read_decision` reads a recorded one
+back. A `node` evaluates on its own: `evaluate_tree(input, logic, strict)`
+and `evaluate_value_tree(input, strict)`.
+
+## Actions
+
+```cpp
+cr::actions actions;
+actions.add("notify_sales", [](cr::action_call &call) {
+    send_mail(call.rule_name(), call.input()["customer"]["email"].as_string());
+    // call.fail("why") or a throw stops the run with an action_error
+});
+auto decision = rules.run(actions, input);
+```
+
+The registry keeps the callables. An action that throws stops the run with an
+`action_error` thrown over it (`std::rethrow_if_nested` gives the original),
+whose `decision()` is a copy of the decision being run; with an `error_info`,
+`cause()` holds the exception, and `decision()` a copy that outlives the
+error_info's next use. Actions run on the thread that calls `run`, and may
+run the rules again. On Windows, each DLL that includes the header keeps the
+exception apart: one thrown by an action registered in one DLL, during a run
+started in another, fails the run without being nested in it.
+
+## Threads
+
+Rule sets, documents, decisions, nodes and batches never change once made:
+use them from as many threads as you like. Values, limits, grids and action
+registries change while they are built; finish them first. A finished
+registry may run on several threads at once, and its actions then run
+concurrently.
+
+## Ownership
+
+Every handle frees its C handle; `c_ptr()` lends it to C code,
+`value::adopt` and `decision::adopt` take ownership of a C handle, and the
+member `release()` of a value gives its C handle up.
+The header includes `cleanrules.h`, so the whole C ABI stays available.
+
+## License
+
+Apache-2.0, with the [NOTICE](../../NOTICE) that every redistribution keeps.

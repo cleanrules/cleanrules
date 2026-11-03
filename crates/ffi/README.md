@@ -94,6 +94,7 @@ The whole program, with explanations and errors, is
   changes. `cr_value_to_json` and `cr_value_from_json` convert to and from
   JSON, though not losslessly: null reasons are written as plain nulls, and
   opaque values cannot be read back.
+  `cr_value_clone` copies a value without losing either.
 - **Describing a rule set.** `cr_ruleset_len`, `cr_ruleset_rule_name`,
   `cr_ruleset_hit_policy`, `cr_ruleset_aggregate` and `cr_ruleset_strict`
   describe one; its summary has the rest.
@@ -102,6 +103,8 @@ The whole program, with explanations and errors, is
   (`cr_decision_output_value`, `cr_decision_outputs_value`) are kept when the
   decision is made, so reading them is free. Writing and explaining a decision
   evaluate its input again, or check its recorded decision again.
+  `cr_decision_clone` keeps a decision borrowed from a batch, an action call
+  or an error after what lends it is freed.
 - **Actions.** A rule may name its action (`DO notify` in text, `"do"` in
   JSON). Register C functions under those names (`cr_actions_new`,
   `cr_actions_add`, with a `void *` passed back to them) and call

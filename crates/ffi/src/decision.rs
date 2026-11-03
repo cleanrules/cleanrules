@@ -26,6 +26,7 @@ use crate::{cr_format, cr_status};
 
 /// Where a decision comes from: it is made again from this whenever it is read,
 /// which gives the same decision (CLAUDE.md, invariant 7).
+#[derive(Clone)]
 enum Source {
     /// An input the rule set evaluated.
     Input(Value),
@@ -35,6 +36,7 @@ enum Source {
 
 /// What a decision says, kept when it is made, so that reading it costs
 /// nothing; writing and explaining it make it again.
+#[derive(Clone)]
 struct Facts {
     fired: Vec<bool>,
     truths: Vec<Truth>,
@@ -46,6 +48,7 @@ struct Facts {
 }
 
 /// The single output of a decision.
+#[derive(Clone)]
 enum Output {
     /// The winner's output or the aggregate; `None` when nothing was selected.
     Single(Option<Value>),
@@ -77,6 +80,7 @@ impl Facts {
 /// with its rule set. What rules fired and were selected, and the outputs, are
 /// kept when it is made; writing and explaining it evaluate the input, or check
 /// the recorded decision, again.
+#[derive(Clone)]
 pub struct cr_decision {
     ruleset: Arc<RuleSet>,
     source: Source,
@@ -387,6 +391,35 @@ pub unsafe extern "C" fn cr_decision_explain(
     };
     // SAFETY: `error` is NULL or writable (# Safety).
     unsafe { call("cr_decision_explain", error, body) }
+}
+
+/// A copy of a decision that the caller owns, freed with `cr_decision_free`:
+/// to keep a decision borrowed from a batch, an action call or an error after
+/// what lends it is freed. It shares the rule set and holds its own copy of
+/// the input.
+///
+/// # Safety
+///
+/// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to
+/// a writable `cr_decision *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_decision_clone(
+    decision: *const cr_decision,
+    out: *mut *mut cr_decision,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `decision` is NULL or live (# Safety).
+        let copy = unsafe { handle(decision, "decision") }?.clone();
+        // SAFETY: `out` passed `clear`.
+        unsafe { give(out, copy) };
+        Ok(())
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_decision_clone", error, body) }
 }
 
 /// Free a decision. `NULL` is ignored.

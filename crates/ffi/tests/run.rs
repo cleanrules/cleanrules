@@ -554,3 +554,30 @@ fn a_batch_reports_the_first_input_that_fails() {
     assert_eq!(failure.status, CR_MISSING_FIELD);
     assert!(cleanrules::json::to_string(&failure.json).contains(r#""row":0"#));
 }
+
+#[test]
+fn a_borrowed_decision_is_kept_by_cloning_it() {
+    let ruleset = common::read_ruleset(RULES.as_bytes(), CR_FORMAT_TEXT).unwrap();
+    let inputs = value_from_json(r#"[{"years": 7}, {"years": 0}]"#).unwrap();
+    let batch = common::evaluate_many(&ruleset, &inputs).unwrap();
+    // SAFETY: the batch is live while its first decision is cloned.
+    let copy = common::Decision(
+        common::handle(|o, e| unsafe { cr_decision_clone(cr_batch_get(batch.0, 0), o, e) })
+            .unwrap(),
+    );
+    let written = common::write_decision(&copy, CR_FORMAT_JSON).unwrap();
+    drop(batch);
+    drop(ruleset);
+    // SAFETY: the copy owns itself and keeps the rule set alive.
+    unsafe { assert_eq!(cr_decision_selected_len(copy.0), 3) };
+    assert_eq!(
+        common::write_decision(&copy, CR_FORMAT_JSON).unwrap(),
+        written
+    );
+    // SAFETY: NULL is refused.
+    let refused = common::handle(|o, e| unsafe { cr_decision_clone(ptr::null(), o, e) });
+    let Err(refused) = refused else {
+        panic!("a NULL decision was cloned");
+    };
+    assert_eq!(refused.code(), "invalid_argument");
+}
