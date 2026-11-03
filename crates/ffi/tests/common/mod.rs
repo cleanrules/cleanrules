@@ -359,3 +359,110 @@ pub fn evaluate_value(ruleset: &RuleSet, input: &Value) -> Result<Decision, Fail
     })
     .map(Decision)
 }
+
+owned!(Node, cr_node, cr_node_free);
+owned!(Batch, cr_batch, cr_batch_free);
+owned!(Actions, cr_actions, cr_actions_free);
+owned!(Grid, cr_grid, cr_grid_free);
+
+pub fn read_node(text: &str, format: i32) -> Result<Node, Failure> {
+    let (p, n) = arg(text.as_bytes());
+    // SAFETY: the text outlives the call.
+    handle(|out, error| unsafe { cr_node_read(p, n, format, ptr::null(), out, error) }).map(Node)
+}
+
+/// Evaluate a node as a condition or as a value: its result tree's JSON.
+pub fn evaluate_node(
+    node: &Node,
+    input: &Value,
+    logic: Option<&str>,
+    strict: bool,
+    as_value: bool,
+) -> Result<String, Failure> {
+    let (p, n) = logic.map_or((ptr::null(), 0), |l| arg(l.as_bytes()));
+    // SAFETY: live handles; the logic's name outlives the call.
+    text(|out, len, error| unsafe {
+        if as_value {
+            cr_node_evaluate_value_tree(node.0, input.0, strict, out, len, error)
+        } else {
+            cr_node_evaluate_tree(node.0, input.0, p, n, strict, out, len, error)
+        }
+    })
+}
+
+pub fn evaluate_many(ruleset: &RuleSet, inputs: &Value) -> Result<Batch, Failure> {
+    // SAFETY: live handles.
+    handle(|out, error| unsafe {
+        cr_ruleset_evaluate_many(ruleset.0, inputs.0, ptr::null(), out, error)
+    })
+    .map(Batch)
+}
+
+/// The decisions of a batch as JSON documents.
+pub fn batch_documents(batch: &Batch) -> Vec<String> {
+    // SAFETY: a live batch.
+    let len = unsafe { cr_batch_len(batch.0) };
+    (0..len)
+        .map(|i| {
+            // SAFETY: a live batch; the decision is borrowed while it lives.
+            let decision = unsafe { cr_batch_get(batch.0, i) };
+            // SAFETY: as above.
+            text(|out, len, error| unsafe {
+                cr_decision_write(decision, CR_FORMAT_JSON, out, len, error)
+            })
+            .unwrap()
+        })
+        .collect()
+}
+
+/// A table from a grid: optional settings, a header of strings and rows given
+/// as JSON arrays of cells.
+pub fn grid(
+    settings: [Option<&str>; 3],
+    strict: bool,
+    header: &str,
+    rows: &[String],
+    limits: Option<&Limits_>,
+) -> Result<Document, Failure> {
+    let [policy, aggregate, logic] = settings.map(|s| s.map(str::as_bytes));
+    let named = |s: Option<&[u8]>| s.map_or((ptr::null(), 0), arg);
+    let ((pp, pn), (ap, an), (lp, ln)) = (named(policy), named(aggregate), named(logic));
+    let header = value_from_json(header)?;
+    // SAFETY: the names and the header outlive the call; live or NULL limits.
+    let grid = handle(|out, error| unsafe {
+        cr_grid_new(
+            pp,
+            pn,
+            ap,
+            an,
+            lp,
+            ln,
+            strict,
+            header.0,
+            raw(limits),
+            out,
+            error,
+        )
+    })
+    .map(Grid)?;
+    for row in rows {
+        let row = value_from_json(row)?;
+        // SAFETY: a live grid and a live row.
+        ok_or(|error| unsafe { cr_grid_push_row(grid.0, row.0, error) })?;
+    }
+    let raw_grid = grid.0;
+    std::mem::forget(grid);
+    // SAFETY: the grid is given up to the call, which consumes it.
+    handle(|out, error| unsafe { cr_grid_finish(raw_grid, out, error) }).map(Document)
+}
+
+/// Run a call that only reports a status.
+pub fn ok_or(call: impl FnOnce(*mut *mut cr_error) -> cr_status) -> Result<(), Failure> {
+    let mut error = ptr::null_mut();
+    let status = call(&raw mut error);
+    if status == CR_OK {
+        Ok(())
+    } else {
+        Err(take(error))
+    }
+}

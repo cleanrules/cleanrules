@@ -92,7 +92,7 @@ jobs:
           components: miri
       - uses: Swatinem/rust-cache@v2
       # Every `unsafe` block of the boundary, under the interpreter.
-      - run: cargo miri test -p cleanrules-ffi --lib --test abi --test values
+      - run: cargo miri test -p cleanrules-ffi --lib --test abi --test values --test run
 
   msrv:
     name: Rust 1.95 (MSRV)

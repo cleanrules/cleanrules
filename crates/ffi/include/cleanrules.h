@@ -3,13 +3,15 @@
  *
  * Texts in: a pointer and a length in bytes, UTF-8, without a final NUL;
  * NULL with a length of 0 is the empty text. They are borrowed for the call:
- * the library never keeps a pointer it was given.
+ * the library never keeps a pointer it was given, except the functions and
+ * data of cr_actions_add, which the registry keeps until it is freed.
  *
  * Results out: through out-parameters. An owned result (a handle, or a text
  * through char **) belongs to the caller, who frees it with its cr_*_free
  * function or cr_string_free; it is NULL after a failure. A borrowed result
- * (through const char ** or const cr_value **) points into a handle and is
- * NULL, with a length of 0, after a failure; never free it. The strings of
+ * (through const char ** or const cr_value **, or returned as by
+ * cr_batch_get and cr_error_decision) points into a handle and is NULL, with
+ * a length of 0, after a failure; never free it. The strings of
  * cr_error_message, cr_error_hint and cr_error_json belong to the error, and
  * those of cr_version, cr_status_name, cr_ruleset_hit_policy and
  * cr_ruleset_aggregate are static. A function with one result needs its
@@ -20,11 +22,17 @@
  * argument, cr_error **error, may be NULL; otherwise *error must be NULL on
  * entry, receives a new cr_error on failure and is left alone on success.
  *
- * Threads: documents, rule sets, decisions and errors never change once made,
- * so one may be used from several threads at once, but not while it is
- * freed. Limits and values change while they are built (cr_limits_set,
- * cr_value_list_set, cr_value_map_insert): finish them first. A decision keeps
- * its rule set alive, and a copy of its input; either may be freed first.
+ * Threads: documents, rule sets, decisions, nodes, batches and errors never
+ * change once made, so one may be used from several threads at once, but not
+ * while it is freed. Limits, values, grids and action registries change while
+ * they are built (cr_limits_set, cr_value_list_set, cr_value_map_insert,
+ * cr_grid_push_row, cr_actions_add): finish them first. A finished registry
+ * may be used by several threads at once; its actions then run concurrently,
+ * each on the thread that called cr_ruleset_run, with the same data, which
+ * must allow it. An action must not change or free the registry it runs
+ * from, nor its decision or input, and must not unwind or jump out of the
+ * call. A decision keeps its rule set alive, and a copy of its input; either
+ * may be freed first.
  *
  * Values: build children first and move them into their list or map, which
  * then owns them. A value read from inside another (cr_value_list_get,
@@ -44,6 +52,18 @@
 // The version of the ABI that this header describes.
 #define CR_ABI_VERSION 1
 
+// One call of an action: the decision, the rule and the input, valid during
+// the call only, and the reason the action gives when it fails.
+typedef struct cr_action_call cr_action_call;
+
+// An action registry (`spec/rules.md`, *Actions*): names mapped to actions.
+// It changes while it is built (`cr_actions_add`); the data pointers are the
+// program's, and the library only passes them back to their actions.
+typedef struct cr_actions cr_actions;
+
+// The decisions of a batch, one per input, in order.
+typedef struct cr_batch cr_batch;
+
 // A decision: what a rule set made of one input, or a recorded decision read
 // with its rule set. What rules fired and were selected, and the outputs, are
 // kept when it is made; writing and explaining it evaluate the input, or check
@@ -57,10 +77,16 @@ typedef struct cr_document cr_document;
 // An error: its status, message, hint and JSON form.
 typedef struct cr_error cr_error;
 
+// A decision table being built, row by row.
+typedef struct cr_grid cr_grid;
+
 // Limits for reading documents and inputs. Functions that take a
 // `const cr_limits *` use the defaults for `NULL`. Unlike the other handles,
 // limits change: set them before sharing them between threads.
 typedef struct cr_limits cr_limits;
+
+// One node: a condition or a value, as in a rule's `when` or payload.
+typedef struct cr_node cr_node;
 
 // A rule set, ready to evaluate.
 typedef struct cr_ruleset cr_ruleset;
@@ -72,6 +98,16 @@ typedef struct cr_value cr_value;
 // What a fallible function returns: `CR_OK`, an error code (`CR_FORMAT_ERROR`,
 // `CR_MISSING_FIELD`, ...), `CR_INVALID_ARGUMENT` or `CR_INTERNAL_ERROR`.
 typedef int32_t cr_status;
+
+// An action: called by `cr_ruleset_run` for a selected rule that names it,
+// with the data it was registered with and the call (`cr_action_call_*`). It
+// returns 0 when it succeeds; any other number stops the run with
+// `CR_ACTION_ERROR`, after `cr_action_call_fail` to say why. It may read the
+// decision and the input, and use the rule set, even to run it again; it must
+// not change or free the registry being run, nor the decision or the input,
+// and must not unwind or jump out of the call.
+typedef int32_t (*cr_action)(void *data,
+                             struct cr_action_call *call);
 
 // A syntax documents are read from and written in (`CR_FORMAT_*`).
 typedef int32_t cr_format;
@@ -255,6 +291,95 @@ extern "C" {
 // the header it was built with.
 uint32_t cr_abi_version(void);
 
+// The decision being run: the same handle that `cr_ruleset_run` then gives
+// through `out`, or through `cr_error_decision` when an action fails.
+//
+// # Safety
+//
+// `call` is `NULL` or the call an action received, during that call.
+const struct cr_decision *cr_action_call_decision(const struct cr_action_call *call);
+
+// Say why the action fails, before it returns a number other than 0: the
+// message (UTF-8; invalid bytes are replaced) ends the error's message and is
+// its `cause` (`spec/errors.md`, *JSON form*). A later call replaces it.
+//
+// # Safety
+//
+// `call` is `NULL` or the call an action received, during that call;
+// `message` is `NULL` or points to `len` readable bytes.
+void cr_action_call_fail(struct cr_action_call *call,
+                         const char *message,
+                         size_t len);
+
+// The input, as the decision keeps it: exactly what was evaluated. Borrowed
+// from the decision; never free or change it.
+//
+// # Safety
+//
+// `call` is `NULL` or the call an action received, during that call.
+const struct cr_value *cr_action_call_input(const struct cr_action_call *call);
+
+// The position of the rule whose action is called; 0 for `NULL`.
+//
+// # Safety
+//
+// `call` is `NULL` or the call an action received, during that call.
+size_t cr_action_call_rule(const struct cr_action_call *call);
+
+// Register `action` under `name`, with `data`, which is passed back to it.
+// The registry keeps both until it is freed. A name is not empty, has no
+// structure and is registered once (`CR_INVALID_ARGUMENT` otherwise).
+//
+// # Safety
+//
+// `actions` is `NULL` or a live `cr_actions` that no other thread uses during
+// the call; `name` is `NULL` or points to `len` readable bytes; `action` is
+// `NULL` or a function of the type `cr_action`, which stays callable with
+// `data` as long as the registry is used; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_actions_add(struct cr_actions *actions,
+                         const char *name,
+                         size_t len,
+                         cr_action action,
+                         void *data,
+                         struct cr_error **error);
+
+// Free an action registry. `NULL` is ignored. The data it holds stays the
+// program's.
+//
+// # Safety
+//
+// `actions` is `NULL` or a `cr_actions` from this library, not freed before,
+// and not being run.
+void cr_actions_free(struct cr_actions *actions);
+
+// A new, empty action registry. Free it with `cr_actions_free`.
+struct cr_actions *cr_actions_new(void);
+
+// Free a batch and its decisions. `NULL` is ignored.
+//
+// # Safety
+//
+// `batch` is `NULL` or a `cr_batch` from this library, not freed before.
+void cr_batch_free(struct cr_batch *batch);
+
+// The decision of the input at `index`, borrowed from the batch; `NULL` when
+// `index` is out of it.
+//
+// # Safety
+//
+// `batch` is `NULL` or a live `cr_batch`. The decision lives as long as the
+// batch and must never be freed.
+const struct cr_decision *cr_batch_get(const struct cr_batch *batch,
+                                       size_t index);
+
+// The number of decisions of a batch; 0 for `NULL`.
+//
+// # Safety
+//
+// `batch` is `NULL` or a live `cr_batch`.
+size_t cr_batch_len(const struct cr_batch *batch);
+
 // The decision's explanation (`spec/explain.md`) as a JSON or YAML document,
 // or as text (`CR_FORMAT_TEXT`).
 //
@@ -349,6 +474,36 @@ cr_status cr_decision_outputs(const struct cr_decision *decision,
 cr_status cr_decision_outputs_value(const struct cr_decision *decision,
                                     struct cr_value **out,
                                     struct cr_error **error);
+
+// The name of the rule at position `rule`, borrowed from the decision and not
+// NUL-terminated.
+//
+// # Safety
+//
+// `decision` is `NULL` or a live `cr_decision`; `name` and `len` are `NULL` or
+// point to a writable `const char *` and `size_t`; `error` is `NULL` or points
+// to a writable `cr_error *` set to `NULL`. The name lives as long as the
+// decision.
+cr_status cr_decision_rule_name(const struct cr_decision *decision,
+                                size_t rule,
+                                const char **name,
+                                size_t *len,
+                                struct cr_error **error);
+
+// The output of the rule at position `rule`, as a new map freed with
+// `cr_value_free`: its payload's keys and values, when its payload was
+// evaluated (`spec/rules.md`, *When payloads are evaluated*), and a plain
+// null otherwise.
+//
+// # Safety
+//
+// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to a
+// writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_decision_rule_output(const struct cr_decision *decision,
+                                  size_t rule,
+                                  struct cr_value **out,
+                                  struct cr_error **error);
 
 // The position in the rule set of the `index`-th selected rule, in rule order.
 //
@@ -449,6 +604,15 @@ cr_status cr_document_write(const struct cr_document *document,
 // `error` is `NULL` or a live `cr_error`.
 cr_status cr_error_code(const struct cr_error *error);
 
+// For a `CR_ACTION_ERROR` from `cr_ruleset_run`, the decision whose action
+// failed, borrowed from the error; `NULL` for any other error and for `NULL`.
+//
+// # Safety
+//
+// `error` is `NULL` or a live `cr_error`. The decision lives as long as the
+// error and must never be freed.
+const struct cr_decision *cr_error_decision(const struct cr_error *error);
+
 // Free an error. `NULL` is ignored.
 //
 // # Safety
@@ -492,6 +656,68 @@ cr_status cr_error_parent(cr_status status);
 // The version of the JSON format the library reads and writes.
 uint32_t cr_format_version(void);
 
+// Check and compile the table: a document holding it, which
+// `cr_ruleset_from_document` turns into a rule set and `cr_document_write`
+// writes as CSV. The grid is consumed, even when the call fails, and also
+// when one of its rows failed, which is `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `grid` is `NULL` or a `cr_grid` owned by the caller, which gives it up;
+// `out` is `NULL` or points to a writable `cr_document *`; `error` is `NULL`
+// or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_grid_finish(struct cr_grid *grid,
+                         struct cr_document **out,
+                         struct cr_error **error);
+
+// Free a grid that was not finished. `NULL` is ignored.
+//
+// # Safety
+//
+// `grid` is `NULL` or a `cr_grid` from this library, not freed or finished
+// before.
+void cr_grid_free(struct cr_grid *grid);
+
+// Start a table from its settings and its header (`spec/tables.md`,
+// *Grids*). The settings are names, as in JSON: the hit policy (`first` for
+// `NULL`), the aggregate (none for `NULL`) and the logic
+// (`boolean` for `NULL`). The header is a list of strings, each read as a CSV
+// header field: `RULE`, `PRIORITY`, `DESCRIPTION`, `THEN key [IN (...)]` or an
+// input expression.
+//
+// # Safety
+//
+// Each name is `NULL` or points to its length's readable bytes; `header` is
+// `NULL` or a live `cr_value`; `limits` is `NULL` or a live `cr_limits`; `out`
+// is `NULL` or points to a writable `cr_grid *`; `error` is `NULL` or points to
+// a writable `cr_error *` set to `NULL`.
+cr_status cr_grid_new(const char *hit_policy,
+                      size_t hit_policy_len,
+                      const char *aggregate,
+                      size_t aggregate_len,
+                      const char *logic,
+                      size_t logic_len,
+                      bool strict,
+                      const struct cr_value *header,
+                      const struct cr_limits *limits,
+                      struct cr_grid **out,
+                      struct cr_error **error);
+
+// Add a row: a list of cells in column order. A string is text, read as a
+// CSV field (`'VIP'` is the string, `VIP` the field); null is an empty cell;
+// any other value is a constant. The row stays the caller's. After a row
+// fails, the grid can only be freed: adding rows or finishing it is
+// `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `grid` is `NULL` or a live `cr_grid` that no other thread uses during the
+// call; `row` is `NULL` or a live `cr_value`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_grid_push_row(struct cr_grid *grid,
+                           const struct cr_value *row,
+                           struct cr_error **error);
+
 // Free limits. `NULL` is ignored.
 //
 // # Safety
@@ -526,6 +752,81 @@ cr_status cr_limits_set(struct cr_limits *limits,
                         size_t value,
                         struct cr_error **error);
 
+// Evaluate a node as a condition on an input (`spec/ast.md`, *Evaluating one
+// node*: `evaluate_tree`), under a logic by name (`boolean` for `NULL`; an
+// unknown one is `CR_REGISTRY_ERROR`), strict or not: its result tree as JSON
+// (`spec/json-format.md`, *Result trees*), whose root holds the truth value. A
+// value node such as `a + 1` is a `CR_EXPRESSION_ERROR`.
+//
+// # Safety
+//
+// `node` is `NULL` or a live `cr_node`; `input` is `NULL` or a live
+// `cr_value`; `logic` is `NULL` or points to `logic_len` readable bytes; `out`
+// is `NULL` or points to a writable `char *`; `len` is `NULL` or points to a
+// writable `size_t`; `error` is `NULL` or points to a writable `cr_error *`
+// set to `NULL`.
+cr_status cr_node_evaluate_tree(const struct cr_node *node,
+                                const struct cr_value *input,
+                                const char *logic,
+                                size_t logic_len,
+                                bool strict,
+                                char **out,
+                                size_t *len,
+                                struct cr_error **error);
+
+// Evaluate a node as a value on an input, strict or not (`spec/ast.md`,
+// *Evaluating one node*: `evaluate_value_tree`): its result tree, whose root
+// holds the value. A condition such as `a > 1` is a `CR_EXPRESSION_ERROR`.
+//
+// # Safety
+//
+// `node` is `NULL` or a live `cr_node`; `input` is `NULL` or a live
+// `cr_value`; `out` is `NULL` or points to a writable `char *`; `len` is
+// `NULL` or points to a writable `size_t`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_node_evaluate_value_tree(const struct cr_node *node,
+                                      const struct cr_value *input,
+                                      bool strict,
+                                      char **out,
+                                      size_t *len,
+                                      struct cr_error **error);
+
+// Free a node. `NULL` is ignored.
+//
+// # Safety
+//
+// `node` is `NULL` or a `cr_node` from this library, not freed before.
+void cr_node_free(struct cr_node *node);
+
+// Read a node in JSON or YAML (`spec/json-format.md`, *Conditions*: the node
+// itself, not a document), or in the rule syntax (`spec/text.md`, *Conditions
+// and values*), such as `customer.years > 5` or `order.total * 0.9`.
+//
+// # Safety
+//
+// `text` is `NULL` or points to `len` readable bytes; `limits` is `NULL` or a
+// live `cr_limits`; `out` is `NULL` or points to a writable `cr_node *`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_node_read(const char *text,
+                       size_t len,
+                       cr_format format,
+                       const struct cr_limits *limits,
+                       struct cr_node **out,
+                       struct cr_error **error);
+
+// Write a node in JSON or YAML (the node itself), or in the rule syntax.
+//
+// # Safety
+//
+// `node` is `NULL` or a live `cr_node`; `out` is `NULL` or points to a
+// writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_node_write(const struct cr_node *node,
+                        cr_format format,
+                        char **out,
+                        size_t *len,
+                        struct cr_error **error);
+
 // The rule set's aggregate (`sum`, `min`, `max`, `count`), a static string;
 // `NULL` when it has none, and for `NULL`. With one, the single output of a
 // decision is the aggregate.
@@ -534,6 +835,21 @@ cr_status cr_limits_set(struct cr_limits *limits,
 //
 // `ruleset` is `NULL` or a live `cr_ruleset`.
 const char *cr_ruleset_aggregate(const struct cr_ruleset *ruleset);
+
+// Check that every action the rule set names is registered, in rule order
+// (`spec/rules.md`, *Actions*): the first that is not is a
+// `CR_REGISTRY_ERROR` with the rule, the name and the registered names. `NULL`
+// is an empty registry. This is the check of Python's `RuleSet.bind`, which
+// other bindings may call `bind` too.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`; `actions` is `NULL` or a live
+// `cr_actions`; `error` is `NULL` or points to a writable `cr_error *` set to
+// `NULL`.
+cr_status cr_ruleset_check_actions(const struct cr_ruleset *ruleset,
+                                   const struct cr_actions *actions,
+                                   struct cr_error **error);
 
 // Evaluate the rule set on an input: a data value as JSON
 // (`spec/json-format.md`, *Values*), such as `{"customer": {"years": 7}}`. In
@@ -552,6 +868,22 @@ cr_status cr_ruleset_evaluate(const struct cr_ruleset *ruleset,
                               const struct cr_limits *limits,
                               struct cr_decision **out,
                               struct cr_error **error);
+
+// Evaluate the rule set on each input of a list, in order (`spec/rules.md`,
+// *Evaluation*). The first input that fails gives the error, with its
+// position as `row`; anything but a list is a `CR_EVALUATION_ERROR`.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`; `inputs` is `NULL` or a live
+// `cr_value`; `limits` is `NULL` or a live `cr_limits`; `out` is `NULL` or
+// points to a writable `cr_batch *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_ruleset_evaluate_many(const struct cr_ruleset *ruleset,
+                                   const struct cr_value *inputs,
+                                   const struct cr_limits *limits,
+                                   struct cr_batch **out,
+                                   struct cr_error **error);
 
 // Evaluate the rule set on an input built with the `cr_value_*` functions (or
 // read with `cr_value_from_json`), which stays the caller's: the decision
@@ -668,6 +1000,31 @@ cr_status cr_ruleset_rule_name(const struct cr_ruleset *ruleset,
                                const char **name,
                                size_t *len,
                                struct cr_error **error);
+
+// Evaluate the rule set on an input, then call the actions of the selected
+// rules, in rule order (`spec/rules.md`, *Actions*). Every action the rule set
+// names must be registered, which is checked before evaluating, so nothing
+// runs otherwise (`CR_REGISTRY_ERROR`); a selected rule without an action is
+// skipped. The first action that fails stops the run with `CR_ACTION_ERROR`,
+// whose context has the rule and the rules whose actions had run
+// (`executed`), whose cause is what the action gave `cr_action_call_fail`, and
+// whose decision `cr_error_decision` gives: the same handle the actions saw.
+// The actions run on the calling thread.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`; `actions` is `NULL` or a live
+// `cr_actions`, whose actions may be called with their data, and which stays
+// unchanged during the run; `input` is `NULL` or a live `cr_value`; `limits`
+// is `NULL` or a live `cr_limits`; `out` is `NULL` or points to a writable
+// `cr_decision *`; `error` is `NULL` or points to a writable `cr_error *` set
+// to `NULL`.
+cr_status cr_ruleset_run(const struct cr_ruleset *ruleset,
+                         const struct cr_actions *actions,
+                         const struct cr_value *input,
+                         const struct cr_limits *limits,
+                         struct cr_decision **out,
+                         struct cr_error **error);
 
 // Whether the rule set is strict (`spec/rules.md`, *Strict mode and
 // errors*); false for `NULL`.

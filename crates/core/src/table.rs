@@ -119,6 +119,48 @@ pub struct TableConfig {
     pub strict: bool,
 }
 
+impl TableConfig {
+    /// A configuration from the names of its settings, given apart from a grid
+    /// (`spec/tables.md`, *Grids*): the hit policy, by its name in JSON, the
+    /// aggregate, and the logic (`boolean` when `None`).
+    ///
+    /// # Errors
+    ///
+    /// `rule_definition_error` for an unknown hit policy or aggregate, and
+    /// `registry_error` for an unknown logic; none has a pointer.
+    pub fn from_names(
+        hit_policy: &str,
+        aggregate: Option<&str>,
+        logic: Option<&str>,
+        strict: bool,
+    ) -> Result<Self> {
+        let unknown = |what: &str, name: &str, known: &str| {
+            Error::new(
+                ErrorCode::RuleDefinitionError,
+                format!("unknown {what} {name:?}"),
+            )
+            .with_hint(format!("use {known}"))
+        };
+        Ok(Self {
+            hit_policy: TablePolicy::from_name(hit_policy).ok_or_else(|| {
+                unknown(
+                    "hit policy",
+                    hit_policy,
+                    "first, priority, unique, any, rule_order, output_order or collect",
+                )
+            })?,
+            aggregate: aggregate
+                .map(|name| {
+                    Aggregate::from_name(name)
+                        .ok_or_else(|| unknown("aggregate", name, "sum, min, max or count"))
+                })
+                .transpose()?,
+            logic: logic.map(LogicName::from_name).transpose()?,
+            strict,
+        })
+    }
+}
+
 /// An output column: its payload key and its output values, highest priority
 /// first.
 #[derive(Clone, Debug)]

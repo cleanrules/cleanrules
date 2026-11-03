@@ -2,10 +2,7 @@
 //! compiles and writes them; Python wraps the result.
 
 use cleanrules::json::Limits;
-use cleanrules::logic::LogicName;
-use cleanrules::rules::Aggregate;
-use cleanrules::table::{Cell, DecisionTable, HeaderItem, TableConfig, TableOutput, TablePolicy};
-use cleanrules::{Error, ErrorCode};
+use cleanrules::table::{Cell, DecisionTable, HeaderItem, TableConfig, TableOutput};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyString, PyTuple};
 
@@ -134,13 +131,6 @@ fn cell(item: &Bound<'_, PyAny>) -> PyResult<Cell> {
     convert::constant(item).map(Cell::Value)
 }
 
-fn unknown(what: &str, name: &str) -> Error {
-    Error::new(
-        ErrorCode::RuleDefinitionError,
-        format!("unknown {what} {name:?}"),
-    )
-}
-
 /// A decision table from a grid (`spec/tables.md`, *Grids*): header items
 /// (`str`, a node, or `(name, values)` for an output) and an iterable of rows,
 /// each a sequence of cells (`str`, a node, or a constant). The rows are
@@ -160,17 +150,7 @@ pub(crate) fn table_from_grid(
     max_depth: Option<usize>,
     max_table_size: Option<usize>,
 ) -> PyResult<PyDecisionTable> {
-    let config = TableConfig {
-        hit_policy: TablePolicy::from_name(hit_policy)
-            .ok_or_else(|| unknown("hit policy", hit_policy))
-            .or_raise(py)?,
-        aggregate: aggregate
-            .map(|name| Aggregate::from_name(name).ok_or_else(|| unknown("aggregate", name)))
-            .transpose()
-            .or_raise(py)?,
-        logic: logic.map(LogicName::from_name).transpose().or_raise(py)?,
-        strict,
-    };
+    let config = TableConfig::from_names(hit_policy, aggregate, logic, strict).or_raise(py)?;
     let mut limits = Limits::default();
     if let Some(size) = max_size {
         limits.max_text_size = size;

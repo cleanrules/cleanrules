@@ -40,13 +40,16 @@ The whole program, with explanations and errors, is
 ## Conventions
 
 - **Names.** Functions and types start with `cr_`, constants with `CR_`.
-- **Handles.** `cr_document`, `cr_ruleset`, `cr_decision`, `cr_limits` and
-  `cr_error` are opaque. Whoever receives one owns it and frees it with its
-  `cr_*_free` function, which accepts `NULL`. Documents, rule sets, decisions
-  and errors never change once made, so one may be used from several threads
-  at once, but not while it is freed; limits change with `cr_limits_set`, so
-  set them before sharing them. A decision keeps its rule set alive: either may
-  be freed first.
+- **Handles.** `cr_document`, `cr_ruleset`, `cr_decision`, `cr_node`,
+  `cr_batch`, `cr_value`, `cr_grid`, `cr_actions`, `cr_limits` and `cr_error`
+  are opaque. Whoever receives one owns it and frees it with its `cr_*_free`
+  function, which accepts `NULL`. Documents, rule sets, decisions, nodes,
+  batches and errors never change once made, so one may be used from several
+  threads at once, but not while it is freed; limits, values, grids and
+  registries change while they are built, so finish them before sharing them.
+  A finished registry may be used by several threads at once, and its actions
+  then run concurrently with the same data. A decision keeps its rule set
+  alive: either may be freed first.
 - **Texts in.** A pointer and a length in bytes, UTF-8, with no final NUL
   needed; `NULL` with a length of 0 is the empty text. The library never keeps
   a pointer after the call. Bytes that are not UTF-8 are a `CR_FORMAT_ERROR` at
@@ -99,6 +102,38 @@ The whole program, with explanations and errors, is
   (`cr_decision_output_value`, `cr_decision_outputs_value`) are kept when the
   decision is made, so reading them is free. Writing and explaining a decision
   evaluate its input again, or check its recorded decision again.
+- **Actions.** A rule may name its action (`DO notify` in text, `"do"` in
+  JSON). Register C functions under those names (`cr_actions_new`,
+  `cr_actions_add`, with a `void *` passed back to them) and call
+  `cr_ruleset_run`: it checks that every named action is registered before it
+  evaluates (`cr_ruleset_check_actions` makes the same check, Python's
+  `bind`), then calls the actions of the selected rules in rule order. An
+  action receives its data and a `cr_action_call`, which gives the decision,
+  the rule's position and the input as the decision keeps it, valid during the
+  call. It returns 0; any other number stops the run with `CR_ACTION_ERROR`,
+  after `cr_action_call_fail` says why, which becomes the error's `cause`. The
+  error lists the rules whose actions had run, and `cr_error_decision` gives
+  the decision: the same handle the actions saw. An action may read the
+  decision and use the rule set, even run it again, but must not change or
+  free the registry, the decision or the input, and must not unwind: a C++
+  action catches its exceptions in a `noexcept` function, a JVM upcall catches
+  everything, and Go passes its data as a `cgo.Handle`.
+  `cr_ruleset_evaluate*` never run actions.
+- **Grids.** `cr_grid_new` starts a decision table from its settings and a
+  header of strings, `cr_grid_push_row` adds rows of cells (a string is text,
+  as in CSV; any other value a constant; null an empty cell), and
+  `cr_grid_finish` gives the table's document (`spec/tables.md`, *Grids*).
+  After a row fails, the grid can only be freed.
+- **Single nodes.** `cr_node_read` reads one condition or value (the node of
+  format version 1, not a document), in JSON, YAML or the rule syntax;
+  `cr_node_evaluate_tree` (with a logic and strictness) and
+  `cr_node_evaluate_value_tree` (with strictness) evaluate it on an input and
+  give its result tree as JSON, as `evaluate_tree` and `evaluate_value_tree`
+  do in every language (`spec/ast.md`, *Evaluating one node*). Python calls a
+  node `Expr`; C, Go and the JVM call it a node.
+- **Batches.** `cr_ruleset_evaluate_many` evaluates a list of inputs; the first
+  that fails gives the error, with its `row`. `cr_batch_get` borrows each
+  decision.
 - **Data.** Documents, inputs, outputs and explanations are JSON
   ([`spec/json-format.md`](../../spec/json-format.md)); documents may also be
   YAML, the rule syntax or, for decision tables, CSV, and explanations and

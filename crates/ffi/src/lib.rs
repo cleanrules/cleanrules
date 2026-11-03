@@ -18,8 +18,11 @@
 pub mod decision;
 pub mod document;
 pub mod error;
+pub mod grid;
 pub mod limits;
+pub mod node;
 pub mod ruleset;
+pub mod run;
 pub mod value;
 
 mod boundary;
@@ -29,8 +32,11 @@ use std::ffi::{CStr, CString, c_char};
 pub use decision::*;
 pub use document::*;
 pub use error::*;
+pub use grid::*;
 pub use limits::*;
+pub use node::*;
 pub use ruleset::*;
+pub use run::*;
 pub use value::*;
 
 /// The version of the ABI that this header describes.
@@ -69,6 +75,8 @@ const _: () = {
     shared::<cr_limits>();
     shared::<cr_error>();
     shared::<cleanrules::Value>();
+    shared::<cr_node>();
+    shared::<cr_batch>();
 };
 
 /// The version of the ABI that the library implements: `CR_ABI_VERSION` of

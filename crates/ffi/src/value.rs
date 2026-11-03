@@ -1216,12 +1216,12 @@ pub(crate) unsafe fn give_new_value(out: *mut *mut cr_value, value: Value) -> Ou
     Ok(())
 }
 
-/// The value behind a handle, for the decision functions.
+/// The value behind a handle argument named `what`, for the other modules.
 ///
 /// # Safety
 ///
 /// `value` is `NULL` or a live `cr_value`.
-pub(crate) unsafe fn borrow_value<'a>(value: *const cr_value) -> Outcome<&'a Value> {
+pub(crate) unsafe fn borrow_value<'a>(value: *const cr_value, what: &str) -> Outcome<&'a Value> {
     // SAFETY: the caller's promise is `value_of`'s.
-    unsafe { value_of(value, "input") }
+    unsafe { value_of(value, what) }
 }

@@ -1,7 +1,7 @@
 //! The conformance vectors, through the C ABI: documents read and written in
-//! every format, decisions read with their rule set, evaluations, explanations
-//! and summaries. Single conditions and values, grids and batches have no C
-//! function yet (task E.1b) and are left to the core's runner.
+//! every format, grids, decisions read with their rule set, single conditions
+//! and values, evaluations from JSON and from native values, batches,
+//! explanations and summaries. Every vector runs.
 
 // A test: a panic is the failure report.
 #![allow(clippy::unwrap_used, clippy::panic)]
@@ -190,6 +190,8 @@ fn run_read(given: &Json, expect: &Json) -> Result<(), String> {
         (text.to_owned(), CR_FORMAT_TEXT)
     } else if let Some(csv) = string(get(given, "table_csv")) {
         (csv.to_owned(), CR_FORMAT_CSV)
+    } else if get(given, "table_grid").is_some() {
+        (String::new(), 0)
     } else {
         panic!("nothing given")
     };
@@ -201,7 +203,11 @@ fn run_read(given: &Json, expect: &Json) -> Result<(), String> {
             .map(|text| json(&text));
         return compare(read, expect, "document", &READ_FIELDS);
     }
-    let document = match common::read_document(source.as_bytes(), format, limits.as_ref()) {
+    let read = match get(given, "table_grid") {
+        Some(grid) => read_grid(grid, limits.as_ref()),
+        None => common::read_document(source.as_bytes(), format, limits.as_ref()),
+    };
+    let document = match read {
         Ok(document) => document,
         Err(failure) => return compare(Err(failure), expect, "document", &READ_FIELDS),
     };
@@ -243,6 +249,47 @@ fn run_read(given: &Json, expect: &Json) -> Result<(), String> {
     Ok(())
 }
 
+/// A table from a vector's grid, built with `cr_grid_*`.
+fn read_grid(grid: &Json, limits: Option<&Limits_>) -> Result<common::Document, Failure> {
+    let settings = ["hit_policy", "aggregate", "logic"].map(|key| string(get(grid, key)));
+    let strict = matches!(get(grid, "strict"), Some(Json::Bool(true)));
+    let header = to_string(get(grid, "header").unwrap());
+    let Some(Json::Array(rows)) = get(grid, "rows") else {
+        panic!("a grid has rows")
+    };
+    let rows: Vec<String> = rows.iter().map(to_string).collect();
+    common::grid(settings, strict, &header, &rows, limits)
+}
+
+/// A condition or value vector, through `cr_node_*`.
+fn run_node(given: &Json, expect: &Json, as_value: bool) -> Result<(), String> {
+    let key = if as_value { "value" } else { "condition" };
+    let node = common::read_node(&to_string(get(given, key).unwrap()), CR_FORMAT_JSON)
+        .map_err(|f| to_string(&f.json))?;
+    let input = common::value_from_json(&to_string(get(given, "input").unwrap()))
+        .map_err(|f| to_string(&f.json))?;
+    let logic = string(get(given, "logic"));
+    let strict = matches!(get(given, "strict"), Some(Json::Bool(true)));
+    let result = common::evaluate_node(&node, &input, logic, strict, as_value).map(|t| json(&t));
+    compare(result, expect, "result", &EVALUATE_FIELDS)
+}
+
+/// A batch vector, through `cr_ruleset_evaluate_many`.
+fn run_batch(given: &Json, expect: &Json) -> Result<(), String> {
+    let ruleset = ruleset(given);
+    let inputs = common::value_from_json(&to_string(get(given, "inputs").unwrap()))
+        .map_err(|f| to_string(&f.json))?;
+    let decisions = common::evaluate_many(&ruleset, &inputs).map(|batch| {
+        Json::Array(
+            common::batch_documents(&batch)
+                .iter()
+                .map(|text| content(text, "decision"))
+                .collect(),
+        )
+    });
+    compare(decisions, expect, "decisions", &EVALUATE_FIELDS)
+}
+
 fn run_evaluate(given: &Json, expect: &Json, explain: bool) -> Result<(), String> {
     let ruleset = ruleset(given);
     let input = to_string(get(given, "input").unwrap());
@@ -274,13 +321,14 @@ fn run_evaluate(given: &Json, expect: &Json, explain: bool) -> Result<(), String
     Ok(())
 }
 
-fn run(vector: &Json) -> Option<Result<(), String>> {
+fn run(vector: &Json) -> Result<(), String> {
     let given = get(vector, "given").unwrap();
     let expect = get(vector, "expect").unwrap();
-    Some(match string(get(given, "kind")).unwrap() {
-        "read" if get(given, "table_grid").is_some() => return None,
+    match string(get(given, "kind")).unwrap() {
         "read" => run_read(given, expect),
-        "evaluate" if get(given, "inputs").is_some() => return None,
+        "condition" => run_node(given, expect, false),
+        "value" => run_node(given, expect, true),
+        "evaluate" if get(given, "inputs").is_some() => run_batch(given, expect),
         "evaluate" => run_evaluate(given, expect, false),
         "explain" => run_evaluate(given, expect, true),
         "summary" => {
@@ -288,8 +336,8 @@ fn run(vector: &Json) -> Option<Result<(), String>> {
                 .map(|text| content(&text, "summary"));
             compare(summary, expect, "summary", &EVALUATE_FIELDS)
         }
-        _ => return None,
-    })
+        other => panic!("unknown kind {other}"),
+    }
 }
 
 #[test]
@@ -301,11 +349,9 @@ fn the_vectors_pass_through_the_c_abi() {
             panic!()
         };
         for vector in vectors {
-            if let Some(result) = run(vector) {
-                ran += 1;
-                if let Err(problem) = result {
-                    failures.push(format!("{}: {problem}", string(get(vector, "id")).unwrap()));
-                }
+            ran += 1;
+            if let Err(problem) = run(vector) {
+                failures.push(format!("{}: {problem}", string(get(vector, "id")).unwrap()));
             }
         }
     }
@@ -315,5 +361,5 @@ fn the_vectors_pass_through_the_c_abi() {
         failures.len(),
         failures.join("\n")
     );
-    assert!(ran >= 1100, "only {ran} vectors ran");
+    assert!(ran >= 2508, "only {ran} vectors ran");
 }

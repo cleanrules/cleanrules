@@ -29,6 +29,8 @@ pub(crate) enum Failure {
     /// An error of the core about an argument, whose message the function's
     /// name begins.
     Argument(cleanrules::Error),
+    /// An action failed (`CR_ACTION_ERROR`); the error keeps the decision.
+    Action(cleanrules::Error, Box<crate::decision::cr_decision>),
     /// A panic (`CR_INTERNAL_ERROR`).
     Internal(String),
 }
@@ -235,6 +237,16 @@ pub(crate) unsafe fn write_out<T>(out: *mut T, value: T, what: &str) -> Outcome 
 pub(crate) unsafe fn give<T>(out: *mut *mut T, value: T) {
     // SAFETY: `clear` checked that `out` is writable.
     unsafe { *out = Box::into_raw(Box::new(value)) };
+}
+
+/// Hand an existing box to the caller as its handle, keeping its address.
+///
+/// # Safety
+///
+/// `out` passed [`clear`].
+pub(crate) unsafe fn give_boxed<T>(out: *mut *mut T, value: Box<T>) {
+    // SAFETY: `clear` checked that `out` is writable.
+    unsafe { *out = Box::into_raw(value) };
 }
 
 /// Hand a text to the caller, with its length when `len` is not `NULL`.

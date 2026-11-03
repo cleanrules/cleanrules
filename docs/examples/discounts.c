@@ -1,7 +1,8 @@
 /*
  * The rules of discounts.rules, from C: read them, evaluate one input given as
  * JSON and then built natively, print the output, the explanation and which
- * rules fired, and report an error.
+ * rules fired, run the rules' named action (notify_sales) as a C function,
+ * and report an error.
  *
  *     cargo build -p cleanrules-ffi
  *     cc -I crates/ffi/include docs/examples/discounts.c \
@@ -78,6 +79,23 @@ static int show(const cr_ruleset *rules, const cr_decision *decision) {
     }
     cr_string_free(discount);
     cr_value_free(output);
+    return 0;
+}
+
+/* The action vip names (DO notify_sales): called by cr_ruleset_run for each
+ * selected rule that names it. Returning anything but 0 stops the run, after
+ * cr_action_call_fail says why. */
+static int32_t notify_sales(void *data, cr_action_call *call) {
+    const char *name = NULL;
+    size_t len = 0;
+    if (cr_decision_rule_name(cr_action_call_decision(call), cr_action_call_rule(call), &name,
+                              &len, NULL) != CR_OK) {
+        cr_action_call_fail(call, "no rule name", 12);
+        return 1;
+    }
+    int *calls = data;
+    *calls += 1;
+    printf("notify_sales: rule %.*s was selected\n", (int)len, name);
     return 0;
 }
 
@@ -166,6 +184,23 @@ int main(int argc, char **argv) {
         cr_ruleset_free(rules);
         return shown;
     }
+
+    /* Run the rules: evaluate, then call the selected rules' actions. */
+    int calls = 0;
+    cr_actions *actions = cr_actions_new();
+    native = native_input(&error);
+    if (native == NULL ||
+        cr_actions_add(actions, "notify_sales", 12, notify_sales, &calls, &error) != CR_OK ||
+        cr_ruleset_run(rules, actions, native, NULL, &decision, &error) != CR_OK) {
+        cr_value_free(native);
+        cr_actions_free(actions);
+        cr_ruleset_free(rules);
+        return fail("running", error);
+    }
+    printf("\n%d action called\n", calls);
+    cr_decision_free(decision);
+    cr_value_free(native);
+    cr_actions_free(actions);
 
     /* An input that is not JSON: the error says where, in its JSON form. */
     const char *broken = "{\"customer\": ";

@@ -1344,6 +1344,16 @@ pub fn parse_rule(text: &str, limits: &Limits) -> Result<Rule> {
     Parser::new(text, limits).single_rule()
 }
 
+/// One expression of any kind, a condition or a value, such as a payload's
+/// value or a table's column (`spec/text.md`, *Conditions and values*).
+///
+/// # Errors
+///
+/// As [`parse`].
+pub fn parse_node(text: &str, limits: &Limits) -> Result<Node> {
+    parse_expression(text, limits)
+}
+
 /// A table's input or output: one expression (`spec/tables.md`).
 pub(crate) fn parse_expression(text: &str, limits: &Limits) -> Result<Node> {
     check_size(text, limits)?;

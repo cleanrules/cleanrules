@@ -165,6 +165,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cr_decision_output_value` and `cr_decision_outputs_value` read a decision
   without evaluating it again. Every evaluation vector also passes from a
   native value rebuilt with these functions, and their tests run under Miri.
+- C ABI, actions, grids, nodes and batches (task E.1c): action registries of
+  C functions by name (`cr_actions_new`, `cr_actions_add`), checked with
+  `cr_ruleset_check_actions` and run with `cr_ruleset_run`. Each action gets
+  a `cr_action_call` (`cr_action_call_decision`, `_rule`, `_input`, and
+  `cr_action_call_fail`, whose message becomes the error's cause); a
+  `CR_ACTION_ERROR` keeps the decision (`cr_error_decision`, the same handle
+  the actions saw) and the rules whose actions had run. `cr_decision_rule_name`
+  and `cr_decision_rule_output`. Decision tables from grids (`cr_grid_new`,
+  `cr_grid_push_row`, `cr_grid_finish`; after a failed row a grid can only be
+  freed); single conditions and values (`cr_node_read`, `cr_node_write`,
+  `cr_node_evaluate_tree`, `cr_node_evaluate_value_tree`, with their result
+  trees); and batches (`cr_ruleset_evaluate_many`, `cr_batch_len`,
+  `cr_batch_get`), which report the first input that fails. Every
+  conformance vector now runs through the C ABI.
+- Core: `TableConfig::from_names` (a grid's settings by name, with a hint
+  listing the valid names, now also used by Python) and `text::parse_node`
+  (one expression of any kind).
 - Data model (`spec/data-model.md`): the C value builder makes opaque values
   from a type name and the program's token, never from a C pointer with a
   release callback, and refuses dates, datetimes and offsets a value cannot

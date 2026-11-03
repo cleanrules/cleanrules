@@ -13,13 +13,15 @@ header = """/*
  *
  * Texts in: a pointer and a length in bytes, UTF-8, without a final NUL;
  * NULL with a length of 0 is the empty text. They are borrowed for the call:
- * the library never keeps a pointer it was given.
+ * the library never keeps a pointer it was given, except the functions and
+ * data of cr_actions_add, which the registry keeps until it is freed.
  *
  * Results out: through out-parameters. An owned result (a handle, or a text
  * through char **) belongs to the caller, who frees it with its cr_*_free
  * function or cr_string_free; it is NULL after a failure. A borrowed result
- * (through const char ** or const cr_value **) points into a handle and is
- * NULL, with a length of 0, after a failure; never free it. The strings of
+ * (through const char ** or const cr_value **, or returned as by
+ * cr_batch_get and cr_error_decision) points into a handle and is NULL, with
+ * a length of 0, after a failure; never free it. The strings of
  * cr_error_message, cr_error_hint and cr_error_json belong to the error, and
  * those of cr_version, cr_status_name, cr_ruleset_hit_policy and
  * cr_ruleset_aggregate are static. A function with one result needs its
@@ -30,11 +32,17 @@ header = """/*
  * argument, cr_error **error, may be NULL; otherwise *error must be NULL on
  * entry, receives a new cr_error on failure and is left alone on success.
  *
- * Threads: documents, rule sets, decisions and errors never change once made,
- * so one may be used from several threads at once, but not while it is
- * freed. Limits and values change while they are built (cr_limits_set,
- * cr_value_list_set, cr_value_map_insert): finish them first. A decision keeps
- * its rule set alive, and a copy of its input; either may be freed first.
+ * Threads: documents, rule sets, decisions, nodes, batches and errors never
+ * change once made, so one may be used from several threads at once, but not
+ * while it is freed. Limits, values, grids and action registries change while
+ * they are built (cr_limits_set, cr_value_list_set, cr_value_map_insert,
+ * cr_grid_push_row, cr_actions_add): finish them first. A finished registry
+ * may be used by several threads at once; its actions then run concurrently,
+ * each on the thread that called cr_ruleset_run, with the same data, which
+ * must allow it. An action must not change or free the registry it runs
+ * from, nor its decision or input, and must not unwind or jump out of the
+ * call. A decision keeps its rule set alive, and a copy of its input; either
+ * may be freed first.
  *
  * Values: build children first and move them into their list or map, which
  * then owns them. A value read from inside another (cr_value_list_get,

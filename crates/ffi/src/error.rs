@@ -9,6 +9,7 @@ use cleanrules::format::write_error;
 use cleanrules::json::{Json, to_string};
 
 use crate::boundary::{Failure, free};
+use crate::decision::cr_decision;
 use crate::{CR_INTERNAL_ERROR, CR_INVALID_ARGUMENT, cr_status};
 
 /// `format_error`.
@@ -83,6 +84,8 @@ pub struct cr_error {
     message: CString,
     hint: Option<CString>,
     json: CString,
+    /// For `CR_ACTION_ERROR`, the decision whose action failed.
+    decision: Option<Box<cr_decision>>,
 }
 
 impl cr_error {
@@ -103,7 +106,20 @@ impl cr_error {
             status,
             message: c_text(message),
             hint: hint.map(c_text),
+            decision: None,
             json: c_text(&to_string(&json)),
+        }
+    }
+}
+
+impl cr_error {
+    fn core(error: &cleanrules::Error, decision: Option<Box<cr_decision>>) -> Self {
+        Self {
+            status: number(error.code()),
+            message: c_text(error.message()),
+            hint: error.hint().map(c_text),
+            json: c_text(&to_string(&write_error(error))),
+            decision,
         }
     }
 }
@@ -111,12 +127,8 @@ impl cr_error {
 impl From<Failure> for cr_error {
     fn from(failure: Failure) -> Self {
         match failure {
-            Failure::Core(error) => Self {
-                status: number(error.code()),
-                message: c_text(error.message()),
-                hint: error.hint().map(c_text),
-                json: c_text(&to_string(&write_error(&error))),
-            },
+            Failure::Core(error) => Self::core(&error, None),
+            Failure::Action(error, decision) => Self::core(&error, Some(decision)),
             Failure::Invalid(message, hint) => Self::own(
                 CR_INVALID_ARGUMENT,
                 "invalid_argument",
@@ -178,6 +190,21 @@ pub unsafe extern "C" fn cr_error_hint(error: *const cr_error) -> *const c_char 
 pub unsafe extern "C" fn cr_error_json(error: *const cr_error) -> *const c_char {
     // SAFETY: the caller promises a live handle when it is not null.
     unsafe { error.as_ref() }.map_or(ptr::null(), |e| e.json.as_ptr())
+}
+
+/// For a `CR_ACTION_ERROR` from `cr_ruleset_run`, the decision whose action
+/// failed, borrowed from the error; `NULL` for any other error and for `NULL`.
+///
+/// # Safety
+///
+/// `error` is `NULL` or a live `cr_error`. The decision lives as long as the
+/// error and must never be freed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_error_decision(error: *const cr_error) -> *const cr_decision {
+    // SAFETY: the caller promises a live handle when it is not null.
+    unsafe { error.as_ref() }
+        .and_then(|e| e.decision.as_deref())
+        .map_or(ptr::null(), ptr::from_ref)
 }
 
 /// Free an error. `NULL` is ignored.

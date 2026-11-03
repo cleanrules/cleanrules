@@ -15,13 +15,13 @@ use cleanrules::rules::{Decision, RuleSet};
 use cleanrules::{Map, Value};
 
 use crate::boundary::{
-    Failure, Outcome, bytes, call, clear, format, free, give, give_text, handle, limits_of,
-    write_out,
+    Failure, Outcome, bytes, call, clear, clear_borrowed, format, free, give, give_text, handle,
+    limits_of, write_out,
 };
 use crate::error::cr_error;
 use crate::limits::cr_limits;
 use crate::ruleset::cr_ruleset;
-use crate::value::{borrow_value, cr_value, give_new_value, nesting};
+use crate::value::{borrow_text, borrow_value, cr_value, give_new_value, nesting};
 use crate::{cr_format, cr_status};
 
 /// Where a decision comes from: it is made again from this whenever it is read,
@@ -39,6 +39,8 @@ struct Facts {
     fired: Vec<bool>,
     truths: Vec<Truth>,
     selected: Vec<usize>,
+    /// Each rule's output, when its payload was evaluated.
+    rule_outputs: Vec<Option<Vec<(String, Value)>>>,
     outputs: Vec<Vec<(String, Value)>>,
     output: Output,
 }
@@ -61,6 +63,10 @@ impl Facts {
                 .map(|r| r.when.truth().unwrap_or(Truth::Unknown))
                 .collect(),
             selected: decision.selected_positions().to_vec(),
+            rule_outputs: results
+                .iter()
+                .map(|r| r.then.as_ref().map(|_| r.output()))
+                .collect(),
             outputs: decision.outputs(),
             output: decision.output().map_or(Output::Several, Output::Single),
         }
@@ -92,6 +98,42 @@ impl cr_decision {
             limits,
             facts,
         })
+    }
+
+    /// The decision of the rule set on an input.
+    pub(crate) fn evaluated(ruleset: Arc<RuleSet>, input: Value, limits: Limits) -> Outcome<Self> {
+        Self::new(ruleset, Source::Input(input), limits)
+    }
+
+    /// A decision the core already made from `input`.
+    pub(crate) fn made(
+        ruleset: Arc<RuleSet>,
+        input: Value,
+        limits: Limits,
+        decision: &Decision<'_>,
+    ) -> Self {
+        Self {
+            facts: Facts::of(decision),
+            ruleset,
+            source: Source::Input(input),
+            limits,
+        }
+    }
+
+    /// The input the decision was made from, when it was evaluated.
+    pub(crate) fn input(&self) -> Option<&Value> {
+        match &self.source {
+            Source::Input(input) => Some(input),
+            Source::Recorded(_) => None,
+        }
+    }
+
+    pub(crate) fn ruleset(&self) -> &RuleSet {
+        &self.ruleset
+    }
+
+    pub(crate) fn selected(&self) -> &[usize] {
+        &self.facts.selected
     }
 
     fn rule(&self, rule: usize) -> Outcome<usize> {
@@ -385,19 +427,8 @@ pub unsafe extern "C" fn cr_ruleset_evaluate_value(
         // SAFETY: `limits` is NULL or live (# Safety).
         let limits = unsafe { limits_of(limits) };
         // SAFETY: `input` is NULL or live (# Safety).
-        let input = unsafe { borrow_value(input) }?;
-        let depth = nesting(input);
-        if depth > limits.max_nesting {
-            return Err(cleanrules::Error::new(
-                cleanrules::ErrorCode::LimitExceeded,
-                format!(
-                    "the input nests lists and maps {depth} deep, more than the limit of {}",
-                    limits.max_nesting
-                ),
-            )
-            .with_hint("raise CR_LIMIT_MAX_NESTING if the input is trusted")
-            .into());
-        }
+        let input = unsafe { borrow_value(input, "input") }?;
+        check_input(input, &limits)?;
         let decision = cr_decision::new(ruleset, Source::Input(input.clone()), limits)?;
         // SAFETY: `out` passed `clear`.
         unsafe { give(out, decision) };
@@ -545,6 +576,8 @@ pub unsafe extern "C" fn cr_decision_output_value(
     error: *mut *mut cr_error,
 ) -> cr_status {
     let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
         // SAFETY: `decision` is NULL or live (# Safety).
         let decision = unsafe { handle(decision, "decision") }?;
         let value = decision
@@ -580,4 +613,92 @@ pub unsafe extern "C" fn cr_decision_outputs_value(
     };
     // SAFETY: `error` is NULL or writable (# Safety).
     unsafe { call("cr_decision_outputs_value", error, body) }
+}
+
+/// The name of the rule at position `rule`, borrowed from the decision and not
+/// NUL-terminated.
+///
+/// # Safety
+///
+/// `decision` is `NULL` or a live `cr_decision`; `name` and `len` are `NULL` or
+/// point to a writable `const char *` and `size_t`; `error` is `NULL` or points
+/// to a writable `cr_error *` set to `NULL`. The name lives as long as the
+/// decision.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_decision_rule_name(
+    decision: *const cr_decision,
+    rule: usize,
+    name: *mut *const c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `name` and `len` are NULL or writable (# Safety).
+        unsafe { clear_borrowed(name, len) };
+        // SAFETY: `decision` is NULL or live (# Safety).
+        let decision = unsafe { handle(decision, "decision") }?;
+        let found = &decision.ruleset.rules()[decision.rule(rule)?];
+        // SAFETY: `name` and `len` are NULL or writable (# Safety).
+        unsafe { borrow_text(Some(found.name()), name, len) };
+        Ok(())
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_decision_rule_name", error, body) }
+}
+
+/// The output of the rule at position `rule`, as a new map freed with
+/// `cr_value_free`: its payload's keys and values, when its payload was
+/// evaluated (`spec/rules.md`, *When payloads are evaluated*), and a plain
+/// null otherwise.
+///
+/// # Safety
+///
+/// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to a
+/// writable `cr_value *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_decision_rule_output(
+    decision: *const cr_decision,
+    rule: usize,
+    out: *mut *mut cr_value,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `decision` is NULL or live (# Safety).
+        let decision = unsafe { handle(decision, "decision") }?;
+        let value = match &decision.facts.rule_outputs[decision.rule(rule)?] {
+            None => Value::Null(cleanrules::NullCause::Null),
+            Some(pairs) => {
+                let mut map = Map::new();
+                for (key, value) in pairs {
+                    map.insert(key.clone(), value.clone());
+                }
+                Value::Map(map)
+            }
+        };
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { give_new_value(out, value) }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_decision_rule_output", error, body) }
+}
+
+/// Check that an input nests no deeper than the limits allow, as JSON input
+/// does (`spec/json-format.md`, *Errors and limits*).
+pub(crate) fn check_input(input: &Value, limits: &Limits) -> Outcome {
+    let depth = nesting(input);
+    if depth > limits.max_nesting {
+        return Err(cleanrules::Error::new(
+            cleanrules::ErrorCode::LimitExceeded,
+            format!(
+                "the input nests lists and maps {depth} deep, more than the limit of {}",
+                limits.max_nesting
+            ),
+        )
+        .with_hint("raise CR_LIMIT_MAX_NESTING if the input is trusted")
+        .into());
+    }
+    Ok(())
 }
