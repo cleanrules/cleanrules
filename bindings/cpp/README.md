@@ -39,7 +39,8 @@ JSON input, which rules fired, an action, and an error both ways.
 ## Building
 
 The CMake project builds the C library with cargo, so it needs a Rust
-toolchain (1.95 or later) and CMake 3.21:
+toolchain (the version `rust-version` names in the workspace's `Cargo.toml`, or
+later) and CMake 3.21:
 
 ```sh
 cmake -S bindings/cpp -B build/cpp            # Debug; -DCMAKE_BUILD_TYPE=Release
@@ -65,6 +66,7 @@ Options:
 | `CLEANRULES_BUILD_TESTS` | on at the top level | the tests and the example |
 | `CLEANRULES_INSTALL` | on at the top level | the install rules and the CMake package |
 | `CLEANRULES_RUST_TARGET` | the host's, or derived | the Rust target triple, such as `aarch64-linux-android` |
+| `CLEANRULES_MSVC_STATIC_CRT` | from `CMAKE_MSVC_RUNTIME_LIBRARY` | build for MSVC's static C runtime (`/MT`) |
 | `CLEANRULES_SANITIZERS` | empty | sanitizers for the tests, such as `address,undefined` |
 | `CLEANRULES_CARGO_TARGET_DIR` | `<build>/cargo` | where cargo builds; the workspace's `target` reuses its builds |
 | `CLEANRULES_NATIVE_LIBS` | asked of rustc | the system libraries of the static library |
@@ -72,16 +74,97 @@ Options:
 
 Debug builds use cargo's `dev` profile, the others `release`. When CMake
 builds for another platform (cross-compiling, one `CMAKE_OSX_ARCHITECTURES`
-that is not the host's, or MinGW), cargo builds for the matching Rust target,
-which `rustup target add` must have installed; set `CLEANRULES_RUST_TARGET`
-when it cannot be told. One architecture at a time: join macOS ones with
+that is not the host's, an iOS device or simulator, or MinGW), cargo builds
+for the matching Rust target; set `CLEANRULES_RUST_TARGET` when it cannot be
+told. Two things must be ready for that target: its Rust standard library
+(`rustup target add <triple>`), and, except on Apple platforms and with MSVC,
+a linker: CMake hands cargo its C compiler for the target
+(`CARGO_TARGET_<TRIPLE>_LINKER`), so a toolchain file whose C compiler links
+for the target is enough. One architecture at a time: join macOS ones with
 `lipo`. `CMAKE_OSX_DEPLOYMENT_TARGET` reaches cargo too.
 
-With MSVC, the Rust objects use the release C runtime (`/MD`): build your
-program with it too (`CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`). A shared
-library on Windows is a DLL that must sit next to your program or on `PATH`;
-on macOS its install name is `@rpath/libcleanrules_ffi.dylib`, and on Linux
-its SONAME `libcleanrules_ffi.so`, so it works wherever it is installed.
+With MSVC, the Rust objects use the release C runtime: the DLL one (`/MD`) by
+default, or the static one (`/MT`) when `CMAKE_MSVC_RUNTIME_LIBRARY` asks for
+it (`MultiThreaded`), in which case cargo builds with `crt-static` in its own
+target directory. Build your program with the same runtime. A Debug program
+(`/MDd` or `/MTd`) links too, with a harmless `LNK4098` warning: nothing from
+the C runtime crosses the C ABI. A shared library on Windows is a DLL that
+must sit next to your program or on `PATH`; on macOS its install name is
+`@rpath/libcleanrules_ffi.dylib`, and on Linux its SONAME
+`libcleanrules_ffi.so`, so it works wherever it is installed.
+
+## Conan
+
+A Conan 2 recipe lives in [`conan/`](conan/conanfile.py). It builds the same
+CMake project, so the build machine needs a Rust toolchain
+([rustup](https://rustup.rs)) as well as Conan:
+
+```sh
+conan create bindings/cpp/conan --build=missing                    # static
+conan create bindings/cpp/conan --build=missing -o "&:shared=True" # shared
+```
+
+`conan create` also builds and runs [`conan/test_package`](conan/test_package).
+In a consumer, with the `CMakeDeps` and `CMakeToolchain` generators:
+
+```text
+[requires]
+cleanrules/<version>
+```
+
+```cmake
+find_package(cleanrules CONFIG REQUIRED)
+target_link_libraries(app PRIVATE cleanrules::cleanrules)   # or cleanrules::c
+```
+
+The package targets are the same as CMake's: `cleanrules::cleanrules` asks for
+C++17 whatever the profile's `compiler.cppstd`, and the package does not depend
+on it. Debug builds use cargo's `dev` profile, and `compiler.runtime=static`
+builds for MSVC's static C runtime. When Conan cross-builds, the recipe passes
+the matching Rust target, which needs what any other cross build needs (above).
+iOS and Android are not packaged yet: build them with CMake.
+
+## vcpkg
+
+An overlay port lives in [`vcpkg/ports/cleanrules`](vcpkg/ports/cleanrules).
+It builds from this checkout, so it also needs cargo. Static or shared follows
+the triplet:
+
+```sh
+vcpkg install cleanrules --overlay-ports=bindings/cpp/vcpkg/ports
+vcpkg install cleanrules:arm64-osx-dynamic --overlay-ports=bindings/cpp/vcpkg/ports
+```
+
+In manifest mode, list `cleanrules` in your `vcpkg.json` and pass the overlay
+to CMake, as [`vcpkg/test`](vcpkg/test) does:
+
+```sh
+cmake -S bindings/cpp/vcpkg/test -B build/vcpkg-test \
+  -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+  -DVCPKG_OVERLAY_PORTS="$PWD/bindings/cpp/vcpkg/ports"
+```
+
+The triplet also chooses the Rust target (x64, x86 and arm64 Windows; x64 and
+arm64 Linux and macOS) and, on Windows, the C runtime: a `static` CRT linkage
+builds with `crt-static`. Two things to know:
+
+- vcpkg's binary cache sees only the port's own files, not this checkout nor
+  rustc's version. After changing either, drop the installed copy, with
+  `vcpkg remove cleanrules` (classic mode) or by deleting
+  `<build>/vcpkg_installed` (manifest mode), and install again with
+  `--binarysource=clear` (in manifest mode,
+  `-DVCPKG_INSTALL_OPTIONS=--binarysource=clear`).
+- On Windows, vcpkg builds with a reduced environment. CMake looks for cargo
+  in `CARGO_HOME`, `~/.cargo/bin` and `%USERPROFILE%\.cargo\bin`. If rustup
+  lives elsewhere, tell vcpkg to keep its variables: in a POSIX shell,
+  `export VCPKG_KEEP_ENV_VARS="CARGO_HOME;RUSTUP_HOME"`; in `cmd`,
+  `set VCPKG_KEEP_ENV_VARS=CARGO_HOME;RUSTUP_HOME`. Add `CARGO` to the list to
+  use a cargo of your choice.
+
+The port's package config names the release library, also for Debug builds:
+the C ABI is the same in both. The ports in the Conan and vcpkg registries
+(ConanCenter, a `vcpkg_from_github` port on a release tag) come with the first
+release.
 
 ## Errors
 

@@ -37,17 +37,51 @@ endif()
 
 # --- Rust -------------------------------------------------------------------
 
+# The Rust version the workspace asks for (rust-version in Cargo.toml).
+file(STRINGS "${CLEANRULES_ROOT}/Cargo.toml" _rust_version REGEX "^rust-version = \"" LIMIT_COUNT 1)
+string(REGEX REPLACE "^rust-version = \"([0-9.]+).*" "\\1" _rust_version "${_rust_version}")
+
 # cargo, and the rustc next to it; CARGO in the environment or the cache wins.
 if(DEFINED ENV{CARGO} AND NOT CARGO)
   set(CARGO "$ENV{CARGO}" CACHE FILEPATH "cargo")
 endif()
-find_program(CARGO cargo HINTS "$ENV{CARGO_HOME}/bin" "$ENV{HOME}/.cargo/bin" REQUIRED)
+# rustup's default place is a hint too: package managers such as vcpkg build
+# with a reduced PATH.
+find_program(CARGO cargo HINTS "$ENV{CARGO_HOME}/bin" "$ENV{HOME}/.cargo/bin"
+                                "$ENV{USERPROFILE}/.cargo/bin")
+if(NOT CARGO)
+  message(FATAL_ERROR
+    "cleanrules builds its C library with cargo, which was not found: install a Rust "
+    "toolchain (${_rust_version} or later) with rustup (https://rustup.rs), or set CARGO to "
+    "its path")
+endif()
 get_filename_component(_cargo_dir "${CARGO}" DIRECTORY)
 find_program(CLEANRULES_RUSTC rustc HINTS "${_cargo_dir}" REQUIRED)
+execute_process(COMMAND "${CLEANRULES_RUSTC}" -vV OUTPUT_VARIABLE _rustc_info RESULT_VARIABLE _rustc_result)
+if(NOT _rustc_result EQUAL 0 OR NOT _rustc_info MATCHES "host: ([^\n]+)")
+  message(FATAL_ERROR "${CLEANRULES_RUSTC} -vV did not name the host's Rust target")
+endif()
+set(_rust_host "${CMAKE_MATCH_1}")
+
+# MSVC's C runtime: the DLL one (/MD), as CMake's default, or the static one
+# (/MT) when CMAKE_MSVC_RUNTIME_LIBRARY asks for it. The Rust library is built
+# to match (crt-static).
+if(NOT DEFINED CLEANRULES_MSVC_STATIC_CRT)
+  set(_static_crt OFF)
+  if(MSVC AND CMAKE_MSVC_RUNTIME_LIBRARY AND NOT CMAKE_MSVC_RUNTIME_LIBRARY MATCHES "DLL")
+    set(_static_crt ON)
+  endif()
+  set(CLEANRULES_MSVC_STATIC_CRT ${_static_crt} CACHE BOOL
+      "Build the Rust library for MSVC's static C runtime (/MT)")
+endif()
+if(CLEANRULES_MSVC_STATIC_CRT AND NOT MSVC)
+  message(FATAL_ERROR "CLEANRULES_MSVC_STATIC_CRT is for MSVC's C runtime only")
+endif()
 
 # The Rust target: the host's, unless the C and C++ code is built for another
-# platform (cross-compiling, one macOS architecture that is not the host's,
-# or MinGW, whose Rust target is not the host's default MSVC one).
+# platform (cross-compiling, one macOS architecture that is not the host's, an
+# Apple device, or MinGW, whose Rust target is not the host's default MSVC
+# one).
 if(CMAKE_OSX_ARCHITECTURES)
   list(LENGTH CMAKE_OSX_ARCHITECTURES _archs)
   if(_archs GREATER 1)
@@ -71,7 +105,18 @@ if(NOT CLEANRULES_RUST_TARGET)
   else()
     set(_arch "${_processor}")
   endif()
-  if(APPLE)
+  if(IOS)
+    # A simulator's SDK, or a device's.
+    if(CMAKE_OSX_SYSROOT MATCHES "[Ss]imulator")
+      if(_arch STREQUAL "aarch64")
+        set(_derived "aarch64-apple-ios-sim")
+      else()
+        set(_derived "${_arch}-apple-ios")
+      endif()
+    else()
+      set(_derived "${_arch}-apple-ios")
+    endif()
+  elseif(APPLE)
     set(_derived "${_arch}-apple-darwin")
   elseif(WIN32 AND MSVC)
     set(_derived "${_arch}-pc-windows-msvc")
@@ -82,26 +127,37 @@ if(NOT CLEANRULES_RUST_TARGET)
   else()
     set(_derived "")
   endif()
-  set(_host_differs OFF)
-  if(APPLE AND CMAKE_OSX_ARCHITECTURES
-     AND NOT CMAKE_OSX_ARCHITECTURES STREQUAL CMAKE_HOST_SYSTEM_PROCESSOR)
-    set(_host_differs ON)
-  endif()
-  if(CMAKE_CROSSCOMPILING OR _host_differs OR (WIN32 AND NOT MSVC))
+  # A native Linux build keeps the host's target, which may be musl.
+  if(CMAKE_CROSSCOMPILING OR APPLE OR WIN32)
     if(NOT _derived)
       message(FATAL_ERROR
         "cleanrules cannot tell the Rust target of ${CMAKE_SYSTEM_NAME} on ${_processor}: "
         "set CLEANRULES_RUST_TARGET, such as aarch64-linux-android")
     endif()
-    set(CLEANRULES_RUST_TARGET "${_derived}")
+    if(NOT _derived STREQUAL _rust_host)
+      set(CLEANRULES_RUST_TARGET "${_derived}")
+    endif()
   endif()
+endif()
+# With the static C runtime the target is always explicit, so that the flag
+# below reaches only the library, not the build scripts.
+set(_rust_target "${CLEANRULES_RUST_TARGET}")
+if(CLEANRULES_MSVC_STATIC_CRT AND NOT _rust_target)
+  set(_rust_target "${_rust_host}")
 endif()
 set(_target_args "")
 set(_target_subdir "")
-if(CLEANRULES_RUST_TARGET)
-  set(_target_args --target "${CLEANRULES_RUST_TARGET}")
-  set(_target_subdir "/${CLEANRULES_RUST_TARGET}")
-  message(STATUS "cleanrules: Rust target ${CLEANRULES_RUST_TARGET}")
+if(_rust_target)
+  set(_target_args --target "${_rust_target}")
+  set(_target_subdir "/${_rust_target}")
+  message(STATUS "cleanrules: Rust target ${_rust_target}")
+endif()
+set(_crt_args "")
+if(CLEANRULES_MSVC_STATIC_CRT)
+  set(_crt_args -C target-feature=+crt-static)
+  # Another C runtime is another build: never in the same target directory.
+  string(APPEND _cargo_target_dir "/crt-static")
+  message(STATUS "cleanrules: MSVC's static C runtime (crt-static)")
 endif()
 
 # The system libraries a Rust static library needs, as rustc lists them for an
@@ -113,7 +169,7 @@ if(NOT DEFINED CLEANRULES_NATIVE_LIBS)
   file(WRITE "${_probe}/probe.rs" "")
   execute_process(
     COMMAND "${CLEANRULES_RUSTC}" --crate-type staticlib --crate-name probe --color never
-            ${_target_args} --print native-static-libs --out-dir "${_probe}" "${_probe}/probe.rs"
+            ${_target_args} ${_crt_args} --print native-static-libs --out-dir "${_probe}" "${_probe}/probe.rs"
     WORKING_DIRECTORY "${CLEANRULES_ROOT}"
     ERROR_VARIABLE _probe_out OUTPUT_VARIABLE _probe_stdout
     RESULT_VARIABLE _probe_result)
@@ -182,6 +238,20 @@ endif()
 set(_cargo_env "CARGO_TARGET_DIR=${_cargo_target_dir}")
 if(APPLE AND CMAKE_OSX_DEPLOYMENT_TARGET)
   list(APPEND _cargo_env "MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+endif()
+# With an explicit --target, RUSTFLAGS reaches only the target's artifacts:
+# build scripts and procedural macros keep the host's defaults.
+if(CLEANRULES_MSVC_STATIC_CRT)
+  string(STRIP "$ENV{RUSTFLAGS} -Ctarget-feature=+crt-static" _rustflags)
+  list(APPEND _cargo_env "RUSTFLAGS=${_rustflags}")
+endif()
+# For another platform, cargo links with the C compiler CMake uses for it
+# (Apple's and MSVC's linkers find their target on their own).
+if(_rust_target AND NOT APPLE AND NOT MSVC)
+  string(TOUPPER "${_rust_target}" _triple_var)
+  string(REPLACE "-" "_" _triple_var "${_triple_var}")
+  string(REPLACE "." "_" _triple_var "${_triple_var}")
+  list(APPEND _cargo_env "CARGO_TARGET_${_triple_var}_LINKER=${CMAKE_C_COMPILER}")
 endif()
 add_custom_target(cleanrules_cargo ALL
   COMMAND "${CMAKE_COMMAND}" -E env ${_cargo_env}
@@ -259,7 +329,11 @@ if(CLEANRULES_BUILD_TESTS)
   enable_testing()
 
   # The Rust objects use the release C runtime: so do the tests.
-  set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+  if(CLEANRULES_MSVC_STATIC_CRT)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded)
+  else()
+    set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+  endif()
 
   if(MSVC)
     set(_warnings /W4 /WX /permissive- /utf-8)
@@ -332,7 +406,7 @@ if(CLEANRULES_BUILD_TESTS)
     set(_prefix "${CMAKE_BINARY_DIR}/installed")
     # The consumer builds for the same platform.
     set(_consumer_options "-DCMAKE_PREFIX_PATH=${_prefix}" "-DCMAKE_BUILD_TYPE=$<CONFIG>"
-                          "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL")
+                          "-DCMAKE_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}")
     foreach(_var IN ITEMS CMAKE_TOOLCHAIN_FILE CMAKE_OSX_ARCHITECTURES CMAKE_OSX_DEPLOYMENT_TARGET)
       if(${_var})
         list(APPEND _consumer_options "-D${_var}=${${_var}}")

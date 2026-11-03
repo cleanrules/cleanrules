@@ -1,0 +1,4 @@
+cleanrules provides CMake targets:
+
+  find_package(cleanrules CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE cleanrules::cleanrules)  # C++17; cleanrules::c for C

@@ -201,6 +201,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and installs both headers. The
   example `docs/examples/discounts.cpp`; CI builds and tests it on Linux and
   macOS under ASan and UBSan, and on Windows with MSVC.
+- C and C++ packages (task E.2b): a Conan 2 recipe
+  (`conan create bindings/cpp/conan`, option `shared`) with a `test_package`,
+  and a vcpkg overlay port (`--overlay-ports=bindings/cpp/vcpkg/ports`, static
+  or dynamic by triplet) with a manifest-mode test. Both build through the
+  CMake package, so the build machine needs a Rust toolchain; both give the
+  targets `cleanrules::c` and `cleanrules::cleanrules` (C++17 whatever the
+  profile's C++ standard). CI builds both on Linux and Windows. The CMake
+  package now supports MSVC's static C runtime (`CLEANRULES_MSVC_STATIC_CRT`,
+  from `CMAKE_MSVC_RUNTIME_LIBRARY`; Conan's `compiler.runtime=static`,
+  vcpkg's static CRT triplets), derives iOS targets, and hands cargo the C
+  compiler as linker when building for another platform. Without cargo, CMake
+  now says to install it with rustup.
 - C ABI: `cr_value_clone`, a deep copy of a value that keeps null reasons and
   opaque tokens, and `cr_decision_clone`, which keeps a decision borrowed from
   a batch, an action call or an error.

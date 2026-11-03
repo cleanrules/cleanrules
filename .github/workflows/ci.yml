@@ -140,6 +140,59 @@ jobs:
           -DCLEANRULES_SHARED=ON -DCLEANRULES_CARGO_TARGET_DIR=${{ github.workspace }}/target
       - run: ctest --test-dir build/cpp-shared -C ${{ matrix.config }} --output-on-failure
 
+  packages:
+    name: Conan and vcpkg (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # The port's version follows the workspace's.
+      - shell: bash
+        run: |
+          workspace=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          port=$(sed -n 's/^ *"version": "\(.*\)",/\1/p' bindings/cpp/vcpkg/ports/cleanrules/vcpkg.json)
+          echo "workspace $workspace, vcpkg port $port"
+          test "$workspace" = "$port"
+      # Conan 2, as CI tooling: the recipe, static and shared, with its test_package.
+      - run: pipx install "conan>=2.34,<3"
+      - run: conan profile detect
+      - run: conan create bindings/cpp/conan --build=missing
+      - run: conan create bindings/cpp/conan --build=missing -o "&:shared=True"
+      # MSVC: Debug (a /MDd program over the release C runtime) and the static
+      # C runtime (/MT, crt-static), through Conan and through plain CMake.
+      - if: runner.os == 'Windows'
+        run: |
+          conan create bindings/cpp/conan --build=missing -s build_type=Debug
+          conan create bindings/cpp/conan --build=missing -s compiler.runtime=static
+          cmake -S bindings/cpp -B build/cpp-mt -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+          ctest --test-dir build/cpp-mt -C Release --output-on-failure
+      # The runner's vcpkg with the overlay port, in manifest mode: static and
+      # shared on Linux; a DLL and the static C runtime on Windows.
+      - shell: bash
+        env:
+          VCPKG_KEEP_ENV_VARS: CARGO_HOME;RUSTUP_HOME
+        run: |
+          root=$(cygpath -m "$VCPKG_INSTALLATION_ROOT" 2>/dev/null || echo "$VCPKG_INSTALLATION_ROOT")
+          here=$(cygpath -m "$PWD" 2>/dev/null || pwd)
+          if [ "$RUNNER_OS" = Linux ]; then
+            triplets="x64-linux x64-linux-dynamic"
+          else
+            triplets="x64-windows x64-windows-static"
+          fi
+          for triplet in $triplets; do
+            cmake -S bindings/cpp/vcpkg/test -B "build/vcpkg-$triplet" -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_TOOLCHAIN_FILE="$root/scripts/buildsystems/vcpkg.cmake" \
+              -DVCPKG_OVERLAY_PORTS="$here/bindings/cpp/vcpkg/ports" \
+              -DVCPKG_TARGET_TRIPLET=$triplet
+            cmake --build "build/vcpkg-$triplet" --config Release
+            ctest --test-dir "build/vcpkg-$triplet" -C Release --output-on-failure
+          done
+
   miri:
     name: Miri (C ABI)
     runs-on: ubuntu-latest
