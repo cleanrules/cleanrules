@@ -151,7 +151,7 @@ fn actions_run_for_the_selected_rules_in_rule_order() {
     common::evaluate_value(&ruleset, &input).unwrap();
     // SAFETY: as above; the record is freed once, after the last run.
     let calls = unsafe { Box::from_raw(calls) };
-    assert!(calls.seen.is_empty());
+    assert_eq!(calls.seen, []);
 }
 
 #[test]

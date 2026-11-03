@@ -11,6 +11,10 @@ authors = ["Jose L. Salmeron"]
 repository = "https://github.com/cleanrules/cleanrules"
 homepage = "https://cleanrules.github.io"
 
+# The core, by path inside the workspace and by version once published.
+[workspace.dependencies]
+cleanrules = { path = "crates/core", version = "0.0.0" }
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 missing_docs = "warn"

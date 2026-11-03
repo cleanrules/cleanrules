@@ -87,7 +87,7 @@ fn an_error_has_a_message_a_hint_and_its_json_form() {
     // SAFETY: a live error, freed once after its strings are read.
     unsafe {
         assert_eq!(cr_error_code(error), CR_FORMAT_ERROR);
-        assert!(!c_str(cr_error_message(error)).unwrap().is_empty());
+        assert_ne!(c_str(cr_error_message(error)).unwrap(), "");
         let actual = json(c_str(cr_error_json(error)).unwrap());
         let wanted = json(r#"{"code":"format_error","line":1,"column":15}"#);
         let (Json::Object(actual), Json::Object(wanted)) = (&actual, &wanted) else {

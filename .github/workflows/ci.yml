@@ -90,10 +90,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build -p cleanrules-ffi
-      # The system libraries the static library needs, as Rust lists them.
+      # The system libraries the static library needs, as Rust lists them
+      # (without colour, which would end up in the library names).
       - shell: bash
         run: |
-          libs=$(cargo rustc -q -p cleanrules-ffi --lib --crate-type staticlib -- \
+          libs=$(cargo rustc -q --color never -p cleanrules-ffi --lib --crate-type staticlib -- \
             --print native-static-libs 2>&1 | sed -n 's/.*native-static-libs: //p' | tail -1)
           echo "native-static-libs: $libs"
           echo "NATIVE_LIBS=$libs" >> "$GITHUB_ENV"

@@ -18,7 +18,7 @@ name = "cleanrules_ffi"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-cleanrules = { path = "../core", features = ["yaml"] }
+cleanrules = { workspace = true, features = ["yaml"] }
 
 # The workspace's lints, except that this crate may use `unsafe`: every block
 # says why it is sound, and every unsafe function says what its caller promises
