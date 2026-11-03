@@ -74,8 +74,9 @@ offsets).
 **Time zones.** A binding sends an aware datetime as its UTC instant, computed
 with the native library, plus the zone's IANA name when it has one. The core
 uses its bundled time zone database (`json-format.md`, *Time zones*): if it does
-not know the name, or gives that zone a different offset at that instant, the
-value keeps the native offset as a fixed offset instead. Native UTC singletons
+not know the name spelled exactly as it spells it (names are case-sensitive), or
+gives that zone a different offset at that instant, the value keeps the native
+offset as a fixed offset instead. Native UTC singletons
 (Python `timezone.utc`, Go `time.UTC`, Java `ZoneOffset.UTC`, JavaScript `Date`
 and `Temporal.Instant`) are the fixed offset `Z`, never the zone `UTC`.
 
@@ -182,8 +183,14 @@ from which the core derives every truth value, reason and path:
 
 Optionally, a binding also records a map's available keys, for the hint of a
 `missing_field` error in strict mode. The C ABI's value builder (phase E)
-exposes exactly these pieces: nulls with a reason, native references and opaque
-handles with a release callback, and sparse lists.
+exposes these pieces: nulls with a reason (a `read_error` with its message),
+records, lists whose unread positions are nulls, and opaque values with a type
+name and a token that the C program chooses. The program keeps its objects; the
+core never holds a C pointer, and an output gives the token back. Equal tokens
+mean the same object (*Equality*). C has no native object to wrap, so the
+builder makes no opaque value on its own: a date or datetime outside years 1 to
+9999, or an offset beyond ±18 hours, is an invalid argument, and the program
+chooses what to build instead.
 
 ### Safety
 

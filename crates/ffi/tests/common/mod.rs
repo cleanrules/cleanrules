@@ -216,3 +216,146 @@ pub fn outputs(decision: &Decision) -> Result<String, Failure> {
 pub fn json(text: &str) -> Json {
     parse(text, &Limits::default()).unwrap()
 }
+
+owned!(Value, cr_value, cr_value_free);
+
+pub fn value_from_json(text: &str) -> Result<Value, Failure> {
+    let (p, n) = arg(text.as_bytes());
+    // SAFETY: the text outlives the call.
+    handle(|out, error| unsafe { cr_value_from_json(p, n, ptr::null(), out, error) }).map(Value)
+}
+
+pub fn value_to_json(value: *const cr_value) -> String {
+    // SAFETY: a live value.
+    text(|out, len, error| unsafe { cr_value_to_json(value, out, len, error) }).unwrap()
+}
+
+/// Run a call that only reports a status, and panic on failure.
+fn ok(call: impl FnOnce(*mut *mut cr_error) -> cr_status) {
+    let mut error = ptr::null_mut();
+    let status = call(&raw mut error);
+    assert!(status == CR_OK, "{:?}", take(error));
+}
+
+/// A borrowed text read through a `const char **` and a length.
+fn borrowed(
+    call: impl FnOnce(*mut *const c_char, *mut usize, *mut *mut cr_error) -> cr_status,
+) -> Vec<u8> {
+    let (mut text, mut len) = (ptr::null(), 0);
+    ok(|error| call(&raw mut text, &raw mut len, error));
+    if text.is_null() {
+        return Vec::new();
+    }
+    // SAFETY: the library points to `len` bytes that live as long as the value.
+    unsafe { std::slice::from_raw_parts(text.cast::<u8>(), len) }.to_vec()
+}
+
+/// A copy of a value, read with the readers and rebuilt with the constructors.
+pub fn copy(value: *const cr_value) -> *mut cr_value {
+    let mut out = ptr::null_mut();
+    // SAFETY: `value` is live; every out-parameter is a local; every value made
+    // is either returned or moved into its parent.
+    unsafe {
+        match cr_value_kind(value) {
+            CR_VALUE_NULL => {
+                let mut reason = 0;
+                let detail = borrowed(|t, l, e| cr_value_get_null(value, &raw mut reason, t, l, e));
+                let (p, n) = arg(&detail);
+                ok(|e| cr_value_new_null_reason(reason, p, n, &raw mut out, e));
+            }
+            CR_VALUE_BOOL => {
+                let mut b = false;
+                ok(|e| cr_value_get_bool(value, &raw mut b, e));
+                out = cr_value_new_bool(b);
+            }
+            CR_VALUE_INT => {
+                let mut i = 0;
+                ok(|e| cr_value_get_int(value, &raw mut i, e));
+                out = cr_value_new_int(i);
+            }
+            CR_VALUE_FLOAT => {
+                let mut f = 0.0;
+                ok(|e| cr_value_get_float(value, &raw mut f, e));
+                out = cr_value_new_float(f);
+            }
+            CR_VALUE_DECIMAL => {
+                let digits = text(|o, l, e| cr_value_get_decimal(value, o, l, e)).unwrap();
+                let (p, n) = arg(digits.as_bytes());
+                ok(|e| cr_value_new_decimal(p, n, &raw mut out, e));
+            }
+            CR_VALUE_STRING => {
+                let s = borrowed(|t, l, e| cr_value_get_string(value, t, l, e));
+                let (p, n) = arg(&s);
+                ok(|e| cr_value_new_string(p, n, &raw mut out, e));
+            }
+            CR_VALUE_DATE => {
+                let (mut y, mut mo, mut d) = (0, 0, 0);
+                ok(|e| cr_value_get_date(value, &raw mut y, &raw mut mo, &raw mut d, e));
+                ok(|e| cr_value_new_date(y, mo, d, &raw mut out, e));
+            }
+            CR_VALUE_NAIVE_DATETIME => {
+                let mut parts = [0_i32; 7];
+                let [y, mo, d, h, mi, s, us] = &mut parts;
+                ok(|e| cr_value_get_naive_datetime(value, y, mo, d, h, mi, s, us, e));
+                let [y, mo, d, h, mi, s, us] = parts;
+                ok(|e| cr_value_new_naive_datetime(y, mo, d, h, mi, s, us, &raw mut out, e));
+            }
+            CR_VALUE_AWARE_DATETIME => {
+                let (mut seconds, mut micro, mut offset) = (0, 0, 0);
+                let zone = borrowed(|t, l, e| {
+                    cr_value_get_aware_datetime(
+                        value,
+                        &raw mut seconds,
+                        &raw mut micro,
+                        &raw mut offset,
+                        t,
+                        l,
+                        e,
+                    )
+                });
+                let (p, n) = arg(&zone);
+                ok(|e| cr_value_new_aware_datetime(seconds, micro, offset, p, n, &raw mut out, e));
+            }
+            CR_VALUE_LIST => {
+                let len = cr_value_len(value);
+                out = cr_value_new_list(len);
+                for i in 0..len {
+                    let item = copy(cr_value_list_get(value, i));
+                    ok(|e| cr_value_list_set(out, i, item, e));
+                }
+            }
+            CR_VALUE_MAP => {
+                out = if cr_value_is_record(value) {
+                    cr_value_new_record()
+                } else {
+                    cr_value_new_map()
+                };
+                for i in 0..cr_value_len(value) {
+                    let mut entry = ptr::null();
+                    let key =
+                        borrowed(|t, l, e| cr_value_map_entry(value, i, t, l, &raw mut entry, e));
+                    let (p, n) = arg(&key);
+                    let item = copy(entry);
+                    ok(|e| cr_value_map_insert(out, p, n, item, e));
+                }
+            }
+            CR_VALUE_OPAQUE => {
+                let type_name = borrowed(|t, l, e| cr_value_get_opaque_type(value, t, l, e));
+                let mut token = 0;
+                ok(|e| cr_value_get_opaque_token(value, &raw mut token, e));
+                let (p, n) = arg(&type_name);
+                ok(|e| cr_value_new_opaque(p, n, token, &raw mut out, e));
+            }
+            other => panic!("kind {other}"),
+        }
+    }
+    out
+}
+
+pub fn evaluate_value(ruleset: &RuleSet, input: &Value) -> Result<Decision, Failure> {
+    // SAFETY: a live rule set and a live value.
+    handle(|out, error| unsafe {
+        cr_ruleset_evaluate_value(ruleset.0, input.0, ptr::null(), out, error)
+    })
+    .map(Decision)
+}

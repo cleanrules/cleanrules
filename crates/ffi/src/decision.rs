@@ -10,15 +10,18 @@ use cleanrules::format::{
     write_explanation_as, write_value,
 };
 use cleanrules::json::{Json, Limits, parse_bytes, to_string};
+use cleanrules::logic::Truth;
 use cleanrules::rules::{Decision, RuleSet};
 use cleanrules::{Map, Value};
 
 use crate::boundary::{
-    Outcome, bytes, call, clear, format, free, give, give_text, handle, limits_of,
+    Failure, Outcome, bytes, call, clear, format, free, give, give_text, handle, limits_of,
+    write_out,
 };
 use crate::error::cr_error;
 use crate::limits::cr_limits;
 use crate::ruleset::cr_ruleset;
+use crate::value::{borrow_value, cr_value, give_new_value, nesting};
 use crate::{cr_format, cr_status};
 
 /// Where a decision comes from: it is made again from this whenever it is read,
@@ -30,17 +33,110 @@ enum Source {
     Recorded(Json),
 }
 
+/// What a decision says, kept when it is made, so that reading it costs
+/// nothing; writing and explaining it make it again.
+struct Facts {
+    fired: Vec<bool>,
+    truths: Vec<Truth>,
+    selected: Vec<usize>,
+    outputs: Vec<Vec<(String, Value)>>,
+    output: Output,
+}
+
+/// The single output of a decision.
+enum Output {
+    /// The winner's output or the aggregate; `None` when nothing was selected.
+    Single(Option<Value>),
+    /// A policy with several outputs: asking for one is an error.
+    Several,
+}
+
+impl Facts {
+    fn of(decision: &Decision<'_>) -> Self {
+        let results = decision.results();
+        Self {
+            fired: results.iter().map(|r| r.fired).collect(),
+            truths: results
+                .iter()
+                .map(|r| r.when.truth().unwrap_or(Truth::Unknown))
+                .collect(),
+            selected: decision.selected_positions().to_vec(),
+            outputs: decision.outputs(),
+            output: decision.output().map_or(Output::Several, Output::Single),
+        }
+    }
+}
+
 /// A decision: what a rule set made of one input, or a recorded decision read
-/// with its rule set. Each function that reads it evaluates the input again,
-/// or checks the recorded decision again.
+/// with its rule set. What rules fired and were selected, and the outputs, are
+/// kept when it is made; writing and explaining it evaluate the input, or check
+/// the recorded decision, again.
 pub struct cr_decision {
     ruleset: Arc<RuleSet>,
     source: Source,
     limits: Limits,
+    facts: Facts,
 }
 
 impl cr_decision {
+    fn new(ruleset: Arc<RuleSet>, source: Source, limits: Limits) -> Outcome<Self> {
+        let facts = match &source {
+            Source::Input(input) => Facts::of(&ruleset.evaluate(input)?),
+            Source::Recorded(json) => {
+                Facts::of(&read_parsed_decision_document(json, &ruleset, &limits)?)
+            }
+        };
+        Ok(Self {
+            ruleset,
+            source,
+            limits,
+            facts,
+        })
+    }
+
+    fn rule(&self, rule: usize) -> Outcome<usize> {
+        let count = self.facts.fired.len();
+        if rule < count {
+            Ok(rule)
+        } else {
+            Err(Failure::Invalid(
+                format!("rule {rule} is out of the rule set of {count}"),
+                "pass a position below cr_decision_len",
+            ))
+        }
+    }
+
     /// The decision, made again; it succeeded before, so it succeeds now.
+    /// The single output; an error for a policy with several.
+    fn output(&self) -> Outcome<&Option<Value>> {
+        match &self.facts.output {
+            Output::Single(output) => Ok(output),
+            // Made again for its error, which the decision does not keep.
+            Output::Several => self
+                .with(|d| d.output().map(|_| ()).map_err(Failure::from))
+                .and(Err(Failure::Internal(
+                    "an output that failed once succeeds; please report it".into(),
+                ))),
+        }
+    }
+
+    /// The outputs of the selected rules, as a list of maps.
+    fn outputs(&self) -> Value {
+        Value::List(
+            self.facts
+                .outputs
+                .iter()
+                .map(|pairs| {
+                    let mut map = Map::new();
+                    for (key, value) in pairs {
+                        map.insert(key.clone(), value.clone());
+                    }
+                    Value::Map(map)
+                })
+                .collect(),
+        )
+    }
+
     fn with<T>(&self, read: impl FnOnce(&Decision<'_>) -> Outcome<T>) -> Outcome<T> {
         let decision = match &self.source {
             Source::Input(input) => self.ruleset.evaluate(input)?,
@@ -82,13 +178,7 @@ pub unsafe extern "C" fn cr_ruleset_evaluate(
         // SAFETY: `input` and `len` (# Safety).
         let input = unsafe { bytes(input, len, "input") }?;
         let input = read_value(&parse_bytes(input, &limits)?, "", ValueContext::Data)?;
-        // Evaluated once here, so that its errors are this call's.
-        ruleset.evaluate(&input)?;
-        let decision = cr_decision {
-            ruleset,
-            source: Source::Input(input),
-            limits,
-        };
+        let decision = cr_decision::new(ruleset, Source::Input(input), limits)?;
         // SAFETY: `out` passed `clear`.
         unsafe { give(out, decision) };
         Ok(())
@@ -129,12 +219,7 @@ pub unsafe extern "C" fn cr_ruleset_read_decision(
         // SAFETY: `text` and `len` (# Safety).
         let text = unsafe { bytes(text, len, "text") }?;
         let json = parse_as(text, format, &limits)?;
-        read_parsed_decision_document(&json, &ruleset, &limits)?;
-        let decision = cr_decision {
-            ruleset,
-            source: Source::Recorded(json),
-            limits,
-        };
+        let decision = cr_decision::new(ruleset, Source::Recorded(json), limits)?;
         // SAFETY: `out` passed `clear`.
         unsafe { give(out, decision) };
         Ok(())
@@ -196,8 +281,8 @@ pub unsafe extern "C" fn cr_decision_output(
         unsafe { clear(out, "out") }?;
         // SAFETY: `decision` is NULL or live (# Safety).
         let decision = unsafe { handle(decision, "decision") }?;
-        let output = decision.with(|d| Ok(d.output()?))?;
-        let json = output.map_or(Json::Null, |value| write_value(&value));
+        let output = decision.output()?;
+        let json = output.as_ref().map_or(Json::Null, write_value);
         // SAFETY: `out` passed `clear`; `len` is NULL or writable (# Safety).
         unsafe { give_text(out, len, to_string(&json)) }
     };
@@ -225,19 +310,8 @@ pub unsafe extern "C" fn cr_decision_outputs(
         unsafe { clear(out, "out") }?;
         // SAFETY: `decision` is NULL or live (# Safety).
         let decision = unsafe { handle(decision, "decision") }?;
-        let outputs = decision.with(|d| Ok(d.outputs()))?;
-        let json = outputs
-            .into_iter()
-            .map(|pairs| {
-                let mut map = Map::new();
-                for (key, value) in pairs {
-                    map.insert(key, value);
-                }
-                write_value(&Value::Map(map))
-            })
-            .collect();
         // SAFETY: `out` passed `clear`; `len` is NULL or writable (# Safety).
-        unsafe { give_text(out, len, to_string(&Json::Array(json))) }
+        unsafe { give_text(out, len, to_string(&write_value(&decision.outputs()))) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
     unsafe { call("cr_decision_outputs", error, body) }
@@ -282,4 +356,228 @@ pub unsafe extern "C" fn cr_decision_explain(
 pub unsafe extern "C" fn cr_decision_free(decision: *mut cr_decision) {
     // SAFETY: the caller's promise is `free`'s.
     unsafe { free(decision) };
+}
+
+/// Evaluate the rule set on an input built with the `cr_value_*` functions (or
+/// read with `cr_value_from_json`), which stays the caller's: the decision
+/// keeps a copy. Lists and maps nested deeper than the limits' JSON nesting
+/// are `CR_LIMIT_EXCEEDED`, as in JSON.
+///
+/// # Safety
+///
+/// `ruleset` is `NULL` or a live `cr_ruleset`; `input` is `NULL` or a live
+/// `cr_value`; `limits` is `NULL` or a live `cr_limits`; `out` is `NULL` or
+/// points to a writable `cr_decision *`; `error` is `NULL` or points to a
+/// writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_ruleset_evaluate_value(
+    ruleset: *const cr_ruleset,
+    input: *const cr_value,
+    limits: *const cr_limits,
+    out: *mut *mut cr_decision,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `ruleset` is NULL or live (# Safety).
+        let ruleset = Arc::clone(&unsafe { handle(ruleset, "ruleset") }?.ruleset);
+        // SAFETY: `limits` is NULL or live (# Safety).
+        let limits = unsafe { limits_of(limits) };
+        // SAFETY: `input` is NULL or live (# Safety).
+        let input = unsafe { borrow_value(input) }?;
+        let depth = nesting(input);
+        if depth > limits.max_nesting {
+            return Err(cleanrules::Error::new(
+                cleanrules::ErrorCode::LimitExceeded,
+                format!(
+                    "the input nests lists and maps {depth} deep, more than the limit of {}",
+                    limits.max_nesting
+                ),
+            )
+            .with_hint("raise CR_LIMIT_MAX_NESTING if the input is trusted")
+            .into());
+        }
+        let decision = cr_decision::new(ruleset, Source::Input(input.clone()), limits)?;
+        // SAFETY: `out` passed `clear`.
+        unsafe { give(out, decision) };
+        Ok(())
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_ruleset_evaluate_value", error, body) }
+}
+
+/// A truth value (`CR_TRUTH_*`).
+pub type cr_truth = i32;
+
+/// True.
+pub const CR_TRUTH_TRUE: cr_truth = 1;
+/// False.
+pub const CR_TRUTH_FALSE: cr_truth = 2;
+/// Unknown: a missing field, a null or a type mismatch.
+pub const CR_TRUTH_UNKNOWN: cr_truth = 3;
+
+/// The number of rules of the decision's rule set; 0 for `NULL`.
+///
+/// # Safety
+///
+/// `decision` is `NULL` or a live `cr_decision`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_decision_len(decision: *const cr_decision) -> usize {
+    // SAFETY: `decision` is NULL or live (# Safety).
+    unsafe { decision.as_ref() }.map_or(0, |d| d.facts.fired.len())
+}
+
+/// Whether the rule at position `rule` fired: its condition passed the logic's
+/// activation test (`spec/rules.md`).
+///
+/// # Safety
+///
+/// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to a
+/// writable `bool`; `error` is `NULL` or points to a writable `cr_error *` set
+/// to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_decision_fired(
+    decision: *const cr_decision,
+    rule: usize,
+    out: *mut bool,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `decision` is NULL or live (# Safety).
+        let decision = unsafe { handle(decision, "decision") }?;
+        let fired = decision.facts.fired[decision.rule(rule)?];
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { write_out(out, fired, "out") }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_decision_fired", error, body) }
+}
+
+/// The truth value of the condition of the rule at position `rule`
+/// (`CR_TRUTH_TRUE`, `CR_TRUTH_FALSE`, `CR_TRUTH_UNKNOWN`).
+///
+/// # Safety
+///
+/// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to a
+/// writable `cr_truth`; `error` is `NULL` or points to a writable `cr_error *`
+/// set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_decision_truth(
+    decision: *const cr_decision,
+    rule: usize,
+    out: *mut cr_truth,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `decision` is NULL or live (# Safety).
+        let decision = unsafe { handle(decision, "decision") }?;
+        let truth = match decision.facts.truths[decision.rule(rule)?] {
+            Truth::True => CR_TRUTH_TRUE,
+            Truth::False => CR_TRUTH_FALSE,
+            Truth::Unknown => CR_TRUTH_UNKNOWN,
+        };
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { write_out(out, truth, "out") }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_decision_truth", error, body) }
+}
+
+/// The number of rules the hit policy selected; 0 for `NULL`.
+///
+/// # Safety
+///
+/// `decision` is `NULL` or a live `cr_decision`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_decision_selected_len(decision: *const cr_decision) -> usize {
+    // SAFETY: `decision` is NULL or live (# Safety).
+    unsafe { decision.as_ref() }.map_or(0, |d| d.facts.selected.len())
+}
+
+/// The position in the rule set of the `index`-th selected rule, in rule order.
+///
+/// # Safety
+///
+/// `decision` is `NULL` or a live `cr_decision`; `rule` is `NULL` or points to
+/// a writable `size_t`; `error` is `NULL` or points to a writable `cr_error *`
+/// set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_decision_selected(
+    decision: *const cr_decision,
+    index: usize,
+    rule: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `decision` is NULL or live (# Safety).
+        let decision = unsafe { handle(decision, "decision") }?;
+        let selected = &decision.facts.selected;
+        let position = *selected.get(index).ok_or_else(|| {
+            Failure::Invalid(
+                format!(
+                    "index {index} is out of the {} selected rules",
+                    selected.len()
+                ),
+                "pass a position below cr_decision_selected_len",
+            )
+        })?;
+        // SAFETY: `rule` is NULL or writable (# Safety).
+        unsafe { write_out(rule, position, "rule") }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_decision_selected", error, body) }
+}
+
+/// The decision's single output as a new value, freed with `cr_value_free`: a
+/// map for the winner's payload, the aggregate, or a plain null when no rule
+/// was selected. Policies with several outputs give `CR_HIT_POLICY_ERROR`.
+///
+/// # Safety
+///
+/// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to a
+/// writable `cr_value *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_decision_output_value(
+    decision: *const cr_decision,
+    out: *mut *mut cr_value,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `decision` is NULL or live (# Safety).
+        let decision = unsafe { handle(decision, "decision") }?;
+        let value = decision
+            .output()?
+            .clone()
+            .unwrap_or(Value::Null(cleanrules::NullCause::Null));
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { give_new_value(out, value) }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_decision_output_value", error, body) }
+}
+
+/// The outputs of the selected rules, in rule order, as a new list of maps,
+/// freed with `cr_value_free`.
+///
+/// # Safety
+///
+/// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to a
+/// writable `cr_value *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_decision_outputs_value(
+    decision: *const cr_decision,
+    out: *mut *mut cr_value,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `decision` is NULL or live (# Safety).
+        let decision = unsafe { handle(decision, "decision") }?;
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { give_new_value(out, decision.outputs()) }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_decision_outputs_value", error, body) }
 }

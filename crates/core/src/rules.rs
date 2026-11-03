@@ -745,6 +745,12 @@ impl<'a> Decision<'a> {
         &self.results
     }
 
+    /// The positions of the selected rules in the rule set, in rule order.
+    #[must_use]
+    pub fn selected_positions(&self) -> &[usize] {
+        &self.selected
+    }
+
     /// The selected rules' results, in rule order.
     pub fn selected(&self) -> impl Iterator<Item = &RuleResult<'a>> {
         self.selected.iter().map(|&i| &self.results[i])

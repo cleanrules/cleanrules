@@ -319,15 +319,7 @@ impl PyDecision {
                 output: result.then.as_ref().map(|_| result.output()),
             })
             .collect();
-        let selected = decision
-            .selected()
-            .filter_map(|chosen| {
-                decision
-                    .results()
-                    .iter()
-                    .position(|r| r.rule.name() == chosen.rule.name())
-            })
-            .collect();
+        let selected = decision.selected_positions().to_vec();
         let aggregated = match decision.aggregated() {
             Some(Aggregated::Values(map)) => Some(map.clone()),
             _ => None,

@@ -123,6 +123,8 @@ impl From<Failure> for cr_error {
                 &message,
                 Some(hint),
             ),
+            // `call` names the function before the error is made.
+            Failure::Argument(error) => Self::from(Failure::Core(error)),
             Failure::Internal(message) => {
                 Self::own(CR_INTERNAL_ERROR, "internal_error", &message, None)
             }

@@ -20,6 +20,7 @@ pub mod document;
 pub mod error;
 pub mod limits;
 pub mod ruleset;
+pub mod value;
 
 mod boundary;
 
@@ -30,6 +31,7 @@ pub use document::*;
 pub use error::*;
 pub use limits::*;
 pub use ruleset::*;
+pub use value::*;
 
 /// The version of the ABI that this header describes.
 pub const CR_ABI_VERSION: u32 = 1;
@@ -66,6 +68,7 @@ const _: () = {
     shared::<cr_decision>();
     shared::<cr_limits>();
     shared::<cr_error>();
+    shared::<cleanrules::Value>();
 };
 
 /// The version of the ABI that the library implements: `CR_ABI_VERSION` of

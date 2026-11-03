@@ -26,6 +26,9 @@ pub(crate) enum Failure {
     /// The caller broke the ABI's rules (`CR_INVALID_ARGUMENT`): what, and how
     /// to fix it.
     Invalid(String, &'static str),
+    /// An error of the core about an argument, whose message the function's
+    /// name begins.
+    Argument(cleanrules::Error),
     /// A panic (`CR_INTERNAL_ERROR`).
     Internal(String),
 }
@@ -74,6 +77,16 @@ pub(crate) unsafe fn call(
                 Failure::Invalid(message, hint) => {
                     Failure::Invalid(format!("{name}: {message}"), hint)
                 }
+                Failure::Argument(error) => {
+                    let named = cleanrules::Error::new(
+                        error.code(),
+                        format!("{name}: {}", error.message()),
+                    );
+                    Failure::Core(match error.hint() {
+                        Some(hint) => named.with_hint(hint),
+                        None => named,
+                    })
+                }
                 other => other,
             };
             let failure = cr_error::from(failure);
@@ -107,6 +120,20 @@ pub(crate) unsafe fn bytes<'a>(text: *const c_char, len: usize, what: &str) -> O
     // SAFETY: the caller promises `len` readable bytes at `text`, which a C
     // object cannot make larger than `isize::MAX`.
     Ok(unsafe { std::slice::from_raw_parts(text.cast::<u8>(), len) })
+}
+
+/// A small text argument (a key, a name, a string), which must be UTF-8: a
+/// `format_error` that names it otherwise.
+pub(crate) fn utf8_arg<'a>(bytes: &'a [u8], what: &str) -> Outcome<&'a str> {
+    std::str::from_utf8(bytes).map_err(|error| {
+        Failure::Argument(
+            cleanrules::Error::new(
+                cleanrules::ErrorCode::FormatError,
+                format!("{what} is not valid UTF-8 at byte {}", error.valid_up_to()),
+            )
+            .with_hint("pass UTF-8 text"),
+        )
+    })
 }
 
 /// A handle argument.
@@ -166,6 +193,24 @@ pub(crate) unsafe fn clear<T>(out: *mut *mut T, what: &str) -> Outcome {
     // SAFETY: the caller promises that a non-null `out` is writable.
     unsafe { *out = ptr::null_mut() };
     Ok(())
+}
+
+/// Set borrowed out-parameters (a text and its length, or an item) to `NULL`
+/// and 0 until there is a result.
+///
+/// # Safety
+///
+/// `out` is `NULL` or points to a writable `*const T`; `len` is `NULL` or
+/// points to a writable `size_t`.
+pub(crate) unsafe fn clear_borrowed<T>(out: *mut *const T, len: *mut usize) {
+    if !out.is_null() {
+        // SAFETY: the caller promises that a non-null `out` is writable.
+        unsafe { *out = ptr::null() };
+    }
+    if !len.is_null() {
+        // SAFETY: the caller promises that a non-null `len` is writable.
+        unsafe { *len = 0 };
+    }
 }
 
 /// Write a value through a pointer argument.

@@ -1,6 +1,7 @@
 /*
- * The rules of discounts.rules, from C: read them, evaluate one input, print
- * the output and the explanation, and report an error.
+ * The rules of discounts.rules, from C: read them, evaluate one input given as
+ * JSON and then built natively, print the output, the explanation and which
+ * rules fired, and report an error.
  *
  *     cargo build -p cleanrules-ffi
  *     cc -I crates/ffi/include docs/examples/discounts.c \
@@ -25,6 +26,59 @@ static int fail(const char *what, cr_error *error) {
     }
     cr_error_free(error);
     return 1;
+}
+
+/* Move an int into a map under a key. */
+static cr_status put_int(cr_value *map, const char *key, int64_t value, cr_error **error) {
+    return cr_value_map_insert(map, key, strlen(key), cr_value_new_int(value), error);
+}
+
+/* The input of main, built natively: {customer: {years: 7}, order: {total: 1500}}. */
+static cr_value *native_input(cr_error **error) {
+    cr_value *input = cr_value_new_map();
+    cr_value *customer = cr_value_new_map();
+    cr_value *order = cr_value_new_map();
+    if (put_int(customer, "years", 7, error) != CR_OK ||
+        put_int(order, "total", 1500, error) != CR_OK) {
+        cr_value_free(customer);
+        cr_value_free(order);
+        cr_value_free(input);
+        return NULL;
+    }
+    /* Each child moves into its parent, even when inserting it fails. */
+    if (cr_value_map_insert(input, "customer", 8, customer, error) != CR_OK ||
+        cr_value_map_insert(input, "order", 5, order, error) != CR_OK) {
+        cr_value_free(input);
+        return NULL;
+    }
+    return input;
+}
+
+/* Print which rules fired and the discount, read without JSON. */
+static int show(const cr_ruleset *rules, const cr_decision *decision) {
+    for (size_t i = 0; i < cr_decision_len(decision); i++) {
+        const char *name = NULL;
+        size_t len = 0;
+        bool fired = false;
+        if (cr_ruleset_rule_name(rules, i, &name, &len, NULL) != CR_OK ||
+            cr_decision_fired(decision, i, &fired, NULL) != CR_OK) {
+            return 1;
+        }
+        printf("%.*s %s\n", (int)len, name, fired ? "fired" : "did not fire");
+    }
+    cr_error *error = NULL;
+    cr_value *output = NULL;
+    if (cr_decision_output_value(decision, &output, &error) != CR_OK) {
+        return fail("reading the output", error);
+    }
+    char *discount = NULL;
+    const cr_value *value = cr_value_map_get(output, "discount", 8);
+    if (cr_value_get_decimal(value, &discount, NULL, NULL) == CR_OK) {
+        printf("discount: %s\n", discount);
+    }
+    cr_string_free(discount);
+    cr_value_free(output);
+    return 0;
 }
 
 /* The whole file, or NULL. */
@@ -92,6 +146,26 @@ int main(int argc, char **argv) {
     cr_string_free(output);
     cr_string_free(explanation);
     cr_decision_free(decision);
+
+    /* The same input, built natively; the decision keeps a copy of it. */
+    cr_value *native = native_input(&error);
+    if (native == NULL) {
+        cr_ruleset_free(rules);
+        return fail("building the input", error);
+    }
+    status = cr_ruleset_evaluate_value(rules, native, NULL, &decision, &error);
+    cr_value_free(native);
+    if (status != CR_OK) {
+        cr_ruleset_free(rules);
+        return fail("evaluating", error);
+    }
+    printf("\n");
+    int shown = show(rules, decision);
+    cr_decision_free(decision);
+    if (shown != 0) {
+        cr_ruleset_free(rules);
+        return shown;
+    }
 
     /* An input that is not JSON: the error says where, in its JSON form. */
     const char *broken = "{\"customer\": ";

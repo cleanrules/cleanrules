@@ -256,6 +256,16 @@ fn run_evaluate(given: &Json, expect: &Json, explain: bool) -> Result<(), String
         .and_then(|d| common::write_decision(d, CR_FORMAT_JSON))
         .map(|text| content(&text, "decision"));
     compare(written, expect, "decision", &EVALUATE_FIELDS)?;
+    // Again from a native value, read and rebuilt piece by piece.
+    let read = common::value_from_json(&input).map_err(|f| to_string(&f.json))?;
+    let native = common::Value(common::copy(read.0));
+    if common::value_to_json(native.0) != common::value_to_json(read.0) {
+        return Err(format!("the copy of {input} differs"));
+    }
+    let from_value = common::evaluate_value(&ruleset, &native)
+        .and_then(|d| common::write_decision(&d, CR_FORMAT_JSON))
+        .map(|text| content(&text, "decision"));
+    compare(from_value, expect, "decision", &EVALUATE_FIELDS)?;
     if explain && let Ok(decision) = &decision {
         let explanation =
             common::explain(decision, CR_FORMAT_JSON).map(|text| content(&text, "explanation"));

@@ -5,11 +5,16 @@
  * NULL with a length of 0 is the empty text. They are borrowed for the call:
  * the library never keeps a pointer it was given.
  *
- * Results out: through out-parameters, which are NULL after a failure. A
- * handle or a text given out belongs to the caller, who frees it with its
- * cr_*_free function or cr_string_free. The strings of cr_error_message,
- * cr_error_hint and cr_error_json belong to the error; those of cr_version
- * and cr_status_name are static. Neither is ever freed by the caller.
+ * Results out: through out-parameters. An owned result (a handle, or a text
+ * through char **) belongs to the caller, who frees it with its cr_*_free
+ * function or cr_string_free; it is NULL after a failure. A borrowed result
+ * (through const char ** or const cr_value **) points into a handle and is
+ * NULL, with a length of 0, after a failure; never free it. The strings of
+ * cr_error_message, cr_error_hint and cr_error_json belong to the error, and
+ * those of cr_version, cr_status_name, cr_ruleset_hit_policy and
+ * cr_ruleset_aggregate are static. A function with one result needs its
+ * out-parameter; one with several parts (a datetime, a map entry) accepts
+ * NULL for any part it should not write.
  *
  * Errors: a fallible function returns a cr_status, CR_OK on success. Its last
  * argument, cr_error **error, may be NULL; otherwise *error must be NULL on
@@ -17,8 +22,16 @@
  *
  * Threads: documents, rule sets, decisions and errors never change once made,
  * so one may be used from several threads at once, but not while it is
- * freed. cr_limits change with cr_limits_set: set them first. A decision keeps
- * its rule set alive; either may be freed first.
+ * freed. Limits and values change while they are built (cr_limits_set,
+ * cr_value_list_set, cr_value_map_insert): finish them first. A decision keeps
+ * its rule set alive, and a copy of its input; either may be freed first.
+ *
+ * Values: build children first and move them into their list or map, which
+ * then owns them. A value read from inside another (cr_value_list_get,
+ * cr_value_map_entry, cr_value_map_get), and a string read from a value, are
+ * borrowed: valid until the value that holds them, or one above it, is
+ * changed, moved or freed. Strings borrowed from values and rule sets are not
+ * NUL-terminated.
  */
 
 #ifndef CLEANRULES_H
@@ -32,8 +45,9 @@
 #define CR_ABI_VERSION 1
 
 // A decision: what a rule set made of one input, or a recorded decision read
-// with its rule set. Each function that reads it evaluates the input again,
-// or checks the recorded decision again.
+// with its rule set. What rules fired and were selected, and the outputs, are
+// kept when it is made; writing and explaining it evaluate the input, or check
+// the recorded decision, again.
 typedef struct cr_decision cr_decision;
 
 // A document read in any format: a condition, a rule, a rule set or a decision
@@ -51,6 +65,10 @@ typedef struct cr_limits cr_limits;
 // A rule set, ready to evaluate.
 typedef struct cr_ruleset cr_ruleset;
 
+// A value: a null with a reason, a boolean, a number, a string, a date or
+// datetime, a list, a map or an opaque value.
+typedef struct cr_value cr_value;
+
 // What a fallible function returns: `CR_OK`, an error code (`CR_FORMAT_ERROR`,
 // `CR_MISSING_FIELD`, ...), `CR_INVALID_ARGUMENT` or `CR_INTERNAL_ERROR`.
 typedef int32_t cr_status;
@@ -58,11 +76,20 @@ typedef int32_t cr_status;
 // A syntax documents are read from and written in (`CR_FORMAT_*`).
 typedef int32_t cr_format;
 
+// A truth value (`CR_TRUTH_*`).
+typedef int32_t cr_truth;
+
 // What a document holds, its content (`CR_DOCUMENT_*`).
 typedef int32_t cr_document_content;
 
 // A limit of `cr_limits` (`CR_LIMIT_*`).
 typedef int32_t cr_limit;
+
+// Why a value is null (`spec/data-model.md`, *Nulls with a reason*).
+typedef int32_t cr_null_reason;
+
+// What a value is (`CR_VALUE_*`).
+typedef int32_t cr_value_type;
 
 // Success.
 #define CR_OK 0
@@ -85,6 +112,15 @@ typedef int32_t cr_limit;
 
 // CSV, for decision tables (`spec/tables.md`).
 #define CR_FORMAT_CSV 4
+
+// True.
+#define CR_TRUTH_TRUE 1
+
+// False.
+#define CR_TRUTH_FALSE 2
+
+// Unknown: a missing field, a null or a type mismatch.
+#define CR_TRUTH_UNKNOWN 3
 
 // A document holding a condition.
 #define CR_DOCUMENT_CONDITION 1
@@ -163,6 +199,54 @@ typedef int32_t cr_limit;
 // The largest text in the rule syntax or CSV, in bytes.
 #define CR_LIMIT_MAX_TEXT_SIZE 6
 
+// A null, with its reason.
+#define CR_VALUE_NULL 1
+
+// `true` or `false`.
+#define CR_VALUE_BOOL 2
+
+// A signed 64-bit integer.
+#define CR_VALUE_INT 3
+
+// A binary64 float, never NaN.
+#define CR_VALUE_FLOAT 4
+
+// An exact decimal of up to 38 digits.
+#define CR_VALUE_DECIMAL 5
+
+// A UTF-8 string.
+#define CR_VALUE_STRING 6
+
+// A day, years 1 to 9999.
+#define CR_VALUE_DATE 7
+
+// A date and a time of day, to the microsecond, without a zone.
+#define CR_VALUE_NAIVE_DATETIME 8
+
+// An instant with a fixed offset or an IANA time zone.
+#define CR_VALUE_AWARE_DATETIME 9
+
+// A list.
+#define CR_VALUE_LIST 10
+
+// A map, or a record (`cr_value_is_record`).
+#define CR_VALUE_MAP 11
+
+// A native value with no equivalent: a type name and a token.
+#define CR_VALUE_OPAQUE 12
+
+// A plain null (a native null, or a NaN).
+#define CR_REASON_NULL 1
+
+// A native integer outside 64 bits.
+#define CR_REASON_INT_OVERFLOW 2
+
+// A native decimal that does not fit in 38 digits.
+#define CR_REASON_DECIMAL_OVERFLOW 3
+
+// Reading the native value failed; the null keeps the message.
+#define CR_REASON_READ_ERROR 4
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -185,12 +269,32 @@ cr_status cr_decision_explain(const struct cr_decision *decision,
                               size_t *len,
                               struct cr_error **error);
 
+// Whether the rule at position `rule` fired: its condition passed the logic's
+// activation test (`spec/rules.md`).
+//
+// # Safety
+//
+// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to a
+// writable `bool`; `error` is `NULL` or points to a writable `cr_error *` set
+// to `NULL`.
+cr_status cr_decision_fired(const struct cr_decision *decision,
+                            size_t rule,
+                            bool *out,
+                            struct cr_error **error);
+
 // Free a decision. `NULL` is ignored.
 //
 // # Safety
 //
 // `decision` is `NULL` or a `cr_decision` from this library, not freed before.
 void cr_decision_free(struct cr_decision *decision);
+
+// The number of rules of the decision's rule set; 0 for `NULL`.
+//
+// # Safety
+//
+// `decision` is `NULL` or a live `cr_decision`.
+size_t cr_decision_len(const struct cr_decision *decision);
 
 // The decision's single output (`spec/rules.md`, *Outputs*), as a JSON data
 // value: the winner's payload as an object, the aggregate, or `null` when no
@@ -208,6 +312,19 @@ cr_status cr_decision_output(const struct cr_decision *decision,
                              size_t *len,
                              struct cr_error **error);
 
+// The decision's single output as a new value, freed with `cr_value_free`: a
+// map for the winner's payload, the aggregate, or a plain null when no rule
+// was selected. Policies with several outputs give `CR_HIT_POLICY_ERROR`.
+//
+// # Safety
+//
+// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to a
+// writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_decision_output_value(const struct cr_decision *decision,
+                                   struct cr_value **out,
+                                   struct cr_error **error);
+
 // The outputs of the selected rules, in rule order, as a JSON array of data
 // values (objects).
 //
@@ -220,6 +337,50 @@ cr_status cr_decision_outputs(const struct cr_decision *decision,
                               char **out,
                               size_t *len,
                               struct cr_error **error);
+
+// The outputs of the selected rules, in rule order, as a new list of maps,
+// freed with `cr_value_free`.
+//
+// # Safety
+//
+// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to a
+// writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_decision_outputs_value(const struct cr_decision *decision,
+                                    struct cr_value **out,
+                                    struct cr_error **error);
+
+// The position in the rule set of the `index`-th selected rule, in rule order.
+//
+// # Safety
+//
+// `decision` is `NULL` or a live `cr_decision`; `rule` is `NULL` or points to
+// a writable `size_t`; `error` is `NULL` or points to a writable `cr_error *`
+// set to `NULL`.
+cr_status cr_decision_selected(const struct cr_decision *decision,
+                               size_t index,
+                               size_t *rule,
+                               struct cr_error **error);
+
+// The number of rules the hit policy selected; 0 for `NULL`.
+//
+// # Safety
+//
+// `decision` is `NULL` or a live `cr_decision`.
+size_t cr_decision_selected_len(const struct cr_decision *decision);
+
+// The truth value of the condition of the rule at position `rule`
+// (`CR_TRUTH_TRUE`, `CR_TRUTH_FALSE`, `CR_TRUTH_UNKNOWN`).
+//
+// # Safety
+//
+// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to a
+// writable `cr_truth`; `error` is `NULL` or points to a writable `cr_error *`
+// set to `NULL`.
+cr_status cr_decision_truth(const struct cr_decision *decision,
+                            size_t rule,
+                            cr_truth *out,
+                            struct cr_error **error);
 
 // Write a decision as a JSON or YAML document (`CR_FORMAT_*`). A decision has
 // no text form: `CR_UNSUPPORTED`.
@@ -365,6 +526,15 @@ cr_status cr_limits_set(struct cr_limits *limits,
                         size_t value,
                         struct cr_error **error);
 
+// The rule set's aggregate (`sum`, `min`, `max`, `count`), a static string;
+// `NULL` when it has none, and for `NULL`. With one, the single output of a
+// decision is the aggregate.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`.
+const char *cr_ruleset_aggregate(const struct cr_ruleset *ruleset);
+
 // Evaluate the rule set on an input: a data value as JSON
 // (`spec/json-format.md`, *Values*), such as `{"customer": {"years": 7}}`. In
 // strict mode, a field the input lacks is a `CR_MISSING_FIELD`, and so on
@@ -382,6 +552,38 @@ cr_status cr_ruleset_evaluate(const struct cr_ruleset *ruleset,
                               const struct cr_limits *limits,
                               struct cr_decision **out,
                               struct cr_error **error);
+
+// Evaluate the rule set on an input built with the `cr_value_*` functions (or
+// read with `cr_value_from_json`), which stays the caller's: the decision
+// keeps a copy. Lists and maps nested deeper than the limits' JSON nesting
+// are `CR_LIMIT_EXCEEDED`, as in JSON.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`; `input` is `NULL` or a live
+// `cr_value`; `limits` is `NULL` or a live `cr_limits`; `out` is `NULL` or
+// points to a writable `cr_decision *`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_ruleset_evaluate_value(const struct cr_ruleset *ruleset,
+                                    const struct cr_value *input,
+                                    const struct cr_limits *limits,
+                                    struct cr_decision **out,
+                                    struct cr_error **error);
+
+// The paths of the input that the rule set reads, its conditions' and
+// payloads', in the order of the summary (`spec/explain.md`, *Summaries*), as
+// a new list of paths, each a list of strings (keys) and ints (indexes), freed
+// with `cr_value_free`. A binding reads only these from native data
+// (`spec/data-model.md`, *Reading native data*).
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`; `out` is `NULL` or points to a
+// writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_ruleset_field_paths(const struct cr_ruleset *ruleset,
+                                 struct cr_value **out,
+                                 struct cr_error **error);
 
 // Free a rule set. `NULL` is ignored. Its decisions stay valid.
 //
@@ -402,6 +604,21 @@ void cr_ruleset_free(struct cr_ruleset *ruleset);
 cr_status cr_ruleset_from_document(const struct cr_document *document,
                                    struct cr_ruleset **out,
                                    struct cr_error **error);
+
+// The rule set's hit policy (`first`, `priority`, `unique`, `any`,
+// `rule_order`, `collect`), a static string; `NULL` for `NULL`.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`.
+const char *cr_ruleset_hit_policy(const struct cr_ruleset *ruleset);
+
+// The number of rules; 0 for `NULL`.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`.
+size_t cr_ruleset_len(const struct cr_ruleset *ruleset);
 
 // Read a rule set in `format` (`CR_FORMAT_*`): a rule set, a decision table,
 // which is compiled, or one rule (`cr_ruleset_from_document`).
@@ -436,6 +653,29 @@ cr_status cr_ruleset_read_decision(const struct cr_ruleset *ruleset,
                                    const struct cr_limits *limits,
                                    struct cr_decision **out,
                                    struct cr_error **error);
+
+// The name of the rule at position `rule`, borrowed from the rule set and not
+// NUL-terminated.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`; `name` and `len` are `NULL` or
+// point to a writable `const char *` and `size_t`; `error` is `NULL` or points
+// to a writable `cr_error *` set to `NULL`. The name lives as long as the rule
+// set.
+cr_status cr_ruleset_rule_name(const struct cr_ruleset *ruleset,
+                               size_t rule,
+                               const char **name,
+                               size_t *len,
+                               struct cr_error **error);
+
+// Whether the rule set is strict (`spec/rules.md`, *Strict mode and
+// errors*); false for `NULL`.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`.
+bool cr_ruleset_strict(const struct cr_ruleset *ruleset);
 
 // The rule set's summary (`spec/explain.md`, *Summaries*) as a JSON or YAML
 // document, or as text (`CR_FORMAT_TEXT`).
@@ -476,6 +716,372 @@ const char *cr_status_name(cr_status status);
 // `text` is `NULL` or a text from a `char **out` parameter of this library,
 // not freed before.
 void cr_string_free(char *text);
+
+// Free a value made by a `cr_value_new_*` function, `cr_value_from_json` or a
+// decision. `NULL` is ignored. Never free a value moved into a list or map,
+// or one borrowed from another value.
+//
+// # Safety
+//
+// `value` is `NULL` or a `cr_value` owned by the caller, not freed or moved
+// before.
+void cr_value_free(struct cr_value *value);
+
+// Read a value from JSON (`spec/json-format.md`, *Values*), as data. Writing
+// a value and reading it back is not always the same value: null reasons are
+// written as plain nulls, and opaque values cannot be read.
+//
+// # Safety
+//
+// `text` is `NULL` or points to `len` readable bytes; `limits` is `NULL` or a
+// live `cr_limits`; `out` is `NULL` or points to a writable `cr_value *`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_value_from_json(const char *text,
+                             size_t len,
+                             const struct cr_limits *limits,
+                             struct cr_value **out,
+                             struct cr_error **error);
+
+// An aware datetime's instant (`seconds` since 1970-01-01T00:00:00Z, and
+// `microsecond`, 0 to 999999, after it, also before 1970), its UTC offset at
+// that instant, in seconds, and its IANA zone's name, borrowed from the value
+// and not NUL-terminated (`NULL` with a length of 0 for a fixed offset). Every
+// out-parameter may be `NULL`.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; each out-parameter is `NULL` or
+// points to a writable value of its type; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_value_get_aware_datetime(const struct cr_value *value,
+                                      int64_t *seconds,
+                                      int32_t *microsecond,
+                                      int32_t *offset_seconds,
+                                      const char **zone,
+                                      size_t *len,
+                                      struct cr_error **error);
+
+// The parts of a date. Every out-parameter may be `NULL`.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; each out-parameter is `NULL` or
+// points to a writable `int32_t`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_value_get_date(const struct cr_value *value,
+                            int32_t *year,
+                            int32_t *month,
+                            int32_t *day,
+                            struct cr_error **error);
+
+// A decimal's canonical text (`spec/json-format.md`, *Numbers*), such as
+// `0.15`: an owned text, freed with `cr_string_free`.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; `out` is `NULL` or points to a
+// writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_value_get_decimal(const struct cr_value *value,
+                               char **out,
+                               size_t *len,
+                               struct cr_error **error);
+
+// The parts of a datetime without a zone. Every out-parameter may be `NULL`.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; each out-parameter is `NULL` or
+// points to a writable `int32_t`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_value_get_naive_datetime(const struct cr_value *value,
+                                      int32_t *year,
+                                      int32_t *month,
+                                      int32_t *day,
+                                      int32_t *hour,
+                                      int32_t *minute,
+                                      int32_t *second,
+                                      int32_t *microsecond,
+                                      struct cr_error **error);
+
+// A null's reason (`CR_REASON_*`) and, for `CR_REASON_READ_ERROR`, its
+// message, borrowed from the value and not NUL-terminated (`NULL` with a
+// length of 0 for the others). Every out-parameter may be `NULL`.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; `reason` is `NULL` or points to a
+// writable `cr_null_reason`; `detail` and `len` are `NULL` or point to a
+// writable `const char *` and `size_t`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_value_get_null(const struct cr_value *value,
+                            cr_null_reason *reason,
+                            const char **detail,
+                            size_t *len,
+                            struct cr_error **error);
+
+// An opaque value's type name, borrowed from the value and not NUL-terminated.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; `text` and `len` are `NULL` or point
+// to a writable `const char *` and `size_t`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_value_get_opaque_type(const struct cr_value *value,
+                                   const char **text,
+                                   size_t *len,
+                                   struct cr_error **error);
+
+// A string's bytes, UTF-8, borrowed from the value and not NUL-terminated.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; `text` and `len` are `NULL` or point
+// to a writable `const char *` and `size_t`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_value_get_string(const struct cr_value *value,
+                              const char **text,
+                              size_t *len,
+                              struct cr_error **error);
+
+// Whether a value is a record: a map whose entries also have positions.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`.
+bool cr_value_is_record(const struct cr_value *value);
+
+// What a value is (`CR_VALUE_*`); 0 for `NULL`.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`.
+cr_value_type cr_value_kind(const struct cr_value *value);
+
+// The number of items of a list or entries of a map; 0 for anything else.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`.
+size_t cr_value_len(const struct cr_value *value);
+
+// A list's item, borrowed from the list; `NULL` when `value` is not a list or
+// `index` is out of it.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`. The item is valid until the list, or
+// a value that holds it, is changed, moved or freed, and must never be freed
+// or changed itself.
+const struct cr_value *cr_value_list_get(const struct cr_value *value,
+                                         size_t index);
+
+// Move `item` into position `index` of `list`. `item` is consumed, even when
+// the call fails, unless it is `list` itself, which is refused. Pointers
+// borrowed from `list` are no longer valid afterwards.
+//
+// # Safety
+//
+// `list` is `NULL` or a live `cr_value` owned by the caller, not inside
+// another value, which no other thread uses during the call; `item` is `NULL`
+// or a `cr_value` owned by the caller, not inside another value; `error` is
+// `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_value_list_set(struct cr_value *list,
+                            size_t index,
+                            struct cr_value *item,
+                            struct cr_error **error);
+
+// A map's entry by position: its key, borrowed and not NUL-terminated, and its
+// value, borrowed. Every out-parameter may be `NULL`.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; each out-parameter is `NULL` or
+// points to a writable value of its type; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`. The key and the item are valid until
+// the map, or a value that holds it, is changed, moved or freed; the item must
+// never be freed or changed itself.
+cr_status cr_value_map_entry(const struct cr_value *value,
+                             size_t index,
+                             const char **key,
+                             size_t *len,
+                             const struct cr_value **item,
+                             struct cr_error **error);
+
+// A map's value under `key`, borrowed from the map; `NULL` when `value` is not
+// a map or has no such key.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; `key` is `NULL` or points to `len`
+// readable bytes. The item is valid until the map, or a value that holds it,
+// is changed, moved or freed, and must never be freed or changed itself.
+const struct cr_value *cr_value_map_get(const struct cr_value *value,
+                                        const char *key,
+                                        size_t len);
+
+// Move `item` into `map` under `key`, replacing a value under the same key in
+// place. `item` is consumed, even when the call fails, unless it is `map`
+// itself, which is refused. Pointers borrowed from `map` are no longer valid
+// afterwards.
+//
+// # Safety
+//
+// `map` is `NULL` or a live `cr_value` owned by the caller, not inside another
+// value, which no other thread uses during the call; `key` is `NULL` or points
+// to `len` readable bytes; `item` is `NULL` or a `cr_value` owned by the
+// caller, not inside another value; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_value_map_insert(struct cr_value *map,
+                              const char *key,
+                              size_t len,
+                              struct cr_value *item,
+                              struct cr_error **error);
+
+// An aware datetime: an instant (`seconds` since 1970-01-01T00:00:00Z, and
+// `microsecond`, 0 to 999999, after it), its UTC offset at that instant, in
+// seconds, and its IANA zone's name when it has one (`NULL` with a length of 0
+// otherwise). The zone is kept when the bundled database knows the name,
+// spelled as it spells it, with that offset; otherwise the value keeps the
+// offset (`spec/data-model.md`, *Time zones*). An instant outside years 1 to
+// 9999, an offset beyond 18 hours or microseconds outside 0 to 999999 are
+// `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `zone` is `NULL` or points to `len` readable bytes; `out` is `NULL` or
+// points to a writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_value_new_aware_datetime(int64_t seconds,
+                                      int32_t microsecond,
+                                      int32_t offset_seconds,
+                                      const char *zone,
+                                      size_t len,
+                                      struct cr_value **out,
+                                      struct cr_error **error);
+
+// A boolean.
+struct cr_value *cr_value_new_bool(bool value);
+
+// A date, years 1 to 9999. Another day of the calendar, or an impossible one,
+// is `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `out` is `NULL` or points to a writable `cr_value *`; `error` is `NULL` or
+// points to a writable `cr_error *` set to `NULL`.
+cr_status cr_value_new_date(int32_t year,
+                            int32_t month,
+                            int32_t day,
+                            struct cr_value **out,
+                            struct cr_error **error);
+
+// A decimal from its text (`-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?`, `inf` or
+// `-inf`); one that does not fit in 38 digits is a null with
+// `CR_REASON_DECIMAL_OVERFLOW`, as in data. Other text is a `CR_FORMAT_ERROR`.
+//
+// # Safety
+//
+// `text` is `NULL` or points to `len` readable bytes; `out` is `NULL` or
+// points to a writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_value_new_decimal(const char *text,
+                               size_t len,
+                               struct cr_value **out,
+                               struct cr_error **error);
+
+// A float; NaN is a plain null.
+struct cr_value *cr_value_new_float(double value);
+
+// An int.
+struct cr_value *cr_value_new_int(int64_t value);
+
+// A list of `len` plain nulls, set with `cr_value_list_set`: positions that
+// are never set stay null, as unread positions of native data do. `NULL` when
+// `len` items cannot be allocated.
+struct cr_value *cr_value_new_list(size_t len);
+
+// An empty map, filled with `cr_value_map_insert`.
+struct cr_value *cr_value_new_map(void);
+
+// A datetime without a zone, years 1 to 9999, to the microsecond (0 to
+// 999999). Anything else is `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `out` is `NULL` or points to a writable `cr_value *`; `error` is `NULL` or
+// points to a writable `cr_error *` set to `NULL`.
+cr_status cr_value_new_naive_datetime(int32_t year,
+                                      int32_t month,
+                                      int32_t day,
+                                      int32_t hour,
+                                      int32_t minute,
+                                      int32_t second,
+                                      int32_t microsecond,
+                                      struct cr_value **out,
+                                      struct cr_error **error);
+
+// A plain null.
+struct cr_value *cr_value_new_null(void);
+
+// A null with a reason (`CR_REASON_*`); `detail`, the message of a
+// `CR_REASON_READ_ERROR`, is ignored for the others.
+//
+// # Safety
+//
+// `detail` is `NULL` or points to `len` readable bytes; `out` is `NULL` or
+// points to a writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_value_new_null_reason(cr_null_reason reason,
+                                   const char *detail,
+                                   size_t len,
+                                   struct cr_value **out,
+                                   struct cr_error **error);
+
+// An opaque value: a native value with no equivalent, by its type's name and a
+// token the program chooses, such as an index into its own table. Equal
+// tokens mean the same object (`ANY` compares them); an output gives the token
+// back, and the library never reads it.
+//
+// # Safety
+//
+// `type_name` is `NULL` or points to `len` readable bytes; `out` is `NULL` or
+// points to a writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_value_new_opaque(const char *type_name,
+                              size_t len,
+                              uint64_t token,
+                              struct cr_value **out,
+                              struct cr_error **error);
+
+// An empty record: a map whose entries also have positions, their order of
+// insertion (`spec/ast.md`, *Reading data*).
+struct cr_value *cr_value_new_record(void);
+
+// A string, copied. Bytes that are not UTF-8 are a `CR_FORMAT_ERROR`.
+//
+// # Safety
+//
+// `text` is `NULL` or points to `len` readable bytes; `out` is `NULL` or
+// points to a writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_value_new_string(const char *text,
+                              size_t len,
+                              struct cr_value **out,
+                              struct cr_error **error);
+
+// Write a value as JSON (`spec/json-format.md`, *Values*), freed with
+// `cr_string_free`.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; `out` is `NULL` or points to a
+// writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_value_to_json(const struct cr_value *value,
+                           char **out,
+                           size_t *len,
+                           struct cr_error **error);
 
 // The library's version, such as `0.1.0`: a static string, never freed.
 const char *cr_version(void);

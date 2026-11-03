@@ -151,6 +151,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   native values (1,149) pass through it; its tests run under Miri, and
   `docs/examples/discounts.c` under the address and undefined behaviour
   sanitizers.
+- C ABI, native values (task E.1b): `cr_value` builds data without JSON, with
+  every kind of the data model (nulls with a reason, decimals from their text,
+  dates, naive and aware datetimes, lists whose unset positions are null, maps,
+  records, and opaque values as a type name and a token the program chooses),
+  reads it back with `cr_value_kind`, `cr_value_get_*` and borrowed list and
+  map items, and converts it to and from JSON. Values nest at most 1024 deep.
+  `cr_ruleset_evaluate_value` evaluates one, with limits; `cr_ruleset_len`,
+  `cr_ruleset_rule_name`, `cr_ruleset_hit_policy`, `cr_ruleset_aggregate`,
+  `cr_ruleset_strict` and `cr_ruleset_field_paths` (the paths a rule set
+  reads) describe a rule set; `cr_decision_len`, `cr_decision_fired`,
+  `cr_decision_truth`, `cr_decision_selected_len`, `cr_decision_selected`,
+  `cr_decision_output_value` and `cr_decision_outputs_value` read a decision
+  without evaluating it again. Every evaluation vector also passes from a
+  native value rebuilt with these functions, and their tests run under Miri.
+- Data model (`spec/data-model.md`): the C value builder makes opaque values
+  from a type name and the program's token, never from a C pointer with a
+  release callback, and refuses dates, datetimes and offsets a value cannot
+  hold; a time zone is kept only under the exact spelling of the bundled
+  database (`AwareDateTime::from_native`, also in Python).
+- Core: `Decision::selected_positions`, which the Python binding now uses.
 - Errors (`spec/errors.md`): a stable number per code for C (*Numeric codes*)
   and a stable JSON form of every error (*JSON form*, with the JSON Schema
   `spec/schemas/v1/error.schema.json`), written by

@@ -73,9 +73,32 @@ The whole program, with explanations and errors, is
 - **Rule sets.** `cr_ruleset_read` accepts a rule set, a decision table, which
   it compiles, or one rule, which becomes a rule set of one with the default
   settings (`spec/json-format.md`, *Documents*).
-- **Decisions.** A decision handle evaluates its input again, or checks its
-  recorded decision again, each time a function reads it; keep what you read
-  rather than asking twice.
+- **Values.** `cr_value` holds data natively, without JSON: nulls with a reason
+  (a `read_error` keeps its message), booleans, ints, floats, decimals (from
+  their text), strings, dates, naive and aware datetimes, lists, maps, records
+  and opaque values (a type name and a token your program chooses; equal
+  tokens mean the same object, and an output gives the token back). Build
+  children first and move them into their list or map (`cr_value_list_set`,
+  `cr_value_map_insert`), which then owns them, even when the call fails.
+  Unset positions of a list stay null, as the unread positions of native data
+  do. A date outside years 1 to 9999 or an offset beyond 18 hours is
+  `CR_INVALID_ARGUMENT`: build an opaque value instead if you need one.
+  Values nest at most 1024 lists and maps deep, as JSON does by default.
+  `cr_ruleset_field_paths` lists the paths a rule set reads, so a binding
+  converts only those (`spec/data-model.md`, *Reading native data*). Readers
+  (`cr_value_kind`, `cr_value_get_*`, `cr_value_len`, `cr_value_list_get`,
+  `cr_value_map_entry`, `cr_value_map_get`) borrow from the value, until it
+  changes. `cr_value_to_json` and `cr_value_from_json` convert to and from
+  JSON, though not losslessly: null reasons are written as plain nulls, and
+  opaque values cannot be read back.
+- **Describing a rule set.** `cr_ruleset_len`, `cr_ruleset_rule_name`,
+  `cr_ruleset_hit_policy`, `cr_ruleset_aggregate` and `cr_ruleset_strict`
+  describe one; its summary has the rest.
+- **Decisions.** Which rules fired (`cr_decision_fired`, `cr_decision_truth`),
+  which were selected (`cr_decision_selected`) and the outputs
+  (`cr_decision_output_value`, `cr_decision_outputs_value`) are kept when the
+  decision is made, so reading them is free. Writing and explaining a decision
+  evaluate its input again, or check its recorded decision again.
 - **Data.** Documents, inputs, outputs and explanations are JSON
   ([`spec/json-format.md`](../../spec/json-format.md)); documents may also be
   YAML, the rule syntax or, for decision tables, CSV, and explanations and

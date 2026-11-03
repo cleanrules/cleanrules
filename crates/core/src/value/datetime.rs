@@ -87,9 +87,9 @@ impl AwareDateTime {
 
     /// Build an aware datetime from a native one: its instant, its offset at that
     /// instant, and its zone's IANA name when it has one (`spec/data-model.md`,
-    /// *Time zones*). The zone is kept when the bundled database knows the name
-    /// and gives it the same offset at that instant; otherwise the value keeps
-    /// the native offset as a fixed offset.
+    /// *Time zones*). The zone is kept when the bundled database knows the name,
+    /// spelled exactly as it spells it, and gives it the same offset at that
+    /// instant; otherwise the value keeps the native offset as a fixed offset.
     ///
     /// # Errors
     ///
@@ -99,10 +99,12 @@ impl AwareDateTime {
         offset: Offset,
         name: Option<&str>,
     ) -> Result<Self, DateTimeError> {
+        // The name as the database spells it, as the JSON reader requires: a
+        // zone kept under another spelling could not be read back.
         let known = name.filter(|name| {
-            jiff::tz::db()
-                .get(name)
-                .is_ok_and(|zone| zone.to_offset(timestamp) == offset)
+            jiff::tz::db().get(name).is_ok_and(|zone| {
+                zone.iana_name() == Some(*name) && zone.to_offset(timestamp) == offset
+            })
         });
         let zone = match known {
             Some(name) => Zone::Named(name.to_owned()),
@@ -227,5 +229,15 @@ mod tests {
             a.to_string(),
             "2026-11-02T09:00:00Z (Named(\"Europe/Madrid\"))"
         );
+    }
+
+    #[test]
+    fn a_zone_is_kept_only_under_its_own_spelling() {
+        let instant: Timestamp = "2026-11-03T08:30:00Z".parse().unwrap();
+        let one = Offset::from_seconds(3600).unwrap();
+        let kept = AwareDateTime::from_native(instant, one, Some("Europe/Madrid")).unwrap();
+        assert_eq!(kept.zone(), &Zone::Named("Europe/Madrid".into()));
+        let lower = AwareDateTime::from_native(instant, one, Some("europe/madrid")).unwrap();
+        assert_eq!(lower.zone(), &Zone::Fixed(one));
     }
 }
