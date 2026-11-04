@@ -213,6 +213,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   vcpkg's static CRT triplets), derives iOS targets, and hands cargo the C
   compiler as linker when building for another platform. Without cargo, CMake
   now says to install it with rustup.
+- C++ conformance runner (task E.3): the ctest test `conformance` runs every
+  conformance vector through `cleanrules.hpp` twice, as `json:<id>` (JSON
+  entry points and the throwing overloads; `read` vectors also with
+  `error_info`) and `native:<id>` (inputs built with the value constructors,
+  the `error_info` overloads, and decisions read back with the decision
+  readers), comparing with a lossless JSON parser of its own. Under
+  `CLEANRULES_SANITIZERS`, any AddressSanitizer report fails a test, and so do
+  leaks on Linux.
 - C ABI: `cr_value_clone`, a deep copy of a value that keeps null reasons and
   opaque tokens, and `cr_decision_clone`, which keeps a decision borrowed from
   a batch, an action call or an error.

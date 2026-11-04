@@ -93,6 +93,36 @@ must sit next to your program or on `PATH`; on macOS its install name is
 `@rpath/libcleanrules_ffi.dylib`, and on Linux its SONAME
 `libcleanrules_ffi.so`, so it works wherever it is installed.
 
+## Tests
+
+`ctest` builds the project first, then runs the API tests, the header without
+exceptions, the example, the installed package, and `conformance`: every
+vector of [`conformance/`](../../conformance/README.md), through this header.
+Each vector runs as `json:<id>`, with JSON documents and inputs and the
+overloads that throw (`read` vectors also with `error_info`), and, except the
+`read` vectors, as `native:<id>`, with input built by the value constructors,
+the `error_info` overloads, and decisions read back with the decision
+readers. The runner reports every vector that fails, with what it got and
+what the vector expects:
+
+```sh
+ctest --test-dir build/cpp -R conformance --output-on-failure
+build/cpp/cleanrules_conformance path/to/vectors   # another directory of vectors
+```
+
+Under the sanitizers (`-DCLEANRULES_SANITIZERS=address,undefined`, in a Debug
+build), any report of AddressSanitizer or UndefinedBehaviorSanitizer fails the
+test, and so does a leak on Linux (macOS has no LeakSanitizer):
+
+```sh
+cmake -S bindings/cpp -B build/cpp-asan -DCMAKE_BUILD_TYPE=Debug \
+  -DCLEANRULES_SANITIZERS=address,undefined
+ctest --test-dir build/cpp-asan --output-on-failure
+```
+
+The tests need a checkout of the repository: packages (Conan, vcpkg) build
+without them.
+
 ## Conan
 
 A Conan 2 recipe lives in [`conan/`](conan/conanfile.py). It builds the same

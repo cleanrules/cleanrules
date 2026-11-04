@@ -394,11 +394,28 @@ if(CLEANRULES_BUILD_TESTS)
   add_test(NAME example COMMAND discounts "${CLEANRULES_ROOT}/docs/examples/discounts.rules")
   set_tests_properties(example PROPERTIES PASS_REGULAR_EXPRESSION "notify_sales: rule vip")
 
-  set_tests_properties(api no_exceptions mixed example PROPERTIES FIXTURES_REQUIRED built)
+  set(_program_tests api no_exceptions mixed example)
+
+  # The conformance vectors through the C++ API, from a checkout of the
+  # repository (packages build without tests, and without the vectors).
+  set(_vectors "${CLEANRULES_ROOT}/conformance/vectors")
+  if(EXISTS "${_vectors}")
+    cleanrules_test(cleanrules_conformance tests/conformance.cpp)
+    target_compile_definitions(cleanrules_conformance PRIVATE "CLEANRULES_VECTORS=\"${_vectors}\"")
+    add_test(NAME conformance COMMAND cleanrules_conformance)
+    list(APPEND _program_tests conformance)
+  endif()
+
+  set_tests_properties(${_program_tests} PROPERTIES FIXTURES_REQUIRED built)
   if(CLEANRULES_SANITIZERS)
-    # Any report fails the test.
-    set_tests_properties(api no_exceptions mixed example PROPERTIES
-      ENVIRONMENT "UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1")
+    # Any report fails the test; leaks too, where AddressSanitizer finds them
+    # (Linux: macOS has no LeakSanitizer).
+    set(_asan_options "halt_on_error=1")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      string(APPEND _asan_options ":detect_leaks=1")
+    endif()
+    set_tests_properties(${_program_tests} PROPERTIES
+      ENVIRONMENT "UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1;ASAN_OPTIONS=${_asan_options}")
   endif()
 
   if(CLEANRULES_INSTALL)

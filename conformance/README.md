@@ -92,6 +92,16 @@ output, never stopping at the first one.
   runs every vector through the binding's JSON entry points (`json:<id>`) and,
   except the `read` vectors, with native Python data and the Python API
   (`native:<id>`).
+- **C ABI**: `cargo test -p cleanrules-ffi --test conformance` runs every
+  vector through the C functions, from JSON and from native `cr_value`s.
+- **C++**: `ctest --test-dir build/cpp -R conformance`, after configuring
+  `bindings/cpp` with CMake, runs every vector through `cleanrules.hpp` with
+  the JSON entry points and the overloads that throw (`json:<id>`; `read`
+  vectors also with `error_info`) and, except the `read` vectors, with input
+  built by the value constructors and the `error_info` overloads
+  (`native:<id>`). Rule sets and nodes are read from their JSON in both runs:
+  the C++ API builds them from documents and text only. It compares with a
+  lossless JSON parser of its own (`bindings/cpp/tests/json.hpp`).
 - **Each binding** runs every vector twice: once through its JSON entry points,
   and once converting `input` into the language's native data (with the
   conversions of `spec/data-model.md`: floats as floats, with `cr.float` in
