@@ -93,7 +93,8 @@ describe('Document', () => {
     assert.equal(cr.Document.read(json.write('yaml'), { format: 'yaml' }).write(), json.write())
     assert.equal(cr.Document.read(json.write('text'), { format: 'text' }).write(), json.write())
     const table = cr.Document.read(example('risk.csv'), { format: 'csv' })
-    assert.equal(table.write('csv'), example('risk.csv').toString())
+    // On Windows, git may check the example out with CRLF line ends.
+    assert.equal(table.write('csv'), example('risk.csv').toString().replace(/\r\n/g, '\n'))
     assert.equal(cr.Document.read(table.write(), { format: 'json' }).write('csv'), table.write('csv'))
     assert.throws(() => table.write('text'), cr.UnsupportedError)
   })
