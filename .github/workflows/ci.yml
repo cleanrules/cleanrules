@@ -265,6 +265,44 @@ jobs:
       - if: matrix.python == '3.11' && matrix.os == 'ubuntu-latest'
         run: uv run --python 3.11 pyright --verifytypes cleanrules --ignoreexternal
 
+  js:
+    name: Node ${{ matrix.node }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Every supported Node on Linux (22 is the minimum, N-API 9), the
+          # current LTS elsewhere.
+          - { os: ubuntu-latest, node: 22 }
+          - { os: ubuntu-latest, node: 24 }
+          - { os: ubuntu-latest, node: 26 }
+          - { os: macos-latest, node: 26 }
+          - { os: windows-latest, node: 26 }
+    defaults:
+      run:
+        working-directory: bindings/js
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      # The per-platform packages are published in M.2: until then `npm ci`
+      # finds them missing from the lockfile, and `npm install` installs the
+      # locked devDependencies and skips them.
+      - run: npm install --no-audit --no-fund
+      # Builds the addon (debug), then node --test and tsc --noEmit.
+      - run: npm test
+      # The committed loader and declarations are the ones napi-rs generates,
+      # and the package, its platform packages and the Cargo workspace share
+      # one version (the addon refuses to load under another one).
+      - if: matrix.os == 'ubuntu-latest' && matrix.node == 26
+        run: |
+          git diff --exit-code -- binding.js binding.d.ts
+          node scripts/check-versions.js
+
   conformance:
     name: Spec schemas and conformance vectors
     runs-on: ubuntu-latest

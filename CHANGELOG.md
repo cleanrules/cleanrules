@@ -221,6 +221,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   readers), comparing with a lossless JSON parser of its own. Under
   `CLEANRULES_SANITIZERS`, any AddressSanitizer report fails a test, and so do
   leaks on Linux.
+- Node binding (`bindings/js`, npm package `cleanrules`, task F.1a): the
+  engine as a native addon built with napi-rs, for Node 22.12 and later (N-API
+  9), with one optional package per platform (`@cleanrules/node-<platform>`:
+  Linux x64 and arm64 with glibc and musl, macOS x64 and arm64, Windows x64 and
+  arm64); the package refuses an addon of another version. The native layer is
+  `cleanrules/native`: `Document`, `RuleSet`, `Decision` and `Node` read and
+  write JSON, YAML, the rule syntax and CSV (`{ format, limits }`, with
+  `maxSize`, `maxNesting`, `maxDepth`, `maxTableSize`, `maxYamlSize`,
+  `maxTextSize`), evaluate native JavaScript data or JSON values, one input or
+  a batch, read recorded decisions, explain and summarise (as text by default,
+  as in C++), and evaluate single condition and value nodes
+  (`{ logic, strict }`). `run(data, actions)` calls the selected rules' named
+  actions as synchronous JavaScript functions with an `ActionCall` (`ruleName`,
+  `position`, `input`, `truth`, `outputJson`, `decision`); one that throws or
+  returns a promise stops the run with `ActionError`. Native data is read as
+  `spec/data-model.md` says for JavaScript (only the paths the rules read, each
+  object and getter once, getters but never methods, prototypes, symbols or
+  `#` fields; `Map`, typed arrays, `Date` and Temporal values; bytes opaque).
+  `cleanrules` itself exports what is final: `decimal`, `float`, `date` and
+  `datetime` for the kinds JavaScript lacks (branded with
+  `Symbol.for('cleanrules.marker')`), `FORMAT_VERSION`, `version`, and the
+  errors, `CleanRulesError` and its subclasses, with `code`, `hint`, `context`,
+  `cause` (what a getter or an action threw) and `toJSON()`. Outputs and
+  explanations come out in the JSON format. TypeScript declarations with
+  literal types (`Format`, `HitPolicy`, `Aggregate`, `DocumentKind`, `Truth`),
+  tests with `node:test` (`npm --prefix bindings/js test`), a CI job on Linux,
+  macOS and Windows with Node 22, 24 and 26 that also checks that every version
+  matches, a workflow that builds and tests the release addon on every
+  platform, and the example `docs/examples/discounts.js`.
 - C ABI: `cr_value_clone`, a deep copy of a value that keeps null reasons and
   opaque tokens, and `cr_decision_clone`, which keeps a decision borrowed from
   a batch, an action call or an error.
@@ -379,6 +408,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Errors (`spec/errors.md`): in JavaScript the context fields are in `context`,
   because an error's `name` is its class, and an `ActionError` has the
   `decision`.
+- The Conan recipe also exports the Node binding's crate (manifest, build
+  script and sources), now a member of the workspace that cargo loads.
 - The conformance vectors of `registry_error` for an unknown logic in a table
   or in text list the `name`, which `spec/errors.md` marks as compared.
 - The text syntax reserves `DO` (task D.4): a field, key or rule named `do`,

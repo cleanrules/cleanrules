@@ -1,0 +1,4 @@
+# Dependencies and build output of the Node binding.
+node_modules/
+*.node
+npm/*/*.node

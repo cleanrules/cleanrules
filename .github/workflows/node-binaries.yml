@@ -1,0 +1,126 @@
+name: Node binaries
+
+# Builds the native addon of the `cleanrules` npm package in release mode for
+# every platform package (`@cleanrules/node-<platform>`, bindings/js/npm),
+# runs the binding's tests on each one, and uploads the addons. Every target
+# has a runner, so every addon is tested where it runs. Publishing to npm comes
+# in M.2.
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "bindings/js/**"
+      - "crates/core/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/node-binaries.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: node-binaries-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: Addon (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # glibc: built on the oldest Ubuntu runner, so the addon needs glibc
+          # 2.35 at most.
+          - { runner: ubuntu-22.04, target: x86_64-unknown-linux-gnu, platform: linux-x64-gnu }
+          - { runner: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu, platform: linux-arm64-gnu }
+          - { runner: macos-15-intel, target: x86_64-apple-darwin, platform: darwin-x64 }
+          - { runner: macos-latest, target: aarch64-apple-darwin, platform: darwin-arm64 }
+          - { runner: windows-latest, target: x86_64-pc-windows-msvc, platform: win32-x64-msvc }
+          - { runner: windows-11-arm, target: aarch64-pc-windows-msvc, platform: win32-arm64-msvc }
+    defaults:
+      run:
+        shell: bash
+        working-directory: bindings/js
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run build:release -- --target ${{ matrix.target }}
+      - run: test -f cleanrules.${{ matrix.platform }}.node
+      # The release addon, on the oldest supported Node.
+      - run: node --test "test/**/*.test.js"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bindings-${{ matrix.platform }}
+          path: bindings/js/cleanrules.${{ matrix.platform }}.node
+          if-no-files-found: error
+
+  musl:
+    name: Addon (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, platform: linux-x64-musl }
+          - { runner: ubuntu-24.04-arm, platform: linux-arm64-musl }
+    steps:
+      - uses: actions/checkout@v7
+      # Built and tested natively in Alpine. The container runs by hand: the
+      # runner cannot run JavaScript actions inside Alpine on arm64.
+      - run: |
+          docker run --rm -v "$PWD:/work" -w /work/bindings/js node:22-alpine sh -euxc '
+            apk add --no-cache build-base curl
+            curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+            . "$HOME/.cargo/env"
+            npm install --no-audit --no-fund
+            npm run build:release
+            test -f cleanrules.${{ matrix.platform }}.node
+            node --test "test/**/*.test.js"
+          '
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bindings-${{ matrix.platform }}
+          path: bindings/js/cleanrules.${{ matrix.platform }}.node
+          if-no-files-found: error
+
+  packages:
+    name: Platform packages
+    needs: [native, musl]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bindings/js
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: bindings-*
+          path: bindings/js/artifacts
+      # Each addon into its platform package (npm/<platform>), as napi-rs lays
+      # them out for publishing; nothing is published.
+      - run: npx napi artifacts
+      # Every package has its addon, and the licence files it ships with.
+      - run: |
+          for dir in npm/*/; do
+            platform=$(basename "$dir")
+            test -f "$dir/cleanrules.$platform.node"
+            cp LICENSE NOTICE "$dir"
+          done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: npm-platform-packages
+          path: bindings/js/npm

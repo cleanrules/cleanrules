@@ -1,0 +1,41 @@
+{
+  "name": "@cleanrules/node-linux-arm64-gnu",
+  "version": "0.0.0",
+  "cpu": [
+    "arm64"
+  ],
+  "main": "cleanrules.linux-arm64-gnu.node",
+  "files": [
+    "cleanrules.linux-arm64-gnu.node",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "description": "The aarch64-unknown-linux-gnu native addon of the cleanrules npm package; install cleanrules, which depends on it",
+  "keywords": [
+    "rules-engine",
+    "business-rules",
+    "expert-system",
+    "validation",
+    "explainable"
+  ],
+  "author": "Jose L. Salmeron",
+  "homepage": "https://cleanrules.github.io",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cleanrules/cleanrules.git",
+    "directory": "bindings/js"
+  },
+  "os": [
+    "linux"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

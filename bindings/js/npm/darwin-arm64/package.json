@@ -1,0 +1,38 @@
+{
+  "name": "@cleanrules/node-darwin-arm64",
+  "version": "0.0.0",
+  "cpu": [
+    "arm64"
+  ],
+  "main": "cleanrules.darwin-arm64.node",
+  "files": [
+    "cleanrules.darwin-arm64.node",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "description": "The aarch64-apple-darwin native addon of the cleanrules npm package; install cleanrules, which depends on it",
+  "keywords": [
+    "rules-engine",
+    "business-rules",
+    "expert-system",
+    "validation",
+    "explainable"
+  ],
+  "author": "Jose L. Salmeron",
+  "homepage": "https://cleanrules.github.io",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cleanrules/cleanrules.git",
+    "directory": "bindings/js"
+  },
+  "os": [
+    "darwin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "name": "cleanrules",
+  "version": "0.0.0",
+  "description": "Explainable rules engine for Node.js: one Rust core with the same semantics in every language",
+  "keywords": [
+    "rules-engine",
+    "business-rules",
+    "expert-system",
+    "validation",
+    "explainable"
+  ],
+  "homepage": "https://cleanrules.github.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cleanrules/cleanrules.git",
+    "directory": "bindings/js"
+  },
+  "license": "Apache-2.0",
+  "author": "Jose L. Salmeron",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./native": {
+      "types": "./native.d.ts",
+      "default": "./native.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "native.js",
+    "native.d.ts",
+    "binding.js",
+    "binding.d.ts",
+    "lib/",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "optionalDependencies": {
+    "@cleanrules/node-darwin-arm64": "0.0.0",
+    "@cleanrules/node-darwin-x64": "0.0.0",
+    "@cleanrules/node-linux-arm64-gnu": "0.0.0",
+    "@cleanrules/node-linux-arm64-musl": "0.0.0",
+    "@cleanrules/node-linux-x64-gnu": "0.0.0",
+    "@cleanrules/node-linux-x64-musl": "0.0.0",
+    "@cleanrules/node-win32-arm64-msvc": "0.0.0",
+    "@cleanrules/node-win32-x64-msvc": "0.0.0"
+  },
+  "napi": {
+    "binaryName": "cleanrules",
+    "packageName": "@cleanrules/node",
+    "targets": [
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-musl",
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-pc-windows-msvc",
+      "aarch64-pc-windows-msvc"
+    ]
+  },
+  "scripts": {
+    "build": "napi build --platform --no-const-enum --js binding.js --dts binding.d.ts",
+    "build:release": "napi build --platform --release --no-const-enum --js binding.js --dts binding.d.ts",
+    "pretest": "npm run build",
+    "test": "node --test \"test/**/*.test.js\" && tsc --noEmit -p test/types"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.10.12",
+    "typescript": "^7.0.2"
+  }
+}

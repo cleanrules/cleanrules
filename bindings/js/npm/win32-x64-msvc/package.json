@@ -1,0 +1,38 @@
+{
+  "name": "@cleanrules/node-win32-x64-msvc",
+  "version": "0.0.0",
+  "cpu": [
+    "x64"
+  ],
+  "main": "cleanrules.win32-x64-msvc.node",
+  "files": [
+    "cleanrules.win32-x64-msvc.node",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "description": "The x86_64-pc-windows-msvc native addon of the cleanrules npm package; install cleanrules, which depends on it",
+  "keywords": [
+    "rules-engine",
+    "business-rules",
+    "expert-system",
+    "validation",
+    "explainable"
+  ],
+  "author": "Jose L. Salmeron",
+  "homepage": "https://cleanrules.github.io",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cleanrules/cleanrules.git",
+    "directory": "bindings/js"
+  },
+  "os": [
+    "win32"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
