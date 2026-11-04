@@ -40,7 +40,7 @@ jobs:
           - { runner: ubuntu-latest, target: x86_64, libc: musllinux, manylinux: musllinux_1_2 }
           - { runner: ubuntu-24.04-arm, target: aarch64, libc: musllinux, manylinux: musllinux_1_2 }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: PyO3/maturin-action@v1
         with:
           working-directory: bindings/python
@@ -53,7 +53,7 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
           args: --release --out dist -i python3.15
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.libc }}-${{ matrix.target }}
           path: bindings/python/dist
@@ -70,15 +70,15 @@ jobs:
         shell: bash
         working-directory: bindings/python
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       - run: uv python install 3.11 3.14t 3.15
       - run: >-
           uvx maturin build --release --out dist
           -i "$(uv python find 3.11)" "$(uv python find 3.14t)"
       - run: uvx maturin build --release --out dist -i "$(uv python find 3.15)"
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.runner }}
           path: bindings/python/dist
@@ -87,11 +87,11 @@ jobs:
     name: Source distribution
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
       - run: uvx maturin sdist --out dist
         working-directory: bindings/python
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: bindings/python/dist
@@ -109,13 +109,13 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: wheels-*
           merge-multiple: true
           path: dist
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       - run: uv venv --python ${{ matrix.python }} .venv-test
       - run: uv pip install --python .venv-test --no-index --find-links dist cleanrules
       # The test suite's own dependencies (pytest, hypothesis, numpy, pandas, ...).
