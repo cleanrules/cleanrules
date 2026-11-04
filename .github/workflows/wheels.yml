@@ -5,6 +5,8 @@ name: Wheels
 #
 # Per platform: one abi3 wheel (CPython 3.11+), one cp314t wheel (free-threaded
 # 3.14) and one abi3t wheel (CPython 3.15+, free-threaded or not).
+# The abi3t wheel is built on its own: given 3.15 with the others, maturin builds
+# the whole call for abi3t, and the 3.11 wheel comes out version-specific.
 
 on:
   push:
@@ -44,7 +46,13 @@ jobs:
           working-directory: bindings/python
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
-          args: --release --out dist -i python3.11 python3.14t python3.15
+          args: --release --out dist -i python3.11 python3.14t
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: bindings/python
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --out dist -i python3.15
       - uses: actions/upload-artifact@v5
         with:
           name: wheels-${{ matrix.libc }}-${{ matrix.target }}
@@ -68,7 +76,8 @@ jobs:
       - run: uv python install 3.11 3.14t 3.15
       - run: >-
           uvx maturin build --release --out dist
-          -i "$(uv python find 3.11)" "$(uv python find 3.14t)" "$(uv python find 3.15)"
+          -i "$(uv python find 3.11)" "$(uv python find 3.14t)"
+      - run: uvx maturin build --release --out dist -i "$(uv python find 3.15)"
       - uses: actions/upload-artifact@v5
         with:
           name: wheels-${{ matrix.runner }}
