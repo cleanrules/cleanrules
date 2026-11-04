@@ -89,9 +89,11 @@ code unit), so the result never depends on hashing (invariant 7).
 
 A list or map **read from native data** stays a reference to the native object
 (*Reading native data*). Its elements are converted only when they are needed:
-to compare it under `ANY` (*Equality*), and to write it to JSON. A native map
-with a key that is not a string, or an element that cannot be converted, makes
-only that element opaque, never the whole value.
+to compare it under `ANY` (*Equality*), and to write it to JSON. An entry of
+a native map whose key is not a string is left out, and an element that cannot
+be converted is opaque; neither makes the whole value opaque. A list has no
+missing elements: where a native sequence has none (a hole in a JavaScript
+array), the element is null.
 
 ### Opaque values
 
@@ -270,7 +272,7 @@ module, records included.
 | `null`, an Invalid `Date` | null; `undefined` is missing |
 | `boolean` | boolean |
 | `number` that is an integer within ±(2⁵³ − 1) | int (use `cr.float(x)` for a float) |
-| other finite `number`, `-0` | float; `NaN` is null |
+| any other `number`, `-0` and infinities included | float; `NaN` is null |
 | `bigint` | int, or null with `int_overflow` |
 | `cr.decimal("0.10")` (JavaScript has no decimal) | decimal |
 | `string` | string |
@@ -278,8 +280,9 @@ module, records included.
 | `cr.datetime(...)`, `Temporal.PlainDateTime` | naive datetime |
 | `Date`, `Temporal.Instant` | aware datetime in `Z` |
 | `Temporal.ZonedDateTime` | aware datetime in its zone, or with a fixed offset when the zone id is an offset such as `+05:30` |
-| `Array`, typed arrays | list; holes and `undefined` elements are missing |
-| `Map` | map, in insertion order; a non-string key makes the entry opaque |
+| `Array`, typed arrays except `Uint8Array` (and `Buffer`) | list; holes and `undefined` elements are null (a list cannot hold a missing element) |
+| `Uint8Array`, `Buffer`, `ArrayBuffer`, `DataView` | opaque, like bytes in other languages |
+| `Map` | map, in insertion order; an entry whose key is not a string is left out |
 | plain objects and class instances | map of own enumerable string-keyed properties (checked with `Object.hasOwn`), plus getters defined by the object's classes, never by `Object.prototype`; `constructor` and `__proto__` are always missing |
 
 Temporal values are recognised by `Symbol.toStringTag`, so polyfills work;

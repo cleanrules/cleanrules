@@ -369,6 +369,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The license is now the Apache License 2.0 (it was MIT), with a NOTICE that
   names Jose L. Salmeron as the author and that every redistribution, and
   every derived work, must keep (section 4(d) of the license).
+- Data model (`spec/data-model.md`): an entry of a native map whose key is not
+  a string is left out (it was "made opaque", without saying under which key;
+  Python already left it out); a list has no missing elements, so holes and
+  `undefined` elements of a JavaScript array are null; in JavaScript, every
+  `number` that is not a safe integer is a float, infinities included, and
+  `Uint8Array`, `Buffer`, `ArrayBuffer` and `DataView` are opaque like bytes in
+  other languages. Native data only, so no conformance vector changes.
+- Errors (`spec/errors.md`): in JavaScript the context fields are in `context`,
+  because an error's `name` is its class, and an `ActionError` has the
+  `decision`.
 - The conformance vectors of `registry_error` for an unknown logic in a table
   or in text list the `name`, which `spec/errors.md` marks as compared.
 - The text syntax reserves `DO` (task D.4): a field, key or rule named `do`,
