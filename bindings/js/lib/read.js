@@ -1,5 +1,3 @@
-'use strict'
-
 // Reading native JavaScript data (spec/data-model.md, *Reading native data*
 // and *Conversions by language*, *JavaScript and TypeScript*).
 //
@@ -19,7 +17,7 @@
 // arrays and typed arrays only. A key that is absent or holds `undefined` is
 // missing. A getter that throws gives a null with reason `read_error`.
 
-const { MARKER } = require('./values.js')
+import { MARKER } from './values.js'
 
 /** How deep containers are converted: the format's node depth. */
 const MAX_DEPTH = 256
@@ -33,14 +31,51 @@ const LAST_MICROS = 253402300799999999n
 /** The largest UTC offset, in seconds: 18 hours. */
 const MAX_OFFSET = 18 * 3600
 
-// The runtime's type checks (`require('node:util').types` in Node), which tell
-// built-in objects apart across realms; `lib/load.js` injects them. Without
-// them the checks below fall back to `instanceof`.
-let types = null
+// Built-in objects are told apart by brand: a built-in method or getter that
+// only works on objects with the built-in's internal slot, in any realm (an
+// iframe, a `vm` context). Where Node's `util.types` exists (`lib/install.js`
+// injects it), its checks are brand checks that never throw; elsewhere, and
+// for the checks a runtime lacks (Deno has no `isExternal`), the reader calls
+// the built-in's own method and catches the `TypeError`. Objects whose
+// prototypes are this realm's are checked by their prototypes first, without
+// calling anything, so the brand calls run only for objects of other realms.
+let types = {}
 
-/** Use `checks` (Node's `util.types`) to recognise built-in objects. */
-function useTypes(checks) {
-  types = checks
+/** The checks of `util.types` that find objects of the runtime. */
+const RUNTIME_CHECKS = [
+  'isNativeError',
+  'isSet',
+  'isWeakMap',
+  'isWeakSet',
+  'isPromise',
+  'isRegExp',
+  'isAnyArrayBuffer',
+  'isDataView',
+  'isBoxedPrimitive',
+  'isGeneratorObject',
+  'isMapIterator',
+  'isSetIterator',
+  'isModuleNamespaceObject',
+  'isExternal',
+]
+let runtimeChecks = []
+
+/** The prototypes of the binding's own classes, whose objects are opaque. */
+let engineProtos = new Set()
+
+/**
+ * Use `checks` (Node's `util.types`, or `null`) to recognise built-in objects,
+ * and treat instances of `classes` (the engine's classes) as opaque.
+ */
+function useTypes(checks, classes = []) {
+  types = {}
+  for (const name of ['isDate', 'isMap', ...RUNTIME_CHECKS]) {
+    if (typeof checks?.[name] === 'function') {
+      types[name] = checks[name]
+    }
+  }
+  runtimeChecks = RUNTIME_CHECKS.filter((name) => name in types).map((name) => types[name])
+  engineProtos = new Set(classes.map((c) => c.prototype))
 }
 
 const getOwn = Object.getOwnPropertyDescriptor
@@ -54,43 +89,110 @@ const dateTime = Date.prototype.getTime
 // any typed array, of any realm, and `undefined` for everything else.
 const typedArrayName = getOwn(getProto(Uint8Array.prototype), Symbol.toStringTag).get
 
-const isDate = (v) => (types ? types.isDate(v) : v instanceof Date)
-const isMap = (v) => (types ? types.isMap(v) : v instanceof Map)
+const getter = (C, name) => getOwn(C.prototype, name).get
 
-/** Objects of the runtime, which are opaque and never read through. */
-function isRuntimeObject(v) {
-  if (
-    v instanceof Error ||
-    v instanceof Set ||
-    v instanceof WeakMap ||
-    v instanceof WeakSet ||
-    v instanceof Promise ||
-    v instanceof RegExp ||
-    v instanceof ArrayBuffer ||
-    v instanceof DataView ||
-    (typeof WeakRef === 'function' && v instanceof WeakRef)
-  ) {
+/** Whether `method` accepts `value` as its receiver: a brand check. */
+function branded(method, value, ...args) {
+  try {
+    method.call(value, ...args)
     return true
-  }
-  if (types === null) {
+  } catch {
     return false
   }
-  return (
-    types.isNativeError(v) ||
-    types.isSet(v) ||
-    types.isWeakMap(v) ||
-    types.isWeakSet(v) ||
-    types.isPromise(v) ||
-    types.isRegExp(v) ||
-    types.isAnyArrayBuffer(v) ||
-    types.isDataView(v) ||
-    types.isBoxedPrimitive(v) ||
-    types.isGeneratorObject(v) ||
-    types.isMapIterator(v) ||
-    types.isSetIterator(v) ||
-    types.isModuleNamespaceObject(v) ||
-    types.isExternal(v)
-  )
+}
+
+/** Brand checks of the runtime objects, for objects of other realms. */
+const BRANDS = [
+  [getter(Set, 'size')],
+  [WeakMap.prototype.has, {}],
+  [WeakSet.prototype.has, {}],
+  [getter(ArrayBuffer, 'byteLength')],
+  [getter(DataView, 'byteLength')],
+  [getter(RegExp, 'source')],
+  [Number.prototype.valueOf],
+  [String.prototype.valueOf],
+  [Boolean.prototype.valueOf],
+  [Symbol.prototype.valueOf],
+  [BigInt.prototype.valueOf],
+  ...(typeof SharedArrayBuffer === 'function' ? [[getter(SharedArrayBuffer, 'byteLength')]] : []),
+]
+
+/** The tags of runtime objects that have no brand method without effects. */
+const RUNTIME_TAGS = new Set([
+  'Generator',
+  'AsyncGenerator',
+  'Iterator',
+  'Array Iterator',
+  'Map Iterator',
+  'Set Iterator',
+  'String Iterator',
+  'RegExp String Iterator',
+  'Segmenter String Iterator',
+  'Module',
+  'Promise',
+  'WeakRef',
+  'FinalizationRegistry',
+])
+
+/** This realm's prototypes of runtime objects. */
+const RUNTIME_PROTOS = new Set(
+  [
+    Error,
+    Set,
+    WeakMap,
+    WeakSet,
+    Promise,
+    RegExp,
+    ArrayBuffer,
+    DataView,
+    Number,
+    String,
+    Boolean,
+    Symbol,
+    BigInt,
+    globalThis.SharedArrayBuffer,
+    globalThis.WeakRef,
+    globalThis.FinalizationRegistry,
+  ]
+    .filter((c) => typeof c === 'function')
+    .map((c) => c.prototype),
+)
+
+/** How many prototypes a chain may have before it counts as endless. */
+const MAX_CHAIN = 64
+
+/** The prototype chain of `value`, read once (a Proxy's trap runs once). */
+function chainOf(value) {
+  const chain = []
+  for (let proto = getProto(value); proto !== null && chain.length < MAX_CHAIN; proto = getProto(proto)) {
+    chain.push(proto)
+  }
+  return chain
+}
+
+/** Whether `chain` is another realm's: it does not end in this realm's `Object.prototype`. */
+const foreign = (chain) => chain.length > 0 && !chain.includes(ObjectPrototype)
+
+function isDate(value, chain) {
+  if (types.isDate) return types.isDate(value)
+  return chain.includes(Date.prototype) || (foreign(chain) && branded(dateTime, value))
+}
+
+function isMap(value, chain) {
+  if (types.isMap) return types.isMap(value)
+  return chain.includes(Map.prototype) || (foreign(chain) && branded(getter(Map, 'size'), value))
+}
+
+/**
+ * Objects of the runtime, and the engine's own, which are opaque and never
+ * read through; `tag` is the value's `Symbol.toStringTag`, read once.
+ */
+function isRuntimeObject(value, tag, chain) {
+  if (chain.some((proto) => RUNTIME_PROTOS.has(proto) || engineProtos.has(proto))) return true
+  if (typeof tag === 'string' && RUNTIME_TAGS.has(tag)) return true
+  if (typeof Error.isError === 'function' && Error.isError(value)) return true
+  if (runtimeChecks.some((check) => check(value))) return true
+  return foreign(chain) && BRANDS.some(([method, ...args]) => branded(method, value, ...args))
 }
 
 const MISSING = Symbol('missing')
@@ -125,10 +227,15 @@ function pathTree(paths) {
 // One tree per rule set or node, for as long as it lives.
 const trees = new WeakMap()
 
+/**
+ * The path tree of `owner`: a rule set or node of the napi-rs build (which has
+ * `fieldPaths()`), or the array of field paths that a rule set or node of the
+ * WebAssembly build makes once and passes instead.
+ */
 function treeOf(owner) {
   let tree = trees.get(owner)
   if (tree === undefined) {
-    tree = pathTree(owner.fieldPaths())
+    tree = pathTree(Array.isArray(owner) ? owner : owner.fieldPaths())
     trees.set(owner, tree)
   }
   return tree
@@ -179,7 +286,8 @@ function shapeOf(value) {
   if (typeof marker === 'string') {
     return [SCALAR, undefined, marker]
   }
-  if (isDate(value)) {
+  const chain = chainOf(value)
+  if (isDate(value, chain)) {
     return [SCALAR]
   }
   const typed = typedArrayName.call(value)
@@ -191,14 +299,15 @@ function shapeOf(value) {
   if (Array.isArray(value) || typed !== undefined) {
     return [LIST, value.length]
   }
-  if (isMap(value)) {
+  if (isMap(value, chain)) {
     return [MAP]
   }
-  if (isRuntimeObject(value)) {
+  // Read once: a getter of the tag runs at most once.
+  const tag = value[Symbol.toStringTag]
+  if (isRuntimeObject(value, tag, chain)) {
     return [OPAQUE]
   }
   // Temporal values, and polyfills, by their tag.
-  const tag = value[Symbol.toStringTag]
   if (typeof tag === 'string' && tag.startsWith('Temporal.')) {
     return [SCALAR, tag]
   }
@@ -575,4 +684,4 @@ function read(data, owner) {
   return [JSON.stringify(encoded), reader.errors]
 }
 
-module.exports = { describe, read, useTypes }
+export { describe, read, useTypes }

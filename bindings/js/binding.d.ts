@@ -14,6 +14,14 @@ export declare const __napiBindingTarget: 'native' | 'wasm32-wasi' | 'wasm32-was
  * read with its rule set; immutable.
  */
 export declare class Decision {
+  /**
+   * Not a constructor: decisions come from `RuleSet.evaluate`.
+   *
+   * # Errors
+   *
+   * Always a `TypeError`, the same as the WebAssembly build's.
+   */
+  private constructor()
   /** How many rules the rule set has: one result each. */
   get length(): number
   /**
@@ -72,7 +80,7 @@ export declare class Decision {
    *
    * `UnsupportedError` for the rule syntax and CSV.
    */
-  write(format?: Format): string
+  write(format?: Format | null): string
   /**
    * The explanation (`spec/explain.md`) in `format`: its text (the
    * default, as in C++), or a `"json"` or `"yaml"` document.
@@ -81,11 +89,19 @@ export declare class Decision {
    *
    * `UnsupportedError` for CSV.
    */
-  explain(format?: Format): string
+  explain(format?: Format | null): string
 }
 
 /** A document read from a text; immutable. */
 export declare class Document {
+  /**
+   * Not a constructor: use `Document.read`.
+   *
+   * # Errors
+   *
+   * Always a `TypeError`, the same as the WebAssembly build's.
+   */
+  private constructor()
   /**
    * Read a document in `options.format` (`"json"`, the default, `"yaml"`,
    * `"text"` or `"csv"`) under `options.limits`.
@@ -94,9 +110,9 @@ export declare class Document {
    *
    * `FormatError`, `RuleSyntaxError`, `ExpressionError`,
    * `RuleDefinitionError`, `RegistryError` or `UnsupportedError`, as the core
-   * reports them; a `RangeError` for an unknown format or a bad limit.
+   * reports them; a `TypeError` or `RangeError` for a bad argument.
    */
-  static read(text: string | Uint8Array, options?: ReadOptions | undefined | null): Document
+  static read(text: string | Uint8Array, options?: ReadOptions | null): Document
   /**
    * What the document holds: `"condition"`, `"rule"`, `"ruleset"` or
    * `"decision_table"`.
@@ -111,11 +127,19 @@ export declare class Document {
    *
    * `UnsupportedError` for a format the document has no form in.
    */
-  write(format?: Format): string
+  write(format?: Format | null): string
 }
 
 /** A condition or value node; immutable. */
 export declare class Node {
+  /**
+   * Not a constructor: use `Node.read`.
+   *
+   * # Errors
+   *
+   * Always a `TypeError`, the same as the WebAssembly build's.
+   */
+  private constructor()
   /**
    * Read a node (`spec/json-format.md`, *Conditions*, not a document) in
    * `options.format` (`"json"`, the default, `"yaml"` or `"text"`, an
@@ -126,7 +150,7 @@ export declare class Node {
    * `FormatError`, `RuleSyntaxError` or `ExpressionError`;
    * `UnsupportedError` for CSV.
    */
-  static read(text: string | Uint8Array, options?: ReadOptions | undefined | null): Node
+  static read(text: string | Uint8Array, options?: ReadOptions | null): Node
   /**
    * The node in `format`: JSON (the default), YAML or the rule syntax.
    *
@@ -134,7 +158,7 @@ export declare class Node {
    *
    * `UnsupportedError` for CSV.
    */
-  write(format?: Format): string
+  write(format?: Format | null): string
   /**
    * The field paths the node reads, in order of first appearance.
    *
@@ -152,7 +176,7 @@ export declare class Node {
    * `RegistryError` for an unknown logic, `UnsupportedError` for a graded
    * one; in strict mode, `EvaluationError` and its subclasses.
    */
-  evaluateTree(data: unknown, options?: TreeOptions): string
+  evaluateTree(data: unknown, options?: TreeOptions | null): string
   /**
    * Evaluate the node as a value on native data: its result tree in JSON.
    *
@@ -160,7 +184,7 @@ export declare class Node {
    *
    * In strict mode, `EvaluationError` and its subclasses.
    */
-  evaluateValueTree(data: unknown, options?: ValueTreeOptions): string
+  evaluateValueTree(data: unknown, options?: ValueTreeOptions | null): string
   /**
    * `evaluateTree` on an input given as a JSON value, under
    * `options.limits`.
@@ -169,7 +193,7 @@ export declare class Node {
    *
    * `FormatError` for an invalid text, and as `evaluateTree`.
    */
-  evaluateTreeJson(input: string | Uint8Array, options?: TreeOptions | undefined | null): string
+  evaluateTreeJson(input: string | Uint8Array, options?: TreeOptions | null): string
   /**
    * `evaluateValueTree` on an input given as a JSON value, under
    * `options.limits`.
@@ -178,23 +202,30 @@ export declare class Node {
    *
    * `FormatError` for an invalid text, and as `evaluateValueTree`.
    */
-  evaluateValueTreeJson(input: string | Uint8Array, options?: ValueTreeOptions | undefined | null): string
+  evaluateValueTreeJson(input: string | Uint8Array, options?: ValueTreeOptions | null): string
 }
 
 /** A rule set; immutable, and shared by its decisions. */
 export declare class RuleSet {
   /**
+   * Not a constructor: use `RuleSet.read`.
+   *
+   * # Errors
+   *
+   * Always a `TypeError`, the same as the WebAssembly build's.
+   */
+  private constructor()
+  /**
    * Read a rule set in `options.format` (`"json"`, the default, `"yaml"`,
    * `"text"` or `"csv"`, whose decision table is compiled) under
-   * `options.limits`. A document
-   * that holds one rule is a rule set of that rule (`spec/json-format.md`,
-   * *Documents*).
+   * `options.limits`. A document that holds one rule is a rule set of that
+   * rule (`spec/json-format.md`, *Documents*).
    *
    * # Errors
    *
    * As `Document.read`, and `FormatError` for a condition document.
    */
-  static read(text: string | Uint8Array, options?: ReadOptions | undefined | null): RuleSet
+  static read(text: string | Uint8Array, options?: ReadOptions | null): RuleSet
   /**
    * The rule set of a document: its rule set, its one rule, or its compiled
    * decision table.
@@ -212,7 +243,7 @@ export declare class RuleSet {
    *
    * `UnsupportedError` for CSV.
    */
-  write(format?: Format): string
+  write(format?: Format | null): string
   /**
    * The summary (`spec/explain.md`, *Summaries*) in `format`: its text (the
    * default, as in C++), or a `"json"` or `"yaml"` document.
@@ -221,7 +252,7 @@ export declare class RuleSet {
    *
    * `UnsupportedError` for CSV.
    */
-  summary(format?: Format): string
+  summary(format?: Format | null): string
   /** How many rules the rule set has. */
   get length(): number
   /** The rules' names, in rule order. */
@@ -266,7 +297,7 @@ export declare class RuleSet {
    *
    * `FormatError` for an invalid text, and as `evaluate`.
    */
-  evaluateJson(input: string | Uint8Array, limits?: Limits | undefined | null): Decision
+  evaluateJson(input: string | Uint8Array, limits?: Limits | null): Decision
   /**
    * Evaluate each input of an array of native data, in order.
    *
@@ -285,18 +316,18 @@ export declare class RuleSet {
    * `FormatError` for an invalid text, `EvaluationError` when it is not an
    * array, and as `evaluateMany`.
    */
-  evaluateManyJson(inputs: string | Uint8Array, limits?: Limits | undefined | null): Array<Decision>
+  evaluateManyJson(inputs: string | Uint8Array, limits?: Limits | null): Array<Decision>
   /**
    * Read a recorded decision in `options.format` (`"json"`, the default,
-   * or `"yaml"`) under `options.limits`, with this rule set (`spec/json-format.md`, *Reading a
-   * decision*).
+   * or `"yaml"`) under `options.limits`, with this rule set
+   * (`spec/json-format.md`, *Reading a decision*).
    *
    * # Errors
    *
    * `FormatError`, with the code `decision_mismatch` for a decision of
    * another rule set.
    */
-  readDecision(text: string | Uint8Array, options?: ReadOptions | undefined | null): Decision
+  readDecision(text: string | Uint8Array, options?: ReadOptions | null): Decision
   /**
    * Check that every action the rules name is among `names`
    * (`spec/rules.md`, *Actions*).
@@ -305,7 +336,7 @@ export declare class RuleSet {
    *
    * `RegistryError` naming the first rule whose action is missing.
    */
-  checkActions(names: Array<string>): void
+  checkActions(names: string[]): void
   /**
    * Evaluate native data like `evaluate`, then run the actions of the
    * selected rules in rule order (`spec/rules.md`, *Actions*). `actions`

@@ -42,7 +42,11 @@ cargo test -p cleanrules-ffi                                # C ABI: sus tests y
 cargo +nightly miri test -p cleanrules-ffi --lib --test abi --test values --test run
 (cd crates/ffi && cbindgen --config cbindgen.toml --output include/cleanrules.h)   # regenera la cabecera C
 cmake -S bindings/cpp -B build/cpp && ctest --test-dir build/cpp
+npm --prefix bindings/js install                    # una vez: @napi-rs/cli y typescript
 npm --prefix bindings/js test
+npm --prefix bindings/js run test:wasm              # sobre el módulo WebAssembly (rustup target add wasm32-unknown-unknown; wasm-bindgen-cli 0.2.130)
+npm --prefix bindings/js run test:deno              # en Deno 2.6+, y el paquete sin permisos
+cargo clippy -p cleanrules-js --target wasm32-unknown-unknown --all-targets -- -D warnings
 (cd bindings/jvm && ./gradlew test)
 (cd bindings/go && go test ./...)
 (cd bindings/erlang && rebar3 ct)

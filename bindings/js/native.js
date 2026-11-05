@@ -1,13 +1,8 @@
-'use strict'
+// `cleanrules/native` on the Node addon: the native layer (task F.1a), the
+// classes of the engine with their JavaScript half registered. The idiomatic
+// API of phase F.2 sits on top of it; errors and marker values are in
+// `cleanrules`. `native.wasm.js` is the same on the WebAssembly module.
 
-// `cleanrules/native`: the native layer (task F.1a), the classes of the addon
-// with their JavaScript half registered. The idiomatic API of phase F.2 sits on
-// top of it; errors and marker values are in `cleanrules`.
+import native from './lib/napi.js'
 
-const native = require('./lib/load.js')
-
-exports.Document = native.Document
-exports.RuleSet = native.RuleSet
-exports.Decision = native.Decision
-exports.Node = native.Node
-exports.FORMAT_VERSION = native.FORMAT_VERSION
+export const { Document, RuleSet, Decision, Node, FORMAT_VERSION } = native

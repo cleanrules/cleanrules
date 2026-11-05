@@ -1,10 +1,8 @@
-'use strict'
-
 // Actions by name (spec/rules.md, *Actions*): the native layer runs the
 // selected rules' actions in rule order through these two hooks, so that a
 // function that throws never leaves an exception pending in native code.
 
-const { describe } = require('./read.js')
+import { describe } from './read.js'
 
 /** The registry `actions` (an object or a `Map` of functions) as `[names, functions]`. */
 function actions(registry) {
@@ -60,4 +58,4 @@ function call(action, argument) {
   }
 }
 
-module.exports = { actions, call }
+export { actions, call }

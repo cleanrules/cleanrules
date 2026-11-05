@@ -300,8 +300,53 @@ jobs:
       # one version (the addon refuses to load under another one).
       - if: matrix.os == 'ubuntu-latest' && matrix.node == 26
         run: |
-          git diff --exit-code -- binding.js binding.d.ts
+          git diff --exit-code -- binding.cjs binding.d.ts
           node scripts/check-versions.js
+
+  js-wasm:
+    name: WebAssembly in Node and Deno (ubuntu-latest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bindings/js
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      # The CLI that writes the module's glue must be the version of the
+      # wasm-bindgen crate, which bindings/js/Cargo.toml pins and
+      # scripts/check-versions.js compares with this line: a checksummed
+      # release binary.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen@0.2.130
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: denoland/setup-deno@v2
+        with:
+          # Source-phase imports of WebAssembly arrived in Deno 2.6.
+          deno-version: v2.x
+      - run: node scripts/check-versions.js
+      # The WebAssembly front end, which the host's clippy does not compile.
+      - run: cargo clippy -p cleanrules-js --target wasm32-unknown-unknown --all-targets -- -D warnings
+      - run: npm install --no-audit --no-fund
+      # The addon too, so that the tests comparing both builds run.
+      - run: npm run build
+      # Builds the module, then the whole suite in Node on it.
+      - run: npm run test:wasm
+      # In Deno, on the module (the `deno` condition's build): the package
+      # loads with no permission, then the same suite runs (which reads its
+      # fixtures).
+      - run: deno run --no-prompt test/deno/smoke.js
+      - run: deno test --no-prompt --env-file=test/wasm.env --allow-read --allow-env test/
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+      - run: node --env-file=test/wasm.env --test "test/**/*.test.js"
 
   conformance:
     name: Spec schemas and conformance vectors

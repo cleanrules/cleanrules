@@ -1,5 +1,3 @@
-'use strict'
-
 // Marker values for the kinds JavaScript has no type for (spec/data-model.md,
 // *Conversions by language*, *JavaScript and TypeScript*): a `number` that is
 // an integer reads as an int, so a float needs `float(x)`; decimals, dates and
@@ -149,7 +147,7 @@ function datetime(year, month, day, hour, minute, second, microsecond) {
   return new NaiveDateTime(year, month, day, hour, minute, second, microsecond)
 }
 
-module.exports = {
+export {
   Decimal,
   Float,
   LocalDate,

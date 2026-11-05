@@ -1,7 +1,7 @@
 // Types of `cleanrules/native` (`native.js`), the native layer: the classes
 // and option types that napi-rs declares in `binding.d.ts`.
 
-export { Decision, Document, FORMAT_VERSION, Node, RuleSet } from './binding'
+export { Decision, Document, FORMAT_VERSION, Node, RuleSet } from './binding.js'
 export type {
   ActionCall,
   Aggregate,
@@ -13,4 +13,4 @@ export type {
   TreeOptions,
   Truth,
   ValueTreeOptions,
-} from './binding'
+} from './binding.js'

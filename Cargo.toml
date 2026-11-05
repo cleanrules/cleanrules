@@ -39,3 +39,11 @@ strip = false
 
 [profile.release.build-override]
 strip = false
+
+# The WebAssembly module of the JavaScript binding (bindings/js): smaller code
+# matters more there than the last per cent of speed.
+[profile.wasm]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1

@@ -1,12 +1,10 @@
-'use strict'
-
 // Actions by name as JavaScript callbacks (spec/rules.md, *Actions*).
 
-const assert = require('node:assert/strict')
-const { test } = require('node:test')
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
 
-const cr = require('./support/cr.js')
-const { rules } = require('./support/probe.js')
+import cr from './support/cr.js'
+import { rules } from './support/probe.js'
 
 const RULES = `HIT POLICY rule_order
 

@@ -1,8 +1,8 @@
-// Types of the `cleanrules` package (`index.js`): what is final today, the
+// Types of the `cleanrules` package (`index.js`, `index.wasm.js`): what is final today, the
 // errors, the marker values and the versions. The native classes are in
 // `cleanrules/native` (`native.d.ts`, over the `binding.d.ts` napi-rs writes).
 
-import type { Decision } from './binding'
+import type { Decision } from './binding.js'
 
 /** The version of the JSON format this build reads and writes. */
 export declare const FORMAT_VERSION: number

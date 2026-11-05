@@ -1,5 +1,3 @@
-'use strict'
-
 // The errors of cleanrules (spec/errors.md). Every error derives from
 // `CleanRulesError`, so one `instanceof CleanRulesError` catches them all.
 // Each has a stable `code`, the same in every language, a `message` written by
@@ -163,7 +161,7 @@ function fromNative(json, cause, decision) {
   return new Class(message, options)
 }
 
-module.exports = {
+export {
   ActionError,
   CleanRulesError,
   EvaluationError,

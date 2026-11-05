@@ -17,33 +17,48 @@
   },
   "license": "Apache-2.0",
   "author": "Jose L. Salmeron",
+  "type": "module",
   "main": "index.js",
   "types": "index.d.ts",
   "exports": {
     ".": {
       "types": "./index.d.ts",
-      "default": "./index.js"
+      "deno": "./index.deno.js",
+      "browser": "./index.wasm.js",
+      "node": "./index.js",
+      "default": "./index.wasm.js"
     },
     "./native": {
       "types": "./native.d.ts",
-      "default": "./native.js"
+      "deno": "./native.deno.js",
+      "browser": "./native.wasm.js",
+      "node": "./native.js",
+      "default": "./native.wasm.js"
     },
+    "./wasm/cleanrules_bg.wasm": "./wasm/cleanrules_bg.wasm",
     "./package.json": "./package.json"
   },
   "files": [
     "index.js",
+    "index.wasm.js",
+    "index.deno.js",
     "index.d.ts",
     "native.js",
+    "native.wasm.js",
+    "native.deno.js",
     "native.d.ts",
-    "binding.js",
+    "binding.cjs",
     "binding.d.ts",
     "lib/",
+    "wasm/cleanrules.js",
+    "wasm/cleanrules_bg.wasm",
     "LICENSE",
     "NOTICE",
     "README.md"
   ],
   "engines": {
-    "node": ">=22.12"
+    "node": ">=22.12",
+    "deno": ">=2.6"
   },
   "optionalDependencies": {
     "@cleanrules/node-darwin-arm64": "0.0.0",
@@ -70,10 +85,16 @@
     ]
   },
   "scripts": {
-    "build": "napi build --platform --no-const-enum --js binding.js --dts binding.d.ts",
-    "build:release": "napi build --platform --release --no-const-enum --js binding.js --dts binding.d.ts",
+    "build": "napi build --platform --no-const-enum --js binding.cjs --dts binding.d.ts && node scripts/private-constructors.js",
+    "build:release": "napi build --platform --release --no-const-enum --js binding.cjs --dts binding.d.ts && node scripts/private-constructors.js",
+    "build:wasm": "node scripts/build-wasm.js",
     "pretest": "npm run build",
-    "test": "node --test \"test/**/*.test.js\" && tsc --noEmit -p test/types"
+    "test": "node --test \"test/**/*.test.js\" && tsc --noEmit -p test/types",
+    "pretest:wasm": "npm run build:wasm",
+    "test:wasm": "node --env-file=test/wasm.env --test \"test/**/*.test.js\"",
+    "test:deno": "deno run --no-prompt test/deno/smoke.js && deno test --no-prompt --env-file=test/wasm.env --allow-read --allow-env test/",
+    "pretest:deno": "npm run build:wasm",
+    "prepack": "node scripts/prepack.js"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.10.12",

@@ -1,5 +1,8 @@
-//! Linker settings for a Node addon (`napi-build`).
+//! Linker settings for the Node addon (`napi-build`); the WebAssembly module
+//! needs none.
 
 fn main() {
-    napi_build::setup();
+    if std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() != Ok("wasm32") {
+        napi_build::setup();
+    }
 }

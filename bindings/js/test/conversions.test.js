@@ -1,14 +1,16 @@
-'use strict'
-
 // Native JavaScript data (spec/data-model.md, *Conversions by language*,
 // *JavaScript and TypeScript*, and *Reading native data*): every row of the
 // table, read and written back in the JSON format, and the safety rules.
 
-const assert = require('node:assert/strict')
-const { describe, test } = require('node:test')
+import assert from 'node:assert/strict'
+import { describe, test } from 'node:test'
 
-const cr = require('./support/cr.js')
-const { detail, read, rules } = require('./support/probe.js')
+import util from 'node:util'
+import vm from 'node:vm'
+
+import { useTypes } from '../lib/read.js'
+import cr, { deno } from './support/cr.js'
+import { detail, read, rules } from './support/probe.js'
 
 const HAS_TEMPORAL = typeof Temporal === 'object'
 
@@ -396,6 +398,58 @@ describe('objects', () => {
     assert.equal(read({ x: new ArrayBuffer(2) }), '{"$opaque":"ArrayBuffer"}')
     assert.equal(read({ x: new WeakMap() }), '{"$opaque":"WeakMap"}')
     assert.equal(read({ x: Symbol('s') }), '{"$opaque":"symbol"}')
+    // Iterators, generators and boxed primitives, by class or tag in every runtime.
+    for (const value of [[1].values(), 'ab'[Symbol.iterator](), new Map().keys(), (function* g() {})(), Object(1), Object('s')]) {
+      assert.match(read({ x: value }), /^\{"\$opaque":/, String(value))
+    }
+  })
+
+  test("the engine's own objects are opaque", () => {
+    const ruleset = rules('RULE a\nIF TRUE')
+    assert.equal(read({ x: ruleset }), '{"$opaque":"RuleSet"}')
+    assert.equal(read({ x: ruleset }, 'x.length'), 'missing_field')
+    assert.equal(read({ x: ruleset.evaluate({}) }), '{"$opaque":"Decision"}')
+    assert.equal(read({ x: cr.Document.read('x > 1', { format: 'text' }) }), '{"$opaque":"Document"}')
+  })
+
+  test('objects of another realm read as those of this one', { skip: deno }, () => {
+    const realm = vm.createContext({})
+    const make = (code) => vm.runInContext(code, realm)
+    assert.equal(read({ x: make('({ a: [1, 2.5] })') }), '{"a":[1,2.5]}')
+    assert.equal(read({ x: make('new Map([["k", 1]])') }), '{"k":1}')
+    assert.equal(read({ x: make('new Date(0)') }), '{"$datetime":"1970-01-01T00:00:00Z"}')
+    assert.equal(read({ x: make('new Uint8Array([1])') }), '{"$opaque":"Uint8Array"}')
+    assert.equal(read({ x: make('new Int16Array([1, 2])') }), '[1,2]')
+    for (const code of ['new Set([1])', 'new Error("e")', '/a/', 'Object(1)', 'new WeakMap()', 'Promise.resolve()', '[1].values()', 'new ArrayBuffer(1)', 'new DataView(new ArrayBuffer(1))']) {
+      assert.match(read({ x: make(code) }), /^\{"\$opaque":/, code)
+    }
+  })
+
+  test('without util.types, built-ins are told apart the same way', { skip: deno }, () => {
+    useTypes(null, [cr.Document, cr.RuleSet, cr.Decision, cr.Node])
+    try {
+      const realm = vm.createContext({})
+      const values = [
+        new Set([1]),
+        new Error('e'),
+        Object(1),
+        [1].values(),
+        new Map([['k', 1]]),
+        new Date(0),
+        vm.runInContext('new Set([1])', realm),
+        vm.runInContext('new Error("e")', realm),
+        vm.runInContext('Object("s")', realm),
+        vm.runInContext('new WeakSet()', realm),
+        vm.runInContext('new Map([["k", 1]])', realm),
+        vm.runInContext('new Date(0)', realm),
+        rules('RULE a\nIF TRUE'),
+      ]
+      const without = values.map((x) => read({ x }))
+      useTypes(util.types, [cr.Document, cr.RuleSet, cr.Decision, cr.Node])
+      assert.deepEqual(values.map((x) => read({ x })), without)
+    } finally {
+      useTypes(util.types, [cr.Document, cr.RuleSet, cr.Decision, cr.Node])
+    }
   })
 
   test('a container that holds itself is opaque where it repeats', () => {

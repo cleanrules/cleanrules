@@ -1,18 +1,16 @@
-'use strict'
-
 // A handful of conformance vectors as smoke tests, through JSON and through
 // native JavaScript data (conformance/README.md). The full runner, over every
 // vector, is task F.3.
 
-const assert = require('node:assert/strict')
-const fs = require('node:fs')
-const path = require('node:path')
-const test = require('node:test')
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import test from 'node:test'
 
-const cr = require('./support/cr.js')
-const { Num, Obj, parse, write, same } = require('./support/json.js')
+import cr from './support/cr.js'
+import { Num, Obj, parse, write, same } from './support/json.js'
 
-const VECTORS = path.join(__dirname, '..', '..', '..', 'conformance', 'vectors')
+const VECTORS = path.join(import.meta.dirname, '..', '..', '..', 'conformance', 'vectors')
 const FILES = [
   'ast/reading.json',
   'ast/missing.json',

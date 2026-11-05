@@ -1,13 +1,11 @@
-'use strict'
-
 // The error classes (spec/errors.md): the hierarchy, one real error of every
 // code with its context fields, and the JSON form.
 
-const assert = require('node:assert/strict')
-const { describe, test } = require('node:test')
+import assert from 'node:assert/strict'
+import { describe, test } from 'node:test'
 
-const cr = require('./support/cr.js')
-const { rules } = require('./support/probe.js')
+import cr, { build } from './support/cr.js'
+import { rules } from './support/probe.js'
 
 const HIERARCHY = [
   ['FormatError', 'CleanRulesError', 'format_error'],
@@ -249,7 +247,48 @@ describe('misuse', () => {
   })
 
   test('the native classes have no public constructor', () => {
-    assert.throws(() => new cr.RuleSet())
-    assert.throws(() => new cr.Decision())
+    const check = (run, message) => assert.throws(run, (e) => e instanceof TypeError && e.message === message)
+    check(() => new cr.RuleSet(), 'RuleSet has no public constructor; use RuleSet.read')
+    check(() => new cr.Document(), 'Document has no public constructor; use Document.read')
+    check(() => new cr.Node(), 'Node has no public constructor; use Node.read')
+    check(() => new cr.Decision(), 'Decision has no public constructor; decisions come from RuleSet.evaluate')
+  })
+
+  test('arguments of the wrong kind are TypeErrors that say what was given', () => {
+    const ruleset = rules('RULE a\nIF x > 1\nDO act')
+    const decision = ruleset.evaluate({ x: 2 })
+    const cases = [
+      [() => cr.RuleSet.read(42), 'the text must be a string or bytes (a Uint8Array), not a number'],
+      [() => cr.Document.read('{}', 'json'), "options must be an object, such as { format: 'yaml' }, not a string"],
+      [() => cr.Node.read('x', { format: 7 }), 'a format is a string such as "json", not a number'],
+      [() => decision.write(7), 'a format is a string such as "json", not a number'],
+      [() => decision.firedAt('0'), "a rule's position is a number, not a string"],
+      [() => ruleset.evaluateJson('{}', 'big'), 'limits must be an object, such as { maxSize: 1000000 }, not a string'],
+      [() => cr.Document.read('{}', { limits: { maxDepth: '9' } }), 'limits.maxDepth is a number, not a string'],
+      [() => ruleset.checkActions([1]), 'action names are strings, not a number'],
+      [() => ruleset.checkActions('act'), 'names must be an array, not a string'],
+      [() => cr.Node.read('x', { format: 'text' }).evaluateTree({}, { strict: 1 }), 'options.strict is a boolean, not a number'],
+      [() => cr.RuleSet.fromDocument(ruleset), 'document must be a Document (from Document.read), not another object'],
+      [() => cr.RuleSet.fromDocument(), 'document must be a Document (from Document.read), not undefined'],
+      [() => cr.Document.read(new DataView(new ArrayBuffer(1))), 'the text must be a string or bytes (a Uint8Array), not a DataView'],
+      [() => cr.Document.read(new Uint16Array(1)), 'the text must be a string or bytes (a Uint8Array), not a typed array'],
+    ]
+    for (const [run, message] of cases) {
+      assert.throws(run, (e) => e instanceof TypeError && !(e instanceof cr.CleanRulesError) && e.message === message, message)
+    }
+  })
+
+  test('engine objects are released by [Symbol.dispose](), once', () => {
+    const ruleset = rules('RULE a\nIF TRUE')
+    ruleset[Symbol.dispose]()
+    ruleset[Symbol.dispose]()
+    if (build === 'wasm') {
+      // The module's objects are released; using one is a clear error.
+      assert.throws(() => ruleset.ruleNames(), (e) => e instanceof TypeError && /was released/.test(e.message))
+      assert.throws(() => ruleset.length, (e) => e instanceof TypeError && /was released/.test(e.message))
+    } else {
+      // The addon's need no release: they stay usable.
+      assert.deepEqual(ruleset.ruleNames(), ['a'])
+    }
   })
 })

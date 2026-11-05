@@ -1,9 +1,7 @@
-'use strict'
-
 // What the binding reads: the value tree of one field, through the core.
 
-const cr = require('./cr.js')
-const { parse, write } = require('./json.js')
+import cr from './cr.js'
+import { parse, write } from './json.js'
 
 const nodes = new Map()
 
@@ -38,4 +36,4 @@ function rules(text) {
   return cr.RuleSet.read(text, { format: 'text' })
 }
 
-module.exports = { detail, read, rules }
+export { detail, read, rules }

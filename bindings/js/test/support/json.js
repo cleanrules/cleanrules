@@ -1,5 +1,3 @@
-'use strict'
-
 // A lossless JSON reader and writer for the conformance smoke tests: numbers
 // keep their text and objects their member order (`JSON.parse` turns `1.0`
 // into `1` and moves integer-like keys first). Comparison follows
@@ -138,4 +136,4 @@ function same(actual, expected, inReason = false) {
   return actual === expected
 }
 
-module.exports = { Num, Obj, parse, write, same }
+export { Num, Obj, parse, write, same }

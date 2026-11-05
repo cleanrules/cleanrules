@@ -1,6 +1,6 @@
 [package]
-name = "cleanrules-node"
-description = "Node.js binding of cleanrules (napi-rs), built by @napi-rs/cli into the `cleanrules` npm package"
+name = "cleanrules-js"
+description = "JavaScript binding of cleanrules: a Node addon (napi-rs) and a WebAssembly module (wasm-bindgen), the engine of the `cleanrules` npm package"
 publish = false
 version.workspace = true
 edition.workspace = true
@@ -12,14 +12,15 @@ homepage.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
-# A Node addon resolves N-API at load time, so test binaries cannot run it:
-# the binding is tested from JavaScript (`npm test`).
+# A Node addon resolves N-API at load time, and a WebAssembly module needs its
+# JavaScript glue, so test binaries cannot run them: the binding is tested from
+# JavaScript (`npm test`, `npm run test:wasm`, `npm run test:deno`).
 test = false
 doctest = false
 
 # The workspace's lints, except that `unsafe_code` is `deny` instead of
-# `forbid`: the `#[napi]` macros generate `unsafe` blocks under
-# `#[allow(unsafe_code)]`, which `forbid` would reject. Code written here has
+# `forbid`: the `#[napi]` and `#[wasm_bindgen]` macros generate `unsafe`
+# blocks under `#[allow(unsafe_code)]`, which `forbid` would reject. Code written here has
 # no `unsafe` (CLAUDE.md, invariant 10): `deny` still rejects it.
 [lints.rust]
 unsafe_code = "deny"
@@ -37,8 +38,18 @@ dbg_macro = "warn"
 
 [dependencies]
 cleanrules = { workspace = true, features = ["yaml"] }
+
+# The Node addon, on every native target.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 napi = { version = "3.16.1", default-features = false, features = ["napi9", "dyn-symbols"] }
 napi-derive = "3.7.0"
+
+# The WebAssembly module. wasm-bindgen is pinned to the version of the
+# `wasm-bindgen` CLI that writes its JavaScript glue: they must match
+# (`scripts/check-versions.js` checks it, and CI installs that CLI).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "=0.2.130"
+js-sys = "0.3.107"
 
 [build-dependencies]
 napi-build = "2.6.0"

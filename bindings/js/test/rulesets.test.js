@@ -1,71 +1,191 @@
-'use strict'
-
 // Documents, rule sets, decisions and nodes: every native entry point.
 
-const assert = require('node:assert/strict')
-const fs = require('node:fs')
-const path = require('node:path')
-const { describe, test } = require('node:test')
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
+import { describe, test } from 'node:test'
+import { pathToFileURL } from 'node:url'
+import { Worker } from 'node:worker_threads'
 
-const cr = require('./support/cr.js')
-const { rules } = require('./support/probe.js')
+import cr, { build, deno, napiBuilt, native, root } from './support/cr.js'
+import { rules } from './support/probe.js'
 
-const EXAMPLES = path.join(__dirname, '..', '..', '..', 'docs', 'examples')
+const EXAMPLES = path.join(import.meta.dirname, '..', '..', '..', 'docs', 'examples')
 const example = (name) => fs.readFileSync(path.join(EXAMPLES, name))
 const DISCOUNTS_DATA = { customer: { years: 6, blocked: false }, order: { total: 2000 } }
 
-describe('the package', () => {
+const JS = path.join(import.meta.dirname, '..')
+const require = createRequire(import.meta.url)
+const pkg = JSON.parse(fs.readFileSync(path.join(JS, 'package.json'), 'utf8'))
+const ENTRIES = build === 'wasm' ? ['index.wasm.js', 'native.wasm.js'] : ['index.js', 'native.js']
+
+describe(`the package (${build})`, () => {
   test('versions', () => {
     assert.equal(cr.FORMAT_VERSION, 1)
-    assert.equal(cr.version, require('../package.json').version)
+    assert.equal(cr.version, pkg.version)
   })
 
   test('the root exports what is final; the native classes are in cleanrules/native', () => {
-    const root = require('..')
-    const native = require('../native')
     assert.deepEqual(Object.keys(native).sort(), ['Decision', 'Document', 'FORMAT_VERSION', 'Node', 'RuleSet'])
     for (const name of ['RuleSet', 'Document', 'Decision', 'Node']) {
       assert.equal(root[name], undefined, name)
     }
     assert.equal(typeof root.MissingFieldError, 'function')
     assert.equal(typeof root.decimal, 'function')
-    // The package's own `exports` resolve both entry points.
-    assert.equal(require.resolve('cleanrules'), path.join(__dirname, '..', 'index.js'))
-    assert.equal(require.resolve('cleanrules/native'), path.join(__dirname, '..', 'native.js'))
   })
 
-  test('ES modules import every name of both entry points', async () => {
-    const { pathToFileURL } = require('node:url')
-    for (const file of ['index.js', 'native.js']) {
-      const module = await import(pathToFileURL(path.join(__dirname, '..', file)).href)
-      const common = require(path.join('..', file))
-      for (const name of Object.keys(common)) {
-        assert.equal(module[name], common[name], `${file}: ${name}`)
-      }
+  const wasmBuilt = fs.existsSync(path.join(JS, 'wasm', 'cleanrules_bg.wasm'))
+  const both = async () => [
+    await import(pathToFileURL(path.join(JS, 'native.js')).href),
+    await import(pathToFileURL(path.join(JS, 'native.wasm.js')).href),
+  ]
+
+  test('both builds export the same names, classes and members', { skip: !(napiBuilt && wasmBuilt) }, async () => {
+    for (const [a, b] of [
+      ['index.js', 'index.wasm.js'],
+      ['native.js', 'native.wasm.js'],
+    ]) {
+      const names = async (file) => Object.keys(await import(pathToFileURL(path.join(JS, file)).href)).sort()
+      assert.deepEqual(await names(a), await names(b), `${a} and ${b}`)
+    }
+    // The only differences: wasm-bindgen's `free()`, which releases an object
+    // early (`[Symbol.dispose]()` does too, and does nothing on the addon), and
+    // its two internal members, `__wrap` and `__destroy_into_raw`.
+    const WASM_ONLY = new Set(['free', '__destroy_into_raw', 'static __wrap'])
+    const members = (Class) =>
+      [
+        ...Object.getOwnPropertyNames(Class.prototype),
+        ...Object.getOwnPropertySymbols(Class.prototype).map(String),
+        ...Object.getOwnPropertyNames(Class).map((name) => `static ${name}`),
+      ].sort()
+    const [napi, wasm] = await both()
+    for (const name of ['Document', 'RuleSet', 'Decision', 'Node']) {
+      assert.deepEqual(
+        members(wasm[name]).filter((member) => !WASM_ONLY.has(member)),
+        members(napi[name]),
+        name,
+      )
     }
   })
 
-  test('an addon of another version is refused, naming the fix', () => {
-    const { execFileSync } = require('node:child_process')
-    const root = path.join(__dirname, '..')
+  test('both builds throw the same errors, of the same classes', { skip: !(napiBuilt && wasmBuilt) }, async () => {
+    const [napi, wasm] = await both()
+    const RULES = 'STRICT\n\nRULE a\nIF x > 1\nTHEN v = x\nDO act'
+    const calls = [
+      (n) => new n.RuleSet(),
+      (n) => new n.Decision(),
+      (n) => n.RuleSet.fromDocument({}),
+      (n) => n.RuleSet.read(42),
+      (n) => n.RuleSet.read('{}', 'json'),
+      (n) => n.RuleSet.read('{}', { format: 7 }),
+      (n) => n.RuleSet.read('{}', { format: 'xml' }),
+      (n) => n.RuleSet.read('{}', { limits: 'big' }),
+      (n) => n.RuleSet.read('{}', { limits: { maxSize: -1 } }),
+      (n) => n.RuleSet.read('{}', { limits: { maxSize: '1' } }),
+      (n) => n.RuleSet.read(RULES, { format: 'text' }).evaluate(),
+      (n) => n.RuleSet.read(RULES, { format: 'text' }).evaluate({}),
+      (n) => n.RuleSet.read(RULES, { format: 'text' }).evaluate({ x: 2 }).ruleName('0'),
+      (n) => n.RuleSet.read(RULES, { format: 'text' }).evaluate({ x: 2 }).firedAt(3),
+      (n) => n.RuleSet.read(RULES, { format: 'text' }).evaluateMany('rows'),
+      (n) => n.RuleSet.read(RULES, { format: 'text' }).evaluateMany([{ x: 2 }, undefined]),
+      (n) => n.RuleSet.read(RULES, { format: 'text' }).checkActions('act'),
+      (n) => n.RuleSet.read(RULES, { format: 'text' }).checkActions([1]),
+      (n) => n.RuleSet.read(RULES, { format: 'text' }).run({ x: 2 }, {}),
+      (n) => n.RuleSet.read(RULES, { format: 'text' }).run({ x: 2 }, { act: 1 }),
+      (n) => n.Node.read('x > 1', { format: 'text' }).evaluateTree({}, { strict: 'yes' }),
+      (n) => n.Node.read('x > 1', { format: 'text' }).evaluateTree({}, { logic: 'nope' }),
+      (n) => n.Document.read(new DataView(new ArrayBuffer(1))),
+    ]
+    const outcome = (call, n) => {
+      try {
+        call(n)
+        return 'no error'
+      } catch (error) {
+        return `${error.constructor.name}: ${error.message}`
+      }
+    }
+    for (const call of calls) {
+      const expected = outcome(call, napi)
+      assert.notEqual(expected, 'no error', String(call))
+      assert.equal(outcome(call, wasm), expected, String(call))
+    }
+  })
+
+  test('package.json picks the build by condition', () => {
+    for (const [subpath, base] of [
+      ['.', './index'],
+      ['./native', './native'],
+    ]) {
+      const conditions = pkg.exports[subpath]
+      assert.deepEqual(Object.keys(conditions), ['types', 'deno', 'browser', 'node', 'default'])
+      assert.equal(conditions.node, `${base}.js`)
+      assert.equal(conditions.deno, `${base}.deno.js`)
+      for (const name of ['browser', 'default']) {
+        assert.equal(conditions[name], `${base}.wasm.js`, `${subpath} ${name}`)
+      }
+    }
+    // The module itself, for bundlers that copy it.
+    assert.equal(pkg.exports['./wasm/cleanrules_bg.wasm'], './wasm/cleanrules_bg.wasm')
+    // Node resolves the package's own `exports` to the native addon.
+    assert.equal(require.resolve('cleanrules'), path.join(JS, 'index.js'))
+    assert.equal(require.resolve('cleanrules/native'), path.join(JS, 'native.js'))
+  })
+
+  // Where no prebuilt addon exists, Node runs the WebAssembly build with
+  // `--conditions=browser`.
+  test('node --conditions=browser loads the WebAssembly build', { skip: deno || !wasmBuilt }, () => {
     const code = `
-      const binding = require(${JSON.stringify(path.join(root, 'binding.js'))})
-      binding.version = () => '9.9.9'
-      try { require(${JSON.stringify(root)}) } catch (error) { console.log(error.message) }
+      const native = await import('cleanrules/native')
+      const root = await import('cleanrules')
+      const ruleset = native.RuleSet.read('RULE a\\nIF x > 1\\nTHEN v = x', { format: 'text' })
+      console.log(JSON.stringify([
+        import.meta.resolve('cleanrules/native').endsWith('/native.wasm.js'),
+        typeof native.RuleSet.prototype.free,
+        root.version,
+        ruleset.evaluate({ x: 2 }).outputJson(),
+      ]))
     `
-    const output = execFileSync(process.execPath, ['-e', code], { encoding: 'utf8' })
+    const output = execFileSync(
+      process.execPath,
+      ['--conditions=browser', '--input-type=module', '-e', code],
+      { cwd: JS, encoding: 'utf8' },
+    )
+    assert.deepEqual(JSON.parse(output), [true, 'function', pkg.version, '{"v":2}'])
+  })
+
+  test('CommonJS requires both entry points on Node (the native addon)', { skip: !napiBuilt }, () => {
+    const code = `
+      const root = require('cleanrules')
+      const native = require('cleanrules/native')
+      const ruleset = native.RuleSet.read('RULE a\\nIF x > 1\\nTHEN v = x', { format: 'text' })
+      console.log(JSON.stringify([root.version, typeof root.MissingFieldError, ruleset.evaluate({ x: 2 }).outputJson()]))
+    `
+    const output = execFileSync(process.execPath, ['--no-warnings', '-e', code], { cwd: JS, encoding: 'utf8' })
+    assert.deepEqual(JSON.parse(output), [pkg.version, 'function', '{"v":2}'])
+  })
+
+  test('an addon of another version is refused, naming the fix', { skip: build === 'wasm' || deno }, () => {
+    const code = `
+      const binding = require(${JSON.stringify(path.join(JS, 'binding.cjs'))})
+      binding.version = () => '9.9.9'
+      try { require(${JSON.stringify(path.join(JS, 'index.js'))}) } catch (error) { console.log(error.message) }
+    `
+    const output = execFileSync(process.execPath, ['--no-warnings', '-e', code], { encoding: 'utf8' })
     assert.match(output, /native addon is version 9\.9\.9, but the package is .*; reinstall cleanrules/)
   })
 
-  test('works in a worker thread, with its own hooks', async () => {
-    const { Worker } = require('node:worker_threads')
+  test('works in a worker thread, with its own instance and hooks', async () => {
+    const urls = ENTRIES.map((file) => pathToFileURL(path.join(JS, file)).href)
     const code = `
       const { parentPort } = require('node:worker_threads')
-      const cr = { ...require(${JSON.stringify(path.join(__dirname, '..'))}), ...require(${JSON.stringify(path.join(__dirname, '..', 'native'))}) }
-      const ruleset = cr.RuleSet.read('STRICT\\n\\nRULE a\\nIF x > 1\\nTHEN v = x', { format: 'text' })
-      let missing = false
-      try { ruleset.evaluate({}) } catch (error) { missing = error instanceof cr.MissingFieldError }
-      parentPort.postMessage([ruleset.evaluate({ x: 2 }).outputJson(), missing])
+      Promise.all(${JSON.stringify(urls)}.map((url) => import(url))).then(([root, native]) => {
+        const ruleset = native.RuleSet.read('STRICT\\n\\nRULE a\\nIF x > 1\\nTHEN v = x', { format: 'text' })
+        let missing = false
+        try { ruleset.evaluate({}) } catch (error) { missing = error instanceof root.MissingFieldError }
+        parentPort.postMessage([ruleset.evaluate({ x: 2 }).outputJson(), missing])
+      })
     `
     const worker = new Worker(code, { eval: true })
     const [output, missing] = await new Promise((resolve, reject) => {

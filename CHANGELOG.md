@@ -221,6 +221,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   readers), comparing with a lossless JSON parser of its own. Under
   `CLEANRULES_SANITIZERS`, any AddressSanitizer report fails a test, and so do
   leaks on Linux.
+- WebAssembly build of the JavaScript binding (task F.1b): the same npm
+  package `cleanrules` runs in browsers, Deno (2.6 or later) and other runtimes
+  on a WebAssembly module built with wasm-bindgen, with the same API as the
+  Node addon (`cleanrules` and `cleanrules/native`: the same classes, methods,
+  options, errors and their messages, markers and `ActionCall`).
+  `package.json` `exports` picks the build: `node` loads the addon; `deno`
+  imports the module as a module source, with no permission
+  (`index.deno.js`, `native.deno.js`); `browser` and `default` fetch it by URL
+  (`index.wasm.js`, `native.wasm.js`, which use no Node API). The module,
+  also exported as `cleanrules/wasm/cleanrules_bg.wasm` for bundlers, is
+  1.8 MiB, 643 KiB gzipped; `npm pack` refuses a missing or stale one. On Node
+  without a prebuilt addon, `--conditions=browser` runs it. The package is now
+  ES modules, one copy of the shared code; CommonJS still works on Node
+  through `require(esm)`, and TypeScript compiling to CommonJS needs
+  `"module": "nodenext"`. The Rust crate, renamed `cleanrules-js`, has one
+  shared module and two thin front ends chosen by target (napi-rs on native
+  targets, wasm-bindgen on `wasm32`), which check arguments the same way.
+  Differences: the module's objects also have wasm-bindgen's `free()`; a
+  second release does nothing and a released object is a clear `TypeError`.
+  The test suite runs on both builds in Node and on the module in Deno, and
+  compares the builds' members and errors; CI adds a job for it, with wasm32
+  clippy and `wasm-bindgen` pinned to the crate's version. Changes to the Node
+  build: arguments of the wrong kind (a text, an options object, a rule
+  position, a document) are `TypeError`s with the binding's own messages, the
+  classes' constructors throw a `TypeError` that says where objects come from,
+  `[Symbol.dispose]()` does nothing, the engine's own objects passed as data
+  are opaque, and built-in objects are told apart by brand and tag in any
+  realm (array and string iterators are now opaque like the other iterators).
 - Node binding (`bindings/js`, npm package `cleanrules`, task F.1a): the
   engine as a native addon built with napi-rs, for Node 22.12 and later (N-API
   9), with one optional package per platform (`@cleanrules/node-<platform>`:

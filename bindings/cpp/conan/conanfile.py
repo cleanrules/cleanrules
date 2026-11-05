@@ -24,7 +24,7 @@ required_conan_version = ">=2.0"
 _ROOT = os.path.join("..", "..", "..")
 
 # What cargo needs to build `-p cleanrules-ffi --locked`: the workspace, whose
-# members include the Python and Node bindings' crates (their manifests, build
+# members include the Python and JavaScript bindings' crates (their manifests, build
 # scripts and sources, for cargo to load the workspace), and the two crates
 # themselves.
 _SOURCES = [

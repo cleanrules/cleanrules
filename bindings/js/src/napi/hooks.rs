@@ -97,15 +97,3 @@ pub(crate) fn type_error(env: &Env, message: &str) -> Error {
         Err(error) => error,
     }
 }
-
-/// Core results as napi-rs ones: a core error becomes its JavaScript class.
-pub(crate) trait OrThrow<T> {
-    /// The value, or the core error thrown as JavaScript.
-    fn or_throw(self, env: &Env) -> Result<T>;
-}
-
-impl<T> OrThrow<T> for cleanrules::Result<T> {
-    fn or_throw(self, env: &Env) -> Result<T> {
-        self.map_err(|error| throw(env, &error, None, None))
-    }
-}

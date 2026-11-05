@@ -11,7 +11,7 @@ import {
   decimal,
   float,
   version,
-} from '../..'
+} from 'cleanrules'
 import {
   type ActionCall,
   type Aggregate,
@@ -24,7 +24,7 @@ import {
   Node,
   RuleSet,
   type Truth,
-} from '../../native'
+} from 'cleanrules/native'
 
 const limits: Limits = { maxSize: 1_000_000, maxDepth: 64 }
 const format: Format = 'text'
@@ -94,5 +94,8 @@ const versions: [number, string] = [FORMAT_VERSION, version]
 
 // @ts-expect-error: formats are a closed set.
 Document.read('{}', { format: 'xml' })
+
+// @ts-expect-error: rule sets come from RuleSet.read, not `new`.
+new RuleSet()
 
 void [names, paths, policy, aggregate, selected, fired, truth, output, ruleOutput, explained, fromJson, batch, recorded, ran, kind, tree, valueTree, made, versions]

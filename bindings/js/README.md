@@ -1,20 +1,22 @@
-# cleanrules for Node.js
+# cleanrules for JavaScript
 
-The `cleanrules` npm package is the Rust engine of cleanrules as a native Node
-addon, built with [napi-rs](https://napi.rs): the same rules, decisions,
-explanations and errors as in every other language. It reads rules as JSON,
-YAML, the rule syntax or CSV decision tables, evaluates them on plain
-JavaScript data, and explains every decision.
+The `cleanrules` npm package is the Rust engine of cleanrules for JavaScript:
+the same rules, decisions, explanations and errors as in every other language.
+It reads rules as JSON, YAML, the rule syntax or CSV decision tables, evaluates
+them on plain JavaScript data, and explains every decision. It comes in two
+builds with the same API: a native Node addon built with
+[napi-rs](https://napi.rs) (task F.1a), and a WebAssembly module built with
+[wasm-bindgen](https://wasm-bindgen.github.io/wasm-bindgen/) for browsers,
+Deno and other runtimes (task F.1b).
 
-This is the native layer (task F.1a), in `cleanrules/native`. The idiomatic
-TypeScript API (rule builders, the `F` proxy, operators) comes in task F.2, on
-top of it, and the browser and Deno build (wasm) in F.1b.
+This is the native layer, in `cleanrules/native`. The idiomatic TypeScript API
+(rule builders, the `F` proxy, operators) comes in task F.2, on top of it.
 
 ## Example
 
 ```js
-const { RuleSet } = require('cleanrules/native')
-const { MissingFieldError } = require('cleanrules')
+import { RuleSet } from 'cleanrules/native'
+import { MissingFieldError } from 'cleanrules'
 
 const rules = RuleSet.read(`
   HIT POLICY priority
@@ -34,8 +36,12 @@ decision.explain()      // why vip was selected and loyal was not
 rules.run(data, { notify_sales: ({ ruleName, outputJson }) => console.log(ruleName, outputJson) })
 ```
 
-[`docs/examples/discounts.js`](../../docs/examples/discounts.js) does more:
-JSON input, which rules fired, an action, and an error.
+The same code runs in Node, Deno (`import { RuleSet } from
+'npm:cleanrules/native'`) and browsers. On Node, CommonJS works too
+(`const { RuleSet } = require('cleanrules/native')`).
+[`docs/examples/discounts.js`](../../docs/examples/discounts.js) (Node,
+CommonJS) and [`docs/examples/discounts.deno.js`](../../docs/examples/discounts.deno.js)
+(Deno) do more: JSON input, which rules fired, an action, and an error.
 
 ## Entry points
 
@@ -45,31 +51,100 @@ JSON input, which rules fired, an action, and an error.
 - `cleanrules/native`: the native layer, the classes below. F.2 builds on it,
   and it stays available.
 
-Both are CommonJS with TypeScript declarations, and ES modules import them by
-name (`import { RuleSet } from 'cleanrules/native'`).
+Each comes in both builds, and `package.json` `exports` picks one by
+condition:
+
+| Runtime | Condition | Build | Files |
+|---|---|---|---|
+| Node 22.12 or later | `node` | the native addon | `index.js`, `native.js` |
+| Deno 2.6 or later | `deno` | WebAssembly, imported as a module source | `index.deno.js`, `native.deno.js` |
+| browsers and bundlers | `browser` | WebAssembly, fetched by URL | `index.wasm.js`, `native.wasm.js` |
+| any other runtime | `default` | WebAssembly, fetched by URL | the same |
+
+The modules are ES modules, one copy of the shared code (`lib/`). On Node,
+CommonJS works too: `require('cleanrules')` and `require('cleanrules/native')`
+load them through `require(esm)`. TypeScript compiling to CommonJS needs
+`"module": "nodenext"` to import them (under `node16` it reports TS1471).
+
+The WebAssembly entries instantiate the module with top-level `await`, so they
+are imported, not required. In browsers (and other runtimes) they use no Node
+API and fetch `wasm/cleanrules_bg.wasm` from `new URL('./wasm/cleanrules_bg.wasm',
+import.meta.url)`; in Node they read it from disk. Deno's entries import it as
+a module source (`import source module from '...wasm'`, Deno 2.6 or later),
+so loading the package needs no permission. A worker instantiates its own
+module.
+
+With bundlers, the module is a separate file that the bundle must ship
+(`exports` names it, `cleanrules/wasm/cleanrules_bg.wasm`):
+
+- webpack 5 handles `new URL('...', import.meta.url)` and copies the file.
+- Vite copies it in builds; in development, add `optimizeDeps: { exclude:
+  ['cleanrules'] }` so that the pre-bundler does not move the JavaScript away
+  from it.
+- esbuild does not follow `new URL(...)`: copy `wasm/cleanrules_bg.wasm` next
+  to the bundled module (or serve it at the URL the module computes).
+
+A hand-initialised entry (passing the module or its bytes yourself) is planned
+for task F.2.
+
+On Node, where no prebuilt addon exists for the platform, `node
+--conditions=browser` runs the WebAssembly build instead.
+
+### What differs between the builds
+
+The same classes, methods, options, errors (classes and messages), markers and
+`ActionCall`: the whole test suite runs on each build, in Node and in Deno, and
+compares their members and the errors of a list of wrong calls. Only these
+differ:
+
+- The WebAssembly build's objects have wasm-bindgen's `free()` (and its
+  internal `__destroy_into_raw()` and static `__wrap()`). `free()` and
+  `[Symbol.dispose]()` release an object early; a second call does nothing,
+  and using a released object is a `TypeError`. JavaScript releases them anyway
+  when it collects them. The addon's `[Symbol.dispose]()` does nothing, so
+  `using` works with both.
+- The addon checks that it is the package's version; the module ships inside
+  the package.
+- Built-in objects of another realm (a `vm` context, an iframe) are told apart
+  by brand everywhere, but where `util.types` does not exist (browsers) an
+  `Error` of another realm is recognised only with `Error.isError`.
 
 ## Installing and building
 
-Users install `cleanrules` only (Node 22.12 or later). The addon ships in one
-optional package per platform, `@cleanrules/node-<platform>`
-([`npm/`](npm)), and npm installs the one for the machine: Linux (x64 and arm64,
-glibc and musl), macOS (x64 and arm64) and Windows (x64 and arm64, MSVC).
-Nothing is published yet (task M.2). The package refuses to load an addon of
-another version, and says to reinstall it.
+Users install `cleanrules` only. On Node, the addon ships in one optional
+package per platform, `@cleanrules/node-<platform>` ([`npm/`](npm)), and npm
+installs the one for the machine: Linux (x64 and arm64, glibc and musl), macOS
+(x64 and arm64) and Windows (x64 and arm64, MSVC). The package refuses to load
+an addon of another version, and says to reinstall it. The WebAssembly module
+is in the package itself (`npm pack` refuses to pack without it, or with one older
+than the Rust sources: `scripts/prepack.js`). Nothing is published yet (task
+M.2).
 
 From the repository, with a Rust toolchain:
 
 ```sh
-npm --prefix bindings/js install      # @napi-rs/cli and typescript
-npm --prefix bindings/js test         # builds the addon (debug), node --test, tsc --noEmit
+npm --prefix bindings/js install          # @napi-rs/cli and typescript
+npm --prefix bindings/js test             # the addon (debug): node --test, tsc --noEmit
+npm --prefix bindings/js run test:wasm    # the WebAssembly module: the same suite in Node
+npm --prefix bindings/js run test:deno    # the same suite in Deno, on the module
 npm --prefix bindings/js run build:release
 ```
 
 `npm run build` writes the addon (`cleanrules.<platform>.node`), the loader
-napi-rs generates (`binding.js`) and its declarations (`binding.d.ts`); the
-last two are committed, and CI checks that they are current and that every
-version (package, platform packages, Cargo workspace) is the same
-(`scripts/check-versions.js`).
+napi-rs generates (`binding.cjs`) and its declarations (`binding.d.ts`, the
+types of both builds); the last two are committed, and CI checks that they are
+current and that every version agrees (`scripts/check-versions.js`).
+
+`npm run build:wasm` (`scripts/build-wasm.js`) builds the module into `wasm/`
+with the `wasm` profile of the workspace (size-optimised: `opt-level = "s"`,
+LTO) and wasm-bindgen's `--target web`. It needs the `wasm32-unknown-unknown`
+target (`rustup target add wasm32-unknown-unknown`) and the `wasm-bindgen` CLI
+at the version of the `wasm-bindgen` crate, which `bindings/js/Cargo.toml` pins
+(`cargo install --locked wasm-bindgen-cli --version 0.2.130`); the script
+checks that they match. The module is 1.8 MiB, 641 KiB gzipped (the core with
+its time zone database, regular expressions and the YAML reader). Binaryen's
+`wasm-opt -Oz` shaves 5 % off the raw size and nothing off the gzipped size,
+so the build does not use it.
 
 ## The native layer
 

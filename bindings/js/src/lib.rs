@@ -1,72 +1,48 @@
-//! Node binding of cleanrules: the native addon of the `cleanrules` npm
-//! package, built with napi-rs.
+//! JavaScript binding of cleanrules: the engine of the `cleanrules` npm
+//! package, built two ways from this one crate.
 //!
-//! A thin layer over the core (`CLAUDE.md`, invariant 2): it reads and writes
-//! documents, converts data and translates errors, and never evaluates on its
-//! own. The addon has a JavaScript half, in `lib/`, which the package entry
-//! (`index.js`) registers with [`set_hooks`] when it loads:
+//! - On every native target, a Node addon built with napi-rs (`napi`),
+//!   shipped in one package per platform.
+//! - On `wasm32`, a WebAssembly module built with wasm-bindgen (`wasm`), for
+//!   browsers, Deno and any other JavaScript runtime.
 //!
-//! - the reader of native data (`lib/read.js`), which walks a JavaScript input
-//!   along the paths a rule set reads (`spec/data-model.md`, *Reading native
-//!   data*) and hands this layer a compact encoding of the sparse value tree
-//!   (`wire.rs`);
-//! - the error classes (`lib/errors.js`), built from an error's JSON form
-//!   (`spec/errors.md`);
-//! - the calls to actions, so that an action that throws never leaves an
-//!   exception pending in this layer.
+//! Both front ends are thin: they turn JavaScript arguments into the shared
+//! code's values, call it (`common`), and turn its problems into JavaScript
+//! errors, so the two builds offer the same API with the same checks. Neither
+//! evaluates anything on its own (`CLAUDE.md`, invariant 2): the core does.
+//! The binding has a JavaScript half (`lib/`), registered with each build when
+//! it loads: the reader of native data (`lib/read.js`), which hands this layer
+//! a compact encoding of the sparse value tree (`common::wire`); the error
+//! classes (`lib/errors.js`), built from an error's JSON form; and the calls
+//! to actions, so that an action that throws never leaves an exception pending
+//! in native code.
 //!
 //! The idiomatic TypeScript API (rule builders, operators) arrives in phase
 //! F.2, on top of these classes.
 
-// napi-rs hands arguments over by value, and ties JavaScript values to the
-// lifetime of `&'env Env`: these two lints would ask for signatures it cannot
-// generate.
+// napi-rs and wasm-bindgen hand arguments over by value, and napi-rs ties
+// JavaScript values to the lifetime of `&'env Env`: these two lints would ask
+// for signatures they cannot generate.
 #![allow(clippy::needless_pass_by_value, clippy::trivially_copy_pass_by_ref)]
 
-mod decision;
-mod document;
-mod hooks;
-mod limits;
-mod node;
-mod read;
-mod ruleset;
-mod wire;
+mod common;
 
-use napi_derive::napi;
+#[cfg(not(target_arch = "wasm32"))]
+mod napi;
+#[cfg(target_arch = "wasm32")]
+mod wasm;
 
-pub use decision::Decision;
-pub use document::Document;
-pub use hooks::set_hooks;
-pub use limits::{Aggregate, DocumentKind, Format, HitPolicy, Limits, ReadOptions, Truth};
-pub use node::{Node, TreeOptions, ValueTreeOptions};
-pub use ruleset::{ActionCall, RuleSet};
+#[cfg(not(target_arch = "wasm32"))]
+pub use napi::classes::{
+    ActionCall, Aggregate, Decision, Document, DocumentKind, Format, HitPolicy, Limits, Node,
+    ReadOptions, RuleSet, TreeOptions, Truth, ValueTreeOptions,
+};
+#[cfg(not(target_arch = "wasm32"))]
+pub use napi::hooks::set_hooks;
+#[cfg(not(target_arch = "wasm32"))]
+pub use napi::{FORMAT_VERSION, decimal_problem, version};
 
-/// The version of the JSON format this build reads and writes
-/// (`spec/json-format.md`).
-#[napi]
-pub const FORMAT_VERSION: u32 = 1;
-
-/// The version of the package.
-#[napi]
-#[must_use]
-pub fn version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
-}
-
-/// Why `text` is not a decimal literal, or `null` when it is one; for the
-/// `Decimal` marker of `lib/values.js`. A literal too large for 38 digits is a
-/// decimal: as data it reads as null with reason `decimal_overflow`.
-#[napi]
-#[must_use]
-pub fn decimal_problem(text: String) -> Option<String> {
-    match cleanrules::Decimal::parse(&text) {
-        Err(cleanrules::value::DecimalError::Malformed) => {
-            Some("not a decimal literal, such as \"0.10\", \"-3\", \"1E+3\" or \"inf\"".to_owned())
-        }
-        _ => None,
-    }
-}
-
-// The literal above is for the generated TypeScript declarations; it must be
-// the core's.
-const _: () = assert!(FORMAT_VERSION == cleanrules::FORMAT_VERSION);
+#[cfg(target_arch = "wasm32")]
+pub use wasm::classes::{Decision, Document, Node, RuleSet};
+#[cfg(target_arch = "wasm32")]
+pub use wasm::{decimal_problem, format_version, not_a_document, set_hooks, version};
