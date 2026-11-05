@@ -1,3 +1,9 @@
 # The examples are compared byte for byte with what the library writes (LF),
 # so they keep LF on every platform, Windows included.
 docs/examples/** text eol=lf
+
+# The Gradle wrapper of the JVM bindings: its POSIX script runs under bash on
+# Windows too (CI), so it keeps LF; the batch file keeps CRLF.
+bindings/jvm/gradlew text eol=lf
+bindings/jvm/gradlew.bat text eol=crlf
+bindings/jvm/gradle/wrapper/gradle-wrapper.jar binary

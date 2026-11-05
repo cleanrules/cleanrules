@@ -342,6 +342,7 @@ that order.
 | `Float` (widened), `Double` | float |
 | `BigDecimal`, Scala `BigDecimal` | decimal, or null with `decimal_overflow` |
 | `String`, `CharSequence` | string |
+| enum constants (`Enum`), those of the platform such as `DayOfWeek` included | string: the constant's `name()` |
 | `LocalDate`, `java.sql.Date` | date |
 | `LocalDateTime` | naive datetime |
 | `OffsetDateTime` | aware datetime with that offset |
@@ -349,8 +350,39 @@ that order.
 | `ZonedDateTime` | aware datetime in its zone, or with a fixed offset when the zone is a `ZoneOffset` |
 | `List`, arrays except `byte[]`, Scala `Seq` | list |
 | `java.util.Map`, Scala `Map`, with `String` keys | map: `SequencedMap` and `SortedMap` (Scala `SeqMap` and `SortedMap`) keep their order, every other map is sorted |
-| records, Scala case classes | map of their components |
-| other objects | map of their public fields and public JavaBean accessors (`getAge()` and `isActive()` read as `age` and `active`) |
+| records, Scala case classes | map of their components, in their order |
+| sets and other collections that are not lists, `byte[]`, iterators, lambdas and other hidden classes, threads, class loaders, `Class` objects, and every other object of the Java platform (a class of a module `java.*` or `jdk.*`) not listed above | opaque, never read through |
+| the binding's own objects (rule sets, decisions, limits, errors, its enums...) | opaque, never read through |
+| other objects | map of their public instance fields and public JavaBean accessors (`getAge()` and `isActive()` read as `age` and `active`; `getURL()` as `URL`), sorted by name by Unicode code point; an accessor wins over a field of the same name, and `getX` over `isX`. Never a member that a class of the platform declares, such as `getClass()` |
+
+A public member of a class that is not public (a private nested record) is
+read where its package is open to the binding, which it always is on the class
+path; elsewhere through its declaration in a public supertype, if one declares
+it, and otherwise reading it gives a null with reason `read_error`. A map's
+`containsKey` decides whether a key is present, and one that refuses a string
+key (a map with other key types) has none.
+
+**Values given back.** Outputs, payloads, aggregates and the values of an
+action's call come back to Java as follows:
+
+| Value | Java |
+|---|---|
+| null, whatever its reason | `null` |
+| boolean | `Boolean` |
+| int | `Long` |
+| float | `Double` (`-0.0` and infinities included) |
+| decimal | `BigDecimal` with the value's scale; the two infinities, which `BigDecimal` cannot hold, as `Double`'s infinities |
+| string | `String` |
+| date | `LocalDate` |
+| naive datetime | `LocalDateTime` |
+| aware datetime | `ZonedDateTime` at its instant: in its IANA zone when Java's zone database knows it, whose rules then give the local fields, and otherwise (a fixed offset, or a zone Java does not know) at a `ZoneOffset` |
+| list | an unmodifiable `List` |
+| map | an unmodifiable `SequencedMap`, in the value's order |
+| opaque | the native object it was read from, the same object; `null` in a decision read from a document, which keeps only the type's name |
+
+Each value reads back as the same value, so an output can be fed to another
+evaluation, except a decimal infinity, which reads back as a float, and an
+opaque value given back as `null`.
 
 #### Go
 

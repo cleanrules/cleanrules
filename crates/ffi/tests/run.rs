@@ -294,6 +294,23 @@ fn a_node_is_read_written_and_evaluated() {
         result.starts_with(r#"{"op":"and","truth":true"#),
         "{result}"
     );
+    // The paths it reads, in preorder and each once.
+    let twice = common::read_node("a.b[1] > 5 OR (x = 1 AND a.b[1] < 2)", CR_FORMAT_TEXT).unwrap();
+    // SAFETY: a live node.
+    let paths =
+        Value(common::handle(|o, e| unsafe { cr_node_field_paths(twice.0, o, e) }).unwrap());
+    assert_eq!(value_to_json(paths.0), r#"[["a","b",1],["x"]]"#);
+    // SAFETY: no node: an invalid argument, and the out-parameter is NULL.
+    unsafe {
+        let mut out = cr_value_new_null();
+        let previous = out;
+        assert_eq!(
+            cr_node_field_paths(ptr::null(), &raw mut out, ptr::null_mut()),
+            CR_INVALID_ARGUMENT
+        );
+        assert!(out.is_null());
+        cr_value_free(previous);
+    }
     // A value node is evaluated as a value, not as a condition.
     let sum = common::read_node("years * 2", CR_FORMAT_TEXT).unwrap();
     assert_eq!(

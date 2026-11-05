@@ -85,6 +85,7 @@ void reading_and_evaluating() {
     CHECK(rules.size() == 3);
     CHECK(rules.rule_name(1) == "vip");
     CHECK(rules.hit_policy() == "priority");
+    CHECK(rules.logic() == "boolean");
     CHECK(!rules.aggregate());
     CHECK(!rules.strict());
 
@@ -485,6 +486,17 @@ void grids_nodes_and_batches() {
     CHECK(!condition.evaluate_tree(input(7, 0), "boolean", true, error).empty());
     CHECK(!error);
     CHECK_THROWS(cr::node::read("a,b", cr::format::csv), cr::unsupported_error);
+    // The paths a node reads, in preorder and each once.
+    auto twice = cr::node::read("a.b[1] > 5 OR (x = 1 AND a.b[1] < 2)", cr::format::text);
+    auto node_paths = twice.field_paths();
+    CHECK(node_paths.size() == 2);
+    CHECK(node_paths[0].size() == 3);
+    CHECK(node_paths[0][2].as_int() == 1);
+    CHECK(node_paths[1][0].as_string() == "x");
+    CHECK(twice.field_paths(error).size() == 2);
+    CHECK(!error);
+    CHECK(cr::node().field_paths(error).kind() == cr::value_type::none);
+    CHECK(error.code() == cr::errc::invalid_argument);
 
     auto all = rules.evaluate_many(cr::value::list({input(7, 0), input(3, 0), input(1, 0)}));
     CHECK(all.size() == 3);

@@ -96,8 +96,8 @@ The whole program, with explanations and errors, is
   opaque values cannot be read back.
   `cr_value_clone` copies a value without losing either.
 - **Describing a rule set.** `cr_ruleset_len`, `cr_ruleset_rule_name`,
-  `cr_ruleset_hit_policy`, `cr_ruleset_aggregate` and `cr_ruleset_strict`
-  describe one; its summary has the rest.
+  `cr_ruleset_hit_policy`, `cr_ruleset_logic`, `cr_ruleset_aggregate` and
+  `cr_ruleset_strict` describe one; its summary has the rest.
 - **Decisions.** Which rules fired (`cr_decision_fired`, `cr_decision_truth`),
   which were selected (`cr_decision_selected`) and the outputs
   (`cr_decision_output_value`, `cr_decision_outputs_value`) are kept when the
@@ -132,8 +132,10 @@ The whole program, with explanations and errors, is
   `cr_node_evaluate_tree` (with a logic and strictness) and
   `cr_node_evaluate_value_tree` (with strictness) evaluate it on an input and
   give its result tree as JSON, as `evaluate_tree` and `evaluate_value_tree`
-  do in every language (`spec/ast.md`, *Evaluating one node*). Python calls a
-  node `Expr`; C, Go and the JVM call it a node.
+  do in every language (`spec/ast.md`, *Evaluating one node*);
+  `cr_node_field_paths` lists the paths it reads, as `cr_ruleset_field_paths`
+  does for a rule set. Python calls a node `Expr`; C, Go and the JVM call it a
+  node.
 - **Batches.** `cr_ruleset_evaluate_many` evaluates a list of inputs; the first
   that fails gives the error, with its `row`. `cr_batch_get` borrows each
   decision.

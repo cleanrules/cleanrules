@@ -16,7 +16,8 @@ use crate::boundary::{
 };
 use crate::error::cr_error;
 use crate::limits::cr_limits;
-use crate::value::{borrow_value, cr_value};
+use crate::ruleset::paths_value;
+use crate::value::{borrow_value, cr_value, give_new_value};
 use crate::{cr_format, cr_status};
 
 /// One node: a condition or a value, as in a rule's `when` or payload.
@@ -251,6 +252,36 @@ pub unsafe extern "C" fn cr_node_evaluate_value_tree(
             error,
         )
     }
+}
+
+/// The paths of the input that the node reads, in preorder and each once, as
+/// a new list of paths, each a list of strings (keys) and ints (indexes),
+/// freed with `cr_value_free`. A binding reads only these from native data
+/// (`spec/data-model.md`, *Reading native data*), as with
+/// `cr_ruleset_field_paths`.
+///
+/// # Safety
+///
+/// `node` is `NULL` or a live `cr_node`; `out` is `NULL` or points to a
+/// writable `cr_value *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_node_field_paths(
+    node: *const cr_node,
+    out: *mut *mut cr_value,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `node` is NULL or live (# Safety).
+        let node = &unsafe { handle(node, "node") }?.node;
+        let paths = paths_value(node.field_paths().into_iter());
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { give_new_value(out, paths) }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_node_field_paths", error, body) }
 }
 
 /// Free a node. `NULL` is ignored.

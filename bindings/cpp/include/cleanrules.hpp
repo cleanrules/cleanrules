@@ -1669,6 +1669,11 @@ public:
         const char *name = cr_ruleset_hit_policy(raw());
         return name != nullptr ? std::string_view(name) : std::string_view();
     }
+    // The logic (`boolean`).
+    std::string_view logic() const noexcept {
+        const char *name = cr_ruleset_logic(raw());
+        return name != nullptr ? std::string_view(name) : std::string_view();
+    }
     // The aggregate (`sum`, `min`, `max`, `count`), if it has one.
     std::optional<std::string_view> aggregate() const noexcept {
         const char *name = cr_ruleset_aggregate(raw());
@@ -1950,10 +1955,21 @@ public:
         return tree_(input, nullptr, strict, &error);
     }
 
+    // The paths of the input that the node reads, in preorder and each once: a
+    // list of paths, each a list of strings (keys) and ints (indexes).
+    CLEANRULES_THROWING([[nodiscard]] value field_paths() const { return field_paths_(nullptr); })
+    [[nodiscard]] value field_paths(error_info &error) const { return field_paths_(&error); }
+
     explicit operator bool() const noexcept { return handle_ != nullptr; }
     const cr_node *c_ptr() const noexcept { return handle_.get(); }
 
 private:
+    value field_paths_(error_info *sink) const {
+        cr_value *out = nullptr;
+        detail::check(sink,
+                      [&](cr_error **e) { return cr_node_field_paths(handle_.get(), &out, e); });
+        return value::adopt(out);
+    }
     static node read_(std::string_view text, format f, const limits *l, error_info *sink) {
         node n;
         cr_node *out = nullptr;

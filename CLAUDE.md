@@ -4,7 +4,7 @@ Motor de reglas con **un único núcleo en Rust** y bindings para Rust, C/C++, P
 
 - **Hoja de ruta y estado**: [docs/PLAN.md](docs/PLAN.md) es la fuente de verdad. Antes de empezar cualquier tarea, léela y localiza la fase y la tarea.
 - **Contratos**: la especificación ([spec/](spec/)) y la batería de conformidad (`conformance/`) definen la semántica. Si cambia el comportamiento, primero se actualizan la especificación y los vectores.
-- **Fase actual**: A, B, C, D y E completadas (especificación, formato JSON v1 y vectores de conformidad; núcleo Rust en `crates/core`, con CI que exige el 95 % de cobertura de líneas; binding de Python en `bindings/python`, que pasa todos los vectores por JSON y con datos nativos; reglas como datos: YAML, texto, tablas de decisión y acciones por nombre; C ABI en `crates/ffi` y C++ en `bindings/cpp`, con CMake, Conan y vcpkg). Siguiente: fase F (JavaScript); O.1–O.3 y V.1–V.2 ya pueden empezar.
+- **Fase actual**: A, B, C, D, E y F completadas (especificación, formato JSON v1 y vectores de conformidad; núcleo Rust en `crates/core`, con CI que exige el 95 % de cobertura de líneas; binding de Python en `bindings/python`, que pasa todos los vectores por JSON y con datos nativos; reglas como datos: YAML, texto, tablas de decisión y acciones por nombre; C ABI en `crates/ffi` y C++ en `bindings/cpp`, con CMake, Conan y vcpkg; JavaScript en `bindings/js`: addon de Node con napi-rs, WebAssembly para navegadores y Deno, API TypeScript y runner de conformidad). Siguiente: fase G (JVM: Java 25+ con FFM y Scala 3, con Gradle); O.1–O.3 y V.1–V.2 ya pueden empezar.
 
 ## Estructura
 

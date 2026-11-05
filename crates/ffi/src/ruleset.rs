@@ -1,10 +1,11 @@
 //! Rule sets (`spec/rules.md`): read from a document, written, summarized.
 
-use std::ffi::c_char;
+use std::ffi::{CStr, c_char};
 use std::sync::Arc;
 
 use cleanrules::explain::summary;
 use cleanrules::format::{Document, read_document_as, write_document_as, write_summary_as};
+use cleanrules::logic::LogicName;
 use cleanrules::rules::{Aggregate, HitPolicy, RuleSet};
 use cleanrules::{Segment, Value};
 
@@ -157,6 +158,28 @@ pub unsafe extern "C" fn cr_ruleset_summary(
     unsafe { call("cr_ruleset_summary", error, body) }
 }
 
+/// Paths as a list of paths, each a list of strings (keys) and ints (indexes),
+/// as `cr_ruleset_field_paths` and `cr_node_field_paths` give them.
+pub(crate) fn paths_value<'a>(paths: impl Iterator<Item = &'a [Segment]>) -> Value {
+    Value::List(
+        paths
+            .map(|path| {
+                Value::List(
+                    path.iter()
+                        .map(|segment| match segment {
+                            Segment::Key(key) => Value::String(key.clone()),
+                            // Indexes are below 2^63: they index lists in memory.
+                            Segment::Index(index) => {
+                                Value::Int(i64::try_from(*index).unwrap_or(i64::MAX))
+                            }
+                        })
+                        .collect(),
+                )
+            })
+            .collect(),
+    )
+}
+
 /// Free a rule set. `NULL` is ignored. Its decisions stay valid.
 ///
 /// # Safety
@@ -238,6 +261,33 @@ pub unsafe extern "C" fn cr_ruleset_hit_policy(ruleset: *const cr_ruleset) -> *c
     name.as_ptr()
 }
 
+/// The names of the core's logics as static C strings: one for every
+/// `LogicName::ALL` (a test checks it).
+const LOGICS: [&CStr; 1] = [c"boolean"];
+
+/// The rule set's logic (`boolean`, `spec/rules.md`), a static string; `NULL`
+/// for `NULL`.
+///
+/// # Safety
+///
+/// `ruleset` is `NULL` or a live `cr_ruleset`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_ruleset_logic(ruleset: *const cr_ruleset) -> *const c_char {
+    // SAFETY: `ruleset` is NULL or live (# Safety).
+    let Some(ruleset) = (unsafe { ruleset.as_ref() }) else {
+        return std::ptr::null();
+    };
+    logic_name(ruleset.ruleset.logic()).map_or(std::ptr::null(), CStr::as_ptr)
+}
+
+/// The static C string of a logic's name.
+fn logic_name(logic: LogicName) -> Option<&'static CStr> {
+    LOGICS
+        .iter()
+        .find(|name| name.to_bytes() == logic.as_str().as_bytes())
+        .copied()
+}
+
 /// The rule set's aggregate (`sum`, `min`, `max`, `count`), a static string;
 /// `NULL` when it has none, and for `NULL`. With one, the single output of a
 /// decision is the aggregate.
@@ -291,28 +341,27 @@ pub unsafe extern "C" fn cr_ruleset_field_paths(
     let body = || {
         // SAFETY: `ruleset` is NULL or live (# Safety).
         let ruleset = &unsafe { handle(ruleset, "ruleset") }?.ruleset;
-        let paths = summary(ruleset)
-            .fields
-            .iter()
-            .map(|field| {
-                Value::List(
-                    field
-                        .path
-                        .iter()
-                        .map(|segment| match segment {
-                            Segment::Key(key) => Value::String(key.clone()),
-                            // Indexes are below 2^63: they index lists in memory.
-                            Segment::Index(index) => {
-                                Value::Int(i64::try_from(*index).unwrap_or(i64::MAX))
-                            }
-                        })
-                        .collect(),
-                )
-            })
-            .collect();
+        let paths = paths_value(summary(ruleset).fields.iter().map(|field| &field.path[..]));
         // SAFETY: `out` is NULL or writable (# Safety).
-        unsafe { give_new_value(out, Value::List(paths)) }
+        unsafe { give_new_value(out, paths) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
     unsafe { call("cr_ruleset_field_paths", error, body) }
+}
+
+#[cfg(test)]
+mod tests {
+    use cleanrules::logic::LogicName;
+
+    use super::logic_name;
+
+    #[test]
+    fn every_logic_has_a_static_name() {
+        for logic in LogicName::ALL {
+            assert_eq!(
+                logic_name(logic).map(|name| name.to_str().ok()),
+                Some(Some(logic.as_str()))
+            );
+        }
+    }
 }

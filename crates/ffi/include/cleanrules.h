@@ -805,6 +805,21 @@ cr_status cr_node_evaluate_value_tree(const struct cr_node *node,
                                       size_t *len,
                                       struct cr_error **error);
 
+// The paths of the input that the node reads, in preorder and each once, as
+// a new list of paths, each a list of strings (keys) and ints (indexes),
+// freed with `cr_value_free`. A binding reads only these from native data
+// (`spec/data-model.md`, *Reading native data*), as with
+// `cr_ruleset_field_paths`.
+//
+// # Safety
+//
+// `node` is `NULL` or a live `cr_node`; `out` is `NULL` or points to a
+// writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_node_field_paths(const struct cr_node *node,
+                              struct cr_value **out,
+                              struct cr_error **error);
+
 // Free a node. `NULL` is ignored.
 //
 // # Safety
@@ -965,6 +980,14 @@ const char *cr_ruleset_hit_policy(const struct cr_ruleset *ruleset);
 //
 // `ruleset` is `NULL` or a live `cr_ruleset`.
 size_t cr_ruleset_len(const struct cr_ruleset *ruleset);
+
+// The rule set's logic (`boolean`, `spec/rules.md`), a static string; `NULL`
+// for `NULL`.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`.
+const char *cr_ruleset_logic(const struct cr_ruleset *ruleset);
 
 // Read a rule set in `format` (`CR_FORMAT_*`): a rule set, a decision table,
 // which is compiled, or one rule (`cr_ruleset_from_document`).

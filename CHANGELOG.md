@@ -354,6 +354,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cleanrules/native` must run on the platform package's addon and
   `--conditions=browser` on WebAssembly. The README lists the platforms and
   the WebAssembly fallback.
+- Java binding, its native layer (task G.1a, `bindings/jvm`): Java 25 or
+  later on the C ABI through the Foreign Function & Memory API, with bindings
+  of `cleanrules.h` written by hand and no native code or dependencies of its
+  own; module `io.github.cleanrules` (artifact
+  `io.github.cleanrules:cleanrules`, not published). The package
+  `io.github.cleanrules` holds what every layer shares: the errors, immutable
+  `Limits`, the enums `Format`, `Truth`, `DocumentKind`, `HitPolicy` and
+  `Aggregate` (with `jsonName()` and `fromJsonName`), and `CleanRules`
+  (versions and where the library came from). The native layer is
+  `io.github.cleanrules.ffi`, as `cleanrules/native` is in JavaScript:
+  `Document`, `RuleSet` (read in JSON, YAML, text or CSV, written, summarized,
+  described with `logic()` among others, evaluated on Java data or JSON, in
+  batches from any `Iterable`, `readDecision`, `checkActions` and `run`),
+  `Decision` (`firedAt`, `truth`, `selected`, outputs as Java values, written
+  and explained), `Node` (read, written, its field paths, and its result trees
+  on Java data or JSON), `Action` and `ActionCall`; the internals are a
+  package the module does not export. Java data is read along the paths the
+  rules read, each object once: `Optional`, numbers with `BigInteger` and
+  `BigDecimal`, strings, enum constants as their names, `java.time` and the
+  legacy dates, lists, arrays, maps (sequenced maps in order, others sorted),
+  records, and the public fields and JavaBean accessors of other objects;
+  anything of the Java platform not listed, and the binding's own objects, is
+  opaque and never read through, and opaque values come back as the same
+  objects; an index beyond `Integer.MAX_VALUE` is missing. Outputs come back as `Long`, `Double`, `BigDecimal`,
+  `LocalDate`, `LocalDateTime`, `ZonedDateTime`, unmodifiable lists and
+  sequenced maps. Errors are unchecked exceptions with the hierarchy of
+  `spec/errors.md` (`CleanRulesException`, `MissingFieldException`...), with
+  `code()`, `hint()`, every context field (`line()`, `column()` and `row()` as
+  `OptionalInt`) and `json()`; a getter that threw is the cause of a
+  strict-mode `EvaluationException`, and an error of the virtual machine is
+  never wrapped. Actions are lambdas called through one upcall stub that never
+  lets an exception cross the native frames: what an action throws is the
+  cause of the `ActionException`, which has the decision. An `ActionCall` is
+  usable from other threads during its call only, and its `decision()` is one
+  copy shared by the actions of a run. Handles are `AutoCloseable` with a `Cleaner` behind them,
+  and a count of the calls using each, so closing twice does nothing, use
+  after close is an `IllegalStateException`, and closing while another thread
+  evaluates frees when that evaluation ends. The library is found by the
+  system property `cleanrules.library.path`, the environment variable
+  `CLEANRULES_LIBRARY_PATH`, `java.library.path` or the system loader, and one
+  that is missing, of another ABI or format version, or loaded without native
+  access for the module is a clear `UnsatisfiedLinkError`, every time. Gradle build (Kotlin DSL, wrapper, `--release 25`,
+  `-Xlint:all -Werror`, javadoc with `-Xdoclint:all -Werror`) that builds the
+  C ABI with cargo before its JUnit 5 tests, including a smoke pass of 131
+  conformance vectors through JSON and 127 through Java data, and the example
+  `docs/examples/Discounts.java` on the class path and the module path; CI job
+  `jvm` on Linux, macOS and Windows with Temurin 25, which first checks the
+  Gradle wrapper jar against the sha256 pinned in the repository and the one
+  Gradle publishes.
+- C ABI: `cr_node_field_paths`, the paths a single node reads, as
+  `cr_ruleset_field_paths` gives a rule set's, so that a binding reads only
+  those from native data when it evaluates a node; and `cr_ruleset_logic`, the
+  rule set's logic as a static string, like `cr_ruleset_hit_policy`. C++:
+  `ruleset::logic()` and `node::field_paths()` (both overloads).
 - WebAssembly build of the JavaScript binding (task F.1b): the same npm
   package `cleanrules` runs in browsers, Deno (2.6 or later) and other runtimes
   on a WebAssembly module built with wasm-bindgen, with the same API as the
@@ -595,6 +649,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`spec/text.md`): `ruleFromText` where camel case is the idiom. Tables
   (`spec/tables.md`, *Grids*): in JavaScript, `null`, `undefined` and holes are
   empty cells. No conformance vector changes.
+- Data model (`spec/data-model.md`, *Java and Scala*): values given back to
+  Java are specified (*Values given back*): null of any reason as `null`, ints
+  as `Long`, floats as `Double`, decimals as `BigDecimal` (the infinities as
+  `Double`'s), dates and naive datetimes as `LocalDate` and `LocalDateTime`,
+  aware datetimes as `ZonedDateTime` in their zone or at a `ZoneOffset`, lists
+  and maps as unmodifiable `List` and `SequencedMap`, opaque values as the
+  objects read (`null` in a decision read from a document). On the way in, sets
+  and other collections that are not lists, `byte[]`, iterators, lambdas,
+  threads, class loaders, classes and every other object of the Java platform
+  not listed are opaque and never read through; records keep their
+  components' order; other objects are maps sorted by name, an accessor
+  winning over a field, and never a member a class of the platform declares;
+  a public member of a class that is not public is read where the package is
+  open, or through a public supertype. Enum constants are strings, their
+  `name()`, and the binding's own objects are opaque. Errors
+  (`spec/errors.md`): Java's exceptions have an accessor for each context
+  field and `json()`, an `ActionException` has the decision, and misuses are
+  `IllegalArgumentException` (`CR_INVALID_ARGUMENT`) and
+  `IllegalStateException` (`CR_INTERNAL_ERROR`, closed objects, ended action
+  calls).
+  Native data only, so no conformance vector changes.
 - Errors (`spec/errors.md`): in JavaScript the context fields are in `context`,
   because an error's `name` is its class, and an `ActionError` has the
   `decision`.

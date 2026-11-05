@@ -339,6 +339,13 @@ fn a_rule_set_says_what_it_reads() {
             "collect"
         );
         assert!(cr_ruleset_hit_policy(ptr::null()).is_null());
+        assert_eq!(
+            std::ffi::CStr::from_ptr(cr_ruleset_logic(ruleset.0))
+                .to_str()
+                .unwrap(),
+            "boolean"
+        );
+        assert!(cr_ruleset_logic(ptr::null()).is_null());
         let (mut name, mut len) = (ptr::null(), 0);
         assert_eq!(
             cr_ruleset_rule_name(ruleset.0, 1, &raw mut name, &raw mut len, ptr::null_mut()),
