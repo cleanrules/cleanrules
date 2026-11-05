@@ -580,6 +580,14 @@ a `decision_mismatch`, with a pointer to the offending value:
 7. `selected` is what the hit policy selects from the fired rules;
 8. `aggregated` is what the aggregate gives from the selected outputs.
 
+Recorded values are compared after reading, in their canonical form
+(*Values*): every accepted form of a value matches it, while an int and a
+float differ, and so do decimals of different scale and float zeros of
+different sign. The exception is check 3's `const` values, which match the
+rule's constants by structural identity (`ast.md`). Reasons compare on `code`,
+`paths` and `types` (never `detail`), and the members of a result tree in any
+order.
+
 So a decision that a reader accepts is exactly one the core could have
 produced for some input.
 

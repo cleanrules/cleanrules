@@ -16,7 +16,7 @@ use cleanrules::format::{
 };
 use cleanrules::json::{Json, JsonNumber, Limits, same, to_string};
 use cleanrules::logic::{Kleene, Truth};
-use cleanrules::rules::{Config, HitPolicy, Rule, RuleSet};
+use cleanrules::rules::{Aggregate, Config, HitPolicy, Rule, RuleSet};
 use cleanrules::table::DecisionTable;
 use cleanrules::value::{Decimal, Map, NullCause, Value};
 use cleanrules::{ErrorCode, Segment};
@@ -393,6 +393,193 @@ fn ruleset(conditions: Vec<Node>, policy: HitPolicy) -> RuleSet {
     .unwrap()
 }
 
+/// Data for the alternative encodings: whole and infinite floats, which have the
+/// `{"$float": n}` and `{"$float": "inf"}` forms, and a map under `m`.
+fn alternative_input() -> impl Strategy<Value = Value> {
+    let item = prop_oneof![
+        4 => maybe(),
+        2 => (-1000_i32..1000).prop_map(|i| Value::Float(f64::from(i))),
+        1 => Just(Value::Float(f64::INFINITY)),
+        1 => Just(Value::Float(-0.0)),
+    ];
+    (
+        item.clone(),
+        item.clone(),
+        item.clone(),
+        item,
+        any::<bool>(),
+    )
+        .prop_map(|(a, b, c, k, dollar)| {
+            let mut inner = Map::new();
+            inner.insert(if dollar { "$ref" } else { "k" }, k);
+            inner.insert("l", Value::List(vec![Value::Int(1), Value::Float(2.0)]));
+            let mut map = Map::new();
+            map.insert("a", a);
+            map.insert("b", b);
+            map.insert("c", c);
+            map.insert("m", Value::Map(inner));
+            Value::Map(map)
+        })
+}
+
+/// Rules with a numeric payload `v` and, when the aggregate allows it, the map
+/// `m`, under a policy and an aggregate.
+fn alternative_ruleset() -> impl Strategy<Value = RuleSet> {
+    let aggregates = vec![
+        None,
+        Some(Aggregate::Sum),
+        Some(Aggregate::Min),
+        Some(Aggregate::Max),
+        Some(Aggregate::Count),
+    ];
+    (
+        prop::collection::vec((condition(), numeric()), 1..4),
+        prop::sample::select(vec![
+            HitPolicy::First,
+            HitPolicy::RuleOrder,
+            HitPolicy::Collect,
+        ]),
+        prop::sample::select(aggregates),
+    )
+        .prop_map(|(rules, policy, aggregate)| {
+            let aggregate = aggregate.filter(|_| policy == HitPolicy::Collect);
+            let numeric_only = matches!(
+                aggregate,
+                Some(Aggregate::Sum | Aggregate::Min | Aggregate::Max)
+            );
+            let rules = rules
+                .into_iter()
+                .enumerate()
+                .map(|(i, (when, v))| {
+                    let mut payload = vec![("v".to_owned(), v)];
+                    if !numeric_only {
+                        payload.push((
+                            "m".to_owned(),
+                            Node::field(vec![Segment::Key("m".into())]).unwrap(),
+                        ));
+                    }
+                    Rule::with_payload(format!("r{i}"), when, payload).unwrap()
+                })
+                .collect();
+            RuleSet::new(
+                rules,
+                Config {
+                    hit_policy: policy,
+                    aggregate,
+                    ..Config::default()
+                },
+            )
+            .unwrap()
+        })
+}
+
+/// A value written in a form that readers accept and writers never produce
+/// (`spec/json-format.md`, *Values*): `{"$int": "n"}`, `{"$float": n}` (with an
+/// integer literal for a whole float, as JavaScript writes it) and `{"$map": ...}`.
+fn alternative(value: &Json) -> Json {
+    let typed = |key: &str, inner: Json| Json::Object(vec![(key.to_owned(), inner)]);
+    let entries = |members: &[(String, Json)]| {
+        Json::Object(
+            members
+                .iter()
+                .map(|(k, v)| (k.clone(), alternative(v)))
+                .collect(),
+        )
+    };
+    match value {
+        Json::Number(n) if n.is_integer_literal() => {
+            typed("$int", Json::String(n.text().to_owned()))
+        }
+        Json::Number(n) => {
+            let f = n.as_f64();
+            let literal = if f.trunc().to_bits() == f.to_bits() && f.abs() < 1e15 {
+                format!("{f:.0}")
+            } else {
+                n.text().to_owned()
+            };
+            typed("$float", Json::Number(JsonNumber::from_literal(literal)))
+        }
+        Json::Array(items) => Json::Array(items.iter().map(alternative).collect()),
+        Json::Object(members) => match members.as_slice() {
+            [(key, Json::Object(inner))] if key == "$map" => typed("$map", entries(inner)),
+            [(key, _)] if key.starts_with('$') => value.clone(),
+            _ => typed("$map", entries(members)),
+        },
+        other => other.clone(),
+    }
+}
+
+/// A written result tree with every value in an alternative form.
+fn alternative_tree(tree: &Json) -> Json {
+    let Json::Object(members) = tree else {
+        unreachable!("a result tree is an object")
+    };
+    Json::Object(
+        members
+            .iter()
+            .map(|(k, v)| match (k.as_str(), v) {
+                ("value", _) => (k.clone(), alternative(v)),
+                ("children", Json::Array(items)) => (
+                    k.clone(),
+                    Json::Array(items.iter().map(alternative_tree).collect()),
+                ),
+                _ => (k.clone(), v.clone()),
+            })
+            .collect(),
+    )
+}
+
+/// A written decision with every value, in its trees and its aggregate, in an
+/// alternative form.
+fn alternative_decision(decision: &Json) -> Json {
+    let Json::Object(members) = decision else {
+        unreachable!("a decision is an object")
+    };
+    let result = |item: &Json| {
+        let Json::Object(fields) = item else {
+            unreachable!("a rule result is an object")
+        };
+        Json::Object(
+            fields
+                .iter()
+                .map(|(k, v)| match (k.as_str(), v) {
+                    ("when", _) => (k.clone(), alternative_tree(v)),
+                    ("then", Json::Object(trees)) => (
+                        k.clone(),
+                        Json::Object(
+                            trees
+                                .iter()
+                                .map(|(key, t)| (key.clone(), alternative_tree(t)))
+                                .collect(),
+                        ),
+                    ),
+                    _ => (k.clone(), v.clone()),
+                })
+                .collect(),
+        )
+    };
+    Json::Object(
+        members
+            .iter()
+            .map(|(k, v)| match (k.as_str(), v) {
+                ("results", Json::Array(items)) => {
+                    (k.clone(), Json::Array(items.iter().map(result).collect()))
+                }
+                ("aggregated", Json::Object(entries)) => (
+                    k.clone(),
+                    Json::Object(
+                        entries
+                            .iter()
+                            .map(|(key, value)| (key.clone(), alternative(value)))
+                            .collect(),
+                    ),
+                ),
+                _ => (k.clone(), v.clone()),
+            })
+            .collect(),
+    )
+}
+
 // --- Properties ------------------------------------------------------------------------------
 
 proptest! {
@@ -467,6 +654,23 @@ proptest! {
         ]);
         let read = read_decision_document(&to_string(&document), &rules, &Limits::default()).unwrap();
         prop_assert!(same(&write_decision(&read), &written));
+    }
+
+    #[test]
+    fn decisions_read_back_from_alternative_encodings(rules in alternative_ruleset(), data in alternative_input()) {
+        let Ok(decision) = rules.evaluate(&data) else {
+            // A non-numeric output under sum, min or max: nothing to read back.
+            return Ok(());
+        };
+        let written = write_decision(&decision);
+        let document = Json::Object(vec![
+            ("version".into(), Json::Number(JsonNumber::from_literal("1"))),
+            ("decision".into(), alternative_decision(&written)),
+        ]);
+        let text = to_string(&document);
+        let read = read_decision_document(&text, &rules, &Limits::default())
+            .map_err(|e| TestCaseError::fail(format!("{text}: {e} at {:?}", e.context().pointer)))?;
+        prop_assert!(same(&write_decision(&read), &written), "{text}");
     }
 
     #[test]

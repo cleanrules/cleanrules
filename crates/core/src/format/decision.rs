@@ -16,7 +16,7 @@ use crate::format::value::{ValueContext, read_value, write_value};
 use crate::json::{Json, pointer_token, same};
 use crate::logic::{Kleene, Logic, Truth};
 use crate::rules::{Aggregated, Decision, HitPolicy, RuleResult, RuleSet};
-use crate::value::Group;
+use crate::value::{Group, Value};
 
 fn format_error(pointer: &str, message: impl Into<String>) -> Error {
     Error::new(ErrorCode::FormatError, message).at_pointer(pointer)
@@ -71,15 +71,46 @@ const TAGS: [&str; 24] = [
     "neg",
 ];
 
-/// A recorded result tree whose shape is valid.
-struct Tree<'j> {
+/// A recorded result tree whose shape is valid, with its values already read, so
+/// any form that *Values* accepts has become the value it stands for.
+struct Tree {
     pointer: String,
-    json: &'j [(String, Json)],
     op: String,
     path: Option<Vec<Segment>>,
     outcome: Outcome<Truth>,
     reason: Option<Reason>,
-    children: Vec<Tree<'j>>,
+    children: Vec<Tree>,
+}
+
+/// Whether two values read from a decision, or computed, are the same value:
+/// compared in their canonical form (`spec/json-format.md`, *Values*), so the
+/// forms a reader accepts (`{"$float": 1}`, `{"$int": "5"}`, `{"$map": ...}`) match
+/// the canonical ones, while an int and a float, or a decimal's scale, differ.
+fn same_value(a: &Value, b: &Value) -> bool {
+    same(&write_value(a), &write_value(b))
+}
+
+/// Whether two recorded trees are equal: the same ops, paths, children, truth
+/// values or values (by [`same_value`]) and reasons (without `detail`, which is
+/// never compared), whatever the order of their keys or the form of their values.
+fn same_tree(a: &Tree, b: &Tree) -> bool {
+    let outcomes = match (&a.outcome, &b.outcome) {
+        (Outcome::Truth(x), Outcome::Truth(y)) => x == y,
+        (Outcome::Value(x), Outcome::Value(y)) => same_value(x, y),
+        _ => false,
+    };
+    a.op == b.op
+        && a.path == b.path
+        && outcomes
+        && same(
+            &reason_json(a.reason.as_ref()),
+            &reason_json(b.reason.as_ref()),
+        )
+        && a.children.len() == b.children.len()
+        && a.children
+            .iter()
+            .zip(&b.children)
+            .all(|(x, y)| same_tree(x, y))
 }
 
 fn read_path(json: &Json, pointer: &str) -> Result<Vec<Segment>> {
@@ -202,12 +233,7 @@ fn read_reason(json: &Json, pointer: &str) -> Result<Reason> {
     })
 }
 
-fn read_tree<'j>(
-    json: &'j Json,
-    pointer: &str,
-    depth: usize,
-    max_depth: usize,
-) -> Result<Tree<'j>> {
+fn read_tree(json: &Json, pointer: &str, depth: usize, max_depth: usize) -> Result<Tree> {
     if depth > max_depth {
         return Err(Error::new(
             ErrorCode::LimitExceeded,
@@ -297,7 +323,6 @@ fn read_tree<'j>(
     )?;
     Ok(Tree {
         pointer: pointer.to_owned(),
-        json: members,
         op,
         path,
         outcome,
@@ -358,11 +383,7 @@ fn expected_children<'a>(node: &Cow<'a, Node>, truth: bool) -> Result<Vec<(Cow<'
 }
 
 /// Check 3: the tree matches its node, node by node; build the result.
-fn match_tree<'a>(
-    tree: &Tree<'_>,
-    node: Cow<'a, Node>,
-    truth: bool,
-) -> Result<Evaluated<'a, Truth>> {
+fn match_tree<'a>(tree: &Tree, node: Cow<'a, Node>, truth: bool) -> Result<Evaluated<'a, Truth>> {
     if tree.op != node.tag() {
         return Err(mismatch(
             &at(&tree.pointer, "op"),
@@ -404,17 +425,18 @@ fn match_tree<'a>(
     for (child_tree, (child_node, child_truth)) in tree.children.iter().zip(expected) {
         children.push(match_tree(child_tree, child_node, child_truth)?);
     }
-    if matches!(node.expr(), Expr::Between { .. }) {
-        let copy = |half: &Tree<'_>| half.children.first().map(|c| Json::Object(c.json.to_vec()));
-        if let (Some(a), Some(b)) = (copy(&tree.children[0]), copy(&tree.children[1]))
-            && !same(&a, &b)
-        {
-            let second = &tree.children[1].children[0].pointer;
-            return Err(mismatch(
-                second,
-                "both halves of a between hold the same operand",
-            ));
-        }
+    if matches!(node.expr(), Expr::Between { .. })
+        // Both halves were matched above, so each has its operand first.
+        && let (Some(first), Some(second)) = (
+            tree.children[0].children.first(),
+            tree.children[1].children.first(),
+        )
+        && !same_tree(first, second)
+    {
+        return Err(mismatch(
+            &second.pointer,
+            "both halves of a between hold the same operand",
+        ));
     }
     Ok(Evaluated {
         node,
@@ -435,7 +457,7 @@ fn reason_json(reason: Option<&Reason>) -> Json {
 }
 
 /// Check 5: every result is what evaluation gives from its children's.
-fn check_recomputed(result: &Evaluated<'_, Truth>, tree: &Tree<'_>) -> Result<()> {
+fn check_recomputed(result: &Evaluated<'_, Truth>, tree: &Tree) -> Result<()> {
     for (child, child_tree) in result.children.iter().zip(&tree.children) {
         check_recomputed(child, child_tree)?;
     }
@@ -450,7 +472,7 @@ fn check_recomputed(result: &Evaluated<'_, Truth>, tree: &Tree<'_>) -> Result<()
                 ),
             ));
         }
-        (Outcome::Value(a), Outcome::Value(b)) if !same(&write_value(a), &write_value(b)) => {
+        (Outcome::Value(a), Outcome::Value(b)) if !same_value(a, b) => {
             return Err(mismatch(
                 &at(&tree.pointer, "value"),
                 "evaluation gives another value",
@@ -570,13 +592,36 @@ pub(crate) fn read_decision<'a>(
         };
         selected_names.push(name.clone());
     }
+    let aggregated_at = at(pointer, "aggregated");
     let aggregated_json = get(members, "aggregated");
     if aggregate.is_some() != aggregated_json.is_some() {
         return Err(format_error(
-            &at(pointer, "aggregated"),
+            &aggregated_at,
             "\"aggregated\" comes with \"aggregate\"",
         ));
     }
+    // The recorded aggregate, read as values: `None` when nothing was selected.
+    let recorded_aggregated: Option<Vec<(String, Value)>> = match aggregated_json {
+        None | Some(Json::Null) => None,
+        Some(Json::Object(entries)) => Some(
+            entries
+                .iter()
+                .map(|(key, value)| {
+                    let value_at = at(&aggregated_at, key);
+                    Ok((
+                        key.clone(),
+                        read_value(value, &value_at, ValueContext::Recorded)?,
+                    ))
+                })
+                .collect::<Result<_>>()?,
+        ),
+        Some(_) => {
+            return Err(format_error(
+                &aggregated_at,
+                "\"aggregated\" is an object of payload keys, or null when nothing was selected",
+            ));
+        }
+    };
     unknown_keys(
         members,
         &[
@@ -717,19 +762,23 @@ pub(crate) fn read_decision<'a>(
     let aggregated = match ruleset.aggregate() {
         None => None,
         Some(aggregate) => {
-            let aggregated_at = at(pointer, "aggregated");
             let computed = ruleset
                 .aggregated(aggregate, &results, &selected)
                 .map_err(|_| mismatch(&aggregated_at, "the aggregate cannot be computed"))?;
-            let written = match &computed {
-                Aggregated::NothingSelected => Json::Null,
-                Aggregated::Values(map) => Json::Object(
-                    map.iter()
-                        .map(|(k, v)| (k.to_owned(), write_value(v)))
-                        .collect(),
-                ),
+            // Compared as values, key by key in order (`spec/rules.md`, *`COLLECT`
+            // aggregates*), so every accepted form of a value matches.
+            let agrees = match (&computed, &recorded_aggregated) {
+                (Aggregated::NothingSelected, None) => true,
+                (Aggregated::Values(map), Some(entries)) => {
+                    map.len() == entries.len()
+                        && map
+                            .iter()
+                            .zip(entries)
+                            .all(|((k, v), (l, w))| k == l && same_value(v, w))
+                }
+                _ => false,
             };
-            if !aggregated_json.is_some_and(|recorded| same(&written, recorded)) {
+            if !agrees {
                 return Err(mismatch(
                     &aggregated_at,
                     "not the aggregate of the selected outputs",
@@ -739,4 +788,157 @@ pub(crate) fn read_decision<'a>(
         }
     };
     Ok(Decision::from_parts(ruleset, results, selected, aggregated))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{read_decision, read_tree, same_tree, same_value};
+    use crate::ErrorCode;
+    use crate::format::read_ruleset;
+    use crate::format::value::{ValueContext, read_value};
+    use crate::json::{Json, Limits, parse};
+    use crate::value::Value;
+
+    fn json(text: &str) -> Json {
+        parse(text, &Limits::default()).unwrap()
+    }
+
+    fn value(text: &str) -> Value {
+        read_value(&json(text), "", ValueContext::Recorded).unwrap()
+    }
+
+    #[test]
+    fn values_compare_whatever_their_form() {
+        for (a, b) in [
+            ("608.0", r#"{"$float": 608}"#),
+            ("6.08e2", r#"{"$float": 608.0}"#),
+            (r#"{"$float": "inf"}"#, r#"{"$float": "inf"}"#),
+            ("5", r#"{"$int": "5"}"#),
+            ("5", r#"{"$int": "005"}"#),
+            ("5", r#"{"$int": 5}"#),
+            (
+                r#"{"a": [1, 2.5]}"#,
+                r#"{"$map": {"a": [{"$int": 1}, {"$float": 2.5}]}}"#,
+            ),
+            (r#"{"$decimal": "1.50"}"#, r#"{"$decimal": "150e-2"}"#),
+        ] {
+            assert!(same_value(&value(a), &value(b)), "{a} and {b}");
+        }
+        for (a, b) in [
+            ("608", r#"{"$float": 608}"#),
+            (r#"{"$int": 3}"#, "3.0"),
+            ("0.0", "-0.0"),
+            (r#"{"$decimal": "1.0"}"#, r#"{"$decimal": "1.00"}"#),
+            (r#"{"a": 1, "b": 2}"#, r#"{"b": 2, "a": 1}"#),
+        ] {
+            assert!(!same_value(&value(a), &value(b)), "{a} and {b}");
+        }
+    }
+
+    #[test]
+    fn trees_compare_by_content_not_by_text() {
+        let tree = |text: &str| read_tree(&json(text), "", 1, 8).unwrap();
+        let canonical = tree(
+            r#"{"op": "field", "path": ["w"], "value": null, "reason": {"code": "missing_field", "paths": [["w"]]}}"#,
+        );
+        let spelled_out = tree(
+            r#"{"reason": {"detail": "w is missing", "types": [], "paths": [["w"]], "code": "missing_field"}, "value": null, "path": ["w"], "op": "field"}"#,
+        );
+        assert!(same_tree(&canonical, &spelled_out));
+        let other_reason = tree(
+            r#"{"op": "field", "path": ["w"], "value": null, "reason": {"code": "null", "paths": [["w"]]}}"#,
+        );
+        assert!(!same_tree(&canonical, &other_reason));
+        let float = tree(r#"{"op": "field", "path": ["x"], "value": 3.0}"#);
+        let alternative = tree(r#"{"op": "field", "path": ["x"], "value": {"$float": 3}}"#);
+        let int = tree(r#"{"op": "field", "path": ["x"], "value": 3}"#);
+        assert!(same_tree(&float, &alternative));
+        assert!(!same_tree(&float, &int));
+        assert!(!same_tree(
+            &float,
+            &tree(r#"{"op": "field", "path": ["y"], "value": 3.0}"#)
+        ));
+        let truth = tree(
+            r#"{"op": "field", "path": ["x"], "truth": true, "children": [{"op": "field", "path": ["x"], "value": true}]}"#,
+        );
+        assert!(!same_tree(&truth, &float));
+        assert!(!same_tree(
+            &truth,
+            &tree(r#"{"op": "field", "path": ["x"], "truth": true}"#)
+        ));
+    }
+
+    /// A collect-sum rule set whose sum is the float 608.0 and the int 3, and its
+    /// decision with `aggregated` replaced.
+    fn read_with_aggregated(aggregated: &str) -> crate::Result<()> {
+        let ruleset = read_ruleset(
+            &json(
+                r#"{"hit_policy": "collect", "aggregate": "sum", "logic": "boolean", "rules": [
+                    {"name": "p", "when": {"op": "const", "value": true}, "then": {"y": {"op": "const", "value": 600.0}, "n": {"op": "const", "value": 1}}},
+                    {"name": "q", "when": {"op": "const", "value": true}, "then": {"y": {"op": "const", "value": 8.0}, "n": {"op": "const", "value": 2}}}]}"#,
+            ),
+            "/ruleset",
+            &Limits::default(),
+        )
+        .unwrap();
+        let result = |name: &str, y: &str, n: &str| {
+            format!(
+                r#"{{"rule": "{name}", "fired": true, "when": {{"op": "const", "truth": true, "children": [{{"op": "const", "value": true}}]}}, "then": {{"y": {{"op": "const", "value": {y}}}, "n": {{"op": "const", "value": {n}}}}}}}"#
+            )
+        };
+        let decision = format!(
+            r#"{{"hit_policy": "collect", "aggregate": "sum", "logic": "boolean", "results": [{}, {}], "selected": ["p", "q"], "aggregated": {aggregated}}}"#,
+            result("p", r#"{"$float": 600}"#, "1"),
+            result("q", "8.0", r#"{"$int": "2"}"#),
+        );
+        read_decision(&json(&decision), "/decision", &ruleset, 8).map(|_| ())
+    }
+
+    #[test]
+    fn the_aggregate_is_compared_as_values() {
+        for accepted in [
+            r#"{"y": 608.0, "n": 3}"#,
+            r#"{"y": {"$float": 608}, "n": {"$int": "3"}}"#,
+            r#"{"y": 6.08e2, "n": {"$int": 3}}"#,
+        ] {
+            assert!(read_with_aggregated(accepted).is_ok(), "{accepted}");
+        }
+        for (rejected, code, pointer) in [
+            (
+                r#"{"y": 608, "n": 3}"#,
+                ErrorCode::DecisionMismatch,
+                "/decision/aggregated",
+            ),
+            (
+                r#"{"y": 608.0, "n": {"$float": 3}}"#,
+                ErrorCode::DecisionMismatch,
+                "/decision/aggregated",
+            ),
+            (
+                r#"{"n": 3, "y": 608.0}"#,
+                ErrorCode::DecisionMismatch,
+                "/decision/aggregated",
+            ),
+            (
+                r#"{"y": 608.0}"#,
+                ErrorCode::DecisionMismatch,
+                "/decision/aggregated",
+            ),
+            ("null", ErrorCode::DecisionMismatch, "/decision/aggregated"),
+            ("[608.0, 3]", ErrorCode::FormatError, "/decision/aggregated"),
+            (
+                r#"{"y": {"$float": "608"}, "n": 3}"#,
+                ErrorCode::FormatError,
+                "/decision/aggregated/y/$float",
+            ),
+        ] {
+            let error = read_with_aggregated(rejected).unwrap_err();
+            assert_eq!(error.code(), code, "{rejected}");
+            assert_eq!(
+                error.context().pointer.as_deref(),
+                Some(pointer),
+                "{rejected}"
+            );
+        }
+    }
 }

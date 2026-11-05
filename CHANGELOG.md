@@ -619,4 +619,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installed: `@rpath/libcleanrules_ffi.dylib` on macOS (it was the absolute
   path of the build) and the SONAME `libcleanrules_ffi.so` on Linux (it had
   none).
+- Reading a decision accepts every form of a value that the JSON format
+  allows: the aggregate (`aggregated`) and the two copies of a `between`
+  operand were compared as raw JSON, so `{"$float": 608}`, `{"$int": "3"}`,
+  `{"$map": ...}`, reasons that spell out their defaults or members in another
+  order were a `decision_mismatch`. They are now read as values and compared
+  as values, so a decision written by `JSON.stringify` in JavaScript reads back;
+  an int and a float still differ. An `aggregated` that is neither an object
+  nor null, or holds a malformed value, is now a `format_error` found with the
+  shape, as for result trees, instead of a `decision_mismatch`.
 

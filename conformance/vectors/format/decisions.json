@@ -13618,6 +13618,2345 @@
           "pointer": "/decision/aggregated"
         }
       }
+    },
+    {
+      "id": "format/decisions/aggregated-float-alternative-form",
+      "spec": [
+        "json-format.md#reading-a-decision",
+        "json-format.md#values",
+        "json-format.md#numbers"
+      ],
+      "description": "an aggregated float holding an integer, written {\"$float\": 608} as JavaScript's toJSON does, reads back as 608.0",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 600.0
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 600.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": true,
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ],
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ],
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 8.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "p",
+              "q"
+            ],
+            "aggregated": {
+              "y": {
+                "$float": 608
+              },
+              "n": 3
+            }
+          }
+        },
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "p",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "q",
+              "when": {
+                "op": "field",
+                "path": [
+                  "flag"
+                ]
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 8.0
+                },
+                "n": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 600.0
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 600.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": true,
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ],
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ],
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 8.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "p",
+              "q"
+            ],
+            "aggregated": {
+              "y": 608.0,
+              "n": 3
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/decisions/alternative-forms",
+      "spec": [
+        "json-format.md#reading-a-decision",
+        "json-format.md#values",
+        "json-format.md#numbers"
+      ],
+      "description": "values read, constants, payload values and the aggregate in their alternative forms read back as the canonical decision",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": {
+                        "$float": 600
+                      }
+                    },
+                    {
+                      "op": "const",
+                      "value": {
+                        "$int": "1"
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": {
+                      "$float": 600
+                    }
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": {
+                      "$int": 1
+                    }
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": true,
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ],
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ],
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": {
+                      "$float": 8
+                    }
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": {
+                      "$int": "002"
+                    }
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "p",
+              "q"
+            ],
+            "aggregated": {
+              "y": {
+                "$float": 608
+              },
+              "n": {
+                "$int": "3"
+              }
+            }
+          }
+        },
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "p",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "q",
+              "when": {
+                "op": "field",
+                "path": [
+                  "flag"
+                ]
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 8.0
+                },
+                "n": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 600.0
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 600.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": true,
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ],
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ],
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 8.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "p",
+              "q"
+            ],
+            "aggregated": {
+              "y": 608.0,
+              "n": 3
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/decisions/aggregated-int-for-float",
+      "spec": [
+        "json-format.md#reading-a-decision",
+        "json-format.md#values",
+        "rules.md#collect-aggregates"
+      ],
+      "description": "the float sum 608.0 recorded as the int 608, as JSON.stringify writes it, is not the aggregate",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 600.0
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 600.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": true,
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ],
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ],
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 8.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "p",
+              "q"
+            ],
+            "aggregated": {
+              "y": 608,
+              "n": 3
+            }
+          }
+        },
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "p",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "q",
+              "when": {
+                "op": "field",
+                "path": [
+                  "flag"
+                ]
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 8.0
+                },
+                "n": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/aggregated"
+        }
+      }
+    },
+    {
+      "id": "format/decisions/aggregated-float-for-int",
+      "spec": [
+        "json-format.md#reading-a-decision",
+        "json-format.md#values",
+        "rules.md#collect-aggregates"
+      ],
+      "description": "the int sum 3 recorded as the float {\"$float\": 3} is not the aggregate",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 600.0
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 600.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": true,
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ],
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ],
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 8.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "p",
+              "q"
+            ],
+            "aggregated": {
+              "y": 608.0,
+              "n": {
+                "$float": 3
+              }
+            }
+          }
+        },
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "p",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "q",
+              "when": {
+                "op": "field",
+                "path": [
+                  "flag"
+                ]
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 8.0
+                },
+                "n": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/aggregated"
+        }
+      }
+    },
+    {
+      "id": "format/decisions/then-float-for-int-constant",
+      "spec": [
+        "json-format.md#reading-a-decision",
+        "ast.md#structural-identity"
+      ],
+      "description": "a payload constant recorded as the float {\"$float\": 1} is not the rule's int 1",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 600.0
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 600.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": {
+                      "$float": 1
+                    }
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": true,
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ],
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ],
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 8.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "p",
+              "q"
+            ],
+            "aggregated": {
+              "y": 608.0,
+              "n": 3
+            }
+          }
+        },
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "p",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "q",
+              "when": {
+                "op": "field",
+                "path": [
+                  "flag"
+                ]
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 8.0
+                },
+                "n": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/results/0/then/n/value"
+        }
+      }
+    },
+    {
+      "id": "format/decisions/shape-aggregated-not-object",
+      "spec": [
+        "json-format.md#reading-a-decision"
+      ],
+      "description": "\"aggregated\" is an object or null",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 600.0
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 600.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": true,
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ],
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ],
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 8.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "p",
+              "q"
+            ],
+            "aggregated": 608
+          }
+        },
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "p",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "q",
+              "when": {
+                "op": "field",
+                "path": [
+                  "flag"
+                ]
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 8.0
+                },
+                "n": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision/aggregated"
+        }
+      }
+    },
+    {
+      "id": "format/decisions/shape-aggregated-value-malformed",
+      "spec": [
+        "json-format.md#reading-a-decision",
+        "json-format.md#numbers"
+      ],
+      "description": "an aggregated value that is not a value is a format error, found with the shape",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 600.0
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 600.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": true,
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ],
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ],
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 8.0
+                  },
+                  "n": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "p",
+              "q"
+            ],
+            "aggregated": {
+              "y": {
+                "$float": "608"
+              },
+              "n": 3
+            }
+          }
+        },
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "p",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "q",
+              "when": {
+                "op": "field",
+                "path": [
+                  "flag"
+                ]
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 8.0
+                },
+                "n": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision/aggregated/y/$float"
+        }
+      }
+    },
+    {
+      "id": "format/decisions/aggregated-infinite",
+      "spec": [
+        "json-format.md#reading-a-decision",
+        "json-format.md#numbers",
+        "rules.md#collect-aggregates"
+      ],
+      "description": "outputs in the {\"$float\": n} form whose sum overflows read back with the aggregate {\"$float\": \"inf\"}",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ],
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ],
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": {
+                      "$float": 1e+308
+                    }
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": true,
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ],
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ],
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "field",
+                    "path": [
+                      "z"
+                    ],
+                    "value": {
+                      "$float": 1e+308
+                    }
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "p",
+              "q"
+            ],
+            "aggregated": {
+              "y": {
+                "$float": "inf"
+              }
+            }
+          }
+        },
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "p",
+              "when": {
+                "op": "field",
+                "path": [
+                  "flag"
+                ]
+              },
+              "then": {
+                "y": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "q",
+              "when": {
+                "op": "field",
+                "path": [
+                  "flag"
+                ]
+              },
+              "then": {
+                "y": {
+                  "op": "field",
+                  "path": [
+                    "z"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ],
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ],
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ],
+                    "value": 1e+308
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": true,
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ],
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ],
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "field",
+                    "path": [
+                      "z"
+                    ],
+                    "value": 1e+308
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "p",
+              "q"
+            ],
+            "aggregated": {
+              "y": {
+                "$float": "inf"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/decisions/between-operand-alternative-forms",
+      "spec": [
+        "json-format.md#reading-a-decision",
+        "json-format.md#values",
+        "json-format.md#lists-and-maps"
+      ],
+      "description": "the two copies of a between operand are equal values in different forms, and a map output in the {\"$map\": ...} form",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "between",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "ge",
+                      "truth": true,
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "x"
+                          ],
+                          "value": 3.0
+                        },
+                        {
+                          "op": "const",
+                          "value": 1
+                        }
+                      ]
+                    },
+                    {
+                      "op": "le",
+                      "truth": true,
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "x"
+                          ],
+                          "value": {
+                            "$float": 3
+                          }
+                        },
+                        {
+                          "op": "const",
+                          "value": 10
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "then": {
+                  "m": {
+                    "op": "field",
+                    "path": [
+                      "m"
+                    ],
+                    "value": {
+                      "$map": {
+                        "a": {
+                          "$int": "1"
+                        },
+                        "b": [
+                          {
+                            "$int": 1
+                          },
+                          {
+                            "$float": 2.5
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": false,
+                "when": {
+                  "op": "between",
+                  "truth": null,
+                  "reason": {
+                    "code": "type_mismatch",
+                    "paths": [
+                      [
+                        "m"
+                      ]
+                    ],
+                    "types": [
+                      "other",
+                      "number"
+                    ]
+                  },
+                  "children": [
+                    {
+                      "op": "ge",
+                      "truth": null,
+                      "reason": {
+                        "code": "type_mismatch",
+                        "paths": [
+                          [
+                            "m"
+                          ]
+                        ],
+                        "types": [
+                          "other",
+                          "number"
+                        ]
+                      },
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "m"
+                          ],
+                          "value": {
+                            "a": 1,
+                            "b": [
+                              1,
+                              2.5
+                            ]
+                          }
+                        },
+                        {
+                          "op": "const",
+                          "value": 1
+                        }
+                      ]
+                    },
+                    {
+                      "op": "le",
+                      "truth": null,
+                      "reason": {
+                        "code": "type_mismatch",
+                        "paths": [
+                          [
+                            "m"
+                          ]
+                        ],
+                        "types": [
+                          "other",
+                          "number"
+                        ]
+                      },
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "m"
+                          ],
+                          "value": {
+                            "$map": {
+                              "a": 1,
+                              "b": [
+                                1,
+                                2.5
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "op": "const",
+                          "value": 10
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "p"
+            ]
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "p",
+              "when": {
+                "op": "between",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "low": {
+                  "op": "const",
+                  "value": 1
+                },
+                "high": {
+                  "op": "const",
+                  "value": 10
+                },
+                "closed": "both"
+              },
+              "then": {
+                "m": {
+                  "op": "field",
+                  "path": [
+                    "m"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "q",
+              "when": {
+                "op": "between",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "m"
+                  ]
+                },
+                "low": {
+                  "op": "const",
+                  "value": 1
+                },
+                "high": {
+                  "op": "const",
+                  "value": 10
+                },
+                "closed": "both"
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "between",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "ge",
+                      "truth": true,
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "x"
+                          ],
+                          "value": 3.0
+                        },
+                        {
+                          "op": "const",
+                          "value": 1
+                        }
+                      ]
+                    },
+                    {
+                      "op": "le",
+                      "truth": true,
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "x"
+                          ],
+                          "value": 3.0
+                        },
+                        {
+                          "op": "const",
+                          "value": 10
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "then": {
+                  "m": {
+                    "op": "field",
+                    "path": [
+                      "m"
+                    ],
+                    "value": {
+                      "a": 1,
+                      "b": [
+                        1,
+                        2.5
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": false,
+                "when": {
+                  "op": "between",
+                  "truth": null,
+                  "reason": {
+                    "code": "type_mismatch",
+                    "paths": [
+                      [
+                        "m"
+                      ]
+                    ],
+                    "types": [
+                      "other",
+                      "number"
+                    ]
+                  },
+                  "children": [
+                    {
+                      "op": "ge",
+                      "truth": null,
+                      "reason": {
+                        "code": "type_mismatch",
+                        "paths": [
+                          [
+                            "m"
+                          ]
+                        ],
+                        "types": [
+                          "other",
+                          "number"
+                        ]
+                      },
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "m"
+                          ],
+                          "value": {
+                            "a": 1,
+                            "b": [
+                              1,
+                              2.5
+                            ]
+                          }
+                        },
+                        {
+                          "op": "const",
+                          "value": 1
+                        }
+                      ]
+                    },
+                    {
+                      "op": "le",
+                      "truth": null,
+                      "reason": {
+                        "code": "type_mismatch",
+                        "paths": [
+                          [
+                            "m"
+                          ]
+                        ],
+                        "types": [
+                          "other",
+                          "number"
+                        ]
+                      },
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "m"
+                          ],
+                          "value": {
+                            "a": 1,
+                            "b": [
+                              1,
+                              2.5
+                            ]
+                          }
+                        },
+                        {
+                          "op": "const",
+                          "value": 10
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "p"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/decisions/between-operand-int-for-float",
+      "spec": [
+        "json-format.md#reading-a-decision",
+        "json-format.md#values"
+      ],
+      "description": "the second copy of a between operand holds the int 3 where the first holds the float 3.0",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "between",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "ge",
+                      "truth": true,
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "x"
+                          ],
+                          "value": 3.0
+                        },
+                        {
+                          "op": "const",
+                          "value": 1
+                        }
+                      ]
+                    },
+                    {
+                      "op": "le",
+                      "truth": true,
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "x"
+                          ],
+                          "value": 3
+                        },
+                        {
+                          "op": "const",
+                          "value": 10
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "then": {
+                  "m": {
+                    "op": "field",
+                    "path": [
+                      "m"
+                    ],
+                    "value": {
+                      "a": 1,
+                      "b": [
+                        1,
+                        2.5
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": false,
+                "when": {
+                  "op": "between",
+                  "truth": null,
+                  "reason": {
+                    "code": "type_mismatch",
+                    "paths": [
+                      [
+                        "m"
+                      ]
+                    ],
+                    "types": [
+                      "other",
+                      "number"
+                    ]
+                  },
+                  "children": [
+                    {
+                      "op": "ge",
+                      "truth": null,
+                      "reason": {
+                        "code": "type_mismatch",
+                        "paths": [
+                          [
+                            "m"
+                          ]
+                        ],
+                        "types": [
+                          "other",
+                          "number"
+                        ]
+                      },
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "m"
+                          ],
+                          "value": {
+                            "a": 1,
+                            "b": [
+                              1,
+                              2.5
+                            ]
+                          }
+                        },
+                        {
+                          "op": "const",
+                          "value": 1
+                        }
+                      ]
+                    },
+                    {
+                      "op": "le",
+                      "truth": null,
+                      "reason": {
+                        "code": "type_mismatch",
+                        "paths": [
+                          [
+                            "m"
+                          ]
+                        ],
+                        "types": [
+                          "other",
+                          "number"
+                        ]
+                      },
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "m"
+                          ],
+                          "value": {
+                            "a": 1,
+                            "b": [
+                              1,
+                              2.5
+                            ]
+                          }
+                        },
+                        {
+                          "op": "const",
+                          "value": 10
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "p"
+            ]
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "p",
+              "when": {
+                "op": "between",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "low": {
+                  "op": "const",
+                  "value": 1
+                },
+                "high": {
+                  "op": "const",
+                  "value": 10
+                },
+                "closed": "both"
+              },
+              "then": {
+                "m": {
+                  "op": "field",
+                  "path": [
+                    "m"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "q",
+              "when": {
+                "op": "between",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "m"
+                  ]
+                },
+                "low": {
+                  "op": "const",
+                  "value": 1
+                },
+                "high": {
+                  "op": "const",
+                  "value": 10
+                },
+                "closed": "both"
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/results/0/when/children/1/children/0"
+        }
+      }
+    },
+    {
+      "id": "format/decisions/between-operand-reason-forms",
+      "spec": [
+        "json-format.md#reading-a-decision",
+        "json-format.md#result-trees"
+      ],
+      "description": "the copies of a between operand are equal when their keys are in another order, their reason spells out the default \"types\" and adds a \"detail\"",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": false,
+                "when": {
+                  "op": "between",
+                  "truth": null,
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "w"
+                      ]
+                    ]
+                  },
+                  "children": [
+                    {
+                      "op": "ge",
+                      "truth": null,
+                      "reason": {
+                        "code": "missing_field",
+                        "paths": [
+                          [
+                            "w"
+                          ]
+                        ]
+                      },
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "w"
+                          ],
+                          "value": null,
+                          "reason": {
+                            "code": "missing_field",
+                            "paths": [
+                              [
+                                "w"
+                              ]
+                            ]
+                          }
+                        },
+                        {
+                          "op": "const",
+                          "value": 1
+                        }
+                      ]
+                    },
+                    {
+                      "op": "le",
+                      "truth": null,
+                      "reason": {
+                        "code": "missing_field",
+                        "paths": [
+                          [
+                            "w"
+                          ]
+                        ]
+                      },
+                      "children": [
+                        {
+                          "reason": {
+                            "types": [],
+                            "paths": [
+                              [
+                                "w"
+                              ]
+                            ],
+                            "code": "missing_field",
+                            "detail": "w is missing"
+                          },
+                          "value": null,
+                          "path": [
+                            "w"
+                          ],
+                          "op": "field"
+                        },
+                        {
+                          "op": "const",
+                          "value": 10
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": []
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "p",
+              "when": {
+                "op": "between",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "w"
+                  ]
+                },
+                "low": {
+                  "op": "const",
+                  "value": 1
+                },
+                "high": {
+                  "op": "const",
+                  "value": 10
+                },
+                "closed": "both"
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": false,
+                "when": {
+                  "op": "between",
+                  "truth": null,
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "w"
+                      ]
+                    ]
+                  },
+                  "children": [
+                    {
+                      "op": "ge",
+                      "truth": null,
+                      "reason": {
+                        "code": "missing_field",
+                        "paths": [
+                          [
+                            "w"
+                          ]
+                        ]
+                      },
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "w"
+                          ],
+                          "value": null,
+                          "reason": {
+                            "code": "missing_field",
+                            "paths": [
+                              [
+                                "w"
+                              ]
+                            ]
+                          }
+                        },
+                        {
+                          "op": "const",
+                          "value": 1
+                        }
+                      ]
+                    },
+                    {
+                      "op": "le",
+                      "truth": null,
+                      "reason": {
+                        "code": "missing_field",
+                        "paths": [
+                          [
+                            "w"
+                          ]
+                        ]
+                      },
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "w"
+                          ],
+                          "value": null,
+                          "reason": {
+                            "code": "missing_field",
+                            "paths": [
+                              [
+                                "w"
+                              ]
+                            ],
+                            "detail": "w is missing"
+                          }
+                        },
+                        {
+                          "op": "const",
+                          "value": 10
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": []
+          }
+        }
+      }
     }
   ]
 }
