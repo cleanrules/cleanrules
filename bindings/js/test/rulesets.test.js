@@ -54,11 +54,17 @@ describe(`the package (${build})`, () => {
     // early (`[Symbol.dispose]()` does too, and does nothing on the addon), and
     // its two internal members, `__wrap` and `__destroy_into_raw`.
     const WASM_ONLY = new Set(['free', '__destroy_into_raw', 'static __wrap'])
+    // On Node 22, the addon's constructors are plain functions with their own
+    // `arguments` and `caller`; they belong to every such function, not to
+    // the API.
+    const INTRINSIC = new Set(['arguments', 'caller'])
     const members = (Class) =>
       [
         ...Object.getOwnPropertyNames(Class.prototype),
         ...Object.getOwnPropertySymbols(Class.prototype).map(String),
-        ...Object.getOwnPropertyNames(Class).map((name) => `static ${name}`),
+        ...Object.getOwnPropertyNames(Class)
+          .filter((name) => !INTRINSIC.has(name))
+          .map((name) => `static ${name}`),
       ].sort()
     const [napi, wasm] = await both()
     for (const name of ['Document', 'RuleSet', 'Decision', 'Node']) {
