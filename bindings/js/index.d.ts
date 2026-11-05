@@ -1,6 +1,7 @@
 // Types of the `cleanrules` package (`index.js`, `index.wasm.js`, `index.deno.js`):
-// the idiomatic API (conditions, rules, rule sets, decisions, explanations and
-// summaries), the errors, the marker values and the versions. The native
+// the idiomatic API (conditions, rules, rule sets, decisions, explanations,
+// summaries, result trees, decision tables and documents), the errors, the
+// marker values and the versions. The native
 // classes are in `cleanrules/native` (`native.d.ts`, over the `binding.d.ts`
 // napi-rs writes).
 
@@ -527,8 +528,12 @@ export declare class Rule {
   readonly do: Action | null
   /** The name of the rule's action, if it names one; otherwise `null`. */
   readonly actionName: string | null
-  /** Not yet: writing rules as documents is not available in this version (`UnsupportedError`). */
-  toJSON(): never
+  /**
+   * The rule document of the JSON format (`{ version, rule }`), as
+   * `dumps(rule)` writes it; an `UnsupportedError` for an action that is
+   * code without a name.
+   */
+  toJSON(): Record<string, unknown>
 }
 
 export interface RuleSetOptions {
@@ -586,8 +591,12 @@ export declare class RuleSet implements Iterable<Rule> {
   /** Evaluate, then call the selected rules' actions in rule order. */
   run(data: unknown): Decision
   summary(): Summary
-  /** Not yet: writing rule sets as documents is not available in this version (`UnsupportedError`). */
-  toJSON(): never
+  /**
+   * The rule set document of the JSON format (`{ version, ruleset }`), as
+   * `dumps(ruleset)` writes it; an `UnsupportedError` for an action that is
+   * code without a name.
+   */
+  toJSON(): Record<string, unknown>
 }
 
 /** One rule's result in a decision. */
@@ -607,6 +616,8 @@ export declare class ActionContext {
   /** The input, as given to `run`. */
   readonly data: unknown
   readonly result: RuleResult
+  /** The result tree of the rule's condition: each node's truth or value, and why it is unknown. */
+  readonly tree: ResultTree
   /** The rule's evaluated payload (empty when it has none). */
   readonly output: Output
   readonly decision: Decision
@@ -776,3 +787,240 @@ export declare class Summary {
   /** The summary as text, the same in every language. */
   toString(): string
 }
+
+// --- Result trees --------------------------------------------------------
+
+/**
+ * The result of evaluating a node and each of its children (`spec/ast.md`,
+ * *Evaluating one node*).
+ */
+export declare class ResultTree {
+  private constructor()
+  /** The node evaluated (a `between` has its two half comparisons as children). */
+  readonly node: Expr
+  /** Its truth value, for a condition; `null` for a value. */
+  readonly truth: Truth | null
+  /** Its value, for a value node (`null` when it is null); `null` for a condition. */
+  readonly value: Value
+  /** Why it is unknown or null, if it is. */
+  readonly reason: Reason | null
+  /** The children's results, in order. */
+  readonly children: readonly ResultTree[]
+  /** The result tree in the JSON format (`spec/json-format.md`, *Result trees*). */
+  toJSON(): Record<string, unknown>
+}
+
+export interface EvaluateTreeOptions {
+  /** The logic, by name: `'boolean'` (the default). */
+  logic?: string | null
+  /** Throw an `EvaluationError` instead of giving unknown. */
+  strict?: boolean | null
+}
+
+export interface EvaluateValueTreeOptions {
+  /** Throw an `EvaluationError` instead of giving null. */
+  strict?: boolean | null
+}
+
+/**
+ * Evaluate a condition (or a field or boolean constant used as one) on
+ * native data and return its result tree. An `ExpressionError` for a value
+ * node; in strict mode, an `EvaluationError` for a missing field or a type
+ * mismatch.
+ *
+ * @example
+ * const tree = evaluateTree(F.age.ge(18).and(F.country.isIn(['ES'])), { age: 20 })
+ * tree.truth                    // 'unknown'
+ * tree.children[1]?.reason?.code // 'missing_field'
+ */
+export declare function evaluateTree(condition: Expr, data: unknown, options?: EvaluateTreeOptions | null): ResultTree
+
+/**
+ * Evaluate a value node on native data and return its result tree.
+ *
+ * @example
+ * evaluateValueTree(F.price.mul(F.quantity), { price: 2.5, quantity: 4 }).value  // 10
+ */
+export declare function evaluateValueTree(value: Expr, data: unknown, options?: EvaluateValueTreeOptions | null): ResultTree
+
+// --- Decision tables -----------------------------------------------------
+
+/** A decision table's hit policy: a rule set's, or `output_order` (DMN's O). */
+export type TablePolicy = HitPolicy | 'output_order'
+
+/**
+ * An output column: its payload key and its output values, highest priority
+ * first. In a header, `new TableOutput('risk', ['high', 'low'])` is the column
+ * `THEN risk IN ('high', 'low')`: the values are constants, not text.
+ */
+export declare class TableOutput {
+  constructor(name: string, values?: Iterable<Constant>)
+  readonly name: string
+  /**
+   * The output values, highest priority first: as given to the constructor
+   * (constants), or as the engine gives them back for a table's `outputs`.
+   */
+  readonly values: ReadonlyArray<Value | Constant>
+}
+
+/** A row of a table: one rule. */
+export declare class TableRow {
+  private constructor()
+  /** The rule's name, or `null` for `row_<n>`. */
+  readonly name: string | null
+  /** The rule's own priority, or `null`. */
+  readonly priority: number | bigint | null
+  readonly description: string | null
+  /** One condition per input, testing that input; `null` for any value. */
+  readonly inputs: ReadonlyArray<Expr | null>
+  /** One value per output; `null` for no value. */
+  readonly outputs: ReadonlyArray<Expr | null>
+}
+
+/** A column of a table's header: its CSV text, an input `Expr`, or a `TableOutput`. */
+export type HeaderItem = string | Expr | TableOutput
+
+/**
+ * A cell of a row: text read as in the table's CSV (`'> 5'`, `'-'`,
+ * `"'VIP'"` for a string), an input's condition or an output's value as an
+ * `Expr`, `null` or `undefined` for an empty cell, or a constant.
+ */
+export type Cell = string | Expr | Constant | undefined
+
+export interface DecisionTableOptions {
+  /** `'first'` by default; names in any case. */
+  hitPolicy?: TablePolicy | Uppercase<TablePolicy> | null
+  /** With `'collect'`. */
+  aggregate?: Aggregate | Uppercase<Aggregate> | null
+  /** `'boolean'` by default. */
+  logic?: string | null
+  strict?: boolean | null
+  /** `maxSize` (the longest text of a header or cell), `maxDepth` and `maxTableSize`. */
+  limits?: Limits | null
+}
+
+/**
+ * A decision table and the rule set it compiles into (`spec/tables.md`);
+ * immutable. Read one with `load('table.csv')` or `loads(text, { format:
+ * 'csv' })`, or build one from a header and rows, as a spreadsheet holds it.
+ * Errors point into the grid: `/header/<c>` or `/rows/<r>/<c>`, from 0.
+ *
+ * @example
+ * const table = new DecisionTable(
+ *   ['RULE', 'customer.years', 'order.total', 'THEN discount'],
+ *   [['vip', '> 5', '> 1000', decimal('0.15')], ['loyal', '> 2', '-', decimal('0.05')]],
+ * )
+ * table.evaluate({ customer: { years: 9 }, order: { total: 1500 } }).output
+ */
+export declare class DecisionTable {
+  constructor(header: Iterable<HeaderItem>, rows: Iterable<Iterable<Cell>>, options?: DecisionTableOptions | null)
+  readonly hitPolicy: TablePolicy
+  readonly aggregate: Aggregate | null
+  readonly logic: string
+  readonly strict: boolean
+  /** The input expressions, in column order. */
+  readonly inputs: readonly Expr[]
+  /** The output columns. */
+  readonly outputs: readonly TableOutput[]
+  /** The rows, in order. */
+  readonly rows: readonly TableRow[]
+  /** The rule set the table compiles into: one rule per row. */
+  readonly ruleset: RuleSet
+  evaluate(data: unknown): Decision
+  evaluateMany(rows: Iterable<unknown>): Decision[]
+  summary(): Summary
+  /** The decision table document of the JSON format, as `dumps(table)` writes it. */
+  toJSON(): Record<string, unknown>
+}
+
+// --- Documents -----------------------------------------------------------
+
+/** A document format: JSON, YAML, the text syntax of rules, or CSV for decision tables. */
+export type Format = 'json' | 'yaml' | 'text' | 'csv'
+
+/** What a document holds. */
+export type Loaded = Expr | Rule | RuleSet | DecisionTable
+
+/** An action registry: each name with its function. */
+export type Actions = Readonly<Record<string, Action>> | ReadonlyMap<string, Action>
+
+export interface LoadOptions {
+  /** `'json'` by default for `loads`; the file's extension for `load`. */
+  format?: Format | null
+  /** The limits; each one left out keeps the core's default. */
+  limits?: Limits | null
+  /** Bind a rule or rule set read to these actions (`RuleSet.bind`). */
+  actions?: Actions | null
+}
+
+export interface DumpOptions {
+  /** `'json'` by default for `dumps`; the file's extension for `dump`. */
+  format?: Format | null
+  /** Write rules without their actions given as code, instead of refusing; `null` is `false`. */
+  omitActions?: boolean | null
+}
+
+export interface RuleFromTextOptions {
+  /** The rule's action, a function; bound to the name the text gives (`DO notify`), if any. */
+  do?: Action | null
+  /** An action registry, as `loads` takes; not with `do`. */
+  actions?: Actions | null
+  limits?: Limits | null
+}
+
+/**
+ * Read a condition, rule, rule set or decision table document (`string` or
+ * UTF-8 bytes). A rule's action is the name the document gives it, unbound
+ * unless `actions` is given. CSV holds a decision table; the text syntax a
+ * condition, a rule or a rule set.
+ *
+ * @example
+ * const rules = loads(text, { format: 'yaml' })
+ */
+export declare function loads(text: string | Uint8Array, options: LoadOptions & { format: 'csv' }): DecisionTable
+export declare function loads(text: string | Uint8Array, options: LoadOptions & { format: 'text' }): Expr | Rule | RuleSet
+export declare function loads(text: string | Uint8Array, options?: LoadOptions | null): Loaded
+
+/**
+ * Write a condition, rule, rule set or decision table in its canonical form.
+ *
+ * @example
+ * const yaml = dumps(rules, { format: 'yaml' })
+ * An `UnsupportedError` for an action given as code (unless `omitActions`),
+ * for CSV of anything but a table, and for what the text syntax cannot hold.
+ */
+export declare function dumps(value: Loaded, options?: DumpOptions | null): string
+
+/**
+ * Read a document from a file (Node and Deno), its format from the extension
+ * (`.json`, `.yaml`, `.yml`, `.rules`, `.csv`) unless given. Rejects with an
+ * `UnsupportedError` in browsers (use `loads`).
+ *
+ * @example
+ * const rules = await load('pricing.yaml', { actions: { notify } })
+ */
+export declare function load(path: string | URLLike, options: LoadOptions & { format: 'csv' }): Promise<DecisionTable>
+export declare function load(path: string | URLLike, options: LoadOptions & { format: 'text' }): Promise<Expr | Rule | RuleSet>
+export declare function load(path: string | URLLike, options?: LoadOptions | null): Promise<Loaded>
+
+/**
+ * Write a document to a file (Node and Deno), as `dumps` does; a rule text
+ * ends with a line break. Rejects with an `UnsupportedError` in browsers (use
+ * `dumps`).
+ *
+ * @example
+ * await dump(rules, 'pricing.rules')
+ */
+export declare function dump(value: Loaded, path: string | URLLike, options?: DumpOptions | null): Promise<void>
+
+/** A `file:` URL (`URL` where the TypeScript libraries in use declare it). */
+export type URLLike = typeof globalThis extends { URL: abstract new (...args: never[]) => infer Url } ? Url : never
+
+/**
+ * Read one rule written in the text syntax (`spec/text.md`); without a
+ * `RULE` line it is named `rule_1`. fuzzytool's verb.
+ *
+ * @example
+ * const vip = ruleFromText('RULE vip IF customer.years > 5 THEN discount = 0.15')
+ */
+export declare function ruleFromText(text: string | Uint8Array, options?: RuleFromTextOptions | null): Rule

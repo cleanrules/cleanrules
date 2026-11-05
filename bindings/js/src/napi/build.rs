@@ -84,7 +84,7 @@ impl Default for RuleList {
 /// A rule of the core, built by `ruleNew`; immutable.
 #[napi]
 pub struct NativeRule {
-    rule: cleanrules::rules::Rule,
+    pub(crate) rule: cleanrules::rules::Rule,
 }
 
 #[napi]

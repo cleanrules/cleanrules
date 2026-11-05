@@ -270,6 +270,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/examples/discounts.mjs`. The native layer, `cleanrules/native`, does
   not change; both builds gain internal functions that build nodes, rules and
   rule sets and give values back in a private encoding shared by the two.
+- Documents, decision tables and result trees in the JavaScript package (task
+  F.2b), the same in the Node addon and the WebAssembly build: `loads(text, {
+  format, limits, actions })` and `dumps(value, { format, omitActions })` for
+  conditions, rules, rule sets and decision tables in JSON, YAML, the text
+  syntax and CSV, with Python's checks (a value node is not a document; an
+  action given as code is an `UnsupportedError` with its rule's `pointer`
+  unless `omitActions`); `load(path, options)` and `dump(value, path,
+  options)`, promises that read and write files in Node and Deno, the format
+  from the extension (`.json`, `.yaml`, `.yml`, `.rules`, `.csv`), a file over
+  its format's size limit left unread, and an `UnsupportedError` naming
+  `loads` and `dumps` in browsers; `ruleFromText(text, { do, actions, limits
+  })`, fuzzytool's verb. Rules and rule sets read from documents keep the
+  core's own (they write back exactly), with their named actions bound by
+  `actions`. `toJSON()` of `Rule` and `RuleSet` is now their JSON document (it
+  was an `UnsupportedError`). `DecisionTable` (header items as text, an `Expr`
+  or a `TableOutput`; cells as text, an `Expr`, `null`/`undefined` or a
+  constant; `hitPolicy` including `output_order`, `aggregate`, `logic`,
+  `strict`, `limits`; `inputs`, `outputs`, `rows` of `TableRow`, `ruleset`,
+  `evaluate`, `evaluateMany`, `summary`, `toJSON()`), built by the core from
+  the grid one item at a time, with errors at `/header/<c>` and
+  `/rows/<r>/<c>`, also for values JavaScript cannot give. `evaluateTree(condition,
+  data, { logic, strict })` and `evaluateValueTree(value, data, { strict })`
+  give a `ResultTree` (`node`, `truth`, `value`, `reason`, `children`,
+  `toJSON()`), and an action's `ActionContext` has the `tree` of its rule's
+  condition. `cleanrules/wasm`, the WebAssembly build initialised by hand: the
+  root's exports, the native classes in `native`, and `init(source)` (a URL, a
+  `Request`, a `Response`, bytes or a `WebAssembly.Module`; the package's file
+  when left out); no top-level `await`; before `init` resolves, what needs the
+  module throws an `Error` with the code `ERR_CLEANRULES_NOT_INITIALISED` that
+  says to call it, and a copy of an export taken before `init` forwards to the
+  real value after it; `version` and `FORMAT_VERSION` are `undefined` until
+  then; calling it twice is harmless. `loads` and `load` are typed
+  `DecisionTable` for `format: 'csv'` and `Expr | Rule | RuleSet` for
+  `'text'`. In rule sets and tables, an empty aggregate name (`''`) is an
+  unknown aggregate (only `undefined` and `null` leave it out), as in Python;
+  `evaluateTree` refuses a value node with its own hint. TypeScript declarations for all of it (`wasm.d.ts` for the new
+  entry). The idiomatic API is made once per native layer, so `cleanrules` on
+  WebAssembly and `cleanrules/wasm` share their classes. `npm test` measures
+  the coverage of the JavaScript half with Node's own and fails under 90 % of
+  lines. The example `docs/examples/risk.mjs`. Internal functions and classes,
+  the same in both builds, read documents and tables and give result trees
+  back; the native layer, `cleanrules/native`, does not change.
 - WebAssembly build of the JavaScript binding (task F.1b): the same npm
   package `cleanrules` runs in browsers, Deno (2.6 or later) and other runtimes
   on a WebAssembly module built with wasm-bindgen, with the same API as the
@@ -502,6 +544,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   generators, module namespaces, and the binding's own objects) are opaque,
   recognised by brand or by `Symbol.toStringTag`; they were "anything not
   listed". Native data only, so no conformance vector changes.
+- Data model (`spec/data-model.md`, *Values given back*): a decision table's
+  output values and the values of a result tree also come back to JavaScript
+  by its rules, and they, a table row's priority and a table output's values
+  follow its rules for priorities and shallow freezing. JSON format
+  (`spec/json-format.md`, *Writing errors*): bindings name `omit_actions` in
+  their language's case (`omitActions` in JavaScript). Text syntax
+  (`spec/text.md`): `ruleFromText` where camel case is the idiom. Tables
+  (`spec/tables.md`, *Grids*): in JavaScript, `null`, `undefined` and holes are
+  empty cells. No conformance vector changes.
 - Errors (`spec/errors.md`): in JavaScript the context fields are in `context`,
   because an error's `name` is its class, and an `ActionError` has the
   `decision`.
@@ -527,12 +578,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path of the build) and the SONAME `libcleanrules_ffi.so` on Linux (it had
   none).
 
-- Data model (`spec/data-model.md`, *Values given back*): a decision table's
-  output values and the values of a result tree also come back to JavaScript
-  by its rules, and they, a table row's priority and a table output's values
-  follow its rules for priorities and shallow freezing. JSON format
-  (`spec/json-format.md`, *Writing errors*): bindings name `omit_actions` in
-  their language's case (`omitActions` in JavaScript). Text syntax
-  (`spec/text.md`): `ruleFromText` where camel case is the idiom. Tables
-  (`spec/tables.md`, *Grids*): in JavaScript, `null`, `undefined` and holes are
-  empty cells. No conformance vector changes.

@@ -7,4 +7,25 @@ import native from './lib/wasm.deno.js'
 export * from './lib/public.js'
 export const FORMAT_VERSION = native.FORMAT_VERSION
 export const version = native.version()
-export const { Const, Decision, Expr, F, Field, Rule, RuleSet, and, constant, field, not, or } = api(native, 'WebAssembly')
+export const {
+  Const,
+  Decision,
+  DecisionTable,
+  Expr,
+  F,
+  Field,
+  Rule,
+  RuleSet,
+  and,
+  constant,
+  dump,
+  dumps,
+  evaluateTree,
+  evaluateValueTree,
+  field,
+  load,
+  loads,
+  not,
+  or,
+  ruleFromText,
+} = api(native, 'WebAssembly')

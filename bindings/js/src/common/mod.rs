@@ -1,7 +1,8 @@
 //! What the napi-rs and wasm-bindgen front ends share: checking arguments as
 //! JavaScript gives them, the reader's encoding (`wire`), the documents, rule
 //! sets, decisions and nodes over the core (`core`), conditions and rules
-//! built in code (`build`), and the encoding of what comes back (`out`).
+//! built in code (`build`), documents and decision tables for the idiomatic
+//! API (`documents`, `tables`), and the encoding of what comes back (`out`).
 //!
 //! Nothing here touches a JavaScript engine. Each front end turns its
 //! arguments into [`Raw`] values and [`RawOptions`], calls this code, and turns
@@ -10,7 +11,9 @@
 
 pub(crate) mod build;
 pub(crate) mod core;
+pub(crate) mod documents;
 pub(crate) mod out;
+pub(crate) mod tables;
 pub(crate) mod wire;
 
 use cleanrules::format::DocumentFormat;
@@ -323,6 +326,10 @@ pub(crate) fn no_constructor(class: &str) -> Problem {
     let how = match class {
         "Decision" => "decisions come from RuleSet.evaluate".to_owned(),
         "NativeRule" => "rules come from the Rule class of cleanrules".to_owned(),
+        "NativeTable" | "NativeGrid" => {
+            "tables come from the DecisionTable class of cleanrules".to_owned()
+        }
+        "NativeTree" => "result trees come from evaluateTree of cleanrules".to_owned(),
         _ => format!("use {class}.read"),
     };
     Problem::Type(format!("{class} has no public constructor; {how}"))

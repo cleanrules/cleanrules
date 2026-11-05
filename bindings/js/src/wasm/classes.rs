@@ -36,13 +36,13 @@ fn paths_to_js(paths: &[Vec<Segment>]) -> Array {
 }
 
 /// One input read by the `read` hook, with the values its getters threw.
-struct Native {
-    read: Read,
+pub(crate) struct Native {
+    pub(crate) read: Read,
     thrown: Array,
 }
 
 /// Read `data` along the paths `owner` (`lib/read.js`).
-fn read(data: &JsValue, owner: &JsValue) -> Result<Native, JsValue> {
+pub(crate) fn read(data: &JsValue, owner: &JsValue) -> Result<Native, JsValue> {
     let result = call_read(data, owner)?;
     let Some(wire) = result.get(0).as_string() else {
         return Err(fail(Problem::Internal(
@@ -62,7 +62,7 @@ fn read(data: &JsValue, owner: &JsValue) -> Result<Native, JsValue> {
 
 /// The JavaScript error of a core error met evaluating `native`; a
 /// `read_error` in strict mode gets what its getter threw as `cause`.
-fn chained(error: &cleanrules::Error, native: &Native) -> JsValue {
+pub(crate) fn chained(error: &cleanrules::Error, native: &Native) -> JsValue {
     let cause = cause_index(error, &native.read.errors)
         .map_or(JsValue::NULL, |index| native.thrown.get(index));
     let cause = if cause.is_undefined() {
@@ -73,7 +73,7 @@ fn chained(error: &cleanrules::Error, native: &Native) -> JsValue {
     core_error(error, &cause, &JsValue::NULL)
 }
 
-fn undefined_input() -> JsValue {
+pub(crate) fn undefined_input() -> JsValue {
     fail(Problem::Type(UNDEFINED_INPUT.to_owned()))
 }
 
@@ -95,7 +95,7 @@ fn optional_limits(value: &JsValue) -> Result<cleanrules::json::Limits, JsValue>
 /// A document read from a text; immutable.
 #[wasm_bindgen]
 pub struct Document {
-    core: DocumentCore,
+    pub(crate) core: DocumentCore,
 }
 
 #[wasm_bindgen]
@@ -567,7 +567,7 @@ impl Node {
         }
     }
 
-    fn paths(&self) -> &Array {
+    pub(crate) fn paths(&self) -> &Array {
         self.paths
             .get_or_init(|| paths_to_js(&self.core.field_paths()))
     }

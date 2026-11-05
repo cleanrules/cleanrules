@@ -1,7 +1,7 @@
 // What the root entry exports besides the versions and the API of its build
 // (`lib/api/index.js`), the same in every build: the errors, the marker
-// values, and the classes of what decisions, explanations and summaries give
-// back.
+// values, and the classes of what decisions, explanations, summaries, result
+// trees and decision tables give back.
 
 export {
   ActionError,
@@ -27,10 +27,13 @@ export {
   FieldUsage,
   Note,
   Reason,
+  ResultTree,
   RuleExplanation,
   RuleResult,
   RuleSummary,
   Summary,
+  TableOutput,
+  TableRow,
 } from './api/results.js'
 export {
   Decimal,

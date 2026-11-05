@@ -7,6 +7,7 @@
 
 pub(crate) mod build;
 pub(crate) mod classes;
+pub(crate) mod documents;
 pub(crate) mod hooks;
 
 use napi::bindgen_prelude::{

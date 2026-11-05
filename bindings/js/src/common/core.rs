@@ -13,7 +13,7 @@
 use std::sync::Arc;
 
 use cleanrules::ast::Node;
-use cleanrules::eval::{Options, evaluate_tree, evaluate_value_tree};
+use cleanrules::eval::{Evaluated, Options, evaluate_tree, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
     Document, DocumentFormat, ValueContext, parse_as, read_document_as, read_node,
@@ -22,7 +22,8 @@ use cleanrules::format::{
 };
 use cleanrules::json::{Json, Limits, parse_bytes, to_string, utf8_text};
 use cleanrules::logic::{Kleene, LogicName, Truth};
-use cleanrules::rules::{Decision, RuleSet};
+use cleanrules::rules::{Decision, Rule, RuleSet};
+use cleanrules::table::DecisionTable;
 use cleanrules::{Error, ErrorCode, Map, Segment, Value};
 
 use super::{Outcome, Problem, Raw, RawOptions, TreeOptions, position, read_options};
@@ -74,6 +75,51 @@ impl DocumentCore {
     pub(crate) fn write(&self, format: &Raw) -> Outcome<String> {
         let format = super::format(format, DocumentFormat::Json)?;
         Ok(write_document_as(&self.document, format)?)
+    }
+
+    /// The condition of a condition document.
+    pub(crate) fn condition(&self) -> Outcome<Node> {
+        match &self.document {
+            Document::Condition(node) => Ok(node.clone()),
+            _ => Err(not_kind("a condition")),
+        }
+    }
+
+    /// The rule of a rule document.
+    pub(crate) fn rule(&self) -> Outcome<Rule> {
+        match &self.document {
+            Document::Rule(rule) => Ok(rule.clone()),
+            _ => Err(not_kind("a rule")),
+        }
+    }
+
+    /// The table of a decision table document.
+    pub(crate) fn table(&self) -> Outcome<DecisionTable> {
+        match &self.document {
+            Document::DecisionTable(table) => Ok(table.clone()),
+            _ => Err(not_kind("a decision table")),
+        }
+    }
+}
+
+/// A document of another kind than the JavaScript half asked for: a bug.
+fn not_kind(what: &str) -> Problem {
+    Problem::Internal(format!("the document does not hold {what}"))
+}
+
+/// A result tree for the idiomatic API: its encoding (`out::tree`) with its
+/// JSON form, `[form, json]`, and its nodes in pre-order.
+pub(crate) struct TreeData {
+    pub(crate) data: String,
+    pub(crate) nodes: Vec<Node>,
+}
+
+impl TreeData {
+    pub(crate) fn of(tree: &Evaluated<'_, Truth>) -> Self {
+        let mut nodes = Vec::new();
+        let form = super::out::tree(tree, &mut nodes);
+        let data = to_string(&Json::Array(vec![form, write_result(tree)]));
+        Self { data, nodes }
     }
 }
 
@@ -570,6 +616,12 @@ impl DecisionCore {
     pub(crate) fn explanation(&self) -> Outcome<String> {
         self.with(|d| Ok(super::out::explanation(&explain(d))))
     }
+
+    /// The result tree of the condition of the rule at position `rule`.
+    pub(crate) fn rule_tree(&self, rule: &Raw) -> Outcome<TreeData> {
+        let position = self.position(rule)?;
+        self.with(|d| Ok(TreeData::of(&d.results()[position].when)))
+    }
 }
 
 // --- Nodes ----------------------------------------------------------------
@@ -660,13 +712,14 @@ impl NodeCore {
         Ok(())
     }
 
-    /// The result tree in JSON (`spec/json-format.md`, *Result trees*).
-    pub(crate) fn tree(
+    /// Evaluate the node on `input` and read its result tree.
+    fn with_tree<T>(
         &self,
         kind: &TreeKind,
         input: &Value,
         options: &TreeOptions,
-    ) -> cleanrules::Result<String> {
+        read: impl FnOnce(&Evaluated<'_, Truth>) -> T,
+    ) -> cleanrules::Result<T> {
         let evaluation = Options {
             strict: options.strict,
             rule: None,
@@ -680,7 +733,27 @@ impl NodeCore {
             )?,
             TreeKind::Value => evaluate_value_tree(&self.node, input, &Kleene, evaluation)?,
         };
-        Ok(to_string(&write_result(&tree)))
+        Ok(read(&tree))
+    }
+
+    /// The result tree in JSON (`spec/json-format.md`, *Result trees*).
+    pub(crate) fn tree(
+        &self,
+        kind: &TreeKind,
+        input: &Value,
+        options: &TreeOptions,
+    ) -> cleanrules::Result<String> {
+        self.with_tree(kind, input, options, |tree| to_string(&write_result(tree)))
+    }
+
+    /// The result tree for the idiomatic API (`TreeData`).
+    pub(crate) fn tree_data(
+        &self,
+        kind: &TreeKind,
+        input: &Value,
+        options: &TreeOptions,
+    ) -> cleanrules::Result<TreeData> {
+        self.with_tree(kind, input, options, TreeData::of)
     }
 
     /// The result tree on an input given as a JSON value.

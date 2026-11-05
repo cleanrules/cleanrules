@@ -25,7 +25,7 @@ fn internal(what: &str, name: &str) -> Problem {
 }
 
 /// A value in the reader's encoding (`lib/read.js`, `encodeData`).
-fn data(wire: &str) -> Outcome<Value> {
+pub(crate) fn data(wire: &str) -> Outcome<Value> {
     decode(wire)
         .map(|read| read.value)
         .map_err(|problem| Problem::Internal(format!("the data encoding is wrong ({problem})")))
@@ -60,7 +60,7 @@ pub(crate) fn field(path: Vec<Raw>) -> Outcome<Node> {
 }
 
 /// What is wrong with a value read as a constant, or `None`.
-fn not_constant(value: &Value) -> Option<(&'static str, &'static str)> {
+pub(crate) fn not_constant(value: &Value) -> Option<(&'static str, &'static str)> {
     match value {
         Value::Null(NullCause::DecimalOverflow) => Some((
             "the decimal constant does not fit in 38 digits",
@@ -280,7 +280,7 @@ pub(crate) fn rule_details(rule: &Rule) -> String {
     ]))
 }
 
-fn name_or<'a>(raw: &'a Raw, default: &'a str, what: &str) -> Outcome<Option<&'a str>> {
+pub(crate) fn name_or<'a>(raw: &'a Raw, default: &'a str, what: &str) -> Outcome<Option<&'a str>> {
     match raw {
         Raw::Undefined => Ok(Some(default)),
         Raw::Null => Ok(None),
@@ -292,7 +292,26 @@ fn name_or<'a>(raw: &'a Raw, default: &'a str, what: &str) -> Outcome<Option<&'a
     }
 }
 
-fn definition_plain(message: impl Into<String>, hint: &str) -> Problem {
+/// The aggregate named by `raw`, in any case; only `undefined` and `null`
+/// leave it out (an empty name is unknown, as in Python).
+pub(crate) fn aggregate_of(raw: &Raw) -> Outcome<Option<Aggregate>> {
+    let Some(name) = name_or(raw, "", "aggregate")? else {
+        return Ok(None);
+    };
+    if matches!(raw, Raw::Undefined) {
+        return Ok(None);
+    }
+    Aggregate::from_name(&name.to_lowercase())
+        .map(Some)
+        .ok_or_else(|| {
+            definition_plain(
+                format!("unknown aggregate {name:?}"),
+                "use one of: count, max, min, sum",
+            )
+        })
+}
+
+pub(crate) fn definition_plain(message: impl Into<String>, hint: &str) -> Problem {
     let error = Error::new(ErrorCode::RuleDefinitionError, message);
     Problem::Core(if hint.is_empty() {
         error
@@ -318,15 +337,7 @@ pub(crate) fn ruleset(
             "use one of: first, priority, unique, any, rule_order, collect",
         )
     })?;
-    let aggregate = match name_or(aggregate, "", "aggregate")? {
-        None | Some("") => None,
-        Some(name) => Some(Aggregate::from_name(&name.to_lowercase()).ok_or_else(|| {
-            definition_plain(
-                format!("unknown aggregate {name:?}"),
-                "use one of: count, max, min, sum",
-            )
-        })?),
-    };
+    let aggregate = aggregate_of(aggregate)?;
     let logic = name_or(logic, "boolean", "logic")?.unwrap_or("boolean");
     let strict = match strict {
         Raw::Undefined | Raw::Null => false,

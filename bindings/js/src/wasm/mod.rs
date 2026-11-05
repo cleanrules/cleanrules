@@ -9,6 +9,7 @@
 
 pub(crate) mod build;
 pub(crate) mod classes;
+pub(crate) mod documents;
 
 use std::cell::RefCell;
 

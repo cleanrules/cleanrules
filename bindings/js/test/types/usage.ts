@@ -268,7 +268,93 @@ const gapOf: Gap | null | undefined = why.causes[0]?.counterfactual?.gap
 F.country.isIn('ES')
 // @ts-expect-error: typed keys below the first are checked.
 void S.customer.age
-// Rules and rule sets cannot be written yet: toJSON() throws (never returns).
-type Written = ReturnType<Rule['toJSON']> | ReturnType<RootRuleSet['toJSON']>
-const written: [Written] extends [never] ? true : false = true
-void [nodeTag, walked, paths2, setPaths, thenOfField, typedYears, typedTag, gapOf, written]
+// Rules and rule sets are written as their JSON documents.
+const written: Record<string, unknown> = rules.toJSON()
+const writtenRule: Record<string, unknown> = vip.toJSON()
+void [nodeTag, walked, paths2, setPaths, thenOfField, typedYears, typedTag, gapOf, written, writtenRule]
+
+
+// --- Documents, result trees and decision tables (F.2b) ---
+
+import {
+  DecisionTable,
+  type Format as RootFormat,
+  type HeaderItem,
+  type Loaded,
+  ResultTree,
+  TableOutput,
+  type TablePolicy,
+  TableRow,
+  dump,
+  dumps,
+  evaluateTree,
+  evaluateValueTree,
+  load,
+  loads,
+  ruleFromText,
+} from 'cleanrules'
+import * as manual from 'cleanrules/wasm'
+
+const rootFormat: RootFormat = 'csv'
+const loaded: Loaded = loads('{}', { format: 'yaml', limits: { maxSize: 1000 }, actions: { notify: () => {} } })
+const loadedBytes: Loaded = loads(new Uint8Array(), { actions: new Map([['notify', (context: ActionContext) => void context.tree.truth]]) })
+if (loaded instanceof RootRuleSet) void loaded.rules
+const dumped: string = dumps(rules, { format: 'yaml', omitActions: true })
+const loadedFile: Promise<Loaded> = load('rules.yaml', { actions: {} })
+const dumpedFile: Promise<void> = dump(rules, 'rules.json', { format: 'json' })
+const parsed: Rule = ruleFromText('RULE vip IF x > 1', { do: (context) => void context.rule.name, limits: { maxDepth: 10 } })
+const resultTree: ResultTree = evaluateTree(F.age.ge(18), { age: 20 }, { logic: 'boolean', strict: false })
+const treeTruth: RootTruth | null = resultTree.truth
+const treeChildren: readonly ResultTree[] = resultTree.children
+const treeReason: Reason | null = resultTree.children[0]?.reason ?? null
+const treeNode: Expr = resultTree.node
+const resultValueTree: ResultTree = evaluateValueTree(F.price.mul(2), { price: 2 }, { strict: true })
+const header: HeaderItem[] = ['RULE', F.age, new TableOutput('band', ['minor', 'adult']), 'THEN note']
+const table = new DecisionTable(header, [['minor', F.age.lt(18), "'minor'", null], ['adult', 18, "'adult'", undefined]], {
+  hitPolicy: 'output_order',
+  aggregate: null,
+  strict: false,
+  limits: { maxTableSize: 100 },
+})
+const tablePolicy: TablePolicy = table.hitPolicy
+const rows: readonly TableRow[] = table.rows
+const firstInput: Expr | null = rows[0]?.inputs[0] ?? null
+const tableSet: RootRuleSet = table.ruleset
+const tableOut: RootDecision = table.evaluate({ age: 20 })
+const outputs: readonly TableOutput[] = table.outputs
+const contextTree = (context: ActionContext): ResultTree => context.tree
+// @ts-expect-error: a table policy is a closed set.
+new DecisionTable([], [], { hitPolicy: 'last' })
+// @ts-expect-error: dumps takes no format such as xml.
+dumps(rules, { format: 'xml' })
+// @ts-expect-error: TableRow has no public constructor.
+new TableRow()
+// @ts-expect-error: ResultTree has no public constructor.
+new ResultTree()
+
+// `cleanrules/wasm`: the same API, the native classes and init.
+const ready: Promise<void> = manual.init(new Uint8Array())
+const manualVersion: string | undefined = manual.version
+const manualFormat: number | undefined = manual.FORMAT_VERSION
+// @ts-expect-error: undefined until init resolves.
+const manualVersionString: string = manual.version
+const notInitialised = (error: manual.NotInitialisedError): 'ERR_CLEANRULES_NOT_INITIALISED' => error.code
+const csvTable: DecisionTable = loads('x\n> 1\n', { format: 'csv' })
+const textDocument: Expr | Rule | RootRuleSet = loads('IF x', { format: 'text', limits: { maxSize: 10 } })
+// @ts-expect-error: a text document is never a table.
+const textTable: DecisionTable = loads('IF x', { format: 'text' })
+const fileTable: Promise<DecisionTable> = load('risk.csv', { format: 'csv' })
+const anyFormat: Loaded = loads('{}', { format: rootFormat })
+const omitted: string = dumps(rules, { omitActions: null })
+const outputValues: ReadonlyArray<Value | Constant> = new TableOutput('y', [decimal('0.1')]).values
+void [manualVersion, manualFormat, manualVersionString, notInitialised, csvTable, textDocument, textTable, fileTable, anyFormat, omitted, outputValues]
+void manual.init()
+void manual.init('https://example.com/cleanrules_bg.wasm')
+void manual.init(new ArrayBuffer(8))
+const manualSet: manual.RuleSet = new manual.RuleSet([new manual.Rule('a', manual.F.x.gt(1))])
+const nativeSet = manual.native.RuleSet.read('RULE a IF x > 1', { format: 'text' })
+// @ts-expect-error: init takes no number.
+void manual.init(42)
+
+void [rootFormat, loadedBytes, dumped, loadedFile, dumpedFile, parsed, treeTruth, treeChildren, treeReason, treeNode, resultValueTree]
+void [tablePolicy, firstInput, tableSet, tableOut, outputs, contextTree, ready, manualSet, nativeSet]

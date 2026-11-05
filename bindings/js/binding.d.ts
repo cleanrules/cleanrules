@@ -130,6 +130,81 @@ export declare class Document {
   write(format?: Format | null): string
 }
 
+/**
+ * A decision table being built from a grid (`spec/tables.md`, *Grids*):
+ * header items, then each row's cells.
+ */
+export declare class NativeGrid {
+  /**
+   * Not a constructor: grids come from `gridNew`.
+   *
+   * # Errors
+   *
+   * Always a `TypeError`, the same as the WebAssembly build's.
+   */
+  private constructor()
+  /**
+   * A header item given as text.
+   *
+   * # Errors
+   *
+   * If the header was already read.
+   */
+  headerText(text: string): void
+  /**
+   * An input given as a node.
+   *
+   * # Errors
+   *
+   * If the header was already read.
+   */
+  headerInput(node: Node): void
+  /**
+   * An output: its key and its values, a list in the reader's encoding.
+   *
+   * # Errors
+   *
+   * `ExpressionError` for a value that is not a constant.
+   */
+  headerOutput(name: string, wire: string): void
+  /**
+   * Read the header.
+   *
+   * # Errors
+   *
+   * As the core reports them, with pointers into the grid.
+   */
+  start(): void
+  /** The next cell, given as text. */
+  cellText(text: string): void
+  /** The next cell, given as a node. */
+  cellNode(node: Node): void
+  /**
+   * The next cell, a value in the reader's encoding.
+   *
+   * # Errors
+   *
+   * `ExpressionError` for a value that is not a constant.
+   */
+  cellValue(wire: string): void
+  /**
+   * End the row and read it.
+   *
+   * # Errors
+   *
+   * As the core reports them, with pointers into the grid.
+   */
+  endRow(): void
+  /**
+   * The table, checked and compiled.
+   *
+   * # Errors
+   *
+   * As the core reports them, with pointers into the grid.
+   */
+  finish(): NativeTable
+}
+
 /** A rule of the core, built by `ruleNew`; immutable. */
 export declare class NativeRule {
   /**
@@ -140,6 +215,56 @@ export declare class NativeRule {
    * Always a `TypeError`, the same as the WebAssembly build's.
    */
   private constructor()
+}
+
+/** A decision table, immutable. */
+export declare class NativeTable {
+  /**
+   * Not a constructor: tables come from documents and grids.
+   *
+   * # Errors
+   *
+   * Always a `TypeError`, the same as the WebAssembly build's.
+   */
+  private constructor()
+  /** `[hit policy, aggregate, logic, strict]`, as JSON. */
+  config(): string
+  /** The input expressions, in column order. */
+  inputs(): Array<Node>
+  /** The output columns, as JSON. */
+  outputs(): string
+  /** The rows, as JSON. */
+  rows(): string
+  /** The nodes of the rows' cells. */
+  rowNodes(): Array<Node>
+  /** The number of rows. */
+  get rowCount(): number
+  /** The rule set the table compiles into. */
+  ruleset(): RuleSet
+  /**
+   * The table document in `format`: JSON (the default), YAML or CSV.
+   *
+   * # Errors
+   *
+   * `UnsupportedError` for the rule syntax.
+   */
+  write(format?: Format | null): string
+}
+
+/** A result tree (`common::core::TreeData`): its encoding and its nodes. */
+export declare class NativeTree {
+  /**
+   * Not a constructor: result trees come from `nodeTree` and `ruleTree`.
+   *
+   * # Errors
+   *
+   * Always a `TypeError`, the same as the WebAssembly build's.
+   */
+  private constructor()
+  /** The tree's encoding and JSON form, `[form, json]`. */
+  data(): string
+  /** The tree's nodes, in pre-order. */
+  nodes(): Array<Node>
 }
 
 /** A condition or value node; immutable. */
@@ -431,8 +556,35 @@ export declare function decimalProblem(text: string): string | null
 /** What a decision gives back, in the binding's encoding. */
 export declare function decisionData(decision: Decision): string
 
+/**
+ * The condition of a condition document.
+ *
+ * # Errors
+ *
+ * For a document of another kind.
+ */
+export declare function documentCondition(document: Document): Node
+
 /** What a document holds. */
 export type DocumentKind = 'condition' | 'rule' | 'ruleset' | 'decision_table'
+
+/**
+ * The rule of a rule document.
+ *
+ * # Errors
+ *
+ * For a document of another kind.
+ */
+export declare function documentRule(document: Document): NativeRule
+
+/**
+ * The table of a decision table document.
+ *
+ * # Errors
+ *
+ * For a document of another kind.
+ */
+export declare function documentTable(document: Document): NativeTable
 
 /**
  * A decision's explanation, in the binding's encoding.
@@ -443,6 +595,15 @@ export type DocumentKind = 'condition' | 'rule' | 'ruleset' | 'decision_table'
  */
 export declare function explanationData(decision: Decision): string
 
+/**
+ * Check that a file of `size` bytes is within the size limit of `format`.
+ *
+ * # Errors
+ *
+ * `FormatError` (`limit_exceeded`) when it is not.
+ */
+export declare function fileSizeCheck(name: string, size: number, format: unknown, limits: unknown): void
+
 /** The name of a format. */
 export type Format = 'json' | 'yaml' | 'text' | 'csv'
 
@@ -451,6 +612,17 @@ export type Format = 'json' | 'yaml' | 'text' | 'csv'
  * (`spec/json-format.md`).
  */
 export declare const FORMAT_VERSION: number
+
+/**
+ * A grid with its settings and limits.
+ *
+ * # Errors
+ *
+ * `RuleDefinitionError` for an unknown hit policy or aggregate, or a
+ * `strict` that is not a boolean; `RegistryError` for an unknown logic; a
+ * `TypeError` or `RangeError` for bad limits.
+ */
+export declare function gridNew(hitPolicy: unknown, aggregate: unknown, logic: unknown, strict: unknown, limits: unknown): NativeGrid
 
 /** The name of a hit policy (`spec/rules.md`). */
 export type HitPolicy = 'first' | 'priority' | 'unique' | 'any' | 'rule_order' | 'collect'
@@ -567,6 +739,16 @@ export declare function nodeSameAs(left: Node, right: Node): boolean
 export declare function nodeStringTest(op: string, operand: Node, text: string): Node
 
 /**
+ * Evaluate `node` (a `Node`) on native data, as a condition or as a value:
+ * its result tree.
+ *
+ * # Errors
+ *
+ * As `Node.evaluateTree` and `Node.evaluateValueTree`.
+ */
+export declare function nodeTree(node: Node, data: unknown, options: unknown, value: boolean): NativeTree
+
+/**
  * `not`, `is_null`, `abs` or `neg`.
  *
  * # Errors
@@ -595,6 +777,12 @@ export declare function ruleDetails(rule: NativeRule): string
  */
 export declare function ruleNew(name: string, when: Node, then: NodeList, priority: string, tags: string[], description?: string | null, metadata?: string | null, action?: string | null): NativeRule
 
+/** A rule's condition and payload values. */
+export declare function ruleNodes(rule: NativeRule): Array<Node>
+
+/** A rule's name, priority, description and payload keys, as JSON. */
+export declare function ruleParts(rule: NativeRule): string
+
 /**
  * A rule set of `rules`, with its options as given.
  *
@@ -603,6 +791,28 @@ export declare function ruleNew(name: string, when: Node, then: NodeList, priori
  * `RuleDefinitionError` or `RegistryError`, as the core reports them.
  */
 export declare function ruleSetNew(rules: RuleList, hitPolicy: unknown, aggregate: unknown, logic: unknown, strict: unknown): RuleSet
+
+/** A rule set's rules, in order. */
+export declare function ruleSetRules(ruleset: RuleSet): Array<NativeRule>
+
+/**
+ * One rule written in the text syntax, under `limits`.
+ *
+ * # Errors
+ *
+ * `RuleSyntaxError`, `ExpressionError` or `RuleDefinitionError`, as the core
+ * reports them; `FormatError` beyond the limits.
+ */
+export declare function ruleText(text: string | Uint8Array, limits?: Limits | null): NativeRule
+
+/**
+ * The result tree of the condition of the rule at `position` in `decision`.
+ *
+ * # Errors
+ *
+ * A `RangeError` for a position out of the rule set.
+ */
+export declare function ruleTree(decision: Decision, position: number): NativeTree
 
 /**
  * Register the JavaScript half of the binding; `index.js` calls it once when
@@ -649,3 +859,21 @@ export interface ValueTreeOptions {
 
 /** The version of the package. */
 export declare function version(): string
+
+/**
+ * The condition document of a node, in `format`.
+ *
+ * # Errors
+ *
+ * `UnsupportedError` for CSV.
+ */
+export declare function writeCondition(node: Node, format: unknown): string
+
+/**
+ * The rule document of a rule, in `format`.
+ *
+ * # Errors
+ *
+ * `UnsupportedError` for CSV, and in text for metadata.
+ */
+export declare function writeRule(rule: NativeRule, format: unknown): string

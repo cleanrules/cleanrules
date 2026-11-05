@@ -21,7 +21,8 @@
 //! explanations and summaries) builds on these classes and on a few internal
 //! functions (`build` in each front end), which build conditions and rules
 //! through the core's constructors and give values back in a private encoding
-//! (`common::out`).
+//! (`common::out`), and read and write documents, result trees and decision
+//! tables (`documents` in each front end).
 
 // napi-rs and wasm-bindgen hand arguments over by value, and napi-rs ties
 // JavaScript values to the lifetime of `&'env Env`: these two lints would ask
@@ -48,6 +49,12 @@ pub use napi::classes::{
     ReadOptions, RuleSet, TreeOptions, Truth, ValueTreeOptions,
 };
 #[cfg(not(target_arch = "wasm32"))]
+pub use napi::documents::{
+    NativeGrid, NativeTable, NativeTree, document_condition, document_rule, document_table,
+    file_size_check, grid_new, node_tree, rule_nodes, rule_parts, rule_set_rules, rule_text,
+    rule_tree, write_condition, write_rule,
+};
+#[cfg(not(target_arch = "wasm32"))]
 pub use napi::hooks::set_hooks;
 #[cfg(not(target_arch = "wasm32"))]
 pub use napi::{FORMAT_VERSION, decimal_problem, version};
@@ -61,5 +68,11 @@ pub use wasm::build::{
 };
 #[cfg(target_arch = "wasm32")]
 pub use wasm::classes::{Decision, Document, Node, RuleSet};
+#[cfg(target_arch = "wasm32")]
+pub use wasm::documents::{
+    NativeGrid, NativeTable, NativeTree, document_condition, document_rule, document_table,
+    file_size_check, grid_new, node_tree, rule_nodes, rule_parts, rule_set_rules, rule_text,
+    rule_tree, write_condition, write_rule,
+};
 #[cfg(target_arch = "wasm32")]
 pub use wasm::{decimal_problem, format_version, not_a_document, set_hooks, version};

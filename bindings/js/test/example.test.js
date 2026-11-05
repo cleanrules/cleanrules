@@ -53,3 +53,22 @@ test('docs/examples/discounts.mjs', async () => {
     check(execFileSync(process.execPath, [path.join(examples, 'discounts.mjs')], { encoding: 'utf8' }))
   }
 })
+
+// The documents and tables example, on the build under test (it reads
+// risk.csv with `load`, so Node and Deno only), and run directly on Node's
+// addon.
+test('docs/examples/risk.mjs', async () => {
+  const examples = path.join(import.meta.dirname, '..', '..', '..', 'docs', 'examples')
+  const { main } = await import(pathToFileURL(path.join(examples, 'risk.mjs')).href)
+  const check = (output) => {
+    assert.match(output, /^risk: medium, discount: 0\.05\nHIT POLICY priority: selected big\n/)
+    assert.match(output, /same table: true\nrows: new, vip, big, default\n/)
+    assert.match(output, /version: 1\ndecision_table:\n/)
+    assert.match(output, /vip: unknown; order\.total > 1000 is unknown \(missing_field\)/)
+    assert.match(output, /notify for vip: customer\.years > 5 is true$/)
+  }
+  check((await main(root)).join('\n'))
+  if (napiBuilt) {
+    check(execFileSync(process.execPath, [path.join(examples, 'risk.mjs')], { encoding: 'utf8' }).trim())
+  }
+})

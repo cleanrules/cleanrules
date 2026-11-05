@@ -293,7 +293,9 @@ jobs:
       # finds them missing from the lockfile, and `npm install` installs the
       # locked devDependencies and skips them.
       - run: npm install --no-audit --no-fund
-      # Builds the addon (debug), then node --test and tsc --noEmit.
+      # Builds the addon (debug), then node --test with the coverage of the
+      # JavaScript half (at least 90 % of lines; the flags exist since Node
+      # 22.8) and tsc --noEmit.
       - run: npm test
       # The committed loader and declarations are the ones napi-rs generates,
       # and the package, its platform packages and the Cargo workspace share
@@ -340,9 +342,10 @@ jobs:
       - run: npm run test:wasm
       # In Deno, on the module (the `deno` condition's build): the package
       # loads with no permission, then the same suite runs (which reads its
-      # fixtures).
+      # fixtures and writes the files of `load` and `dump` in a temporary
+      # directory).
       - run: deno run --no-prompt test/deno/smoke.js
-      - run: deno test --no-prompt --env-file=test/wasm.env --allow-read --allow-env test/
+      - run: deno test --no-prompt --env-file=test/wasm.env --allow-read --allow-env --allow-write test/
       - uses: actions/setup-node@v7
         with:
           node-version: 26

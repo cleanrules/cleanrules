@@ -152,17 +152,26 @@ describe('RuleSet', () => {
     throwsWith(() => new RuleSet([]).rule('x'), RuleNotFoundError, /no rule/, (error) => assert.equal(error.hint, null))
   })
 
-  test('field paths are frozen; rules and rule sets cannot be written yet', () => {
+  test('field paths are frozen; rules and rule sets are their JSON documents, actions as names', () => {
     const rules = new RuleSet([vip, loyal])
     const paths = rules.fieldPaths()
     assert.ok(Object.isFrozen(paths) && Object.isFrozen(paths[0]))
-    for (const value of [vip, rules]) {
-      throwsWith(() => value.toJSON(), UnsupportedError, /not available in this version/, (error) => {
-        assert.equal(error.code, 'unsupported')
-        assert.match(error.hint, /RuleSet\.read/)
-      })
-      assert.throws(() => JSON.stringify({ value }), UnsupportedError)
-    }
+    assert.equal(vip.toJSON().version, 1)
+    assert.equal(vip.toJSON().rule.name, 'vip')
+    assert.deepEqual(rules.toJSON().ruleset.rules.map((rule) => rule.name), ['vip', 'loyal'])
+    assert.equal(JSON.parse(JSON.stringify({ rules })).rules.ruleset.hit_policy, 'first')
+    // A named action is written as its name; code is refused, with where it is.
+    assert.equal(new Rule('n', F.x, null, { do: 'notify' }).toJSON().rule.do, 'notify')
+    const coded = new Rule('c', F.x, null, { do: () => {} })
+    throwsWith(() => coded.toJSON(), UnsupportedError, /action of rule "c" cannot be written: it is code without a name/, (error) => {
+      assert.equal(error.code, 'unsupported')
+      assert.equal(error.context.pointer, '/rule/do')
+      assert.equal(error.context.rule, 'c')
+      assert.match(error.hint, /omitActions/)
+    })
+    throwsWith(() => new RuleSet([vip, coded]).toJSON(), UnsupportedError, /cannot be written/, (error) => {
+      assert.equal(error.context.pointer, '/ruleset/rules/1/do')
+    })
   })
 
   test('arguments and configurations it refuses', () => {

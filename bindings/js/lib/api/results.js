@@ -1,8 +1,10 @@
-// What decisions, explanations and summaries give back, as frozen objects of
-// these classes (spec/explain.md; the same classes as Python's
-// `cleanrules._rules`). The core builds every explanation and summary; this
-// module only turns its encoding into objects. The classes are the same for
-// both builds; only the engine makes their objects.
+// What decisions, explanations, summaries, result trees and decision tables
+// give back, as frozen objects of these classes (spec/explain.md; the same
+// classes as Python's `cleanrules._rules`, `_trees` and `_tables`). The core
+// builds every explanation, summary and tree; this module only turns its
+// encoding into objects. The classes are the same for both builds; only the
+// engine makes their objects, except `TableOutput`, which a table's header
+// may also hold.
 
 import { RuleNotFoundError } from '../errors.js'
 import { decode, decodeGap, jsonInt, plainObject } from '../output.js'
@@ -44,8 +46,12 @@ class RuleResult {
 
 /** What an action receives (`spec/rules.md`, *Actions*). */
 class ActionContext {
-  constructor(token, rule, data, result, output, decision) {
+  #tree
+  #treeOf
+
+  constructor(token, rule, data, result, output, decision, tree) {
     check(token, 'ActionContext')
+    this.#treeOf = tree
     /** The rule whose action runs. */
     this.rule = rule
     /** The input, as given to `run`. */
@@ -56,6 +62,120 @@ class ActionContext {
     this.output = output
     /** The whole decision. */
     this.decision = decision
+    Object.freeze(this)
+  }
+
+  /**
+   * The result tree of the rule's condition: each node's truth or value, and
+   * why it is unknown (made when first read, from the input already read).
+   */
+  get tree() {
+    this.#tree ??= this.#treeOf()
+    return this.#tree
+  }
+}
+
+// --- Result trees --------------------------------------------------------
+
+/** A value of a result tree; the lists and maps it makes are frozen (opaque objects are not). */
+function treeValue(form, objects) {
+  const value = decode(form, objects)
+  return Array.isArray(form) && (form[0] === 'l' || form[0] === 'O') ? Object.freeze(value) : value
+}
+
+/**
+ * The result of evaluating a node and each of its children (`spec/ast.md`,
+ * *Evaluating one node*; `spec/json-format.md`, *Result trees*).
+ */
+class ResultTree {
+  #native
+  #node
+  #wrap
+  #json
+
+  /**
+   * `form` is the tree's encoding, `json` its JSON form, `cursor` the native
+   * nodes in pre-order with the next one to take, `objects` the opaque
+   * values' objects, and `wrap` makes an `Expr` of a native node.
+   */
+  constructor(token, form, json, cursor, objects, wrap) {
+    check(token, 'ResultTree')
+    this.#native = cursor.nodes[cursor.next]
+    cursor.next += 1
+    this.#wrap = wrap
+    this.#json = json
+    const [tag, outcome, reason, children] = form
+    /** Its truth value (`"true"`, `"false"` or `"unknown"`) for a condition; `null` for a value. */
+    this.truth = tag === 't' ? outcome : null
+    /** Its value, for a value node (`null` when it is null); `null` for a condition. */
+    this.value = tag === 'v' ? treeValue(outcome, objects) : null
+    /** Why it is unknown or null, if it is; otherwise `null`. */
+    this.reason = reason === null ? null : new Reason(INTERNAL, reason)
+    /** The children's results, in order. */
+    this.children = frozen(
+      children.map((child, i) => new ResultTree(INTERNAL, child, json.children[i], cursor, objects, wrap)),
+    )
+    Object.freeze(this)
+  }
+
+  /** The node evaluated, as an `Expr` (a `between` has two synthetic comparisons as children). */
+  get node() {
+    this.#node ??= this.#wrap(this.#native)
+    return this.#node
+  }
+
+  /** The result tree in the JSON format (`spec/json-format.md`, *Result trees*); a copy. */
+  toJSON() {
+    return JSON.parse(JSON.stringify(this.#json))
+  }
+
+  [INSPECT]() {
+    return `ResultTree(${this.node}: ${this.truth ?? (typeof this.value === 'string' ? JSON.stringify(this.value) : String(this.value))})`
+  }
+
+  [DENO_INSPECT]() {
+    return this[INSPECT]()
+  }
+}
+
+// --- Decision tables -----------------------------------------------------
+
+/**
+ * An output column of a decision table: its payload key and its output
+ * values, highest priority first. In a header, `new TableOutput('risk',
+ * ['high', 'low'])` is the column `THEN risk IN ('high', 'low')`: the values
+ * are JavaScript constants, not text.
+ */
+class TableOutput {
+  constructor(name, values = []) {
+    if (typeof name !== 'string') {
+      throw new TypeError(`an output's name is a string, not ${typeof name}`)
+    }
+    if (values === null || typeof values !== 'object' || typeof values[Symbol.iterator] !== 'function') {
+      throw new TypeError("an output's values are an array of constants")
+    }
+    /** The payload key. */
+    this.name = name
+    /** The output values, highest priority first (frozen). */
+    this.values = frozen(values)
+    Object.freeze(this)
+  }
+}
+
+/** A row of a decision table: one rule. */
+class TableRow {
+  constructor(token, name, priority, description, inputs, outputs) {
+    check(token, 'TableRow')
+    /** The rule's name, or `null` for `row_<n>`. */
+    this.name = name
+    /** The rule's own priority, or `null`. */
+    this.priority = priority
+    /** The rule's description, or `null`. */
+    this.description = description
+    /** One condition per input, testing that input; `null` for any value. */
+    this.inputs = frozen(inputs)
+    /** One value per output; `null` for no value. */
+    this.outputs = frozen(outputs)
     Object.freeze(this)
   }
 }
@@ -340,6 +460,9 @@ class Summary {
 registerOpaque(
   RuleResult,
   ActionContext,
+  ResultTree,
+  TableOutput,
+  TableRow,
   Reason,
   Counterfactual,
   Cause,
@@ -364,7 +487,10 @@ export {
   Reason,
   RuleExplanation,
   RuleResult,
+  ResultTree,
   RuleSummary,
   Summary,
+  TableOutput,
+  TableRow,
   notFound,
 }

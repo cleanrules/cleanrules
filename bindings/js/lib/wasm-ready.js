@@ -6,12 +6,20 @@ import { install } from './install.js'
 
 /** The idiomatic API's internal functions and classes, the same as the Node addon's. */
 const INTERNAL = [
+  'NativeGrid',
   'NativeRule',
+  'NativeTable',
+  'NativeTree',
   'NodeList',
   'RuleList',
   'actionErrorData',
   'decisionData',
+  'documentCondition',
+  'documentRule',
+  'documentTable',
   'explanationData',
+  'fileSizeCheck',
+  'gridNew',
   'nodeArith',
   'nodeBetween',
   'nodeChildren',
@@ -24,11 +32,19 @@ const INTERNAL = [
   'nodeMatches',
   'nodeSameAs',
   'nodeStringTest',
+  'nodeTree',
   'nodeUnary',
   'ruleDetails',
   'ruleNew',
+  'ruleNodes',
+  'ruleParts',
   'ruleSetNew',
+  'ruleSetRules',
+  'ruleText',
+  'ruleTree',
   'summaryWith',
+  'writeCondition',
+  'writeRule',
 ]
 
 /**
@@ -74,8 +90,21 @@ function guardFreed(Class) {
 
 export { INTERNAL }
 
-/** The native layer of the instantiated module `glue`, ready to use. */
+// The native layer of each instantiated glue module: made once, whichever
+// entry point asks first (`cleanrules` or `cleanrules/wasm`).
+const layers = new WeakMap()
+
+/** The native layer of the instantiated module `glue`, ready to use (made once). */
 export function ready(glue) {
+  let found = layers.get(glue)
+  if (found === undefined) {
+    found = layer(glue)
+    layers.set(glue, found)
+  }
+  return found
+}
+
+function layer(glue) {
   const native = {
     Document: glue.Document,
     RuleSet: glue.RuleSet,
@@ -86,11 +115,13 @@ export function ready(glue) {
     decimalProblem: glue.decimalProblem,
     setHooks: glue.setHooks,
   }
-  // The idiomatic API's internal functions and classes (`src/wasm/build.rs`).
+  // The idiomatic API's internal functions and classes (`src/wasm/build.rs`
+  // and `src/wasm/documents.rs`).
   for (const name of INTERNAL) {
     native[name] = glue[name]
   }
-  for (const Class of [native.Document, native.RuleSet, native.Decision, native.Node, native.NodeList, native.RuleList, native.NativeRule]) {
+  const classes = ['Document', 'RuleSet', 'Decision', 'Node', 'NodeList', 'RuleList', 'NativeRule', 'NativeTable', 'NativeGrid', 'NativeTree']
+  for (const Class of classes.map((name) => native[name])) {
     guardFreed(Class)
   }
   // wasm-bindgen takes an engine object only by reference, with its own

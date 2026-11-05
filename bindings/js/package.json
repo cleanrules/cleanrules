@@ -35,6 +35,10 @@
       "node": "./native.js",
       "default": "./native.wasm.js"
     },
+    "./wasm": {
+      "types": "./wasm.d.ts",
+      "default": "./wasm.js"
+    },
     "./wasm/cleanrules_bg.wasm": "./wasm/cleanrules_bg.wasm",
     "./package.json": "./package.json"
   },
@@ -47,6 +51,8 @@
     "native.wasm.js",
     "native.deno.js",
     "native.d.ts",
+    "wasm.js",
+    "wasm.d.ts",
     "binding.cjs",
     "binding.d.ts",
     "lib/",
@@ -89,10 +95,10 @@
     "build:release": "napi build --platform --release --no-const-enum --js binding.cjs --dts binding.d.ts && node scripts/private-constructors.js",
     "build:wasm": "node scripts/build-wasm.js",
     "pretest": "npm run build",
-    "test": "node --test \"test/**/*.test.js\" && tsc --noEmit -p test/types && tsc --noEmit -p test/types/tsconfig.unchecked.json",
+    "test": "node --test --experimental-test-coverage --test-coverage-lines=90 --test-coverage-include=\"lib/**\" --test-coverage-include=\"*.js\" --test-coverage-exclude=\"test/**\" --test-coverage-exclude=\"scripts/**\" --test-coverage-exclude=\"wasm/**\" \"test/**/*.test.js\" && tsc --noEmit -p test/types && tsc --noEmit -p test/types/tsconfig.unchecked.json",
     "pretest:wasm": "npm run build:wasm",
     "test:wasm": "node --env-file=test/wasm.env --test \"test/**/*.test.js\"",
-    "test:deno": "deno run --no-prompt test/deno/smoke.js && deno test --no-prompt --env-file=test/wasm.env --allow-read --allow-env test/",
+    "test:deno": "deno run --no-prompt test/deno/smoke.js && deno test --no-prompt --env-file=test/wasm.env --allow-read --allow-env --allow-write test/",
     "pretest:deno": "npm run build:wasm",
     "prepack": "node scripts/prepack.js"
   },

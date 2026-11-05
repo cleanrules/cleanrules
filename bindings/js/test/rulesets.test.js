@@ -40,6 +40,7 @@ describe(`the package (${build})`, () => {
       'Counterfactual',
       'Decimal',
       'Decision',
+      'DecisionTable',
       'EvaluationError',
       'Explanation',
       'Expr',
@@ -57,6 +58,7 @@ describe(`the package (${build})`, () => {
       'Note',
       'Reason',
       'RegistryError',
+      'ResultTree',
       'Rule',
       'RuleDefinitionError',
       'RuleExplanation',
@@ -66,6 +68,8 @@ describe(`the package (${build})`, () => {
       'RuleSummary',
       'RuleSyntaxError',
       'Summary',
+      'TableOutput',
+      'TableRow',
       'TypeMismatchError',
       'UnsupportedError',
       'ZonedDateTime',
@@ -74,10 +78,17 @@ describe(`the package (${build})`, () => {
       'date',
       'datetime',
       'decimal',
+      'dump',
+      'dumps',
+      'evaluateTree',
+      'evaluateValueTree',
       'field',
       'float',
+      'load',
+      'loads',
       'not',
       'or',
+      'ruleFromText',
       'version',
     ])
     // The root's RuleSet and Decision are the idiomatic ones, not the native classes.
@@ -136,12 +147,16 @@ describe(`the package (${build})`, () => {
     }
     // The idiomatic API: each build makes its own classes, with the same members.
     const [napiRoot, wasmRoot] = await roots()
-    for (const name of ['Expr', 'Field', 'Const', 'Rule', 'RuleSet', 'Decision']) {
+    for (const name of ['Expr', 'Field', 'Const', 'Rule', 'RuleSet', 'Decision', 'DecisionTable']) {
       assert.notEqual(napiRoot[name], wasmRoot[name], name)
       assert.deepEqual(members(wasmRoot[name]), members(napiRoot[name]), name)
     }
+    for (const name of ['loads', 'dumps', 'load', 'dump', 'ruleFromText', 'evaluateTree', 'evaluateValueTree']) {
+      assert.notEqual(napiRoot[name], wasmRoot[name], name)
+      assert.equal(wasmRoot[name].length, napiRoot[name].length, name)
+    }
     // The shared classes are the same objects.
-    for (const name of ['Explanation', 'Summary', 'ZonedDateTime', 'CleanRulesError']) {
+    for (const name of ['Explanation', 'Summary', 'ZonedDateTime', 'CleanRulesError', 'ResultTree', 'TableOutput', 'TableRow', 'ActionContext']) {
       assert.equal(napiRoot[name], wasmRoot[name], name)
     }
     // The internal functions and classes the API uses (`src/*/build.rs`).
@@ -150,10 +165,13 @@ describe(`the package (${build})`, () => {
       assert.equal(typeof napiLayer[name], 'function', `napi ${name}`)
       assert.equal(typeof wasmLayer[name], 'function', `wasm ${name}`)
     }
-    const internal = (layer) => Object.keys(layer).filter((name) => /^(node|rule|decision|explanation|summary|action)[A-Z]|^(NodeList|RuleList|NativeRule)$/.test(name)).sort()
+    const internal = (layer) =>
+      Object.keys(layer)
+        .filter((name) => /^(node|rule|decision|explanation|summary|action|document|write|grid|file)[A-Z]|^(NodeList|RuleList|Native[A-Z]\w*)$/.test(name))
+        .sort()
     assert.deepEqual(internal(napiLayer), [...INTERNAL].sort())
     assert.deepEqual(internal(wasmLayer), [...INTERNAL].sort())
-    for (const name of ['NodeList', 'RuleList', 'NativeRule']) {
+    for (const name of ['NodeList', 'RuleList', 'NativeRule', 'NativeTable', 'NativeGrid', 'NativeTree']) {
       assert.deepEqual(
         members(wasmLayer[name]).filter((member) => !WASM_ONLY.has(member)),
         members(napiLayer[name]),
@@ -214,8 +232,37 @@ describe(`the package (${build})`, () => {
       (r) => new r.RuleSet([new r.Rule('a', r.F.x)], { hitPolicy: 'rule_order' }).evaluate({ x: true }).output,
       (r) => new r.RuleSet([new r.Rule('a', r.F.x)]).evaluate({ x: true }).whyNot('b'),
       (r) => new r.RuleSet([new r.Rule('a', r.F.x)]).rule('b'),
-      (r) => new r.RuleSet([new r.Rule('a', r.F.x)]).toJSON(),
+      (r) => new r.RuleSet([new r.Rule('a', r.F.x, null, { do: () => {} })]).toJSON(),
       (r) => r.F.x.between(1, 2, { close: 'left' }),
+      // Documents, tables and trees (F.2b).
+      (r) => r.loads('{"version": 1, "condition": {"op": "nope"}}'),
+      (r) => r.loads('RULE r\nIF x >\nTHEN y = 1', { format: 'text' }),
+      (r) => r.loads('x\n"1\n', { format: 'csv' }),
+      (r) => r.loads('{}', { format: 'xml' }),
+      (r) => r.loads(42),
+      (r) => r.loads('RULE a IF x DO n', { format: 'text', actions: {} }),
+      (r) => r.loads('{}', { limits: { maxSize: -1 } }),
+      (r) => r.dumps(r.F.x.add(1)),
+      (r) => r.dumps({}),
+      (r) => r.dumps(new r.RuleSet([]), { format: 'csv' }),
+      (r) => r.dumps(new r.Rule('a', r.F.x, null, { metadata: { m: 1 } }), { format: 'text' }),
+      (r) => r.ruleFromText('IF a\nIF b'),
+      (r) => r.ruleFromText('IF a', { do: 'n' }),
+      (r) => r.ruleFromText(new Uint8Array([0xff])),
+      (r) => new r.DecisionTable(['x', "THEN risk IN ('high', 'low')"], [['1', "'low'"], ['2', 'high']]),
+      (r) => new r.DecisionTable(['x'], [['> )']]),
+      (r) => new r.DecisionTable(['x'], [[1], [Number.NaN]]),
+      (r) => new r.DecisionTable(['x', new r.TableOutput('y', [r.decimal('1e40')])], []),
+      (r) => new r.DecisionTable(['x'], [[r.decimal('1e40')]]),
+      (r) => new r.DecisionTable(['x'], [], { hitPolicy: 'sometimes' }),
+      (r) => new r.DecisionTable(['x'], [], { strict: 1 }),
+      (r) => new r.DecisionTable(['x'], [], { logic: 'nope' }),
+      (r) => new r.DecisionTable(['x', 3], []),
+      (r) => new r.DecisionTable(['x'], Array.from({ length: 10 }, () => ['> 1']), { limits: { maxTableSize: 7 } }),
+      (r) => r.evaluateTree(r.F.x.gt(1), {}, { strict: true }),
+      (r) => r.evaluateTree(r.F.x.add(1), {}),
+      (r) => r.evaluateTree(r.F.x.gt(1), {}, { logic: 'nope' }),
+      (r) => r.evaluateValueTree('x', {}),
     ]
     const outcome = (call, r) => {
       try {
@@ -238,8 +285,26 @@ describe(`the package (${build})`, () => {
       ])
       const decision = rules.evaluate({ x: 8, d: r.date(2026, 2, 1), z: new Date(0) })
       const explanation = decision.explain()
+      const table = r.loads('HIT POLICY,priority\nRULE,x,THEN v,"THEN r IN (\'a\', \'b\')"\nhi,> 1,1.5,\'a\'\nlo,-,0,\'b\'\n', { format: 'csv' })
+      const tree = r.evaluateTree(r.F.x.between(1, 5).and(r.F.y.isNull()), { x: 3, y: new Set() })
+      const loaded = r.loads(r.dumps(rules, { format: 'yaml' }), { format: 'yaml' })
+      const text = r.ruleFromText('RULE t PRIORITY 2 TAGS a IF x > 1 THEN v = x * 2 DO act')
       return JSON.stringify(
-        [decision.toJSON(), explanation.toJSON(), String(explanation), explanation.rules.map(String), rules.summary().toJSON(), String(rules.summary()), rules.get('a').metadata],
+        [
+          decision.toJSON(),
+          explanation.toJSON(),
+          String(explanation),
+          explanation.rules.map(String),
+          rules.summary().toJSON(),
+          String(rules.summary()),
+          rules.get('a').metadata,
+          rules.toJSON(),
+          r.dumps(loaded, { format: 'yaml' }),
+          [table.toJSON(), r.dumps(table, { format: 'csv' }), table.rows, table.outputs, table.ruleset.toJSON()],
+          table.evaluate({ x: 2 }).output,
+          [tree.toJSON(), tree.truth, tree.children.map((child) => [String(child.node), child.truth])],
+          [text.toJSON(), text.actionName, text.priority, text.tags],
+        ],
         (_, value) => (typeof value === 'bigint' ? `${value}n` : value),
       )
     }
@@ -302,7 +367,10 @@ describe(`the package (${build})`, () => {
         assert.equal(conditions[name], `${base}.wasm.js`, `${subpath} ${name}`)
       }
     }
-    // The module itself, for bundlers that copy it.
+    // The WebAssembly build initialised by hand, in every runtime, and the
+    // module itself, for bundlers that copy it.
+    assert.deepEqual(pkg.exports['./wasm'], { types: './wasm.d.ts', default: './wasm.js' })
+    assert.ok(pkg.files.includes('wasm.js') && pkg.files.includes('wasm.d.ts'))
     assert.equal(pkg.exports['./wasm/cleanrules_bg.wasm'], './wasm/cleanrules_bg.wasm')
     // Node resolves the package's own `exports` to the native addon.
     assert.equal(require.resolve('cleanrules'), path.join(JS, 'index.js'))

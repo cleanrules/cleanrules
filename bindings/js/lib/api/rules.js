@@ -11,7 +11,9 @@
 //
 // The core builds, evaluates and explains; this module checks the arguments
 // JavaScript gives, converts values, and calls the actions of the rules the
-// core selected. It is made once per build (`rules(native, expressions)`).
+// core selected. It is made once per build (`rules(native, expressions,
+// trees, build)`). Rules and rule sets read from documents (`documents.js`)
+// are made of the core's own (`fromNativeRule`, `fromNativeRuleSet`).
 
 import { call, registry } from '../actions.js'
 import { CleanRulesError, RuleDefinitionError, UnsupportedError, fromNative } from '../errors.js'
@@ -25,6 +27,8 @@ const DENO_INSPECT = Symbol.for('Deno.customInspect')
 
 /** Only the binding makes decisions, and copies of rules. */
 const PRIVATE = Symbol('cleanrules.rules')
+/** Rules and rule sets made of the core's own, read from a document. */
+const NATIVE = Symbol('cleanrules.native')
 
 const RULE_OPTIONS = ['priority', 'tags', 'description', 'metadata', 'do']
 const RULESET_OPTIONS = ['hitPolicy', 'aggregate', 'logic', 'strict']
@@ -42,17 +46,29 @@ function entriesOf(value) {
   return null
 }
 
-/** The error of writing rules or rule sets, which this version cannot do yet. */
-function notWritable(what) {
-  return new UnsupportedError(`writing ${what} as documents is not available in this version of the JavaScript package`, {
-    hint: 'write them with the rule syntax, YAML or JSON and read them with RuleSet.read of cleanrules/native; decisions, explanations and summaries have toJSON()',
-    context: { operation: 'toJSON', reason: `${what} built in code cannot be written yet` },
-  })
+/**
+ * Refuse to write a rule whose action is code without a name, unless
+ * `omitActions` (`spec/json-format.md`, *Writing errors*): a document holds a
+ * named action as its name, but never code. `pointer` locates the rule, with
+ * `{}` for its position.
+ */
+function checkActions(ruleList, pointer, omitActions) {
+  if (omitActions) return
+  for (const [position, rule] of ruleList.entries()) {
+    if (rule.do !== null && rule.actionName === null) {
+      throw new UnsupportedError(`the action of rule ${JSON.stringify(rule.name)} cannot be written: it is code without a name`, {
+        hint: "name it ({ do: 'notify' }) and bind it with RuleSet.bind, or pass { omitActions: true } to write the rule without it",
+        context: { pointer: `${pointer.replace('{}', String(position))}/do`, rule: rule.name },
+      })
+    }
+  }
 }
 
 /** The rules, rule sets and decisions of one build. */
-function rules(native, expressions, build) {
-  const { Expr, constant, nodeOf, wrapJson } = expressions
+function rules(native, expressions, trees, build) {
+  const { Expr, constant, nodeOf, wrap, wrapJson } = expressions
+  // The native decision and the objects of its input, of each `Decision`.
+  let decisionParts
   // The native rule of each `Rule`, and the native rule set of each `RuleSet`.
   const natives = new WeakMap()
 
@@ -137,6 +153,21 @@ function rules(native, expressions, build) {
      *   action: a function, or the name of one that `RuleSet.bind` resolves).
      */
     constructor(name, when, then, ruleOptions) {
+      if (name === NATIVE) {
+        // A rule of the core (`when`), read from a document.
+        const made = when
+        const [ruleName, priority, description, keys] = JSON.parse(native.ruleParts(made))
+        const nodes = native.ruleNodes(made).map(wrap)
+        this.name = ruleName
+        this.#when = nodes[0]
+        this.#then = Object.freeze(Object.fromEntries(keys.map((key, i) => [key, nodes[i + 1]])))
+        this.#priority = decode(priority, [])
+        this.#description = description
+        this.#do = null
+        natives.set(this, made)
+        Object.freeze(this)
+        return
+      }
       if (name === PRIVATE) {
         // A copy of the rule `when` with the action `then` (`bind`).
         const [source, action] = [when, then]
@@ -267,9 +298,14 @@ function rules(native, expressions, build) {
       return this.#read()[2]
     }
 
-    /** Not yet: writing rules as documents is not available in this version of the package. */
+    /**
+     * The rule document of the JSON format (`spec/json-format.md`, *Rules*),
+     * as `dumps(rule)` writes it; an `UnsupportedError` for an action that is
+     * code without a name.
+     */
     toJSON() {
-      throw notWritable('rules')
+      checkActions([this], '/rule', false)
+      return JSON.parse(native.writeRule(natives.get(this), 'json'))
     }
 
     [INSPECT]() {
@@ -292,6 +328,16 @@ function rules(native, expressions, build) {
      *   `'collect'`), `logic` (`'boolean'`) and `strict` (`false`).
      */
     constructor(ruleList, setOptions) {
+      if (ruleList === NATIVE) {
+        // A rule set of the core (`setOptions`), read from a document.
+        const made = setOptions
+        const items = native.ruleSetRules(made).map((rule) => new Rule(NATIVE, rule))
+        natives.set(this, made)
+        this.#rules = Object.freeze(items)
+        this.#byName = new Map(items.map((rule) => [rule.name, rule]))
+        Object.freeze(this)
+        return
+      }
       if (ruleList === null || typeof ruleList !== 'object' || typeof ruleList[Symbol.iterator] !== 'function') {
         throw definition(`RuleSet takes an iterable of rules, not ${show(ruleList)}`, null)
       }
@@ -428,7 +474,12 @@ function rules(native, expressions, build) {
       for (const result of decision.selected) {
         const action = result.rule.do
         if (action === null) continue
-        const context = new ActionContext(INTERNAL, result.rule, data, result, result.output ?? EMPTY, decision)
+        const position = decision.results.indexOf(result)
+        const tree = () => {
+          const [made, objects] = decisionParts(decision)
+          return trees.resultTree(native.ruleTree(made, position), objects)
+        }
+        const context = new ActionContext(INTERNAL, result.rule, data, result, result.output ?? EMPTY, decision, tree)
         const failure = call(action, context)
         if (failure !== undefined) {
           const [kind, thrown, detail] = failure
@@ -449,9 +500,14 @@ function rules(native, expressions, build) {
       )
     }
 
-    /** Not yet: writing rule sets as documents is not available in this version of the package. */
+    /**
+     * The rule set document of the JSON format (`spec/json-format.md`, *Rule
+     * sets*), as `dumps(ruleset)` writes it; an `UnsupportedError` for an
+     * action that is code without a name.
+     */
     toJSON() {
-      throw notWritable('rule sets')
+      checkActions(this.#rules, '/ruleset/rules/{}', false)
+      return JSON.parse(natives.get(this).write('json'))
     }
 
     [INSPECT]() {
@@ -470,6 +526,10 @@ function rules(native, expressions, build) {
     #output
     #failed
     #explanation
+
+    static {
+      decisionParts = (decision) => [decision.#native, decision.#objects]
+    }
 
     constructor(token, ruleset, decision, objects) {
       if (token !== PRIVATE) {
@@ -562,7 +622,22 @@ function rules(native, expressions, build) {
   registerOpaque(Rule, RuleSet, Decision)
   brand(build, Rule, RuleSet, Decision)
 
-  return { Decision, Rule, RuleSet }
+  return {
+    Decision,
+    Rule,
+    RuleSet,
+    checkActions,
+    /** The `Rule` of a rule of the core. */
+    fromNativeRule: (made) => new Rule(NATIVE, made),
+    /** The `RuleSet` of a rule set of the core. */
+    fromNativeRuleSet: (made) => new RuleSet(NATIVE, made),
+    /** The rule of the core of a `Rule`. */
+    ruleNative: (rule) => natives.get(rule),
+    /** The rule set of the core of a `RuleSet`. */
+    ruleSetNative: (ruleset) => natives.get(ruleset),
+    /** A copy of `rule` with the action `action` (a function). */
+    withAction: (rule, action) => new Rule(PRIVATE, rule, action),
+  }
 }
 
 export { rules }

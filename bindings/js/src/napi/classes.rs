@@ -209,13 +209,17 @@ fn paths_to_js<'env>(env: &'env Env, paths: &[Vec<Segment>]) -> Result<Array<'en
 }
 
 /// One input read by the `read` hook, with the values its getters threw.
-struct Native<'env> {
-    read: Read,
+pub(crate) struct Native<'env> {
+    pub(crate) read: Read,
     thrown: Option<Array<'env>>,
 }
 
 /// Read `data` along the paths of `owner` (`lib/read.js`).
-fn read<'env>(env: &'env Env, data: Unknown<'env>, owner: Unknown<'env>) -> Result<Native<'env>> {
+pub(crate) fn read<'env>(
+    env: &'env Env,
+    data: Unknown<'env>,
+    owner: Unknown<'env>,
+) -> Result<Native<'env>> {
     let read = hook::<FnArgs<(Unknown<'env>, Unknown<'env>)>, Array<'env>>(env, "read")?;
     let result = read.call(FnArgs::from((data, owner)))?;
     let wire: String = result
@@ -233,14 +237,14 @@ fn read<'env>(env: &'env Env, data: Unknown<'env>, owner: Unknown<'env>) -> Resu
 
 /// The JavaScript error of a core error met evaluating `native`, thrown; a
 /// `read_error` in strict mode gets what its getter threw as `cause`.
-fn chained(env: &Env, error: &cleanrules::Error, native: &Native<'_>) -> napi::Error {
+pub(crate) fn chained(env: &Env, error: &cleanrules::Error, native: &Native<'_>) -> napi::Error {
     let cause = cause_index(error, &native.read.errors)
         .and_then(|index| native.thrown.as_ref()?.get::<Unknown<'_>>(index).ok()?)
         .filter(|value| value.get_type().is_ok_and(|t| t != ValueType::Undefined));
     throw(env, error, cause, None)
 }
 
-fn is_undefined(value: &Unknown<'_>) -> Result<bool> {
+pub(crate) fn is_undefined(value: &Unknown<'_>) -> Result<bool> {
     Ok(value.get_type()? == ValueType::Undefined)
 }
 
@@ -249,7 +253,7 @@ fn is_undefined(value: &Unknown<'_>) -> Result<bool> {
 /// A document read from a text; immutable.
 #[napi]
 pub struct Document {
-    core: DocumentCore,
+    pub(crate) core: DocumentCore,
 }
 
 #[napi]
@@ -305,7 +309,7 @@ impl Document {
 }
 
 /// An optional argument as a [`Raw`] value.
-fn optional(value: Option<Unknown<'_>>) -> Result<Raw> {
+pub(crate) fn optional(value: Option<Unknown<'_>>) -> Result<Raw> {
     value.map_or(Ok(Raw::Undefined), |value| raw(&value))
 }
 

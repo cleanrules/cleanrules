@@ -498,7 +498,7 @@ function expressions(native, build) {
   registerOpaque(Expr)
   brand(build, Expr)
 
-  return { Const, Expr, F, Field, and, constant, field, lift, nodeOf, not, or, wrapJson }
+  return { Const, Expr, F, Field, and, constant, field, lift, nodeOf, not, or, wrap, wrapJson }
 }
 
 export { constantWire, expressions }

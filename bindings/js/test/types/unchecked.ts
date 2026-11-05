@@ -2,7 +2,8 @@
 // (tsconfig.unchecked.json): with typed keys (`Fields<T>`) or `field(...)`,
 // nothing is possibly undefined.
 
-import { type Expr, F, type Field, type FieldRef, type Fields, Rule, RuleSet, decimal, field } from 'cleanrules'
+import { DecisionTable, type Expr, F, type Field, type FieldRef, type Fields, Rule, RuleSet, decimal, dumps, evaluateTree, field, loads } from 'cleanrules'
+import { init } from 'cleanrules/wasm'
 
 interface Order {
   customer: { years: number; newsletter?: boolean; address: { city: string } | null }
@@ -45,3 +46,10 @@ void O.items[0].price
 const then: undefined = F.customer?.then
 
 void [years, city, optional, price, discount, gap, text, total, then]
+
+// Documents, trees and tables with exact optional properties.
+const table = new DecisionTable(['RULE', O.customer.years, 'THEN discount'], [['vip', O.customer.years.gt(5), decimal('0.15')]])
+const firstRow = table.rows[0]?.inputs[0]
+const back = loads(dumps(rules, { format: 'yaml' }), { format: 'yaml' })
+const leaf = evaluateTree(vipWhen, { customer: { years: 7 } }).children[0]?.truth
+void [table, firstRow, back, leaf, init(new Uint8Array())]

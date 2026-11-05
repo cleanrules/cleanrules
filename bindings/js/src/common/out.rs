@@ -18,7 +18,13 @@
 //! | `["l", [items]]` | list |
 //! | `["O", [[key, item], ...]]` | map, in order |
 //! | `["X", "<type>", "<token>"]` | opaque |
+//!
+//! A result tree (`tree`) is `["t", truth, reason, children]` for a node with
+//! a truth value and `["v", value, reason, children]` for any other, with its
+//! nodes apart, in pre-order.
 
+use cleanrules::ast::Node;
+use cleanrules::eval::{Evaluated, Outcome, Reason};
 use cleanrules::explain::{Cause, Explanation, Gap, GroupKind, Requirement};
 use cleanrules::format::{write_node, write_path, write_value};
 use cleanrules::jiff::civil::DateTime;
@@ -181,6 +187,40 @@ fn gap(gap: &Gap) -> Json {
     }
 }
 
+/// Why a result is unknown or null: `[code, paths, types, detail]`.
+fn reason(reason: &Reason) -> Json {
+    Json::Array(vec![
+        string(reason.code.as_str()),
+        Json::Array(reason.paths.iter().map(|p| path(p)).collect()),
+        Json::Array(reason.types.iter().map(|g| string(g.as_str())).collect()),
+        nullable(reason.detail.as_deref(), string),
+    ])
+}
+
+/// A result tree (`spec/json-format.md`, *Result trees*): `["t", truth,
+/// reason, children]` or `["v", value, reason, children]`; its nodes are
+/// pushed to `nodes` in pre-order, so that JavaScript wraps them as they are.
+pub(crate) fn tree(tree: &Evaluated<'_, Truth>, nodes: &mut Vec<Node>) -> Json {
+    nodes.push(Node::clone(&tree.node));
+    let (tag, outcome) = match &tree.outcome {
+        Outcome::Truth(truth) => ("t", string(truth_name(*truth))),
+        Outcome::Value(found) => ("v", value(found)),
+    };
+    let children = tree
+        .children
+        .iter()
+        .map(|child| self::tree(child, nodes))
+        .collect();
+    tagged(
+        tag,
+        vec![
+            outcome,
+            nullable(tree.reason.as_ref(), reason),
+            Json::Array(children),
+        ],
+    )
+}
+
 /// A cause: `["c", node, truth, negated, holds, values, reason, counterfactual,
 /// text]`.
 fn cause(cause: &Cause<'_, '_>) -> Json {
@@ -189,14 +229,7 @@ fn cause(cause: &Cause<'_, '_>) -> Json {
         .iter()
         .map(|(at, read)| Json::Array(vec![path(at), value(read)]))
         .collect();
-    let reason = nullable(cause.reason(), |reason| {
-        Json::Array(vec![
-            string(reason.code.as_str()),
-            Json::Array(reason.paths.iter().map(|p| path(p)).collect()),
-            Json::Array(reason.types.iter().map(|g| string(g.as_str())).collect()),
-            nullable(reason.detail.as_deref(), string),
-        ])
-    });
+    let reason = nullable(cause.reason(), reason);
     let counterfactual = nullable(cause.counterfactual.as_ref(), |counterfactual| {
         Json::Array(vec![
             path(&counterfactual.path),

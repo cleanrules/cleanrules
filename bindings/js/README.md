@@ -9,10 +9,14 @@ builds with the same API: a native Node addon built with
 [wasm-bindgen](https://wasm-bindgen.github.io/wasm-bindgen/) for browsers,
 Deno and other runtimes (task F.1b).
 
-The package root, `cleanrules`, is the idiomatic API (task F.2a): conditions
-built with the `F` proxy and methods, rules and rule sets built in code,
-decisions with native JavaScript values, and explanations and summaries as
-objects. The native layer underneath stays available in `cleanrules/native`.
+The package root, `cleanrules`, is the idiomatic API (tasks F.2a and F.2b):
+conditions built with the `F` proxy and methods, rules and rule sets built in
+code or read from documents (`loads`, `load`, `ruleFromText`) and written back
+(`dumps`, `dump`), decision tables, result trees of one condition
+(`evaluateTree`), decisions with native JavaScript values, and explanations
+and summaries as objects. The native layer underneath stays available in
+`cleanrules/native`, and `cleanrules/wasm` is the WebAssembly build
+initialised by hand.
 
 ## Example
 
@@ -74,11 +78,16 @@ CommonJS) and [`docs/examples/discounts.deno.js`](../../docs/examples/discounts.
 ## Entry points
 
 - `cleanrules`: the idiomatic API (`F`, `field`, `constant`, `and`, `or`,
-  `not`, `Expr`, `Rule`, `RuleSet`, `Decision` and the classes of explanations
-  and summaries), the errors, the marker values (`decimal`, `float`, `date`,
-  `datetime`, and `ZonedDateTime` given back), `FORMAT_VERSION` and `version`.
+  `not`, `Expr`, `Rule`, `RuleSet`, `Decision`, `DecisionTable`, `loads`,
+  `dumps`, `load`, `dump`, `ruleFromText`, `evaluateTree`,
+  `evaluateValueTree`, and the classes of explanations, summaries, result
+  trees and tables), the errors, the marker values (`decimal`, `float`,
+  `date`, `datetime`, and `ZonedDateTime` given back), `FORMAT_VERSION` and
+  `version`.
 - `cleanrules/native`: the native layer, the classes below. The idiomatic API
   builds on it, and it stays available.
+- `cleanrules/wasm`: the WebAssembly build initialised by hand (*Initialising
+  the WebAssembly module yourself*, below), in every runtime.
 
 Each comes in both builds, and `package.json` `exports` picks one by
 condition:
@@ -113,8 +122,8 @@ With bundlers, the module is a separate file that the bundle must ship
 - esbuild does not follow `new URL(...)`: copy `wasm/cleanrules_bg.wasm` next
   to the bundled module (or serve it at the URL the module computes).
 
-A hand-initialised entry (passing the module or its bytes yourself) is planned
-for task F.2b.
+Where a bundler or a CDN serves the module from a URL of its own, use
+`cleanrules/wasm` and pass that URL (below).
 
 On Node, where no prebuilt addon exists for the platform, `node
 --conditions=browser` runs the WebAssembly build instead.
@@ -142,6 +151,53 @@ Only these differ:
   by brand everywhere, but where `util.types` does not exist (browsers) an
   `Error` of another realm is recognised only with `Error.isError`.
 
+### Initialising the WebAssembly module yourself
+
+`cleanrules/wasm` has the exports of `cleanrules`, the native classes in
+`native` (`native.RuleSet.read(...)`: its `RuleSet` and `Decision` are not the
+API's), and `init(source)`, which loads the module from where you say:
+
+```js
+import { init, F, Rule, RuleSet } from 'cleanrules/wasm'
+
+// A URL (a string or a URL), a Request, a Response or a promise of one, the
+// bytes (an ArrayBuffer or a typed array) or a compiled WebAssembly.Module.
+await init(new URL('cleanrules_bg.wasm', import.meta.url))
+```
+
+- With **Vite**: `import wasmUrl from 'cleanrules/wasm/cleanrules_bg.wasm?url'`
+  and `await init(wasmUrl)`.
+- With **webpack 5**: an asset rule (`{ test: /cleanrules_bg\.wasm$/, type:
+  'asset/resource' }`) makes `import wasmUrl from
+  'cleanrules/wasm/cleanrules_bg.wasm'` the file's URL; then `await
+  init(wasmUrl)`.
+- With **esbuild** or any bundler that does not copy it: copy
+  `node_modules/cleanrules/wasm/cleanrules_bg.wasm` to your assets and pass its
+  URL.
+- From a **CDN**, the module next to the package's files: `await
+  init('https://cdn.jsdelivr.net/npm/cleanrules@<version>/wasm/cleanrules_bg.wasm')`
+  (served as `application/wasm`, it compiles while it downloads).
+- In **Node** and **Deno**, `await init()` loads the file next to the package
+  (Node reads it from disk; Deno fetches it, with `--allow-read`), and bytes
+  work everywhere: `await init(await readFile(path))`.
+
+Importing the entry loads nothing (no top-level `await`, no runtime module).
+Until `init` resolves, using what needs the module (the API of the build,
+`decimal` and `native`: calling it, constructing it, or reading, listing or
+changing its properties) throws an `Error` whose `code` is
+`'ERR_CLEANRULES_NOT_INITIALISED'` and whose message says to call `await
+init(source)` first, and `version` and `FORMAT_VERSION` are `undefined` (typed
+`string | undefined` and `number | undefined`); the error classes, the marker
+classes and the classes of results work at once. The exports become the real
+values when `init` resolves, and a copy taken before (`const { F } = await
+import('cleanrules/wasm')`, or with `require`) forwards to them. `init`
+returns the same promise when called again (a rejected one can be retried),
+so calling it twice is harmless. In one realm, `cleanrules/wasm` and
+`cleanrules` on WebAssembly share the module and the API's classes. The error
+is a plain `Error`, not a `CleanRulesError`: like the addon's version check,
+it is a loading mistake, not one of the engine's error codes
+(`spec/errors.md`), hence a code in Node's style.
+
 ## Installing and building
 
 Users install `cleanrules` only. On Node, the addon ships in one optional
@@ -157,11 +213,15 @@ From the repository, with a Rust toolchain:
 
 ```sh
 npm --prefix bindings/js install          # @napi-rs/cli and typescript
-npm --prefix bindings/js test             # the addon (debug): node --test, tsc --noEmit
+npm --prefix bindings/js test             # the addon (debug): node --test with coverage, tsc --noEmit
 npm --prefix bindings/js run test:wasm    # the WebAssembly module: the same suite in Node
 npm --prefix bindings/js run test:deno    # the same suite in Deno, on the module
 npm --prefix bindings/js run build:release
 ```
+
+`npm test` measures the coverage of the JavaScript half (`lib/` and the entry
+files) with Node's own (`--experimental-test-coverage`), and fails under 90 %
+of lines.
 
 `npm run build` writes the addon (`cleanrules.<platform>.node`), the loader
 napi-rs generates (`binding.cjs`) and its declarations (`binding.d.ts`, the
@@ -174,7 +234,7 @@ LTO) and wasm-bindgen's `--target web`. It needs the `wasm32-unknown-unknown`
 target (`rustup target add wasm32-unknown-unknown`) and the `wasm-bindgen` CLI
 at the version of the `wasm-bindgen` crate, which `bindings/js/Cargo.toml` pins
 (`cargo install --locked wasm-bindgen-cli --version 0.2.130`); the script
-checks that they match. The module is 1.8 MiB, 641 KiB gzipped (the core with
+checks that they match. The module is 1.9 MiB, 676 KiB gzipped (the core with
 its time zone database, regular expressions and the YAML reader). Binaryen's
 `wasm-opt -Oz` shaves 5 % off the raw size and nothing off the gzipped size,
 so the build does not use it.
@@ -296,9 +356,10 @@ only. Rules and rule sets are immutable and checked as they are built
 (`RuleDefinitionError`, `ExpressionError` or `RegistryError`, as the core
 reports them); an unknown option, here and in `between` and `readDecision`, is
 a `TypeError`. Hit policies and aggregates are named as in the format, in any
-case. Writing rules and rule sets as documents is not available yet: their
-`toJSON()` throws an `UnsupportedError` (decisions, explanations and summaries
-have theirs).
+case. `toJSON()` of a rule or rule set is its document of the JSON format
+(`{ version, rule }`, `{ version, ruleset }`), as `dumps` writes it: an action
+given as a name is written as its name, and one given as code is an
+`UnsupportedError` (pass `{ omitActions: true }` to `dumps`).
 
 | Name | What |
 |---|---|
@@ -321,6 +382,113 @@ a `Cause` (`node`, `truth`, `negated`, `holds`, `values`, `reason`,
 `gap` (a number, a `Decimal`, `{ days }` or `{ microseconds }`); a `Note` says
 why a rule that fired was not selected. Everything comes from the core:
 evaluation, selection, explanation and their text.
+
+## Documents
+
+```js
+import { dump, dumps, load, loads, ruleFromText } from 'cleanrules'
+
+const rules = await load('pricing.yaml', { actions: { notify } })   // Node and Deno
+const text = dumps(rules, { format: 'yaml' })
+const same = loads(text, { format: 'yaml' })
+const vip = ruleFromText('RULE vip IF customer.years > 5 THEN discount = 0.15')
+await dump(rules, 'pricing.rules')
+```
+
+| Name | What |
+|---|---|
+| `loads(text, { format, limits, actions }?)` | an `Expr`, `Rule`, `RuleSet` or `DecisionTable` from a document (a string or UTF-8 bytes); typed `DecisionTable` for `format: 'csv'` and `Expr \| Rule \| RuleSet` for `'text'` |
+| `dumps(value, { format, omitActions }?)` | the canonical document of a condition, rule, rule set or table |
+| `load(path, { format, limits, actions }?)` | `loads` of a file: a promise; the format comes from the extension |
+| `dump(value, path, { format, omitActions }?)` | `dumps` to a file: a promise; a rule text ends with a line break |
+| `ruleFromText(text, { do, actions, limits }?)` | one rule in the text syntax (fuzzytool's verb); `rule_1` without a `RULE` line |
+
+Formats are `'json'` (the default for `loads` and `dumps`), `'yaml'`, `'text'`
+(the rule syntax, `spec/text.md`) and `'csv'` (decision tables,
+`spec/tables.md`); a file's extension (`.json`, `.yaml`, `.yml`, `.rules`,
+`.csv`) gives its format unless `format` says, and an unknown one is a
+`RangeError`. Reading is the core's, strict and bounded: errors have a JSON
+Pointer or a line and column, and `limits` are the native layer's (`maxSize`,
+`maxNesting`, `maxDepth`, `maxTableSize`, `maxYamlSize`, `maxTextSize`). A
+file larger than its format's limit is not read. A rule's action is the name
+the document gives it, unbound unless `actions` (an object or a `Map` of
+functions) binds it, as `RuleSet.bind` does; `ruleFromText` also takes `do`, a
+function, which a name in the text (`DO notify`) is bound to. Rules and rule
+sets read from documents are the core's own, so they write back exactly (a
+float `1.0` in metadata stays a float). A rule whose action is code cannot be
+written (`UnsupportedError`, with the rule's `pointer`) unless `omitActions`
+(`null` is `false`);
+the text syntax holds neither metadata nor code.
+
+[`docs/examples/risk.mjs`](../../docs/examples/risk.mjs) reads the decision
+table of `risk.csv`, builds it again from rows, and reads and writes rules as
+documents and text, in Node and Deno.
+
+`load` and `dump` work in Node (through `process.getBuiltinModule`, so the
+package imports no Node module) and Deno (`Deno.readFile`, `Deno.writeTextFile`,
+with `--allow-read` and `--allow-write`) and take a path or a `file:` URL. In
+browsers there is no file system: they reject with an `UnsupportedError` that
+names `loads` and `dumps`.
+
+## Decision tables
+
+```js
+import { DecisionTable, F, TableOutput, decimal } from 'cleanrules'
+
+const table = new DecisionTable(
+  ['RULE', 'customer.years', F.order.total, new TableOutput('risk', ['high', 'low']), 'THEN discount'],
+  [
+    ['vip', '> 5', null, "'low'", decimal('0.15')],
+    ['new', '< 1', F.order.total.gt(1000), "'high'", 0],
+  ],
+  { hitPolicy: 'priority' },
+)
+table.evaluate({ customer: { years: 9 }, order: { total: 200 } }).output   // { risk: 'low', discount: Decimal { text: '0.15' } }
+```
+
+A header item is a CSV header field's text (`'RULE'`, `'PRIORITY'`,
+`'DESCRIPTION'`, `'THEN key'`, `"THEN key IN (...)"` or an input expression),
+an input `Expr`, or a `TableOutput` (a key and its output values, as
+constants). A string cell is read as in the table's CSV, in the text syntax:
+`'> 5'`, `'-'`, and `"'VIP'"` for the string, since `'VIP'` is the field named
+`VIP`. An `Expr` cell is an input's condition, which must test its column
+(`F.age.lt(18)` under `age`), or an output's value; `null` and `undefined` are
+empty; any other value is a constant (under an input `x`, the test `x =
+value`; under `PRIORITY`, an integer). Rows may be shorter than the header,
+and any iterable, read one at a time. Options: `hitPolicy` (a rule set's, or
+`'output_order'`), `aggregate` (`null` or left out for none; `''` is an
+unknown aggregate, as in rule sets), `logic`, `strict`, and `limits` (`maxSize` for
+each text, `maxDepth`, `maxTableSize`). Errors point into the grid
+(`context.pointer` `/header/<c>` or `/rows/<r>/<c>`, from 0), also for values
+JavaScript cannot give (`NaN`).
+
+A table has `hitPolicy`, `aggregate`, `logic`, `strict`, `inputs` (`Expr`s),
+`outputs` (`TableOutput`s), `rows` (`TableRow`s: `name`, `priority`,
+`description`, `inputs` and `outputs`, an `Expr` or `null` each), `ruleset`
+(the `RuleSet` it compiles into), `evaluate`, `evaluateMany`, `summary` and
+`toJSON()`; it is read and written as CSV, JSON or YAML with
+`loads`/`dumps`. Python's `DecisionTable.from_dataframe` has no equivalent:
+JavaScript has no standard data frame (pass its rows).
+
+## Result trees
+
+```js
+import { F, evaluateTree, evaluateValueTree } from 'cleanrules'
+
+const tree = evaluateTree(F.age.ge(18).and(F.country.isIn(['ES'])), { age: 20 })
+tree.truth                       // 'unknown'
+tree.children[1].reason.code     // 'missing_field'
+evaluateValueTree(F.price.mul(F.quantity), { price: 2.5, quantity: 4 }).value   // 10
+```
+
+`evaluateTree(condition, data, { logic, strict }?)` and
+`evaluateValueTree(value, data, { strict }?)` evaluate one node on native data
+and give its `ResultTree` (`evaluateTree` refuses a value node with an
+`ExpressionError`): `node` (an `Expr`; a `between` has its two half
+comparisons as children), `truth` (for a condition) or `value` (for a value,
+given back as above), `reason`, `children`, and `toJSON()`, the result tree of
+the JSON format. An action's `ActionContext` has the `tree` of its rule's
+condition, made from the input already read.
 
 ## Values given back
 
@@ -436,7 +604,7 @@ whose named actions are resolved; every named action is checked, whether or
 not its rule fires (`RegistryError`), and actions given as functions are kept.
 `ruleset.run(data)` refuses unbound names before reading anything, evaluates,
 and calls the selected rules' actions in rule order with an `ActionContext`
-(`rule`, `data`, `result`, `output`, `decision`). `evaluate` never calls
+(`rule`, `data`, `result`, `tree`, `output`, `decision`). `evaluate` never calls
 actions. Actions are synchronous: what they return is ignored, except a
 promise, which fails the run (and its rejection is handled). An action that
 throws or returns a promise stops the run with an `ActionError` whose `cause`
