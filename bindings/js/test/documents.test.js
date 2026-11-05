@@ -307,14 +307,16 @@ describe('load and dump', () => {
   })
 
   test('the documented examples load', async () => {
+    // Git may check the examples out with CRLF (Windows); dumps writes LF.
+    const example = (name) => fs.readFileSync(path.join(EXAMPLES, name), 'utf8').replaceAll('\r\n', '\n')
     const fromYaml = await load(path.join(EXAMPLES, 'discounts.yaml'))
     const fromJson = await load(path.join(EXAMPLES, 'discounts.json'))
     assert.ok(fromYaml instanceof RuleSet)
     assert.equal(dumps(fromYaml), dumps(fromJson))
-    assert.equal(fs.readFileSync(path.join(EXAMPLES, 'discounts.yaml'), 'utf8'), dumps(fromYaml, { format: 'yaml' }))
+    assert.equal(example('discounts.yaml'), dumps(fromYaml, { format: 'yaml' }))
     const fromText = await load(path.join(EXAMPLES, 'discounts.rules'))
     assert.equal(dumps(fromText), dumps(fromJson))
-    assert.equal(fs.readFileSync(path.join(EXAMPLES, 'discounts.rules'), 'utf8'), `${dumps(fromText, { format: 'text' })}\n`)
+    assert.equal(example('discounts.rules'), `${dumps(fromText, { format: 'text' })}\n`)
   })
 
   // Browsers have no file system: there load and dump reject. Node stands in
