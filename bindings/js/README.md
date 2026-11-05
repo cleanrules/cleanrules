@@ -216,8 +216,20 @@ npm --prefix bindings/js install          # @napi-rs/cli and typescript
 npm --prefix bindings/js test             # the addon (debug): node --test with coverage, tsc --noEmit
 npm --prefix bindings/js run test:wasm    # the WebAssembly module: the same suite in Node
 npm --prefix bindings/js run test:deno    # the same suite in Deno, on the module
+npm --prefix bindings/js run test:conformance   # the conformance runner alone, on the addon
 npm --prefix bindings/js run build:release
 ```
+
+Each suite runs the conformance runner (`test/conformance.test.js`): every
+vector of [`conformance/`](../../conformance) through JSON on the native layer
+(`json:<id>`) and through native JavaScript data on the idiomatic API
+(`native:<id>`), compared with a lossless JSON reader of its own. It prints
+how many passed each way, and lists the vectors a route skips (grids, which
+are native data, have no JSON route) and the native inputs no JavaScript form
+holds exactly (without Temporal, an aware datetime with microseconds is given
+as the `ZonedDateTime` the engine gives back). On the module:
+`CLEANRULES_BUILD=wasm node --test test/conformance.test.js` from
+`bindings/js`, after `npm run build:wasm`.
 
 `npm test` measures the coverage of the JavaScript half (`lib/` and the entry
 files) with Node's own (`--experimental-test-coverage`), and fails under 90 %
@@ -429,6 +441,20 @@ package imports no Node module) and Deno (`Deno.readFile`, `Deno.writeTextFile`,
 with `--allow-read` and `--allow-write`) and take a path or a `file:` URL. In
 browsers there is no file system: they reject with an `UnsupportedError` that
 names `loads` and `dumps`.
+
+`toJSON()` of a condition, rule, rule set, decision table, decision,
+explanation, summary, result tree or error gives its JSON form as an object
+for `JSON.stringify`. JavaScript writes the number `1.0` as `1`, which reads
+back as an int, so a float that holds an integer is `{"$float": 1}` there, as
+`spec/json-format.md` (*Values*) asks of such writers (ints beyond 2⁵³ are
+already `{"$int": "…"}` and infinities `{"$float": "inf"}`): `loads` and
+`RuleSet.readDecision` read the text back as the same document. Two things a
+plain object cannot hold are lost: the sign of a float zero
+(`JSON.stringify(-0)` is `0`), and the order of integer-like keys, which come
+first (a payload `{ b, "10" }` becomes `{ "10", b }`, and a decision with that
+payload no longer matches its rule). `dumps` writes conditions, rules, rule
+sets and tables exactly, and so do the native layer's `write()` and
+`explain('json')` for decisions and explanations.
 
 ## Decision tables
 

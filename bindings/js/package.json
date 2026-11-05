@@ -100,6 +100,8 @@
     "test:wasm": "node --env-file=test/wasm.env --test \"test/**/*.test.js\"",
     "test:deno": "deno run --no-prompt test/deno/smoke.js && deno test --no-prompt --env-file=test/wasm.env --allow-read --allow-env --allow-write test/",
     "pretest:deno": "npm run build:wasm",
+    "test:conformance": "node --test test/conformance.test.js",
+    "pretest:conformance": "npm run build",
     "prepack": "node scripts/prepack.js"
   },
   "devDependencies": {

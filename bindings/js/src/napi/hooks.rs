@@ -64,7 +64,10 @@ pub(crate) fn throw(
     decision: Option<Unknown<'_>>,
 ) -> Error {
     let build = || -> Result<Unknown<'_>> {
-        let json = to_string(&write_error(error));
+        // `toJSON()` gives it as an object: floats that hold integers typed.
+        let mut form = write_error(error);
+        crate::common::out::stringifiable(&mut form);
+        let json = to_string(&form);
         let hook = hook::<FnArgs<(String, Option<Unknown<'_>>, Option<Unknown<'_>>)>, Unknown<'_>>(
             env, "error",
         )?;

@@ -300,12 +300,12 @@ function rules(native, expressions, trees, build) {
 
     /**
      * The rule document of the JSON format (`spec/json-format.md`, *Rules*),
-     * as `dumps(rule)` writes it; an `UnsupportedError` for an action that is
-     * code without a name.
+     * for `JSON.stringify` (`Expr.toJSON` says how; `dumps(rule)` writes it
+     * exactly); an `UnsupportedError` for an action that is code without a name.
      */
     toJSON() {
       checkActions([this], '/rule', false)
-      return JSON.parse(native.writeRule(natives.get(this), 'json'))
+      return JSON.parse(native.stringifiable(native.writeRule(natives.get(this), 'json')))
     }
 
     [INSPECT]() {
@@ -495,19 +495,20 @@ function rules(native, expressions, trees, build) {
     summary() {
       const ruleset = natives.get(this)
       const actions = this.#rules.map((rule) => rule.do !== null)
-      return new Summary(INTERNAL, native.summaryWith(ruleset, actions, 'json'), () =>
+      return new Summary(INTERNAL, native.stringifiable(native.summaryWith(ruleset, actions, 'json')), () =>
         native.summaryWith(ruleset, actions, 'text'),
       )
     }
 
     /**
      * The rule set document of the JSON format (`spec/json-format.md`, *Rule
-     * sets*), as `dumps(ruleset)` writes it; an `UnsupportedError` for an
-     * action that is code without a name.
+     * sets*), for `JSON.stringify` (`Expr.toJSON` says how; `dumps(ruleset)`
+     * writes it exactly); an `UnsupportedError` for an action that is code
+     * without a name.
      */
     toJSON() {
       checkActions(this.#rules, '/ruleset/rules/{}', false)
-      return JSON.parse(natives.get(this).write('json'))
+      return JSON.parse(native.stringifiable(natives.get(this).write('json')))
     }
 
     [INSPECT]() {
@@ -594,7 +595,7 @@ function rules(native, expressions, trees, build) {
           JSON.parse(native.explanationData(decision)),
           this.#objects,
           wrapJson,
-          () => JSON.parse(decision.explain('json')),
+          () => JSON.parse(native.stringifiable(decision.explain('json'))),
         )
       }
       return this.#explanation
@@ -605,9 +606,12 @@ function rules(native, expressions, trees, build) {
       return this.explain().forRule(name)
     }
 
-    /** The decision document of the JSON format (`spec/json-format.md`, *Decisions*). */
+    /**
+     * The decision document of the JSON format (`spec/json-format.md`,
+     * *Decisions*), for `JSON.stringify` (`Expr.toJSON` says how).
+     */
     toJSON() {
-      return JSON.parse(this.#native.write('json'))
+      return JSON.parse(native.stringifiable(this.#native.write('json')))
     }
 
     [INSPECT]() {

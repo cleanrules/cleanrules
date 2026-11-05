@@ -124,7 +124,10 @@ class ResultTree {
     return this.#node
   }
 
-  /** The result tree in the JSON format (`spec/json-format.md`, *Result trees*); a copy. */
+  /**
+   * The result tree in the JSON format (`spec/json-format.md`, *Result
+   * trees*), for `JSON.stringify` (`Expr.toJSON` says how); a copy.
+   */
   toJSON() {
     return JSON.parse(JSON.stringify(this.#json))
   }
@@ -217,14 +220,14 @@ class Counterfactual {
 /** A condition in a rule's requirement, with what was read (`spec/explain.md`). */
 class Cause {
   #node
-  #nodeJson
+  #nodeText
   #wrap
   #text
 
   constructor(token, form, objects, wrap) {
     check(token, 'Cause')
     const [, node, truth, negated, holds, values, reason, counterfactual, text] = form
-    this.#nodeJson = node
+    this.#nodeText = node
     this.#wrap = wrap
     this.#text = text
     /** Its truth value. */
@@ -244,7 +247,7 @@ class Cause {
 
   /** The condition, as an `Expr`. */
   get node() {
-    this.#node ??= this.#wrap(this.#nodeJson)
+    this.#node ??= this.#wrap(this.#nodeText)
     return this.#node
   }
 
@@ -373,7 +376,10 @@ class Explanation {
     return found
   }
 
-  /** The explanation document of the JSON format (`spec/json-format.md`, *Explanations*). */
+  /**
+   * The explanation document of the JSON format (`spec/json-format.md`,
+   * *Explanations*), for `JSON.stringify` (`Expr.toJSON` says how).
+   */
   toJSON() {
     return this.#json()
   }

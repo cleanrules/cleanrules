@@ -29,7 +29,7 @@ use cleanrules::explain::{Cause, Explanation, Gap, GroupKind, Requirement};
 use cleanrules::format::{write_node, write_path, write_value};
 use cleanrules::jiff::civil::DateTime;
 use cleanrules::jiff::tz::TimeZone;
-use cleanrules::json::{Json, JsonNumber, to_string};
+use cleanrules::json::{self as json, Json, JsonNumber, to_string};
 use cleanrules::logic::Truth;
 use cleanrules::value::{AwareDateTime, Zone};
 use cleanrules::{Map, Segment, Value};
@@ -222,7 +222,8 @@ pub(crate) fn tree(tree: &Evaluated<'_, Truth>, nodes: &mut Vec<Node>) -> Json {
 }
 
 /// A cause: `["c", node, truth, negated, holds, values, reason, counterfactual,
-/// text]`.
+/// text]`, the node as its JSON text: nested, `JSON.parse` would turn a float
+/// constant such as `0.0` into the int `0`.
 fn cause(cause: &Cause<'_, '_>) -> Json {
     let values = cause
         .values
@@ -241,7 +242,7 @@ fn cause(cause: &Cause<'_, '_>) -> Json {
     tagged(
         "c",
         vec![
-            write_node(&cause.result.node),
+            string(&to_string(&write_node(&cause.result.node))),
             string(truth_name(cause.truth())),
             Json::Bool(cause.negated),
             Json::Bool(cause.holds()),
@@ -299,4 +300,56 @@ pub(crate) fn explanation(explanation: &Explanation<'_, '_>) -> String {
         string(&explanation.to_string()),
         Json::Array(rules),
     ]))
+}
+
+/// A document the core wrote, made to keep its meaning through `JSON.parse`
+/// and `JSON.stringify`, for `toJSON()`: each float literal that holds an
+/// integer becomes `{"$float": <literal>}`, the form `spec/json-format.md`
+/// (*Values*) asks of writers that cannot write `1.0` (JavaScript writes the
+/// number `1.0` as `1`, an int). The canonical form already writes ints beyond
+/// ±(2⁵³ − 1) as `{"$int": "…"}`, infinities as `{"$float": "inf"}` and maps
+/// with `$` keys inside `{"$map": …}`, which `JSON.parse` keeps. In version 1
+/// of the format a number literal with a fraction or an exponent is always a
+/// float value (truth values are booleans; graded truths arrive in phase J),
+/// so the class of each literal, which the core's writer chose, says which
+/// numbers are floats. A float zero keeps its class but not its sign:
+/// `JSON.stringify(-0)` writes `0`.
+pub(crate) fn stringifiable(document: &mut Json) {
+    let mut pending = vec![document];
+    while let Some(value) = pending.pop() {
+        let literal = match &*value {
+            Json::Number(n) if !n.is_integer_literal() => {
+                let x = n.as_f64();
+                (x.is_finite() && x.fract() == 0.0).then(|| n.clone())
+            }
+            _ => None,
+        };
+        if let Some(literal) = literal {
+            *value = Json::Object(vec![("$float".to_owned(), Json::Number(literal))]);
+            continue;
+        }
+        match value {
+            Json::Array(items) => pending.extend(items.iter_mut()),
+            Json::Object(members) => pending.extend(members.iter_mut().map(|(_, item)| item)),
+            _ => {}
+        }
+    }
+}
+
+/// `stringifiable` on the text of a document the core wrote.
+pub(crate) fn stringifiable_text(text: &str) -> String {
+    let limits = json::Limits {
+        max_size: text.len(),
+        max_nesting: usize::MAX,
+        ..json::Limits::default()
+    };
+    // The core wrote the text, so it reads back; were it not to, it is
+    // returned as it is.
+    match json::parse(text, &limits) {
+        Ok(mut document) => {
+            stringifiable(&mut document);
+            to_string(&document)
+        }
+        Err(_) => text.to_owned(),
+    }
 }

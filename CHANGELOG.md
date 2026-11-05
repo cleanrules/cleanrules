@@ -312,6 +312,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lines. The example `docs/examples/risk.mjs`. Internal functions and classes,
   the same in both builds, read documents and tables and give result trees
   back; the native layer, `cleanrules/native`, does not change.
+- JavaScript conformance runner (task F.3a, `bindings/js/test/conformance.test.js`):
+  every vector, text, YAML and table reads included, through JSON on the
+  native layer (`json:<id>`) and through native JavaScript data on the
+  idiomatic API (`native:<id>`: conditions, rules and rule sets built in code
+  and checked against the core's reading of the same JSON, inputs as `bigint`,
+  `float(x)`, `decimal`, `date`, `datetime`, `Date`, Temporal and `Map`,
+  results compared as the values given back, and the same data through the
+  native layer compared exactly), with a lossless JSON reader and comparer of
+  its own. It runs in `npm test`, `npm run test:wasm` and `npm run test:deno`,
+  and alone with `npm run test:conformance`; vectors a route cannot run
+  (grids have no JSON route) and native inputs no JavaScript form holds
+  exactly (aware datetimes with microseconds without Temporal) are counted and
+  listed. It found that a cause's node (`Cause.node`) gave float constants
+  holding integers (`0.0`, `-0.0`) back as ints; the node now crosses as the
+  core's JSON text. `toJSON()` of conditions, rules, rule sets, decision
+  tables, decisions, explanations, summaries, result trees and errors now
+  gives each float that holds an integer as `{"$float": n}`, so that
+  `JSON.stringify` writes a document with the same meaning, which `loads` and
+  `RuleSet.readDecision` read back (it wrote `1.0` as `1`, an int, and a
+  decision so written was a `decision_mismatch`); the binding's Rust half
+  decides it from the core's own writing (`stringifiable`, internal). Plain
+  objects still lose the sign of a float zero and the order of integer-like
+  keys; `dumps` and the native layer's `write()` are exact. The runner checks
+  `JSON.stringify` of every decision, explanation, summary and result tree
+  against the vectors, and reads every rule set, condition and document back
+  with `loads` and `readDecision`.
 - WebAssembly build of the JavaScript binding (task F.1b): the same npm
   package `cleanrules` runs in browsers, Deno (2.6 or later) and other runtimes
   on a WebAssembly module built with wasm-bindgen, with the same API as the

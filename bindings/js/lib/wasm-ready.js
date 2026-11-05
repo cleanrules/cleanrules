@@ -42,6 +42,7 @@ const INTERNAL = [
   'ruleSetRules',
   'ruleText',
   'ruleTree',
+  'stringifiable',
   'summaryWith',
   'writeCondition',
   'writeRule',

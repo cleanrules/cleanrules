@@ -337,3 +337,84 @@ describe('load and dump', () => {
     }
   })
 })
+
+// `toJSON()` gives objects for `JSON.stringify`, which writes the number 1.0
+// as `1`, an int: floats that hold an integer come as `{"$float": n}`
+// (`spec/json-format.md`, *Values*), so the text means the same document.
+describe('toJSON and JSON.stringify', () => {
+  const big = 2n ** 60n
+  const payload = { n: float(1), i: float(Infinity), b: big, h: 0.5, e: float(1e300), d: decimal('2.50') }
+  const rules = new RuleSet(
+    [
+      new Rule('a', F.x.ge(float(2)).and(F.y.isIn([float(3), 4])), payload, { priority: big, metadata: { $k: float(7), m: big } }),
+      new Rule('b', F.x.lt(10), { n: 1 }),
+    ],
+    { hitPolicy: 'priority' },
+  )
+
+  test('a decision written with JSON.stringify reads back with its rule set', () => {
+    // The reproduction: JSON.stringify used to write 1.0 as 1, and readDecision
+    // refused it ("not the rule's constant").
+    const decision = rules.evaluate({ x: float(3), y: 4 })
+    const text = JSON.stringify(decision)
+    assert.match(text, /"n":\{"op":"const","value":\{"\$float":1\}\}/)
+    assert.match(text, /"value":\{"\$int":"1152921504606846976"\}/)
+    assert.match(text, /"value":\{"\$float":"inf"\}/)
+    const read = rules.readDecision(text)
+    assert.deepEqual(read.fired, decision.fired)
+    assert.deepEqual(read.output, decision.output)
+    assert.deepEqual(read.results.map((r) => r.output), decision.results.map((r) => r.output))
+  })
+
+  test('loads(JSON.stringify(x)) is x for conditions, rules, rule sets and tables', () => {
+    const table = new DecisionTable(['RULE', 'x', 'THEN rate'], [['a', '> 1', float(2)], ['b', float(3), 0.5]])
+    for (const value of [rules, rules.rules[0], table]) {
+      assert.equal(dumps(loads(JSON.stringify(value))), dumps(value), String(value))
+    }
+    // A node's toJSON() is the node, without the document around it.
+    for (const node of [rules.rules[0].when, F.z.between(float(1), 2.5)]) {
+      assert.equal(dumps(loads(`{"version":1,"condition":${JSON.stringify(node)}}`)), dumps(node), String(node))
+    }
+    assert.match(JSON.stringify(rules), /"metadata":\{"\$k":\{"\$float":7\},"m":\{"\$int":"1152921504606846976"\}\}/)
+  })
+
+  test('explanations, result trees, summaries and errors type their floats too', () => {
+    const decision = rules.evaluate({ x: float(1), y: float(3) })
+    assert.match(JSON.stringify(decision.explain()), /"value":\{"\$float":1\}/)
+    assert.match(JSON.stringify(rules.summary()), /"priority":\{"\$int":"1152921504606846976"\}/)
+    const { evaluateTree } = root
+    assert.equal(
+      JSON.stringify(evaluateTree(F.x.gt(float(1)), { x: float(2) })),
+      '{"op":"gt","truth":true,"children":[{"op":"field","path":["x"],"value":{"$float":2}},{"op":"const","value":{"$float":1}}]}',
+    )
+    const strict = new RuleSet([new Rule('s', F.x.gt(float(1)))], { strict: true })
+    assert.throws(
+      () => strict.evaluate({ x: 's' }),
+      (error) => JSON.stringify(error).includes('"right":{"op":"const","value":{"$float":1}}'),
+    )
+  })
+
+  test('the limit: JSON.stringify loses the sign of a float zero; dumps keeps it', () => {
+    const negative = F.x.eq(-0)
+    assert.equal(dumps(negative), '{"version":1,"condition":{"op":"eq","left":{"op":"field","path":["x"]},"right":{"op":"const","value":-0.0}}}')
+    // JSON.stringify(-0) is "0": the float stays a float, without its sign.
+    const text = JSON.stringify(negative)
+    assert.equal(text, '{"op":"eq","left":{"op":"field","path":["x"]},"right":{"op":"const","value":{"$float":0}}}')
+    const again = loads(`{"version":1,"condition":${text}}`)
+    assert.equal(dumps(again), dumps(F.x.eq(float(0))))
+    assert.notEqual(dumps(again), dumps(negative))
+    assert.equal(dumps(loads(dumps(negative))), dumps(negative))
+  })
+
+  test('the limit: plain objects list integer-like keys first; dumps keeps the order', () => {
+    const ordered = new RuleSet([new Rule('a', F.go, new Map([['b', 1], ['10', 2], ['2', 3]]))])
+    assert.match(dumps(ordered), /"then":\{"b":.*,"10":.*,"2":/)
+    assert.match(JSON.stringify(ordered), /"then":\{"2":.*,"10":.*,"b":/)
+    // A payload's order is part of the rule, so the decision no longer matches it.
+    throwsWith(() => ordered.readDecision(JSON.stringify(ordered.evaluate({ go: true }))), FormatError, /./, (error) => {
+      assert.equal(error.code, 'decision_mismatch')
+    })
+    // Without a payload evaluated, it reads back.
+    assert.deepEqual(ordered.readDecision(JSON.stringify(ordered.evaluate({ go: false }))).fired, [])
+  })
+})

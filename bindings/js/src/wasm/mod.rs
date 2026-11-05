@@ -111,7 +111,10 @@ pub(crate) fn core_error(
     cause: &JsValue,
     decision: &JsValue,
 ) -> JsValue {
-    let json = JsValue::from_str(&to_string(&write_error(error)));
+    // `toJSON()` gives it as an object: floats that hold integers typed.
+    let mut form = write_error(error);
+    crate::common::out::stringifiable(&mut form);
+    let json = JsValue::from_str(&to_string(&form));
     let built = with_hooks(|hooks| {
         hooks
             .error

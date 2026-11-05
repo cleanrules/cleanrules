@@ -208,9 +208,14 @@ function expressions(native, build) {
       return nodeOf(this).write('text')
     }
 
-    /** The node in the JSON format (`spec/json-format.md`, *Conditions*). */
+    /**
+     * The node in the JSON format (`spec/json-format.md`, *Conditions*).
+     * Floats that hold an integer are `{"$float": n}` (`stringifiable`), so
+     * `JSON.stringify` writes the same node, but for the sign of a float zero
+     * and the order of integer-like keys, which plain objects list first.
+     */
     toJSON() {
-      return JSON.parse(nodeOf(this).write('json'))
+      return JSON.parse(native.stringifiable(nodeOf(this).write('json')))
     }
 
     /**
@@ -434,9 +439,13 @@ function expressions(native, build) {
     return proxy
   }
 
-  /** The `Expr` of a node in the JSON format (an explanation's cause). */
-  function wrapJson(json) {
-    return wrap(native.Node.read(JSON.stringify(json)))
+  /**
+   * The `Expr` of a node's JSON text (an explanation's cause), read as the
+   * core wrote it: through `JSON.parse`, a float constant such as `0.0`
+   * would come back as the int `0`.
+   */
+  function wrapJson(text) {
+    return wrap(native.Node.read(text))
   }
 
   /** A field by its path: keys (strings) and indices (whole numbers from 0). */

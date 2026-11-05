@@ -179,7 +179,14 @@ export declare class CleanRulesError extends Error {
    * `run`; otherwise `null`.
    */
   readonly decision: Decision | NativeDecision | null
-  /** The error's JSON form (`spec/errors.md`, *JSON form*). */
+  /**
+   * The error's JSON form (`spec/errors.md`, *JSON form*), as an object for
+   * `JSON.stringify`: a float that holds an integer is `{"$float": n}`, so the
+   * text reads back as the same form, except that a float zero loses its sign
+   * (`JSON.stringify(-0)` is `0`) and integer-like keys, such as a payload key
+   * `"10"`, come first, as in any plain object. Its `node`, if any, is exact
+   * in `dumps` of the node.
+   */
   toJSON(): Record<string, unknown>
 }
 
@@ -346,7 +353,14 @@ export declare class Expr {
   sameAs(other: unknown): boolean
   /** The canonical text: `customer.age >= 18 AND NOT blocked`. */
   toString(): string
-  /** The node in the JSON format (`spec/json-format.md`, *Conditions*). */
+  /**
+   * The node in the JSON format (`spec/json-format.md`, *Conditions*), as an
+   * object for `JSON.stringify`: a float that holds an integer is `{"$float":
+   * n}`, so the text reads back as the same node, except that a float zero
+   * loses its sign (`JSON.stringify(-0)` is `0`) and integer-like keys, such
+   * as a payload key `"10"`, come first, as in any plain object. `dumps(node)`
+   * writes it exactly.
+   */
   toJSON(): Record<string, unknown>
   /** `this = other`; comparing with `null` is refused (use `isNull()`). */
   eq(other: Operand): Expr
@@ -529,9 +543,13 @@ export declare class Rule {
   /** The name of the rule's action, if it names one; otherwise `null`. */
   readonly actionName: string | null
   /**
-   * The rule document of the JSON format (`{ version, rule }`), as
-   * `dumps(rule)` writes it; an `UnsupportedError` for an action that is
-   * code without a name.
+   * The rule document of the JSON format (`{ version, rule }`), as an object
+   * for `JSON.stringify`: a float that holds an integer is `{"$float": n}`, so
+   * the text reads back as the same rule, except that a float zero loses its
+   * sign (`JSON.stringify(-0)` is `0`) and integer-like keys, such as a
+   * payload key `"10"`, come first, as in any plain object. `dumps(rule)`
+   * writes it exactly. An `UnsupportedError` for an action that is code
+   * without a name.
    */
   toJSON(): Record<string, unknown>
 }
@@ -592,9 +610,13 @@ export declare class RuleSet implements Iterable<Rule> {
   run(data: unknown): Decision
   summary(): Summary
   /**
-   * The rule set document of the JSON format (`{ version, ruleset }`), as
-   * `dumps(ruleset)` writes it; an `UnsupportedError` for an action that is
-   * code without a name.
+   * The rule set document of the JSON format (`{ version, ruleset }`), as an
+   * object for `JSON.stringify`: a float that holds an integer is `{"$float":
+   * n}`, so the text reads back as the same rule set, except that a float zero
+   * loses its sign (`JSON.stringify(-0)` is `0`) and integer-like keys, such
+   * as a payload key `"10"`, come first, as in any plain object.
+   * `dumps(ruleset)` writes it exactly. An `UnsupportedError` for an action
+   * that is code without a name.
    */
   toJSON(): Record<string, unknown>
 }
@@ -654,7 +676,15 @@ export declare class Decision {
   explain(): Explanation
   /** One rule's explanation; a `RuleNotFoundError` for an unknown name. */
   whyNot(name: string): RuleExplanation
-  /** The decision document of the JSON format. */
+  /**
+   * The decision document of the JSON format, as an object for
+   * `JSON.stringify`: a float that holds an integer is `{"$float": n}`, so the
+   * text reads back as the same decision (`RuleSet.readDecision` reads it),
+   * except that a float zero loses its sign (`JSON.stringify(-0)` is `0`) and
+   * integer-like keys, such as a payload key `"10"`, come first, as in any
+   * plain object. The native layer's `Decision.write()` (`cleanrules/native`)
+   * writes it exactly.
+   */
   toJSON(): Record<string, unknown>
 }
 
@@ -744,7 +774,14 @@ export declare class Explanation {
   readonly selected: readonly string[]
   /** One rule's explanation; a `RuleNotFoundError` for an unknown name. */
   forRule(name: string): RuleExplanation
-  /** The explanation document of the JSON format. */
+  /**
+   * The explanation document of the JSON format, as an object for
+   * `JSON.stringify`: a float that holds an integer is `{"$float": n}`, so the
+   * text reads back as the same explanation, except that a float zero loses
+   * its sign (`JSON.stringify(-0)` is `0`) and integer-like keys, such as a
+   * payload key `"10"`, come first, as in any plain object. The native layer's
+   * `Decision.explain('json')` writes it exactly.
+   */
   toJSON(): Record<string, unknown>
   /** The explanation as text, the same in every language. */
   toString(): string
@@ -782,7 +819,14 @@ export declare class Summary {
   readonly outputs: readonly string[]
   /** Each tag with the names of its rules. */
   readonly tags: Readonly<Record<string, readonly string[]>>
-  /** The summary document of the JSON format. */
+  /**
+   * The summary document of the JSON format, as an object for
+   * `JSON.stringify`: a float that holds an integer is `{"$float": n}`, so the
+   * text reads back as the same summary, except that a float zero loses its
+   * sign (`JSON.stringify(-0)` is `0`) and integer-like keys, such as a
+   * payload key `"10"`, come first, as in any plain object. Summaries hold no
+   * floats.
+   */
   toJSON(): Record<string, unknown>
   /** The summary as text, the same in every language. */
   toString(): string
@@ -806,7 +850,14 @@ export declare class ResultTree {
   readonly reason: Reason | null
   /** The children's results, in order. */
   readonly children: readonly ResultTree[]
-  /** The result tree in the JSON format (`spec/json-format.md`, *Result trees*). */
+  /**
+   * The result tree in the JSON format (`spec/json-format.md`, *Result
+   * trees*), as an object for `JSON.stringify`: a float that holds an integer
+   * is `{"$float": n}`, so the text reads back as the same tree, except that a
+   * float zero loses its sign (`JSON.stringify(-0)` is `0`) and integer-like
+   * keys, such as a payload key `"10"`, come first, as in any plain object.
+   * The native layer's `Node.evaluateTree` writes it exactly.
+   */
   toJSON(): Record<string, unknown>
 }
 
@@ -929,7 +980,14 @@ export declare class DecisionTable {
   evaluate(data: unknown): Decision
   evaluateMany(rows: Iterable<unknown>): Decision[]
   summary(): Summary
-  /** The decision table document of the JSON format, as `dumps(table)` writes it. */
+  /**
+   * The decision table document of the JSON format, as an object for
+   * `JSON.stringify`: a float that holds an integer is `{"$float": n}`, so the
+   * text reads back as the same table, except that a float zero loses its sign
+   * (`JSON.stringify(-0)` is `0`) and integer-like keys, such as a payload key
+   * `"10"`, come first, as in any plain object. `dumps(table)` writes it
+   * exactly.
+   */
   toJSON(): Record<string, unknown>
 }
 

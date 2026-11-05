@@ -363,6 +363,13 @@ pub fn write_rule(rule: &NativeRule, format: &JsValue) -> Result<String, JsValue
     documents::write_rule(&rule.rule, &raw(format)).or_fail()
 }
 
+/// As in the napi-rs build.
+#[wasm_bindgen]
+#[must_use]
+pub fn stringifiable(text: &str) -> String {
+    crate::common::out::stringifiable_text(text)
+}
+
 /// Check that a file of `size` bytes is within the size limit of `format`.
 ///
 /// # Errors

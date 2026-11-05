@@ -208,9 +208,13 @@ function tables(native, expressions, rules, build) {
       return this.ruleset.summary()
     }
 
-    /** The decision table document of the JSON format (`spec/tables.md`, *JSON*), as `dumps(table)` writes it. */
+    /**
+     * The decision table document of the JSON format (`spec/tables.md`,
+     * *JSON*), for `JSON.stringify` (`Expr.toJSON` says how); `dumps(table)`
+     * writes it exactly.
+     */
     toJSON() {
-      return JSON.parse(this.#native.write('json'))
+      return JSON.parse(native.stringifiable(this.#native.write('json')))
     }
 
     [INSPECT]() {

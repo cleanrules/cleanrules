@@ -118,7 +118,9 @@ impl TreeData {
     pub(crate) fn of(tree: &Evaluated<'_, Truth>) -> Self {
         let mut nodes = Vec::new();
         let form = super::out::tree(tree, &mut nodes);
-        let data = to_string(&Json::Array(vec![form, write_result(tree)]));
+        let mut json = write_result(tree);
+        super::out::stringifiable(&mut json);
+        let data = to_string(&Json::Array(vec![form, json]));
         Self { data, nodes }
     }
 }
@@ -219,9 +221,9 @@ pub(crate) fn action_error_json(
     failure: &ActionFailure,
     executed: Vec<String>,
 ) -> String {
-    to_string(&cleanrules::format::write_error(&action_error(
-        rule, action, failure, executed,
-    )))
+    let mut json = cleanrules::format::write_error(&action_error(rule, action, failure, executed));
+    super::out::stringifiable(&mut json);
+    to_string(&json)
 }
 
 /// What an action threw, described, as the core error's cause: its JSON form

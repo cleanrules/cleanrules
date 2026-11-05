@@ -825,6 +825,13 @@ export declare function ruleTree(decision: Decision, position: number): NativeTr
 export declare function setHooks(hooks: object): void
 
 /**
+ * The text of a document the core wrote, with each float that holds an
+ * integer as `{"$float": n}`, for `toJSON()`: `JSON.stringify` of what
+ * `JSON.parse` makes of it means the same document (`common::out::stringifiable`).
+ */
+export declare function stringifiable(text: string): string
+
+/**
  * The summary with the rules whose action is code marked, in `format`.
  *
  * # Errors

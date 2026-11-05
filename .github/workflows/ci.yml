@@ -295,7 +295,10 @@ jobs:
       - run: npm install --no-audit --no-fund
       # Builds the addon (debug), then node --test with the coverage of the
       # JavaScript half (at least 90 % of lines; the flags exist since Node
-      # 22.8) and tsc --noEmit.
+      # 22.8) and tsc --noEmit. The suite includes the conformance runner,
+      # every vector through JSON and through native data (where Node has no
+      # Temporal, as Node 22, aware datetimes with microseconds are given as
+      # the engine's ZonedDateTime; the runner lists them).
       - run: npm test
       # The committed loader and declarations are the ones napi-rs generates,
       # and the package, its platform packages and the Cargo workspace share
@@ -338,7 +341,8 @@ jobs:
       - run: npm install --no-audit --no-fund
       # The addon too, so that the tests comparing both builds run.
       - run: npm run build
-      # Builds the module, then the whole suite in Node on it.
+      # Builds the module, then the whole suite in Node on it, the
+      # conformance runner included.
       - run: npm run test:wasm
       # In Deno, on the module (the `deno` condition's build): the package
       # loads with no permission, then the same suite runs (which reads its

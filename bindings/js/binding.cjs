@@ -882,6 +882,7 @@ module.exports.ruleSetRules = nativeBinding.ruleSetRules
 module.exports.ruleText = nativeBinding.ruleText
 module.exports.ruleTree = nativeBinding.ruleTree
 module.exports.setHooks = nativeBinding.setHooks
+module.exports.stringifiable = nativeBinding.stringifiable
 module.exports.summaryWith = nativeBinding.summaryWith
 module.exports.Truth = nativeBinding.Truth
 module.exports.version = nativeBinding.version

@@ -102,6 +102,21 @@ output, never stopping at the first one.
   (`native:<id>`). Rule sets and nodes are read from their JSON in both runs:
   the C++ API builds them from documents and text only. It compares with a
   lossless JSON parser of its own (`bindings/cpp/tests/json.hpp`).
+- **JavaScript**: `npm --prefix bindings/js test` (the Node addon),
+  `run test:wasm` and `run test:deno` (the WebAssembly module, in Node and
+  Deno) run every vector through the native layer's JSON entry points
+  (`json:<id>`; decisions also through its readers) and through the idiomatic
+  API with native JavaScript data (`native:<id>`): conditions, rules and rule
+  sets are built in code and checked against the core's reading of the same
+  JSON, results are compared as the values given back to JavaScript
+  (`spec/data-model.md`, which lets a float holding an integer come back as an
+  int, and a map's integer-like keys come first), and the same native data
+  also goes through the native layer, whose JSON is compared exactly. `read`
+  vectors go through `loads`, `dumps`, `ruleFromText`, `DecisionTable` and
+  `readDecision`. `JSON.stringify` of what `toJSON()` gives is checked too,
+  and read back with `loads` and `readDecision`. Grids are native data, so
+  `table_grid` vectors have no JSON run; skips and inexact native inputs are counted and listed. It compares
+  with a lossless JSON reader of its own (`bindings/js/test/support/json.js`).
 - **Each binding** runs every vector twice: once through its JSON entry points,
   and once converting `input` into the language's native data (with the
   conversions of `spec/data-model.md`: floats as floats, with `cr.float` in

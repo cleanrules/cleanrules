@@ -388,6 +388,15 @@ pub fn write_rule(env: &Env, rule: &NativeRule, format: Unknown<'_>) -> Result<S
     documents::write_rule(&rule.rule, &raw(&format)?).or_fail(env)
 }
 
+/// The text of a document the core wrote, with each float that holds an
+/// integer as `{"$float": n}`, for `toJSON()`: `JSON.stringify` of what
+/// `JSON.parse` makes of it means the same document (`common::out::stringifiable`).
+#[napi]
+#[must_use]
+pub fn stringifiable(text: String) -> String {
+    crate::common::out::stringifiable_text(&text)
+}
+
 /// Check that a file of `size` bytes is within the size limit of `format`.
 ///
 /// # Errors

@@ -361,6 +361,19 @@ describe('Explanation', () => {
     assert.equal(exact.target.text, '10.05')
   })
 
+  test("a cause's node is the rule's own: float constants that hold integers stay floats", () => {
+    // Found by the conformance runner (generated/explanations/0011): the node
+    // used to cross as parsed JSON, and `0.0` came back as the int `0`.
+    const nodes = [F.x.le(float(0)), F.y.lt(-0), F.z.isIn([float(2), 3])]
+    const causes = new RuleSet([new Rule('r', nodes[0].and(nodes[1], nodes[2]))]).evaluate({}).whyNot('r').causes
+    assert.equal(causes.length, 3)
+    for (const [i, node] of nodes.entries()) {
+      assert.ok(causes[i].node.sameAs(node), `${causes[i].node} is not ${node}`)
+      assert.equal(String(causes[i].node), String(node))
+    }
+    assert.equal(String(causes[0].node), 'x <= 0e0')
+  })
+
   test('groups and the frozen structure', () => {
     const f = decision.whyNot('f')
     assert.ok(f.requirement instanceof CauseGroup)

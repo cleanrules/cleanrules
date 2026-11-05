@@ -1,264 +1,132 @@
-// A handful of conformance vectors as smoke tests, through JSON and through
-// native JavaScript data (conformance/README.md). The full runner, over every
-// vector, is task F.3.
+// The conformance vectors (conformance/README.md) on the build under test
+// (the Node addon, or the WebAssembly module with `npm run test:wasm` and in
+// Deno): every vector of conformance/vectors, through JSON (`json:<id>`, the
+// native layer) and through native JavaScript data (`native:<id>`, the
+// idiomatic API). test/support/conformance.js says what each route calls and
+// compares. Every failure is reported with its id, what came back and what
+// the vector expects; the vectors a route cannot run, and the native inputs
+// it cannot represent exactly, are counted and listed.
 
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 
-import cr from './support/cr.js'
-import { Num, Obj, parse, write, same } from './support/json.js'
+import { build, deno, native, root } from './support/cr.js'
+import { MINIMUM_VECTORS, SKIPS, checkComparison, conformance } from './support/conformance.js'
+import { Obj, parse, write } from './support/json.js'
 
 const VECTORS = path.join(import.meta.dirname, '..', '..', '..', 'conformance', 'vectors')
-const FILES = [
-  'ast/reading.json',
-  'ast/missing.json',
-  'ast/nodes.json',
-  'ast/types.json',
-  'rules/policies.json',
-  'rules/aggregates.json',
-  'rules/payloads.json',
-  'rules/strict.json',
-  'rules/batch.json',
-  'explain/notes.json',
-  'explain/summaries.json',
-  'format/documents.json',
-  'format/limits.json',
-  'format/decisions.json',
-  'format/yaml.json',
-]
+const ROUTES = ['json', 'native']
 
-/**
- * The fields of an error that vectors compare, as the C and C++ runners do:
- * for reading, those the vector lists; for evaluating, these.
- */
-const EVALUATION = ['code', 'rule', 'path', 'types', 'rules', 'row']
-
-function errorTree(error, expected, read) {
-  assert.ok(error instanceof cr.CleanRulesError, `not a cleanrules error: ${error}`)
-  const form = error.toJSON()
-  const fields = read ? expected.entries.map(([k]) => k) : EVALUATION
-  const kept = {}
-  for (const field of fields) {
-    if (field in form) kept[field] = form[field]
+/** The vector files, in the order of their paths. */
+function vectorFiles(dir) {
+  const found = []
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const file = path.join(dir, entry.name)
+    if (entry.isDirectory()) found.push(...vectorFiles(file))
+    else if (entry.name.endsWith('.json')) found.push(file)
   }
-  return parse(JSON.stringify(kept))
+  return found.sort()
 }
 
-function sameError(actual, expected) {
-  const a = actual.entries.slice().sort(([x], [y]) => (x < y ? -1 : 1))
-  const e = expected.entries.slice().sort(([x], [y]) => (x < y ? -1 : 1))
-  return a.length === e.length && e.every(([k, v], n) => a[n][0] === k && same(a[n][1], v))
+const runner = conformance(root, native)
+const files = vectorFiles(VECTORS).map((file) => [
+  path.relative(VECTORS, file).split(path.sep).join('/'),
+  parse(fs.readFileSync(file, 'utf8')).get('vectors'),
+])
+/** Every vector, by id. */
+const vectors = new Map(files.flatMap(([, list]) => list.map((vector) => [vector.get('id'), vector])))
+const counts = Object.fromEntries(ROUTES.map((route) => [route, { passed: 0, failed: 0, skipped: new Map() }]))
+let ran = 0
+const runtime = deno ? `Deno ${globalThis.Deno.version.deno}` : `Node ${process.versions.node}`
+
+/** Print a line of the report (`t.diagnostic` where the runner has it). */
+function report(t, line) {
+  if (typeof t.diagnostic === 'function') t.diagnostic(line)
+  else console.log(line)
 }
 
-/** Run `produce` and compare with `expect[key]`, or with `expect.error`. */
-function check(id, produce, expect, key, read = false) {
-  let actual
-  try {
-    actual = produce()
-  } catch (error) {
-    if (!expect.has('error')) throw error
-    const got = errorTree(error, expect.get('error'), read)
-    assert.ok(sameError(got, expect.get('error')), `${id}: error ${write(got)}, expected ${write(expect.get('error'))}`)
-    return
-  }
-  assert.ok(!expect.has('error'), `${id}: no error, expected ${write(expect.get('error') ?? null)}`)
-  assert.ok(same(actual, expect.get(key)), `${id}: ${write(actual)}\nexpected ${write(expect.get(key))}`)
-}
-
-const document = (content) => `{"version":1,"ruleset":${write(content)}}`
-const contentOf = (text, key) => parse(text).get(key)
-
-function limitsOf(given) {
-  const limits = given.get('limits')
-  if (limits === undefined) return undefined
-  const names = { max_size: 'maxSize', max_nesting: 'maxNesting', max_depth: 'maxDepth', max_table_size: 'maxTableSize' }
-  const out = {}
-  for (const [k, v] of limits.entries) out[names[k]] = Number(v.text)
-  return out
-}
-
-/** A value of the format as native JavaScript data, or `undefined` to skip. */
-function native(tree) {
-  if (tree instanceof Num) {
-    const n = Number(tree.text)
-    if (tree.isInteger) return Number.isSafeInteger(n) ? n : BigInt(tree.text)
-    return Number.isInteger(n) ? cr.float(n) : n
-  }
-  if (Array.isArray(tree)) return tree.map(native)
-  if (!(tree instanceof Obj)) return tree
-  if (tree.entries.length === 1) {
-    const [[key, inner]] = tree.entries
-    const text = inner instanceof Num ? inner.text : inner
-    switch (key) {
-      case '$int':
-        return Number.isSafeInteger(Number(text)) ? Number(text) : BigInt(text)
-      case '$float':
-        return cr.float(text === 'inf' ? Infinity : text === '-inf' ? -Infinity : Number(text))
-      case '$decimal':
-        return cr.decimal(text)
-      case '$date': {
-        const [y, m, d] = text.split('-').map(Number)
-        return cr.date(y, m, d)
-      }
-      case '$datetime': {
-        const m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d{1,6}))?(.*)$/.exec(text)
-        const parts = m.slice(1, 7).map(Number)
-        const micros = Number((m[7] ?? '').padEnd(6, '0'))
-        if (m[8] === '') return cr.datetime(...parts, micros)
-        throw new Skip()
-      }
-      case '$map':
-        return objectOf(inner)
-      default:
-        break
-    }
-  }
-  return objectOf(tree)
-}
-
-class Skip extends Error {}
-
-/** A map: a plain object, or a `Map` when its keys are integer-like (objects reorder those). */
-function objectOf(tree) {
-  const entries = tree.entries.map(([k, v]) => [k, native(v)])
-  if (entries.some(([k]) => /^(0|[1-9]\d*)$/.test(k))) return new Map(entries)
-  return Object.fromEntries(entries)
-}
-
-function runJson(id, given, expect) {
-  const kind = given.get('kind')
-  switch (kind) {
-    case 'read': {
-      if (['rules_text', 'table_csv', 'table_grid', 'write'].some((k) => given.has(k))) return false
-      if (['csv', 'compiled', 'printed'].some((k) => expect.has(k))) return false
-      const yaml = given.has('yaml')
-      const text = given.has('text') ? given.get('text') : yaml ? given.get('yaml') : write(given.get('document'))
-      const format = yaml ? 'yaml' : 'json'
-      const limits = limitsOf(given)
-      if (given.has('ruleset')) {
-        const ruleset = cr.RuleSet.read(document(given.get('ruleset')))
-        check(id, () => parse(ruleset.readDecision(text, { format, limits }).write()), expect, 'document', true)
-      } else {
-        check(id, () => parse(cr.Document.read(text, { format, limits }).write()), expect, 'document', true)
-      }
-      return true
-    }
-    case 'condition':
-    case 'value': {
-      const node = cr.Node.read(write(given.get(kind)))
-      const strict = given.get('strict') === true
-      const input = write(given.get('input'))
-      check(
-        id,
-        () =>
-          parse(
-            kind === 'value'
-              ? node.evaluateValueTreeJson(input, { strict })
-              : node.evaluateTreeJson(input, { logic: given.get('logic'), strict }),
-          ),
-        expect,
-        'result',
-      )
-      return true
-    }
-    case 'evaluate': {
-      const ruleset = cr.RuleSet.read(document(given.get('ruleset')))
-      if (given.has('inputs')) {
-        check(
-          id,
-          () => ruleset.evaluateManyJson(write(given.get('inputs'))).map((d) => contentOf(d.write(), 'decision')),
-          expect,
-          'decisions',
-        )
-      } else {
-        check(id, () => contentOf(ruleset.evaluateJson(write(given.get('input'))).write(), 'decision'), expect, 'decision')
-      }
-      return true
-    }
-    case 'explain': {
-      const ruleset = cr.RuleSet.read(document(given.get('ruleset')))
-      const decision = () => ruleset.evaluateJson(write(given.get('input')))
-      check(id, () => contentOf(decision().write(), 'decision'), expect, 'decision')
-      check(id, () => contentOf(decision().explain('json'), 'explanation'), expect, 'explanation')
-      if (expect.has('text')) assert.equal(decision().explain(), expect.get('text'), id)
-      return true
-    }
-    case 'summary': {
-      const ruleset = cr.RuleSet.read(document(given.get('ruleset')))
-      check(id, () => contentOf(ruleset.summary('json'), 'summary'), expect, 'summary')
-      if (expect.has('text')) assert.equal(ruleset.summary('text'), expect.get('text'), id)
-      return true
-    }
-    default:
-      return false
-  }
-}
-
-function runNative(id, given, expect) {
-  const kind = given.get('kind')
-  let input
-  try {
-    if (given.has('inputs')) input = given.get('inputs').map(native)
-    else if (given.has('input')) input = native(given.get('input'))
-    else return false
-  } catch (error) {
-    if (error instanceof Skip) return false
-    throw error
-  }
-  switch (kind) {
-    case 'condition':
-    case 'value': {
-      const node = cr.Node.read(write(given.get(kind)))
-      const strict = given.get('strict') === true
-      check(
-        id,
-        () =>
-          parse(
-            kind === 'value'
-              ? node.evaluateValueTree(input, { strict })
-              : node.evaluateTree(input, { logic: given.get('logic'), strict }),
-          ),
-        expect,
-        'result',
-      )
-      return true
-    }
-    case 'evaluate': {
-      const ruleset = cr.RuleSet.read(document(given.get('ruleset')))
-      if (given.has('inputs')) {
-        check(id, () => ruleset.evaluateMany(input).map((d) => contentOf(d.write(), 'decision')), expect, 'decisions')
-      } else {
-        check(id, () => contentOf(ruleset.evaluate(input).write(), 'decision'), expect, 'decision')
-      }
-      return true
-    }
-    case 'explain': {
-      const ruleset = cr.RuleSet.read(document(given.get('ruleset')))
-      check(id, () => contentOf(ruleset.evaluate(input).explain('json'), 'explanation'), expect, 'explanation')
-      return true
-    }
-    default:
-      return false
-  }
-}
-
-const vectors = FILES.flatMap((file) => parse(fs.readFileSync(path.join(VECTORS, file), 'utf8')).get('vectors'))
-
-test('the smoke vectors pass through JSON', () => {
-  let ran = 0
-  for (const vector of vectors) {
-    if (runJson(vector.get('id'), vector.get('given'), vector.get('expect'))) ran += 1
-  }
-  // Every vector of these files that the smoke runner handles (F.3 runs all).
-  assert.ok(ran >= 200, `only ${ran} vectors ran`)
+test('the comparison holds on its own cases', () => {
+  assert.deepEqual(checkComparison(), [])
 })
 
-test('the smoke vectors pass through native data', () => {
-  let ran = 0
-  for (const vector of vectors) {
-    if (runNative(vector.get('id'), vector.get('given'), vector.get('expect'))) ran += 1
+for (const [name, list] of files) {
+  test(`vectors in ${name}`, () => {
+    const failures = []
+    for (const vector of list) {
+      const id = vector.get('id')
+      ran += 1
+      for (const route of ROUTES) {
+        const outcome = runner.run(vector, route)
+        if (outcome === '') {
+          counts[route].passed += 1
+        } else if (typeof outcome === 'object') {
+          const ids = counts[route].skipped.get(outcome.skip) ?? []
+          counts[route].skipped.set(outcome.skip, [...ids, id])
+        } else {
+          counts[route].failed += 1
+          failures.push(`${route}:${id}: ${outcome}`)
+        }
+      }
+    }
+    assert.ok(failures.length === 0, `${failures.length} failed:\n${failures.join('\n')}`)
+  })
+}
+
+test('every vector ran both ways, but those listed with their reason', (t) => {
+  assert.ok(vectors.size >= MINIMUM_VECTORS, `only ${vectors.size} vectors, expected at least ${MINIMUM_VECTORS}`)
+  assert.equal(vectors.size, files.reduce((n, [, list]) => n + list.length, 0), 'vector ids repeat')
+  assert.equal(ran, vectors.size, 'every vector file ran')
+  for (const route of ROUTES) {
+    const { passed, failed, skipped } = counts[route]
+    const skips = [...skipped.values()].reduce((n, ids) => n + ids.length, 0)
+    report(t, `${route} (${build}, ${runtime}): ${passed} of ${vectors.size} passed, ${failed} failed, ${skips} skipped`)
+    for (const [why, ids] of skipped) report(t, `  ${ids.length} skipped: ${SKIPS[why]}: ${ids.join(', ')}`)
+    assert.equal(passed + failed + skips, vectors.size)
   }
-  assert.ok(ran >= 70, `only ${ran} vectors ran`)
+  const forms = [...runner.forms].map(([form, ids]) => `${form} ${ids.size}`)
+  report(t, `native: vectors using each JavaScript form (inputs, constants, metadata, grid cells): ${forms.join(', ')}`)
+  for (const [why, ids] of runner.fallbacks) {
+    report(t, `native: ${ids.size} vectors whose input no native form holds exactly, ${why}; given as the ZonedDateTime the engine gives back for its text: ${[...ids].join(', ')}`)
+  }
+  // The only vectors a route skips: grids have no JSON route.
+  const grids = [...vectors.values()].filter((v) => v.get('given').has('table_grid')).map((v) => v.get('id'))
+  assert.deepEqual([...counts.json.skipped.keys()], grids.length > 0 ? ['grid'] : [])
+  assert.deepEqual(counts.json.skipped.get('grid') ?? [], grids)
+  assert.equal(counts.native.skipped.size, 0)
+})
+
+/** `vector` with `from` replaced by `to` in its expected output only. */
+function mutated(id, from, to) {
+  const vector = vectors.get(id)
+  assert.ok(vector !== undefined, `no vector ${id}`)
+  const expect = write(vector.get('expect'))
+  assert.ok(expect.includes(from), `${id}: no ${from} in ${expect}`)
+  const entries = vector.entries.map(([k, v]) => [k, k === 'expect' ? parse(expect.replace(from, to)) : v])
+  return new Obj(entries)
+}
+
+test('a wrong expected output fails both ways', () => {
+  const wrong = [
+    // A value, a truth value, an int that should be a float, an order.
+    ['ast/nodes/div-int', '"value":3.5', '"value":3.25'],
+    ['ast/missing/missing-field', '"truth":null', '"truth":false'],
+    ['rules/batch/decisions', '"value":2}', '"value":2.0}'],
+    ['explain/summaries/pricing', '"priority":10', '"priority":11'],
+    ['explain/summaries/pricing', '"outputs":["discount","total"]', '"outputs":["total","discount"]'],
+    // What the idiomatic API does not give (a cause's `at`) is still checked
+    // by the native route, through the native layer.
+    ['explain/counterfactuals/at-the-limit', '"at":"/decision/results/0/when"', '"at":"/decision/results/0"'],
+    ['explain/counterfactuals/at-the-limit', '"gap":0', '"gap":1'],
+    ['ast/missing/strict-missing', '"path":["age"]', '"path":["years"]'],
+    ['format/conditions/and-flattened', '"path":["c"]', '"path":["d"]'],
+    ['format/tables/basic', 'loyal,> 2,-,0.05', 'loyal,> 3,-,0.05'],
+  ]
+  for (const [id, from, to] of wrong) {
+    const vector = mutated(id, from, to)
+    for (const route of ROUTES) {
+      assert.notEqual(runner.run(vector, route), '', `${route}:${id} passes with ${to} for ${from}`)
+    }
+  }
 })
