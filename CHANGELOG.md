@@ -464,3 +464,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path of the build) and the SONAME `libcleanrules_ffi.so` on Linux (it had
   none).
 
+- Data model (`spec/data-model.md`, *JavaScript and TypeScript*): values given
+  back to JavaScript are specified (*Values given back*): null of any reason as
+  `null`, ints as `number` within ±(2⁵³ − 1) and `bigint` beyond, floats as
+  `number`, decimals as `cr.Decimal` with the canonical text, dates and naive
+  datetimes as `cr.LocalDate` and `cr.NaiveDateTime`, aware datetimes as the
+  new `cr.ZonedDateTime` (with `toTemporal()` in its zone or at its offset, a
+  `RangeError` for an offset with seconds), lists as arrays, maps as plain
+  objects (a key such as `__proto__` an own property), opaque values as the
+  objects read (`null` in a decision read from a document); counterfactual
+  gaps and priorities by the same rules. Each reads back as the same value,
+  except the keys `__proto__` and `constructor` of a plain object, an opaque
+  given back as `null`, and a float holding an integer; payloads and outputs
+  are frozen shallowly. `cr.ZonedDateTime` is a new input row. Native data
+  only, so no conformance vector changes.

@@ -280,6 +280,7 @@ module, records included.
 | `cr.datetime(...)`, `Temporal.PlainDateTime` | naive datetime |
 | `Date`, `Temporal.Instant` | aware datetime in `Z` |
 | `Temporal.ZonedDateTime` | aware datetime in its zone, or with a fixed offset when the zone id is an offset such as `+05:30` |
+| `cr.ZonedDateTime` (as the binding gives it back, below) | aware datetime: its instant, in its zone or with its offset |
 | `Array`, typed arrays except `Uint8Array` (and `Buffer`) | list; holes and `undefined` elements are null (a list cannot hold a missing element) |
 | `Uint8Array`, `Buffer`, `ArrayBuffer`, `DataView` | opaque, like bytes in other languages |
 | `Map` | map, in insertion order; an entry whose key is not a string is left out |
@@ -291,6 +292,42 @@ those in a non-ISO calendar are opaque, and nanoseconds are truncated.
 JavaScript orders an object's integer-like keys first, so a map passed through
 from a JavaScript object may come out in a different order than the same data
 in Python; equality ignores that order.
+
+**Values given back.** Outputs, payloads, aggregates, metadata, constants (a
+constant node's value) and the values in an explanation (the values a cause
+read, a counterfactual's target) come back to JavaScript as follows, the same
+in Node, Deno and browsers:
+
+| Value | JavaScript |
+|---|---|
+| null, whatever its reason | `null` |
+| boolean | `boolean` |
+| int within ±(2⁵³ − 1) | `number`; any other int is a `bigint` |
+| float | `number` (`-0` and infinities included) |
+| decimal | `cr.Decimal`, holding the canonical text (`json-format.md`, *Numbers*), `inf` and `-inf` included |
+| string | `string` |
+| date | `cr.LocalDate` |
+| naive datetime | `cr.NaiveDateTime` |
+| aware datetime | `cr.ZonedDateTime`: the local date and time, the offset in seconds, the IANA zone name or `null` for a fixed offset, and the instant; it converts to `Date` and, where the runtime has it, to `Temporal.ZonedDateTime` in its IANA zone or at its offset. Temporal's offset zones have whole minutes, so an offset with seconds is a `RangeError`; in a named zone, the Temporal value's local fields follow the runtime's zone database |
+| list | `Array` |
+| map | a plain object whose own enumerable properties are the map's entries (a key such as `__proto__` is an own property, never the prototype) |
+| opaque | the native object it was read from, the same object; `null` in a decision read from a document (`readDecision`), which keeps only the type's name |
+
+A counterfactual's gap is a `number`, `bigint` or `cr.Decimal`, like the int,
+float or decimal above; between dates it is a frozen `{ days }`, and between
+datetimes a frozen `{ microseconds }`, each holding an int by the rule above.
+Priorities in notes and summaries are ints by the same rule.
+
+These classes are frozen, and payloads and outputs are frozen shallowly (the
+arrays and objects inside them are not). Each value reads back as the same
+value (the table above), so an output can be fed to another evaluation, with
+three exceptions: a plain object never yields the keys `__proto__` and
+`constructor` (pass such a map as a `Map`); an opaque value given back as
+`null` reads as null; and a float that holds an integer comes back as a
+`number`, which reads back as an int (wrap it in `cr.float(x)` where the
+difference matters). JavaScript orders an object's integer-like keys first, so
+a map given back may list them in another order than the core; equality ignores
+that order.
 
 #### Java and Scala
 
