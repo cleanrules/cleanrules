@@ -1,13 +1,16 @@
 //! What the napi-rs and wasm-bindgen front ends share: checking arguments as
-//! JavaScript gives them, the reader's encoding (`wire`), and the documents,
-//! rule sets, decisions and nodes over the core (`core`).
+//! JavaScript gives them, the reader's encoding (`wire`), the documents, rule
+//! sets, decisions and nodes over the core (`core`), conditions and rules
+//! built in code (`build`), and the encoding of what comes back (`out`).
 //!
 //! Nothing here touches a JavaScript engine. Each front end turns its
 //! arguments into [`Raw`] values and [`RawOptions`], calls this code, and turns
 //! a [`Problem`] into a JavaScript error, so that both builds accept the same
 //! arguments and throw the same errors.
 
+pub(crate) mod build;
 pub(crate) mod core;
+pub(crate) mod out;
 pub(crate) mod wire;
 
 use cleanrules::format::DocumentFormat;
@@ -317,10 +320,10 @@ pub(crate) fn decimal_problem(text: &str) -> Option<String> {
 /// The error of calling a class of the engine with `new`: its objects come
 /// from its factories, the same in both builds.
 pub(crate) fn no_constructor(class: &str) -> Problem {
-    let how = if class == "Decision" {
-        "decisions come from RuleSet.evaluate".to_owned()
-    } else {
-        format!("use {class}.read")
+    let how = match class {
+        "Decision" => "decisions come from RuleSet.evaluate".to_owned(),
+        "NativeRule" => "rules come from the Rule class of cleanrules".to_owned(),
+        _ => format!("use {class}.read"),
     };
     Problem::Type(format!("{class} has no public constructor; {how}"))
 }

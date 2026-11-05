@@ -1,5 +1,7 @@
-// What the root entry exports besides the versions, the same in every build:
-// the errors and the marker values.
+// What the root entry exports besides the versions and the API of its build
+// (`lib/api/index.js`), the same in every build: the errors, the marker
+// values, and the classes of what decisions, explanations and summaries give
+// back.
 
 export {
   ActionError,
@@ -17,10 +19,25 @@ export {
   UnsupportedError,
 } from './errors.js'
 export {
+  ActionContext,
+  Cause,
+  CauseGroup,
+  Counterfactual,
+  Explanation,
+  FieldUsage,
+  Note,
+  Reason,
+  RuleExplanation,
+  RuleResult,
+  RuleSummary,
+  Summary,
+} from './api/results.js'
+export {
   Decimal,
   Float,
   LocalDate,
   NaiveDateTime,
+  ZonedDateTime,
   date,
   datetime,
   decimal,

@@ -5,6 +5,7 @@
 //! JavaScript half (`lib/`) is registered per environment with
 //! [`hooks::set_hooks`].
 
+pub(crate) mod build;
 pub(crate) mod classes;
 pub(crate) mod hooks;
 

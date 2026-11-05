@@ -9,10 +9,38 @@ builds with the same API: a native Node addon built with
 [wasm-bindgen](https://wasm-bindgen.github.io/wasm-bindgen/) for browsers,
 Deno and other runtimes (task F.1b).
 
-This is the native layer, in `cleanrules/native`. The idiomatic TypeScript API
-(rule builders, the `F` proxy, operators) comes in task F.2, on top of it.
+The package root, `cleanrules`, is the idiomatic API (task F.2a): conditions
+built with the `F` proxy and methods, rules and rule sets built in code,
+decisions with native JavaScript values, and explanations and summaries as
+objects. The native layer underneath stays available in `cleanrules/native`.
 
 ## Example
+
+```js
+import { F, Rule, RuleSet, decimal } from 'cleanrules'
+
+const rules = new RuleSet(
+  [
+    new Rule('vip', F.customer.years.gt(5).and(F.order.total.gt(1000)), { discount: decimal('0.15') }, {
+      priority: 10,
+      do: ({ rule, output }) => console.log(`${rule.name}: ${output.discount}`),
+    }),
+    new Rule('loyal', F.customer.years.gt(2), { discount: decimal('0.05') }, { priority: 5 }),
+  ],
+  { hitPolicy: 'priority' },
+)
+
+const decision = rules.evaluate({ customer: { years: 7 }, order: { total: 900 } })
+decision.output              // { discount: Decimal { text: '0.05' } }
+decision.whyNot('vip').causes[0].counterfactual   // { path: ['order', 'total'], op: 'gt', target: 1000, gap: 100 }
+String(decision.explain())   // the explanation's text, the same in every language
+rules.run({ customer: { years: 7 }, order: { total: 1500 } })   // calls vip's action
+```
+
+[`docs/examples/discounts.mjs`](../../docs/examples/discounts.mjs) does more,
+in Node and Deno: why a rule did not fire, the summary, a named action bound
+to a function, and an error. The same rules read from the rule syntax, with the
+native layer:
 
 ```js
 import { RuleSet } from 'cleanrules/native'
@@ -45,11 +73,12 @@ CommonJS) and [`docs/examples/discounts.deno.js`](../../docs/examples/discounts.
 
 ## Entry points
 
-- `cleanrules`: what is final today, the errors, the marker values
-  (`decimal`, `float`, `date`, `datetime`), `FORMAT_VERSION` and `version`. The
-  idiomatic API (task F.2) arrives here.
-- `cleanrules/native`: the native layer, the classes below. F.2 builds on it,
-  and it stays available.
+- `cleanrules`: the idiomatic API (`F`, `field`, `constant`, `and`, `or`,
+  `not`, `Expr`, `Rule`, `RuleSet`, `Decision` and the classes of explanations
+  and summaries), the errors, the marker values (`decimal`, `float`, `date`,
+  `datetime`, and `ZonedDateTime` given back), `FORMAT_VERSION` and `version`.
+- `cleanrules/native`: the native layer, the classes below. The idiomatic API
+  builds on it, and it stays available.
 
 Each comes in both builds, and `package.json` `exports` picks one by
 condition:
@@ -85,7 +114,7 @@ With bundlers, the module is a separate file that the bundle must ship
   to the bundled module (or serve it at the URL the module computes).
 
 A hand-initialised entry (passing the module or its bytes yourself) is planned
-for task F.2.
+for task F.2b.
 
 On Node, where no prebuilt addon exists for the platform, `node
 --conditions=browser` runs the WebAssembly build instead.
@@ -93,9 +122,13 @@ On Node, where no prebuilt addon exists for the platform, `node
 ### What differs between the builds
 
 The same classes, methods, options, errors (classes and messages), markers and
-`ActionCall`: the whole test suite runs on each build, in Node and in Deno, and
-compares their members and the errors of a list of wrong calls. Only these
-differ:
+`ActionCall`, and the same idiomatic API (each build makes its own `Expr`,
+`Rule`, `RuleSet` and `Decision` classes, over its own native objects, so
+objects of one build do not mix with the other's: passing one to the other
+build is a `TypeError` that says so): the whole test suite runs on
+each build, in Node and in Deno, and compares their members, the errors of a
+list of wrong calls, and what decisions, explanations and summaries give back.
+Only these differ:
 
 - The WebAssembly build's objects have wasm-bindgen's `free()` (and its
   internal `__destroy_into_raw()` and static `__wrap()`). `free()` and
@@ -170,10 +203,168 @@ object with any of `maxSize` (bytes, for every format), `maxNesting`,
 `maxDepth`, `maxTableSize`, `maxYamlSize` and `maxTextSize`. The defaults
 (explanations and summaries as text) are those of C++.
 
-Outputs, explanations and summaries come out as text in the JSON format
-(`spec/json-format.md`), with `{"$decimal": ...}`, `{"$int": ...}` for integers
-beyond 2⁵³ and so on. Native JavaScript values for outputs come with the
-TypeScript API (F.2).
+In this layer, outputs, explanations and summaries come out as text in the
+JSON format (`spec/json-format.md`), with `{"$decimal": ...}`, `{"$int": ...}`
+for integers beyond 2⁵³ and so on. The idiomatic API gives native values
+(*Values given back*, below).
+
+## Conditions
+
+A condition is data, a tree of nodes the core evaluates, never a JavaScript
+function, so a rule can be explained, written and audited. Nodes are built
+with the `F` proxy and methods; fuzzytool's operators `&`, `|` and `~` are
+`.and()`, `.or()` and `.not()`:
+
+```js
+import { F, and, constant, decimal, field, not, or } from 'cleanrules'
+
+F.customer.age.ge(18).and(F.country.isIn(['ES', 'PT']), not(F.blocked))
+F.price.mul(F.quantity).sub(F.discount).gt(decimal('100.00'))
+F.age.between(18, 65, { closed: 'left' })   // 'both' (default), 'left', 'right', 'none'
+F.email.matches('^[^@]+@example\\.com$')       // the Rust regex syntax: linear time
+or(F.vip, F.total.gt(1000))
+```
+
+| Method | Node |
+|---|---|
+| `eq`, `ne`, `lt`, `le`, `gt`, `ge` | comparison with a node or a constant |
+| `and(...)`, `or(...)`, `not()`; `and(...)`, `or(...)`, `not(x)` as functions | connectives (at least two operands) |
+| `add`, `sub`, `mul`, `div`, `neg()`, `abs()` | arithmetic |
+| `isIn(values)` | membership in constants of one type group |
+| `between(low, high, { closed })` | a range |
+| `isNull()` | missing or null; never unknown |
+| `matches(pattern)`, `startsWith(text)`, `endsWith(text)`, `contains(text)` | string tests |
+
+Every node is built by the core's constructors, so a node it refuses fails at
+once with an `ExpressionError` (`F.x.gt(NaN)`, `F.x.isIn([1, 'a'])`, `and(F.a)`).
+Values next to a node become constants (`F.x.gt(5)`); `constant(value)` makes
+one where no node is involved. Comparing with `null` is refused: test missing
+values with `isNull()`. A node is immutable, with `tag`, `kind`
+(`'condition'`, `'value'` or `'any'`), `children()`, `fieldPaths()`,
+`sameAs(other)` (structural identity), `toString()` (the canonical text, as
+explanations write it) and `toJSON()` (its JSON form). Fields have `path`,
+constants `value`; `walk()` yields a node and its descendants in pre-order.
+Nodes are immutable: assigning to one throws a `TypeError`, in strict and
+sloppy code alike.
+
+Every property of `F` (and of a field) is a key, except a field's own members.
+Three rules keep the proxy safe:
+
+- `then` is never a field, so `await` and promises never take a field for a
+  promise; symbols, `toJSON`, Node's and Deno's inspection and the methods are
+  the real members.
+- A key named like a method (`and`, `path`, `tag`...) or like a member of
+  `Object.prototype` (`constructor`, `valueOf`, `toString`, `hasOwnProperty`...)
+  is reached with `F.x.at('and')`, or `field('x', 'and')`.
+- An index is ambiguous as a property (JavaScript property names are strings,
+  and a string key never reads an array): `F.items[0]` throws, with the fix.
+  Write `F.items.at(0).price` or `field('items', 0, 'price')`; `.at('0')` is the
+  key `"0"`.
+
+In TypeScript, `F` lets any key through. Typed after the input, it checks the
+keys below the first and completes them, with nothing possibly `undefined`
+(also under `noUncheckedIndexedAccess`, where every key of the untyped `F` is
+possibly `undefined`, as for any index signature):
+
+```ts
+import { F, type Fields } from 'cleanrules'
+
+interface Order { customer: { years: number }; items: { price: number }[] }
+const O = F as Fields<Order>               // types only: at run time it is F
+O.customer.years.gt(5).and(O.items.at(0).price.gt(10))
+```
+
+JavaScript operators are refused rather than silently wrong: `F.age >= 18` and
+`F.age + 1` throw an `ExpressionError` (a node is not a number), while
+`` `${node}` `` and `String(node)` give its text. Like `==` in other bindings,
+`===` compares objects: use `sameAs`.
+
+## Rules, rule sets and decisions
+
+```js
+new Rule(name, when, then?, { priority, tags, description, metadata, do }?)
+new RuleSet(rules, { hitPolicy, aggregate, logic, strict }?)
+```
+
+The third argument is the payload and the fourth the options: `new Rule('vip',
+cond, { priority: 10 })` makes a payload with the output `priority`, which is
+rarely what was meant (`new Rule('vip', cond, null, { priority: 10 })`).
+`then` is an object or a `Map` of payload values (nodes or constants), in
+order. `do` is the action: a function, called by `run`, or the name of one
+(`do: 'notify'`), which is data and `bind` resolves. `metadata` holds data
+only. Rules and rule sets are immutable and checked as they are built
+(`RuleDefinitionError`, `ExpressionError` or `RegistryError`, as the core
+reports them); an unknown option, here and in `between` and `readDecision`, is
+a `TypeError`. Hit policies and aggregates are named as in the format, in any
+case. Writing rules and rule sets as documents is not available yet: their
+`toJSON()` throws an `UnsupportedError` (decisions, explanations and summaries
+have theirs).
+
+| Name | What |
+|---|---|
+| `rule.name`, `when`, `then`, `priority`, `tags`, `description`, `metadata`, `do`, `actionName` | the rule, as the core keeps it (tags sorted, without repeats) |
+| `ruleset.rules`, `length`, iteration, `get(name)`, `has(name)`, `rule(name)` | the rules; `get` gives `undefined` for an unknown name, like `Map`, and `rule` throws a `RuleNotFoundError` listing them |
+| `ruleset.hitPolicy`, `aggregate`, `logic`, `strict`, `fieldPaths()` | its configuration and what it reads |
+| `ruleset.evaluate(data)`, `evaluateMany(rows)`, `readDecision(text, { format, limits }?)` | decisions |
+| `ruleset.bind(actions)`, `run(data)` | actions (below) |
+| `ruleset.summary()` | a `Summary`: `hitPolicy`, `rules`, `fields`, `outputs`, `tags`; `toString()` and `toJSON()` |
+| `decision.ruleset`, `results`, `selected`, `fired`, `hitPolicy` | each rule's `RuleResult` (`rule`, `fired`, `truth`, `output`) |
+| `decision.output`, `outputs`, `aggregated` | native values; `output` throws a `HitPolicyError` for `rule_order`, and `collect` without an aggregate |
+| `decision.explain()`, `whyNot(name)`, `toJSON()` | an `Explanation`, one rule's (a `RuleNotFoundError` for an unknown name), and the decision document |
+
+An `Explanation` has `rules` (a `RuleExplanation` each: `rule`, `status`,
+`requirement`, `note`, `achievable`, `causes`), `selected`, `forRule(name)`,
+`toString()` (the text every language shares) and `toJSON()`. A requirement is
+a `Cause` (`node`, `truth`, `negated`, `holds`, `values`, `reason`,
+`counterfactual`, and its line as `toString()`) or a `CauseGroup` (`kind`
+`'all'` or `'any'`, `items`); a `Counterfactual` has `path`, `op`, `target` and
+`gap` (a number, a `Decimal`, `{ days }` or `{ microseconds }`); a `Note` says
+why a rule that fired was not selected. Everything comes from the core:
+evaluation, selection, explanation and their text.
+
+## Values given back
+
+Outputs, payloads, aggregates, metadata, constants (`Const.value`) and the
+values in an explanation (the values a cause read, a counterfactual's target)
+come back as `spec/data-model.md` says (*Values given back*), the same in Node,
+Deno and browsers:
+
+| Value | JavaScript |
+|---|---|
+| null, whatever its reason | `null` |
+| int within ±(2⁵³ − 1) | `number`; beyond, `bigint` |
+| float | `number` (`-0` and infinities included) |
+| decimal | `Decimal`, with the canonical text (`inf` and `-inf` included) |
+| date, naive datetime | `LocalDate`, `NaiveDateTime` |
+| aware datetime | `ZonedDateTime` |
+| list | `Array` |
+| map | a plain object; a key such as `__proto__` is an own property |
+| opaque | the very object read from the input; `null` in a decision read from a document (`readDecision`), which keeps only the type's name |
+
+`ZonedDateTime` holds the local `year`, `month`, `day`, `hour`, `minute`,
+`second` and `microsecond`, `offsetSeconds`, `timeZone` (an IANA name, or
+`null` for a fixed offset) and `epochMicroseconds` (a `bigint`); `toDate()`,
+`toTemporal()` (in its IANA zone or at its offset; a `TypeError` where the
+runtime has no Temporal, such as Node 22, and a `RangeError` for an offset with
+seconds, since Temporal's offset zones have whole minutes; in a named zone the
+Temporal value's local fields follow the runtime's zone database), and
+`toString()` and `toJSON()`, the RFC 9557 text of the JSON format
+(`2026-10-31T09:30:00+01:00[Europe/Madrid]`). Only the engine makes them.
+
+A counterfactual's gap is a `number`, `bigint` or `Decimal`, like the values
+above; between dates a frozen `{ days }`, between datetimes a frozen
+`{ microseconds }`, each an int by the rule above. Priorities in notes and
+summaries are ints by the same rule.
+
+These classes are frozen, and payloads and outputs are frozen shallowly (the
+arrays and objects inside them are not); results and explanations are frozen
+too. Each value reads back as the same value, so an output can be fed to
+another evaluation, with three exceptions: a plain object never yields the
+keys `__proto__` and `constructor` (pass such a map as a `Map`); an opaque value
+given back as `null` reads as null; and a float that holds an integer comes
+back as a `number`, which reads back as an int (wrap it in `float(x)` where it
+matters). What the core cannot hold (a forged marker, an instant beyond its
+range) is opaque, and comes back as the object itself.
 
 ## Data
 
@@ -239,7 +430,20 @@ unknown format, a negative limit) are `TypeError`s and `RangeError`s.
 
 ## Actions
 
-`run(data, actions)` takes an object or a `Map` from action names to functions.
+With the idiomatic API, a rule's action is `do`: a function, or a name.
+`ruleset.bind(actions)` (an object or a `Map` of functions) returns a rule set
+whose named actions are resolved; every named action is checked, whether or
+not its rule fires (`RegistryError`), and actions given as functions are kept.
+`ruleset.run(data)` refuses unbound names before reading anything, evaluates,
+and calls the selected rules' actions in rule order with an `ActionContext`
+(`rule`, `data`, `result`, `output`, `decision`). `evaluate` never calls
+actions. Actions are synchronous: what they return is ignored, except a
+promise, which fails the run (and its rejection is handled). An action that
+throws or returns a promise stops the run with an `ActionError` whose `cause`
+is what it threw, `context.executed` the rules whose actions ran, and
+`decision` the decision.
+
+In the native layer, `run(data, actions)` takes an object or a `Map` from action names to functions.
 Every action the rules name must be there (else a `RegistryError`, before
 anything is read). Each selected rule's action is called, in rule order, with an
 `ActionCall`: `{ ruleName, position, input, truth, outputJson, decision }` (the

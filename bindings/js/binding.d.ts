@@ -130,6 +130,18 @@ export declare class Document {
   write(format?: Format | null): string
 }
 
+/** A rule of the core, built by `ruleNew`; immutable. */
+export declare class NativeRule {
+  /**
+   * Not a constructor: rules come from `ruleNew`.
+   *
+   * # Errors
+   *
+   * Always a `TypeError`, the same as the WebAssembly build's.
+   */
+  private constructor()
+}
+
 /** A condition or value node; immutable. */
 export declare class Node {
   /**
@@ -203,6 +215,26 @@ export declare class Node {
    * `FormatError` for an invalid text, and as `evaluateValueTree`.
    */
   evaluateValueTreeJson(input: string | Uint8Array, options?: ValueTreeOptions | null): string
+}
+
+/**
+ * Nodes in order, each with an optional key: the operands of `and` and `or`,
+ * or a rule's payload. wasm-bindgen cannot borrow objects inside an array, so
+ * both builds pass them one by one.
+ */
+export declare class NodeList {
+  /** An empty list. */
+  constructor()
+  /** Add `node`, under `key` for a payload. */
+  push(node: Node, key?: string | undefined | null): void
+}
+
+/** Rules in order, for a rule set. */
+export declare class RuleList {
+  /** An empty list. */
+  constructor()
+  /** Add `rule`. */
+  push(rule: NativeRule): void
 }
 
 /** A rule set; immutable, and shared by its decisions. */
@@ -379,6 +411,13 @@ export interface ActionCall {
   decision: Decision
 }
 
+/**
+ * The JSON form of the `ActionError` of an action given as a function (or
+ * bound to `action`) that failed: it threw (`kind` `"threw"`, described by
+ * `detail`) or returned a promise (`"promise"`).
+ */
+export declare function actionErrorData(rule: string, action: string | undefined | null, kind: string, detail: string, executed: Array<string>): string
+
 /** The name of an aggregate of `collect`. */
 export type Aggregate = 'sum' | 'min' | 'max' | 'count'
 
@@ -389,8 +428,20 @@ export type Aggregate = 'sum' | 'min' | 'max' | 'count'
  */
 export declare function decimalProblem(text: string): string | null
 
+/** What a decision gives back, in the binding's encoding. */
+export declare function decisionData(decision: Decision): string
+
 /** What a document holds. */
 export type DocumentKind = 'condition' | 'rule' | 'ruleset' | 'decision_table'
+
+/**
+ * A decision's explanation, in the binding's encoding.
+ *
+ * # Errors
+ *
+ * `UnsupportedError` for a logic explanations do not support.
+ */
+export declare function explanationData(decision: Decision): string
 
 /** The name of a format. */
 export type Format = 'json' | 'yaml' | 'text' | 'csv'
@@ -425,6 +476,105 @@ export interface Limits {
   maxTextSize?: number
 }
 
+/**
+ * Arithmetic.
+ *
+ * # Errors
+ *
+ * `ExpressionError`, as the core reports it.
+ */
+export declare function nodeArith(op: string, left: Node, right: Node): Node
+
+/**
+ * A range test.
+ *
+ * # Errors
+ *
+ * `ExpressionError`, as the core reports it.
+ */
+export declare function nodeBetween(operand: Node, low: Node, high: Node, closed: string): Node
+
+/** A node's children, in order. */
+export declare function nodeChildren(parent: Node): Array<Node>
+
+/**
+ * `left op right`.
+ *
+ * # Errors
+ *
+ * `ExpressionError`, as the core reports it.
+ */
+export declare function nodeCompare(op: string, left: Node, right: Node): Node
+
+/**
+ * `and` or `or` of the nodes of `operands`.
+ *
+ * # Errors
+ *
+ * `ExpressionError`, as the core reports it.
+ */
+export declare function nodeConnective(tag: string, operands: NodeList): Node
+
+/**
+ * A constant, in the reader's encoding.
+ *
+ * # Errors
+ *
+ * `ExpressionError` for a value that is not a constant.
+ */
+export declare function nodeConstant(wire: string): Node
+
+/** A node's tag, kind and own data, as JSON. */
+export declare function nodeDetails(node: Node): string
+
+/**
+ * A field, by its path of keys and indices.
+ *
+ * # Errors
+ *
+ * `ExpressionError` for an invalid path.
+ */
+export declare function nodeField(path: Array<string | number>): Node
+
+/**
+ * Membership in constants, a list in the reader's encoding.
+ *
+ * # Errors
+ *
+ * `ExpressionError`, as the core reports it.
+ */
+export declare function nodeIsIn(operand: Node, wire: string): Node
+
+/**
+ * A regular expression search.
+ *
+ * # Errors
+ *
+ * `ExpressionError` for a pattern that does not compile.
+ */
+export declare function nodeMatches(operand: Node, pattern: string): Node
+
+/** Whether two nodes are structurally identical (`spec/ast.md`). */
+export declare function nodeSameAs(left: Node, right: Node): boolean
+
+/**
+ * `starts_with`, `ends_with` or `contains`.
+ *
+ * # Errors
+ *
+ * `ExpressionError`, as the core reports it.
+ */
+export declare function nodeStringTest(op: string, operand: Node, text: string): Node
+
+/**
+ * `not`, `is_null`, `abs` or `neg`.
+ *
+ * # Errors
+ *
+ * `ExpressionError`, as the core reports it.
+ */
+export declare function nodeUnary(tag: string, operand: Node): Node
+
 /** How a text is read: its format (JSON when left out) and limits. */
 export interface ReadOptions {
   /** The format: `"json"` (the default), `"yaml"`, `"text"` or `"csv"`. */
@@ -432,6 +582,27 @@ export interface ReadOptions {
   /** The limits; each one left out keeps the core's default. */
   limits?: Limits
 }
+
+/** A rule's tags, metadata and action name, as JSON. */
+export declare function ruleDetails(rule: NativeRule): string
+
+/**
+ * A rule.
+ *
+ * # Errors
+ *
+ * `RuleDefinitionError` or `ExpressionError`, as the core reports them.
+ */
+export declare function ruleNew(name: string, when: Node, then: NodeList, priority: string, tags: string[], description?: string | null, metadata?: string | null, action?: string | null): NativeRule
+
+/**
+ * A rule set of `rules`, with its options as given.
+ *
+ * # Errors
+ *
+ * `RuleDefinitionError` or `RegistryError`, as the core reports them.
+ */
+export declare function ruleSetNew(rules: RuleList, hitPolicy: unknown, aggregate: unknown, logic: unknown, strict: unknown): RuleSet
 
 /**
  * Register the JavaScript half of the binding; `index.js` calls it once when
@@ -442,6 +613,15 @@ export interface ReadOptions {
  * If the environment cannot hold the hooks.
  */
 export declare function setHooks(hooks: object): void
+
+/**
+ * The summary with the rules whose action is code marked, in `format`.
+ *
+ * # Errors
+ *
+ * `UnsupportedError` for CSV.
+ */
+export declare function summaryWith(ruleset: RuleSet, actions: Array<boolean>, format: unknown): string
 
 /**
  * How one condition node is evaluated (`spec/ast.md`, *Evaluating one

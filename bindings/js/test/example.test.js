@@ -7,7 +7,7 @@ import path from 'node:path'
 import { test } from 'node:test'
 import { pathToFileURL } from 'node:url'
 
-import { deno, napiBuilt } from './support/cr.js'
+import { deno, napiBuilt, root } from './support/cr.js'
 
 // The example is CommonJS for Node, on the native addon.
 test('docs/examples/discounts.js', { skip: !napiBuilt }, () => {
@@ -32,4 +32,24 @@ test('docs/examples/discounts.deno.js', { skip: !deno }, async () => {
   assert.match(output, /same decision from JSON: true/)
   assert.match(output, /notify_sales for vip/)
   assert.match(output, /missing_field in rule adult: customer\.age/)
+})
+
+// The idiomatic API example, on the build under test (Node addon, WebAssembly
+// in Node, WebAssembly in Deno), and run directly on Node's addon.
+test('docs/examples/discounts.mjs', async () => {
+  const examples = path.join(import.meta.dirname, '..', '..', '..', 'docs', 'examples')
+  const { main } = await import(pathToFileURL(path.join(examples, 'discounts.mjs')).href)
+  const check = (output) => {
+    assert.match(output, /^discount: 0\.15\nfired: vip, loyal\n/)
+    assert.match(output, /HIT POLICY priority: selected vip/)
+    assert.match(output, /fired, but vip has a higher priority \(10 > 5\)/)
+    assert.match(output, /vip: order\.total > 1000 is false; needs gt, short by 100\.00/)
+    assert.match(output, /discount DO notify_sales/)
+    assert.match(output, /notify_sales for vip: 0\.15/)
+    assert.match(output, /missing_field in rule adult: customer\.age/)
+  }
+  check(main(root).join('\n'))
+  if (napiBuilt) {
+    check(execFileSync(process.execPath, [path.join(examples, 'discounts.mjs')], { encoding: 'utf8' }))
+  }
 })

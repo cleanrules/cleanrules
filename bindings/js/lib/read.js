@@ -16,6 +16,10 @@
 // `__proto__`, and never anything of a scalar. An integer segment indexes
 // arrays and typed arrays only. A key that is absent or holds `undefined` is
 // missing. A getter that throws gives a null with reason `read_error`.
+//
+// The reader also encodes constants and rule metadata (`encodeData`), with
+// the same rules, and keeps the objects of the opaque values it meets, by
+// token, so that a decision can give back the very objects (`capture`).
 
 import { MARKER } from './values.js'
 
@@ -62,6 +66,13 @@ let runtimeChecks = []
 
 /** The prototypes of the binding's own classes, whose objects are opaque. */
 let engineProtos = new Set()
+/** The prototypes of the idiomatic API's classes (`registerOpaque`), opaque too. */
+const apiProtos = new Set()
+
+/** Treat instances of `classes` (the idiomatic API's) as opaque. */
+function registerOpaque(...classes) {
+  for (const Class of classes) apiProtos.add(Class.prototype)
+}
 
 /**
  * Use `checks` (Node's `util.types`, or `null`) to recognise built-in objects,
@@ -188,7 +199,9 @@ function isMap(value, chain) {
  * read through; `tag` is the value's `Symbol.toStringTag`, read once.
  */
 function isRuntimeObject(value, tag, chain) {
-  if (chain.some((proto) => RUNTIME_PROTOS.has(proto) || engineProtos.has(proto))) return true
+  if (chain.some((proto) => RUNTIME_PROTOS.has(proto) || engineProtos.has(proto) || apiProtos.has(proto))) {
+    return true
+  }
   if (typeof tag === 'string' && RUNTIME_TAGS.has(tag)) return true
   if (typeof Error.isError === 'function' && Error.isError(value)) return true
   if (runtimeChecks.some((check) => check(value))) return true
@@ -403,7 +416,13 @@ function floatText(x) {
 }
 
 class Reader {
-  constructor() {
+  /**
+   * @param {boolean} data Whether this reads a constant or metadata, where a
+   *   NaN is an error (the form `["NaN"]`), not a null.
+   */
+  constructor(data = false) {
+    /** What a NaN reads as. */
+    this.nan = data ? ['NaN'] : null
     /** Values thrown while reading, by index. */
     this.errors = []
     /** The token of each opaque value, in the order they are met. */
@@ -417,13 +436,18 @@ class Reader {
     return ['E', describe(thrown), this.errors.length - 1]
   }
 
-  opaque(value, name) {
+  /** The token of `value`: its position among the objects met, given once. */
+  token(value) {
     let token = this.tokens.get(value)
     if (token === undefined) {
       token = this.tokens.size
       this.tokens.set(value, token)
     }
-    return ['X', name, token]
+    return token
+  }
+
+  opaque(value, name) {
+    return ['X', name, this.token(value)]
   }
 
   /** Walk `value` along the path tree `node`. */
@@ -489,7 +513,7 @@ class Reader {
         return value.isWellFormed() ? value : this.opaque(value, 'string')
       case 'number':
         if (Number.isNaN(value)) {
-          return null
+          return this.nan
         }
         if (Number.isSafeInteger(value) && !Object.is(value, -0)) {
           return ['i', String(value)]
@@ -636,14 +660,25 @@ class Reader {
     switch (kind) {
       case 'decimal': {
         const { text } = value
-        return typeof text === 'string' ? ['d', text] : this.opaque(value, 'Decimal')
+        // With the object's token: a literal the core refuses (a forged
+        // marker) is opaque, and gives back this object.
+        return typeof text === 'string' ? ['d', text, this.token(value)] : this.opaque(value, 'Decimal')
       }
       case 'float': {
         const number = value.value
         if (typeof number !== 'number') {
           return this.opaque(value, 'Float')
         }
-        return Number.isNaN(number) ? null : ['f', floatText(number)]
+        return Number.isNaN(number) ? this.nan : ['f', floatText(number)]
+      }
+      case 'aware_datetime': {
+        // A ZonedDateTime the engine gave back: its instant, offset and zone.
+        const { epochMicroseconds: micros, offsetSeconds: offset, timeZone: zone } = value
+        const zoneOk = zone === null || typeof zone === 'string'
+        if (!Number.isSafeInteger(offset) || Math.abs(offset) > MAX_OFFSET || !zoneOk) {
+          return this.opaque(value, 'ZonedDateTime')
+        }
+        return this.instant(value, micros, offset, zone)
       }
       case 'date': {
         const { year, month, day } = value
@@ -658,18 +693,36 @@ class Reader {
     }
   }
 
-  /** A date or naive datetime form, if its fields are whole numbers. */
+  /**
+   * A date or naive datetime form, if its fields are whole numbers, with the
+   * object's token: a date the core refuses (a forged marker) is opaque and
+   * gives back this object.
+   */
   civil(value, name, form) {
-    return form.slice(1).every(Number.isSafeInteger) ? form : this.opaque(value, name)
+    return form.slice(1).every(Number.isSafeInteger) ? [...form, this.token(value)] : this.opaque(value, name)
   }
 
+  /**
+   * An aware datetime, if its UTC instant and its local date and time both
+   * fall within years 1 to 9999 (spec/data-model.md, *Datetimes*), with the
+   * object's token for anything else the core refuses.
+   */
   instant(value, micros, offset, zone) {
     if (typeof micros !== 'bigint' || micros < FIRST_MICROS || micros > LAST_MICROS) {
       return this.opaque(value, typeName(value))
     }
-    return ['A', micros.toString(), offset, zone]
+    const local = micros + BigInt(offset) * 1000000n
+    if (local < FIRST_MICROS || local > LAST_MICROS) {
+      return this.opaque(value, typeName(value))
+    }
+    return ['A', micros.toString(), offset, zone, this.token(value)]
   }
 }
+
+// Reads made under `capture`: the opaque objects of each, in order. A read
+// that runs inside another (a getter that evaluates) is not the capture's.
+let captured = null
+let depth = 0
 
 /**
  * Read `data` along the paths of `owner` (a `RuleSet` or a `Node`):
@@ -680,8 +733,76 @@ function read(data, owner) {
     throw new TypeError('the input is undefined; pass the data to evaluate (null for none)')
   }
   const reader = new Reader()
-  const encoded = reader.walk(data, treeOf(owner))
+  depth += 1
+  let encoded
+  try {
+    encoded = reader.walk(data, treeOf(owner))
+  } finally {
+    depth -= 1
+  }
+  if (captured !== null && depth === 0) {
+    // The object of each opaque value, by token.
+    captured.push([...reader.tokens.keys()])
+  }
   return [JSON.stringify(encoded), reader.errors]
 }
 
-export { describe, read, useTypes }
+/**
+ * Call `call`, which evaluates through the native layer, and the objects of
+ * the opaque values of each input it read: `[result, [objects, ...]]`, one
+ * array per input, in the order they were read.
+ */
+function capture(call) {
+  const [outer, outerDepth] = [captured, depth]
+  const lists = []
+  captured = lists
+  depth = 0
+  try {
+    return [call(), lists]
+  } finally {
+    captured = outer
+    depth = outerDepth
+  }
+}
+
+/**
+ * A constant or metadata in the reader's encoding (not yet a string), read
+ * whole with the rules of native data, and the values thrown while reading:
+ * `[form, thrown]`. A NaN is the form `["NaN"]`, which the caller rejects.
+ */
+function encodeData(value) {
+  const reader = new Reader(true)
+  return [reader.convert(value), reader.errors]
+}
+
+/**
+ * The first form in `form` that is not data, with where it is: `[form, at]`,
+ * `at` built from `root` like `metadata["key"][0]`; or `null`. Not data: a NaN,
+ * an opaque value, an int beyond 64 bits and a value whose reading threw.
+ */
+function notData(form, root) {
+  if (form === null || typeof form !== 'object') return null
+  switch (form[0]) {
+    case 'NaN':
+    case 'X':
+    case 'IO':
+    case 'E':
+      return [form, root]
+    case 'l':
+      for (const [i, element] of form[1].entries()) {
+        const found = notData(element, `${root}[${i}]`)
+        if (found !== null) return found
+      }
+      return null
+    case 'O':
+      for (const [key, element] of form[1]) {
+        const found = notData(element, `${root}[${JSON.stringify(key)}]`)
+        if (found !== null) return found
+      }
+      return null
+    default:
+      return null
+  }
+}
+
+export { capture, describe, encodeData, notData, read, registerOpaque, typeName, useTypes }

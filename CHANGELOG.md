@@ -221,6 +221,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   readers), comparing with a lossless JSON parser of its own. Under
   `CLEANRULES_SANITIZERS`, any AddressSanitizer report fails a test, and so do
   leaks on Linux.
+- Idiomatic JavaScript API (task F.2a), the root of the `cleanrules` npm
+  package, the same in the Node addon and the WebAssembly build: conditions
+  built with the `F` proxy and methods (`eq`, `ne`, `lt`, `le`, `gt`, `ge`,
+  `and`, `or`, `not`, `add`, `sub`, `mul`, `div`, `neg`, `abs`, `isIn`,
+  `between(low, high, { closed })`, `isNull`, `matches`, `startsWith`,
+  `endsWith`, `contains`; fuzzytool's `&`, `|` and `~` are `.and()`, `.or()`
+  and `.not()`), the functions `field(...path)`, `constant(value)`, `and`, `or`
+  and `not`, and immutable `Expr`, `Field` and `Const` nodes (`tag`, `kind`,
+  `children()`, `walk()`, `fieldPaths()`, `sameAs()`, `toString()` with the
+  canonical text, `toJSON()` with the node's JSON form, `path`, `value`;
+  assigning to one is a `TypeError`), built by the core's constructors so that
+  a bad node fails at once with an `ExpressionError`. The proxy never makes a field thenable (`then`), keeps
+  symbols, `toJSON`, inspection and methods as members, reaches keys named like
+  methods and indices with `.at(...)` or `field(...)`, and refuses `F.items[0]`
+  (ambiguous in JavaScript) and JavaScript operators on nodes (`F.age >= 18`)
+  with an `ExpressionError` naming the fix. `Rule` (name, condition, payload,
+  `priority`, `tags`, `description`, `metadata` and `do`, a function or an
+  action's name) and `RuleSet` (`hitPolicy`, `aggregate`, `logic`, `strict`;
+  iterable, `length`, `rules`, `get` (`undefined` for an unknown name, like
+  `Map`), `has`, `rule` (a `RuleNotFoundError` listing the rules),
+  `fieldPaths()`, `evaluate`, `evaluateMany`, `readDecision`, `bind(actions)`,
+  `run(data)` and `summary()`), with Python's checks and errors (an unknown
+  option is a `TypeError`; `toJSON()` of rules and rule sets is an
+  `UnsupportedError` until they can be written). `Decision`
+  (`ruleset`, `results`, `selected`, `fired`, `hitPolicy`, `outputs`,
+  `output`, `aggregated`, `explain()`, `whyNot(name)`, `toJSON()`) gives
+  native values, and opaque values as the very objects read. `run` calls the
+  selected rules' actions with an `ActionContext` (`rule`, `data`, `result`,
+  `output`, `decision`), refuses unbound names first, and stops with an
+  `ActionError` (with `cause`, `executed` and the decision) when one throws or
+  returns a promise. Explanations and summaries are frozen objects of the
+  classes Python has (`Explanation`, `RuleExplanation`, `Cause`, `CauseGroup`,
+  `Counterfactual`, `Note`, `Reason`, `Summary`, `RuleSummary`, `FieldUsage`,
+  and `RuleResult`), with the core's text as `toString()` and its JSON
+  documents as `toJSON()`. `ZonedDateTime`, the aware datetime given back:
+  local fields, `offsetSeconds`, `timeZone`, `epochMicroseconds`, `toDate()`,
+  `toTemporal()` and the RFC 9557 text; it reads back as input. What the core
+  cannot hold (a forged marker, an instant beyond its range) is opaque and
+  comes back as the object read. Each build makes its own API classes; passing
+  an object to the other build is a `TypeError` that says so. TypeScript
+  declarations with literal types (`HitPolicy`, `Aggregate`, `Truth`, `Status`,
+  `Kind`, `Closed`, `Tag`, `NoteKind`, `GroupKind`, `CompareOp`, `ReasonCode`),
+  a typed `F` whose `then` is `undefined` and whose indices are `never`, and
+  `Fields<T>` (`F as Fields<Order>`: checked keys, nothing possibly `undefined`
+  under `noUncheckedIndexedAccess`); tests on both builds, in Node and Deno,
+  comparing the builds' errors, outputs, explanations and summaries; the example
+  `docs/examples/discounts.mjs`. The native layer, `cleanrules/native`, does
+  not change; both builds gain internal functions that build nodes, rules and
+  rule sets and give values back in a private encoding shared by the two.
 - WebAssembly build of the JavaScript binding (task F.1b): the same npm
   package `cleanrules` runs in browsers, Deno (2.6 or later) and other runtimes
   on a WebAssembly module built with wasm-bindgen, with the same API as the
@@ -433,6 +482,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `number` that is not a safe integer is a float, infinities included, and
   `Uint8Array`, `Buffer`, `ArrayBuffer` and `DataView` are opaque like bytes in
   other languages. Native data only, so no conformance vector changes.
+- Data model (`spec/data-model.md`, *JavaScript and TypeScript*): values given
+  back to JavaScript are specified (*Values given back*): null of any reason as
+  `null`, ints as `number` within ±(2⁵³ − 1) and `bigint` beyond, floats as
+  `number`, decimals as `cr.Decimal` with the canonical text, dates and naive
+  datetimes as `cr.LocalDate` and `cr.NaiveDateTime`, aware datetimes as the
+  new `cr.ZonedDateTime` (with `toTemporal()` in its zone or at its offset, a
+  `RangeError` for an offset with seconds), lists as arrays, maps as plain
+  objects (a key such as `__proto__` an own property), opaque values as the
+  objects read (`null` in a decision read from a document); counterfactual
+  gaps and priorities by the same rules. Each reads back as the same value,
+  except the keys `__proto__` and `constructor` of a plain object, an opaque
+  given back as `null`, and a float holding an integer; payloads and outputs
+  are frozen shallowly. `cr.ZonedDateTime` is a new input row. Native data
+  only, so no conformance vector changes.
 - Data model (`spec/data-model.md`, *JavaScript and TypeScript*): objects of
   the runtime (`Error`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`,
   `FinalizationRegistry`, `Promise`, `RegExp`, boxed primitives, iterators,
@@ -464,17 +527,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path of the build) and the SONAME `libcleanrules_ffi.so` on Linux (it had
   none).
 
-- Data model (`spec/data-model.md`, *JavaScript and TypeScript*): values given
-  back to JavaScript are specified (*Values given back*): null of any reason as
-  `null`, ints as `number` within ±(2⁵³ − 1) and `bigint` beyond, floats as
-  `number`, decimals as `cr.Decimal` with the canonical text, dates and naive
-  datetimes as `cr.LocalDate` and `cr.NaiveDateTime`, aware datetimes as the
-  new `cr.ZonedDateTime` (with `toTemporal()` in its zone or at its offset, a
-  `RangeError` for an offset with seconds), lists as arrays, maps as plain
-  objects (a key such as `__proto__` an own property), opaque values as the
-  objects read (`null` in a decision read from a document); counterfactual
-  gaps and priorities by the same rules. Each reads back as the same value,
-  except the keys `__proto__` and `constructor` of a plain object, an opaque
-  given back as `null`, and a float holding an integer; payloads and outputs
-  are frozen shallowly. `cr.ZonedDateTime` is a new input row. Native data
-  only, so no conformance vector changes.

@@ -11,10 +11,10 @@
 //! | `null`, `true`, `false`, a string | null, a boolean, a string |
 //! | `["i", "<digits>"]` | int |
 //! | `["f", "<shortest repr>"]` | float (`-0` and infinities included) |
-//! | `["d", "<literal>"]` | decimal, or null with `decimal_overflow`; opaque if malformed |
-//! | `["D", y, m, d]` | date |
-//! | `["N", y, m, d, h, mi, s, us]` | naive datetime |
-//! | `["A", "<epoch µs>", <offset s>, <zone or null>]` | aware datetime |
+//! | `["d", "<literal>", k]` | decimal, or null with `decimal_overflow`; opaque if malformed |
+//! | `["D", y, m, d, k]` | date |
+//! | `["N", y, m, d, h, mi, s, us, k]` | naive datetime |
+//! | `["A", "<epoch µs>", <offset s>, <zone or null>, k]` | aware datetime |
 //! | `["l", [items]]` | list, every element given |
 //! | `["L", len, [[i, item], ...]]` | list of `len`, holes where no path reads |
 //! | `["M"]` | a hole or an `undefined` element: null |
@@ -22,6 +22,11 @@
 //! | `["X", "<type>", token]` | opaque |
 //! | `["E", "<detail>", k]` | null with `read_error`; `k` is the thrown value's index |
 //! | `["IO"]`, `["DO"]` | null with `int_overflow`, `decimal_overflow` |
+//!
+//! `k`, optional in the scalar forms, is the object's token: a scalar the core
+//! refuses (a forged marker, an instant beyond the core's range) is opaque
+//! with it, so that the object comes back. Without it the opaque value gets a
+//! token of its own.
 
 use cleanrules::jiff::Timestamp;
 use cleanrules::jiff::civil::{Date, DateTime, Time};
@@ -37,9 +42,9 @@ pub(crate) struct Read {
     pub(crate) errors: Vec<(Vec<Segment>, u32)>,
 }
 
-/// Tokens for values the reader could not have rejected but the core does (an
-/// aware datetime whose local time falls outside years 1 to 9999): above every
-/// token the reader hands out, which are positions in its own list.
+/// Tokens for values the core refuses that came without the reader's token
+/// (the scalar forms carry one; this is a fallback): above every token the
+/// reader hands out, which are positions in its own list.
 const FRESH_TOKENS: u64 = 1 << 53;
 
 /// Decode the reader's text.
@@ -123,11 +128,18 @@ impl Decoder {
         })
     }
 
-    fn opaque(&mut self, type_name: &str) -> Value {
-        self.fresh += 1;
+    /// An opaque value: with `token` (the reader's, for the native object),
+    /// or with a token of its own.
+    fn opaque(&mut self, type_name: &str, token: Option<&Json>) -> Value {
+        let token = if let Some(token) = token.and_then(|json| integer(Some(json)).ok()) {
+            u64::try_from(token).unwrap_or(u64::MAX)
+        } else {
+            self.fresh += 1;
+            self.fresh
+        };
         Value::Opaque(Opaque {
             type_name: type_name.to_owned(),
-            token: self.fresh,
+            token,
         })
     }
 
@@ -140,7 +152,7 @@ impl Decoder {
                 let year: i16 = small(arg(1))?;
                 match Date::new(year, small(arg(2))?, small(arg(3))?) {
                     Ok(date) if (1..=9999).contains(&year) => Value::Date(date),
-                    _ => self.opaque("date"),
+                    _ => self.opaque("date", arg(4)),
                 }
             }
             "N" => {
@@ -157,7 +169,7 @@ impl Decoder {
                     (Ok(date), Ok(time)) if (1..=9999).contains(&year) => {
                         Value::NaiveDateTime(DateTime::from_parts(date, time))
                     }
-                    _ => self.opaque("naive datetime"),
+                    _ => self.opaque("naive datetime", arg(8)),
                 }
             }
             "A" => {
@@ -175,7 +187,7 @@ impl Decoder {
                     });
                 match aware {
                     Some(aware) => Value::AwareDateTime(aware),
-                    None => self.opaque("aware datetime"),
+                    None => self.opaque("aware datetime", arg(4)),
                 }
             }
             _ => return Err(format!("{tag:?} is not a date or datetime")),
@@ -198,7 +210,7 @@ impl Decoder {
                 Ok(decimal) => Value::Decimal(decimal),
                 Err(DecimalError::DoesNotFit) => Value::Null(NullCause::DecimalOverflow),
                 // A marker of another copy of the package, or a forged one.
-                Err(DecimalError::Malformed) => self.opaque("Decimal"),
+                Err(DecimalError::Malformed) => self.opaque("Decimal", arg(2)),
             },
             "D" | "N" | "A" => self.datetime(tag, form)?,
             "l" => {

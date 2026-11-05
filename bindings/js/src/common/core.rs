@@ -6,9 +6,9 @@
 //! rule set and what it was made from (the input, or a recorded decision),
 //! with what is read at once. Writing or explaining it makes it again:
 //! evaluation is deterministic (`CLAUDE.md`, invariant 7), so it is the same
-//! decision. Values come out in the JSON format (`spec/json-format.md`,
-//! *Values*); native JavaScript values for outputs wait for the specification
-//! of that direction (phase F.2).
+//! decision. The native layer gives values in the JSON format
+//! (`spec/json-format.md`, *Values*); the idiomatic API gets them in the
+//! encoding of `out`, which `lib/output.js` turns into native values.
 
 use std::sync::Arc;
 
@@ -137,35 +137,45 @@ pub(crate) enum ActionFailure {
     Promise,
 }
 
-/// The `action_error` of an action that failed (`spec/rules.md`, *Actions*),
-/// after the actions of `executed` ran.
+/// The `action_error` of the action of `rule` that failed (`spec/rules.md`,
+/// *Actions*), after the actions of `executed` ran; `action` is its name, or
+/// `None` for an action given as a function.
 pub(crate) fn action_error(
-    step: &ActionStep,
+    rule: &str,
+    action: Option<&str>,
     failure: &ActionFailure,
     executed: Vec<String>,
 ) -> Error {
+    let action = action.map_or_else(|| "action".to_owned(), |name| format!("action {name:?}"));
     let (message, detail) = match failure {
         ActionFailure::Threw(detail) => (
-            format!(
-                "the action {:?} of rule {:?} threw {detail}",
-                step.action, step.rule
-            ),
+            format!("the {action} of rule {rule:?} threw {detail}"),
             detail.clone(),
         ),
         ActionFailure::Promise => (
-            format!(
-                "the action {:?} of rule {:?} returned a Promise; actions are synchronous",
-                step.action, step.rule
-            ),
+            format!("the {action} of rule {rule:?} returned a Promise; actions are synchronous"),
             "a Promise".to_owned(),
         ),
     };
     let mut error = Error::new(ErrorCode::ActionError, message)
         .with_hint("later actions did not run; error.decision is the decision")
         .caused_by(Thrown(detail));
-    error.context_mut().rule = Some(step.rule.clone());
+    error.context_mut().rule = Some(rule.to_owned());
     error.context_mut().executed = executed;
     error
+}
+
+/// The JSON form of [`action_error`] (`spec/errors.md`), for the idiomatic
+/// API's `run`, whose JavaScript half calls actions given as functions.
+pub(crate) fn action_error_json(
+    rule: &str,
+    action: Option<&str>,
+    failure: &ActionFailure,
+    executed: Vec<String>,
+) -> String {
+    to_string(&cleanrules::format::write_error(&action_error(
+        rule, action, failure, executed,
+    )))
 }
 
 /// What an action threw, described, as the core error's cause: its JSON form
@@ -182,7 +192,7 @@ impl std::fmt::Display for Thrown {
 impl std::error::Error for Thrown {}
 
 impl RulesCore {
-    fn new(ruleset: RuleSet) -> Self {
+    pub(crate) fn new(ruleset: RuleSet) -> Self {
         Self {
             ruleset: Arc::new(ruleset),
         }
@@ -210,6 +220,16 @@ impl RulesCore {
     pub(crate) fn summary(&self, format: &Raw) -> Outcome<String> {
         let format = super::format(format, DocumentFormat::Text)?;
         Ok(write_summary_as(&summary(&self.ruleset), format)?)
+    }
+
+    /// The summary with the rules whose action is code marked (`actions`, in
+    /// rule order): its text by default, or a `"json"` or `"yaml"` document.
+    pub(crate) fn summary_with(&self, actions: Vec<bool>, format: &Raw) -> Outcome<String> {
+        let format = super::format(format, DocumentFormat::Text)?;
+        Ok(write_summary_as(
+            &summary(&self.ruleset).with_actions(actions),
+            format,
+        )?)
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -501,6 +521,55 @@ impl DecisionCore {
         let format = super::format(format, DocumentFormat::Text)?;
         self.with(|d| write_explanation_as(&explain(d), format))
     }
+
+    /// What the idiomatic API reads at once, in `out`'s encoding:
+    /// `[results, selected, output, failed]`, each result `[fired, truth,
+    /// payload or null]`; `output` is the single output (or `null`), and
+    /// `failed` says whether reading it fails (a multi-hit decision).
+    pub(crate) fn data(&self) -> String {
+        let results = self
+            .facts
+            .fired
+            .iter()
+            .zip(&self.facts.truths)
+            .zip(&self.facts.rule_outputs)
+            .map(|((fired, truth), output)| {
+                Json::Array(vec![
+                    Json::Bool(*fired),
+                    Json::String(truth_name(*truth).to_owned()),
+                    output
+                        .as_ref()
+                        .map_or(Json::Null, |pairs| super::out::pairs(pairs)),
+                ])
+            })
+            .collect();
+        let selected = self
+            .facts
+            .selected
+            .iter()
+            .map(|position| {
+                Json::Number(cleanrules::json::JsonNumber::from_literal(
+                    position.to_string(),
+                ))
+            })
+            .collect();
+        let (output, failed) = match &self.facts.output {
+            Ok(Some(value)) => (super::out::value(value), false),
+            Ok(None) => (Json::Null, false),
+            Err(_) => (Json::Null, true),
+        };
+        to_string(&Json::Array(vec![
+            Json::Array(results),
+            Json::Array(selected),
+            output,
+            Json::Bool(failed),
+        ]))
+    }
+
+    /// The explanation in `out`'s encoding (`out::explanation`).
+    pub(crate) fn explanation(&self) -> Outcome<String> {
+        self.with(|d| Ok(super::out::explanation(&explain(d))))
+    }
 }
 
 // --- Nodes ----------------------------------------------------------------
@@ -544,6 +613,16 @@ pub(crate) enum TreeKind {
 }
 
 impl NodeCore {
+    /// A node built in code.
+    pub(crate) fn new(node: Node) -> Self {
+        Self { node }
+    }
+
+    /// The core's node.
+    pub(crate) fn node(&self) -> &Node {
+        &self.node
+    }
+
     pub(crate) fn read(text: &[u8], options: Option<&RawOptions>) -> Outcome<Self> {
         let (format, limits) = read_options(options)?;
         let node = match format {

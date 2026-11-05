@@ -17,8 +17,11 @@
 //! to actions, so that an action that throws never leaves an exception pending
 //! in native code.
 //!
-//! The idiomatic TypeScript API (rule builders, operators) arrives in phase
-//! F.2, on top of these classes.
+//! The idiomatic API (`lib/api/`: conditions, rules, rule sets, decisions,
+//! explanations and summaries) builds on these classes and on a few internal
+//! functions (`build` in each front end), which build conditions and rules
+//! through the core's constructors and give values back in a private encoding
+//! (`common::out`).
 
 // napi-rs and wasm-bindgen hand arguments over by value, and napi-rs ties
 // JavaScript values to the lifetime of `&'env Env`: these two lints would ask
@@ -33,6 +36,13 @@ mod napi;
 mod wasm;
 
 #[cfg(not(target_arch = "wasm32"))]
+pub use napi::build::{
+    NativeRule, NodeList, RuleList, action_error_data, decision_data, explanation_data, node_arith,
+    node_between, node_children, node_compare, node_connective, node_constant, node_details,
+    node_field, node_is_in, node_matches, node_same_as, node_string_test, node_unary, rule_details,
+    rule_new, rule_set_new, summary_with,
+};
+#[cfg(not(target_arch = "wasm32"))]
 pub use napi::classes::{
     ActionCall, Aggregate, Decision, Document, DocumentKind, Format, HitPolicy, Limits, Node,
     ReadOptions, RuleSet, TreeOptions, Truth, ValueTreeOptions,
@@ -42,6 +52,13 @@ pub use napi::hooks::set_hooks;
 #[cfg(not(target_arch = "wasm32"))]
 pub use napi::{FORMAT_VERSION, decimal_problem, version};
 
+#[cfg(target_arch = "wasm32")]
+pub use wasm::build::{
+    NativeRule, NodeList, RuleList, action_error_data, decision_data, explanation_data, node_arith,
+    node_between, node_children, node_compare, node_connective, node_constant, node_details,
+    node_field, node_is_in, node_matches, node_same_as, node_string_test, node_unary, rule_details,
+    rule_new, rule_set_new, summary_with,
+};
 #[cfg(target_arch = "wasm32")]
 pub use wasm::classes::{Decision, Document, Node, RuleSet};
 #[cfg(target_arch = "wasm32")]

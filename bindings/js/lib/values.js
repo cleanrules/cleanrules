@@ -4,7 +4,9 @@
 // naive datetimes need `decimal`, `date` and `datetime`. The reader
 // (`lib/read.js`) recognises them by the brand `Symbol.for('cleanrules.marker')`
 // on their prototype, so markers made by another copy of the package work too.
-// Their final API shape is decided with the TypeScript API (phase F.2).
+// Values given back (*Values given back*) use the same classes, and
+// `ZonedDateTime` for aware datetimes, which the engine alone makes; each
+// reads back as the value it came from.
 
 /** The brand of marker values: its value names the kind. */
 const MARKER = Symbol.for('cleanrules.marker')
@@ -122,10 +124,112 @@ class NaiveDateTime {
   }
 }
 
+/** Only the engine makes `ZonedDateTime` values (`zoned`). */
+const ENGINE = Symbol('cleanrules.engine')
+
+/** `floor(a / b)` for bigints (division truncates toward zero). */
+function floorDiv(a, b) {
+  const q = a / b
+  return a % b !== 0n && a < 0n !== b < 0n ? q - 1n : q
+}
+
+/** An offset in seconds as `±HH:MM`, with `:SS` when the seconds are not zero. */
+function offsetText(seconds) {
+  const pad = (n) => String(n).padStart(2, '0')
+  const sign = seconds < 0 ? '-' : '+'
+  const total = Math.abs(seconds)
+  const [h, m, s] = [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60]
+  return `${sign}${pad(h)}:${pad(m)}${s === 0 ? '' : `:${pad(s)}`}`
+}
+
+/**
+ * An aware datetime as the engine gives it back: an instant, to the
+ * microsecond, with its local date and time in its IANA time zone or at a
+ * fixed offset. The same in every runtime (Node 22 has no Temporal); it
+ * converts to a `Date` and, where the runtime has Temporal, to a
+ * `Temporal.ZonedDateTime`, and reads back as the same value.
+ */
+class ZonedDateTime {
+  #text
+
+  constructor(engine, fields) {
+    if (engine !== ENGINE) {
+      throw new TypeError(
+        'ZonedDateTime values come from the engine; as input, pass a Date or a Temporal.ZonedDateTime',
+      )
+    }
+    const [text, year, month, day, hour, minute, second, microsecond, offsetSeconds, timeZone, epoch] = fields
+    this.#text = text
+    /** The local date and time: year, month (from 1), day, hour, minute, second and microsecond. */
+    this.year = year
+    this.month = month
+    this.day = day
+    this.hour = hour
+    this.minute = minute
+    this.second = second
+    this.microsecond = microsecond
+    /** The offset from UTC at this instant, in seconds. */
+    this.offsetSeconds = offsetSeconds
+    /** The IANA time zone, such as `"Europe/Madrid"`, or `null` for a fixed offset. */
+    this.timeZone = timeZone
+    /** The instant, in microseconds since 1970-01-01T00:00:00Z. */
+    this.epochMicroseconds = BigInt(epoch)
+    Object.freeze(this)
+  }
+
+  /** The instant as a `Date` (to the millisecond, rounded toward the past). */
+  toDate() {
+    return new Date(Number(floorDiv(this.epochMicroseconds, 1000n)))
+  }
+
+  /**
+   * The same instant as a `Temporal.ZonedDateTime`, in its IANA zone or at
+   * its offset. In a named zone its local fields follow the runtime's zone
+   * database (this object's follow the engine's bundled one). A `TypeError`
+   * where the runtime has no `Temporal`; a `RangeError` for an offset with
+   * seconds, which Temporal's offset zones (whole minutes) cannot hold.
+   */
+  toTemporal() {
+    const Temporal = globalThis.Temporal
+    if (typeof Temporal !== 'object' || Temporal === null) {
+      throw new TypeError(
+        'this runtime has no Temporal: use toDate(), or install a Temporal polyfill as globalThis.Temporal',
+      )
+    }
+    if (this.timeZone === null && this.offsetSeconds % 60 !== 0) {
+      throw new RangeError(
+        `the offset ${offsetText(this.offsetSeconds)} has seconds, which a Temporal.ZonedDateTime cannot hold; ` +
+          'use toDate(), or epochMicroseconds with offsetSeconds',
+      )
+    }
+    const instant = Temporal.Instant.fromEpochNanoseconds(this.epochMicroseconds * 1000n)
+    return instant.toZonedDateTimeISO(this.timeZone ?? offsetText(this.offsetSeconds))
+  }
+
+  /**
+   * The value as the JSON format writes it (RFC 9557): `2026-10-31T09:30:00+01:00[Europe/Madrid]`,
+   * or with a fixed offset, `Z` for UTC.
+   */
+  toString() {
+    return this.#text
+  }
+
+  /** `toString()`, for `JSON.stringify` (its `epochMicroseconds` is a bigint). */
+  toJSON() {
+    return this.#text
+  }
+}
+
+/** A `ZonedDateTime` of the engine, from the fields of `lib/output.js`. */
+function zoned(fields) {
+  return new ZonedDateTime(ENGINE, fields)
+}
+
 brand(Decimal, 'decimal')
 brand(Float, 'float')
 brand(LocalDate, 'date')
 brand(NaiveDateTime, 'naive_datetime')
+brand(ZonedDateTime, 'aware_datetime')
 
 /** `decimal("0.10")`: an exact decimal (JavaScript has none). */
 function decimal(text) {
@@ -153,9 +257,11 @@ export {
   LocalDate,
   MARKER,
   NaiveDateTime,
+  ZonedDateTime,
   date,
   datetime,
   decimal,
   float,
   setDecimalCheck,
+  zoned,
 }

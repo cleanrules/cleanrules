@@ -322,7 +322,7 @@ fn optional_options(
 /// A rule set; immutable, and shared by its decisions.
 #[napi]
 pub struct RuleSet {
-    core: RulesCore,
+    pub(crate) core: RulesCore,
 }
 
 impl RuleSet {
@@ -687,7 +687,7 @@ impl RuleSet {
             } else {
                 ActionFailure::Threw(detail)
             };
-            let error = action_error(&step, &failure, executed);
+            let error = action_error(&step.rule, Some(&step.action), &failure, executed);
             let cause =
                 cause.filter(|value| value.get_type().is_ok_and(|t| t != ValueType::Undefined));
             return Err(throw(env, &error, cause, Some(unknown(&decision))));
@@ -711,7 +711,7 @@ fn optional_limits(env: &Env, value: Option<Unknown<'_>>) -> Result<cleanrules::
 /// read with its rule set; immutable.
 #[napi]
 pub struct Decision {
-    core: DecisionCore,
+    pub(crate) core: DecisionCore,
 }
 
 #[napi]
@@ -831,7 +831,7 @@ impl Decision {
 /// A condition or value node; immutable.
 #[napi]
 pub struct Node {
-    core: NodeCore,
+    pub(crate) core: NodeCore,
 }
 
 impl Node {

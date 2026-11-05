@@ -58,4 +58,4 @@ function call(action, argument) {
   }
 }
 
-export { actions, call }
+export { actions, actions as registry, call }

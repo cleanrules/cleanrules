@@ -7,6 +7,7 @@
 //! half (`lib/`) is registered per module instance with [`set_hooks`], and an
 //! instance runs on one thread (a worker loads its own).
 
+pub(crate) mod build;
 pub(crate) mod classes;
 
 use std::cell::RefCell;

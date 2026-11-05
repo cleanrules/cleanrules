@@ -2,6 +2,8 @@
 //! results of the napi-rs build (`src/napi/classes.rs`, whose declarations
 //! are the package's types for both builds).
 
+use std::cell::OnceCell;
+
 use cleanrules::Segment;
 use js_sys::Array;
 use wasm_bindgen::prelude::*;
@@ -142,13 +144,13 @@ impl Document {
 /// A rule set; immutable, and shared by its decisions.
 #[wasm_bindgen]
 pub struct RuleSet {
-    core: RulesCore,
+    pub(crate) core: RulesCore,
     /// The field paths, made once: the reader keeps its path tree by them.
     paths: Array,
 }
 
 impl RuleSet {
-    fn from_core(core: RulesCore) -> Self {
+    pub(crate) fn from_core(core: RulesCore) -> Self {
         let paths = paths_to_js(&core.field_paths());
         Self { core, paths }
     }
@@ -423,7 +425,7 @@ impl RuleSet {
             } else {
                 cause
             };
-            let error = action_error(&step, &failure_kind, executed);
+            let error = action_error(&step.rule, Some(&step.action), &failure_kind, executed);
             return Err(core_error(&error, &cause, &decision));
         }
         Ok(decision)
@@ -436,7 +438,7 @@ impl RuleSet {
 /// read with its rule set; immutable.
 #[wasm_bindgen]
 pub struct Decision {
-    core: DecisionCore,
+    pub(crate) core: DecisionCore,
 }
 
 #[wasm_bindgen]
@@ -550,12 +552,26 @@ impl Decision {
 /// A condition or value node; immutable.
 #[wasm_bindgen]
 pub struct Node {
-    core: NodeCore,
-    /// The field paths, made once: the reader keeps its path tree by them.
-    paths: Array,
+    pub(crate) core: NodeCore,
+    /// The field paths, made once, when first read: the reader keeps its path
+    /// tree by them. Nodes built in code often never read data.
+    paths: OnceCell<Array>,
 }
 
 impl Node {
+    /// A node of the core, as a JavaScript object.
+    pub(crate) fn from_core(core: NodeCore) -> Self {
+        Self {
+            core,
+            paths: OnceCell::new(),
+        }
+    }
+
+    fn paths(&self) -> &Array {
+        self.paths
+            .get_or_init(|| paths_to_js(&self.core.field_paths()))
+    }
+
     fn native(
         &self,
         data: &JsValue,
@@ -568,7 +584,7 @@ impl Node {
         if data.is_undefined() {
             return Err(undefined_input());
         }
-        let native = read(data, &self.paths)?;
+        let native = read(data, self.paths())?;
         self.core
             .tree(kind, &native.read.value, &options)
             .map_err(|error| chained(&error, &native))
@@ -603,8 +619,7 @@ impl Node {
         let text = crate::common::text(raw(text), "the text").or_fail()?;
         let options = raw_options(options)?;
         let core = NodeCore::read(&text, options.as_ref()).or_fail()?;
-        let paths = paths_to_js(&core.field_paths());
-        Ok(Self { core, paths })
+        Ok(Self::from_core(core))
     }
 
     /// The node in `format`.

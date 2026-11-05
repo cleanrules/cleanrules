@@ -89,7 +89,7 @@
     "build:release": "napi build --platform --release --no-const-enum --js binding.cjs --dts binding.d.ts && node scripts/private-constructors.js",
     "build:wasm": "node scripts/build-wasm.js",
     "pretest": "npm run build",
-    "test": "node --test \"test/**/*.test.js\" && tsc --noEmit -p test/types",
+    "test": "node --test \"test/**/*.test.js\" && tsc --noEmit -p test/types && tsc --noEmit -p test/types/tsconfig.unchecked.json",
     "pretest:wasm": "npm run build:wasm",
     "test:wasm": "node --env-file=test/wasm.env --test \"test/**/*.test.js\"",
     "test:deno": "deno run --no-prompt test/deno/smoke.js && deno test --no-prompt --env-file=test/wasm.env --allow-read --allow-env test/",

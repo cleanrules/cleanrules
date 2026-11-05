@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url'
 import { Worker } from 'node:worker_threads'
 
 import cr, { build, deno, napiBuilt, native, root } from './support/cr.js'
+import { INTERNAL } from '../lib/wasm-ready.js'
 import { rules } from './support/probe.js'
 
 const EXAMPLES = path.join(import.meta.dirname, '..', '..', '..', 'docs', 'examples')
@@ -27,19 +28,78 @@ describe(`the package (${build})`, () => {
     assert.equal(cr.version, pkg.version)
   })
 
-  test('the root exports what is final; the native classes are in cleanrules/native', () => {
+  test('the root exports the idiomatic API; the native classes are in cleanrules/native', () => {
     assert.deepEqual(Object.keys(native).sort(), ['Decision', 'Document', 'FORMAT_VERSION', 'Node', 'RuleSet'])
-    for (const name of ['RuleSet', 'Document', 'Decision', 'Node']) {
-      assert.equal(root[name], undefined, name)
-    }
-    assert.equal(typeof root.MissingFieldError, 'function')
-    assert.equal(typeof root.decimal, 'function')
+    assert.deepEqual(Object.keys(root).sort(), [
+      'ActionContext',
+      'ActionError',
+      'Cause',
+      'CauseGroup',
+      'CleanRulesError',
+      'Const',
+      'Counterfactual',
+      'Decimal',
+      'Decision',
+      'EvaluationError',
+      'Explanation',
+      'Expr',
+      'ExpressionError',
+      'F',
+      'FORMAT_VERSION',
+      'Field',
+      'FieldUsage',
+      'Float',
+      'FormatError',
+      'HitPolicyError',
+      'LocalDate',
+      'MissingFieldError',
+      'NaiveDateTime',
+      'Note',
+      'Reason',
+      'RegistryError',
+      'Rule',
+      'RuleDefinitionError',
+      'RuleExplanation',
+      'RuleNotFoundError',
+      'RuleResult',
+      'RuleSet',
+      'RuleSummary',
+      'RuleSyntaxError',
+      'Summary',
+      'TypeMismatchError',
+      'UnsupportedError',
+      'ZonedDateTime',
+      'and',
+      'constant',
+      'date',
+      'datetime',
+      'decimal',
+      'field',
+      'float',
+      'not',
+      'or',
+      'version',
+    ])
+    // The root's RuleSet and Decision are the idiomatic ones, not the native classes.
+    assert.notEqual(root.RuleSet, native.RuleSet)
+    assert.notEqual(root.Decision, native.Decision)
+    assert.equal(root.Document, undefined)
+    assert.equal(root.Node, undefined)
   })
 
   const wasmBuilt = fs.existsSync(path.join(JS, 'wasm', 'cleanrules_bg.wasm'))
   const both = async () => [
     await import(pathToFileURL(path.join(JS, 'native.js')).href),
     await import(pathToFileURL(path.join(JS, 'native.wasm.js')).href),
+  ]
+  const roots = async () => [
+    await import(pathToFileURL(path.join(JS, 'index.js')).href),
+    await import(pathToFileURL(path.join(JS, 'index.wasm.js')).href),
+  ]
+  // The native layers themselves, internal functions included.
+  const layers = async () => [
+    (await import(pathToFileURL(path.join(JS, 'lib', 'napi.js')).href)).default,
+    (await import(pathToFileURL(path.join(JS, 'lib', 'wasm.js')).href)).default,
   ]
 
   test('both builds export the same names, classes and members', { skip: !(napiBuilt && wasmBuilt) }, async () => {
@@ -74,6 +134,116 @@ describe(`the package (${build})`, () => {
         name,
       )
     }
+    // The idiomatic API: each build makes its own classes, with the same members.
+    const [napiRoot, wasmRoot] = await roots()
+    for (const name of ['Expr', 'Field', 'Const', 'Rule', 'RuleSet', 'Decision']) {
+      assert.notEqual(napiRoot[name], wasmRoot[name], name)
+      assert.deepEqual(members(wasmRoot[name]), members(napiRoot[name]), name)
+    }
+    // The shared classes are the same objects.
+    for (const name of ['Explanation', 'Summary', 'ZonedDateTime', 'CleanRulesError']) {
+      assert.equal(napiRoot[name], wasmRoot[name], name)
+    }
+    // The internal functions and classes the API uses (`src/*/build.rs`).
+    const [napiLayer, wasmLayer] = await layers()
+    for (const name of INTERNAL) {
+      assert.equal(typeof napiLayer[name], 'function', `napi ${name}`)
+      assert.equal(typeof wasmLayer[name], 'function', `wasm ${name}`)
+    }
+    const internal = (layer) => Object.keys(layer).filter((name) => /^(node|rule|decision|explanation|summary|action)[A-Z]|^(NodeList|RuleList|NativeRule)$/.test(name)).sort()
+    assert.deepEqual(internal(napiLayer), [...INTERNAL].sort())
+    assert.deepEqual(internal(wasmLayer), [...INTERNAL].sort())
+    for (const name of ['NodeList', 'RuleList', 'NativeRule']) {
+      assert.deepEqual(
+        members(wasmLayer[name]).filter((member) => !WASM_ONLY.has(member)),
+        members(napiLayer[name]),
+        name,
+      )
+    }
+  })
+
+  test('objects of the two builds do not mix: a TypeError names the other build', { skip: !(napiBuilt && wasmBuilt) }, async () => {
+    const [napi, wasm] = await roots()
+    const mixed = (call, from) =>
+      assert.throws(call, (error) => {
+        assert.ok(error instanceof TypeError, String(error))
+        assert.match(error.message, new RegExp(`comes from the ${from} build of cleanrules`))
+        assert.match(error.message, /import everything from one entry point/)
+        return true
+      })
+    const napiNode = napi.F.x.gt(1)
+    const napiRule = new napi.Rule('r', napiNode)
+    mixed(() => new wasm.Rule('r', napiNode), 'Node addon')
+    mixed(() => new wasm.RuleSet([napiRule]), 'Node addon')
+    mixed(() => wasm.F.y.eq(napi.F.x), 'Node addon')
+    mixed(() => wasm.and(wasm.F.y, napiNode), 'Node addon')
+    mixed(() => wasm.F.y.sameAs(napiNode), 'Node addon')
+    mixed(() => wasm.F.y.isIn([napi.constant(1)]), 'Node addon')
+    mixed(() => new wasm.Rule('r', wasm.F.y, { v: napi.F.x }), 'Node addon')
+    mixed(() => new napi.Rule('r', wasm.F.x), 'WebAssembly')
+    // Within one build, nothing changes.
+    assert.ok(napi.F.x.gt(1).sameAs(napiNode))
+  })
+
+  test('both builds build, refuse and give back the same with the idiomatic API', { skip: !(napiBuilt && wasmBuilt) }, async () => {
+    const [napi, wasm] = await roots()
+    const calls = [
+      (r) => r.field(),
+      (r) => r.field('a', -1),
+      (r) => r.field(true),
+      (r) => r.F.x.gt(NaN),
+      (r) => r.F.x.gt(r.decimal('1e40')),
+      (r) => r.F.x.gt(2n ** 64n),
+      (r) => r.F.x.isIn([1, 'a']),
+      (r) => r.F.x.matches('('),
+      (r) => r.and(r.F.x),
+      (r) => r.F.x.add(1).and(r.F.y),
+      (r) => r.constant(null).not(),
+      (r) => new r.Rule('r', r.F.x.add(1)),
+      (r) => new r.Rule('r', r.F.x, { v: r.F.y.gt(1) }),
+      (r) => new r.Rule('r', r.F.x, null, { do: '' }),
+      (r) => new r.Rule('r', r.F.x, null, { priority: 2n ** 63n }),
+      (r) => new r.Rule('r', r.F.x, null, { metadata: { d: r.decimal('1e40') } }),
+      (r) => new r.RuleSet([], { hitPolicy: 'last' }),
+      (r) => new r.RuleSet([], { aggregate: 'sum' }),
+      (r) => new r.RuleSet([], { logic: 'fuzzy' }),
+      (r) => new r.RuleSet([], { strict: 1 }),
+      (r) => new r.RuleSet([new r.Rule('a', r.F.x), new r.Rule('a', r.F.y)]),
+      (r) => new r.RuleSet([new r.Rule('a', r.F.x, null, { do: 'n' })]).bind({}),
+      (r) => new r.RuleSet([new r.Rule('a', r.F.x, null, { do: () => { throw new Error('boom') } })]).run({ x: true }),
+      (r) => new r.RuleSet([new r.Rule('a', r.F.x)], { hitPolicy: 'rule_order' }).evaluate({ x: true }).output,
+      (r) => new r.RuleSet([new r.Rule('a', r.F.x)]).evaluate({ x: true }).whyNot('b'),
+      (r) => new r.RuleSet([new r.Rule('a', r.F.x)]).rule('b'),
+      (r) => new r.RuleSet([new r.Rule('a', r.F.x)]).toJSON(),
+      (r) => r.F.x.between(1, 2, { close: 'left' }),
+    ]
+    const outcome = (call, r) => {
+      try {
+        call(r)
+        return 'no error'
+      } catch (error) {
+        return `${error.constructor.name}: ${error.message} (${error.hint})`
+      }
+    }
+    for (const call of calls) {
+      const expected = outcome(call, napi)
+      assert.notEqual(expected, 'no error', String(call))
+      assert.equal(outcome(call, wasm), expected, String(call))
+    }
+    // What comes back, explanations and summaries included.
+    const result = (r) => {
+      const rules = new r.RuleSet([
+        new r.Rule('a', r.F.x.gt(10).and(r.F.d.lt(r.date(2026, 1, 1))), { v: r.F.x, d: r.F.d, z: r.F.z }, { metadata: { m: [1, 2n ** 60n] } }),
+        new r.Rule('b', r.F.x.between(0, 5)),
+      ])
+      const decision = rules.evaluate({ x: 8, d: r.date(2026, 2, 1), z: new Date(0) })
+      const explanation = decision.explain()
+      return JSON.stringify(
+        [decision.toJSON(), explanation.toJSON(), String(explanation), explanation.rules.map(String), rules.summary().toJSON(), String(rules.summary()), rules.get('a').metadata],
+        (_, value) => (typeof value === 'bigint' ? `${value}n` : value),
+      )
+    }
+    assert.equal(result(wasm), result(napi))
   })
 
   test('both builds throw the same errors, of the same classes', { skip: !(napiBuilt && wasmBuilt) }, async () => {

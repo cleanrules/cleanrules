@@ -13,7 +13,8 @@ import { setDecimalCheck } from './values.js'
  * (Node's `util.types`), or `null` where there are none.
  */
 export function install(native, types) {
-  const classes = [native.Document, native.RuleSet, native.Decision, native.Node]
+  // The native classes, and those the idiomatic API uses internally.
+  const classes = [native.Document, native.RuleSet, native.Decision, native.Node, native.NodeList, native.RuleList, native.NativeRule]
   // The engine's own objects passed as data are opaque.
   useTypes(types, classes)
   setDecimalCheck(native.decimalProblem)
