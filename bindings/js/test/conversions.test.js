@@ -437,7 +437,9 @@ describe('objects', () => {
         new Map([['k', 1]]),
         new Date(0),
         vm.runInContext('new Set([1])', realm),
-        vm.runInContext('new Error("e")', realm),
+        // Without util.types, an Error from another realm is known only
+        // through Error.isError, which Node 22 lacks (see the README).
+        ...(typeof Error.isError === 'function' ? [vm.runInContext('new Error("e")', realm)] : []),
         vm.runInContext('Object("s")', realm),
         vm.runInContext('new WeakSet()', realm),
         vm.runInContext('new Map([["k", 1]])', realm),
