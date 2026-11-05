@@ -27,7 +27,7 @@ use crate::ast::{Kind, Node};
 use crate::error::{Error, ErrorCode, Result};
 use crate::json::Limits;
 use crate::logic::LogicName;
-use crate::rules::{Aggregate, Config, HitPolicy, Rule, RuleSet};
+use crate::rules::{Aggregate, Config, HitPolicy, Rule, RuleSet, unknown_name};
 use crate::text::{cell_text, check_keys};
 use crate::value::Value;
 
@@ -134,16 +134,9 @@ impl TableConfig {
         logic: Option<&str>,
         strict: bool,
     ) -> Result<Self> {
-        let unknown = |what: &str, name: &str, known: &str| {
-            Error::new(
-                ErrorCode::RuleDefinitionError,
-                format!("unknown {what} {name:?}"),
-            )
-            .with_hint(format!("use {known}"))
-        };
         Ok(Self {
             hit_policy: TablePolicy::from_name(hit_policy).ok_or_else(|| {
-                unknown(
+                unknown_name(
                     "hit policy",
                     hit_policy,
                     "first, priority, unique, any, rule_order, output_order or collect",
@@ -152,7 +145,7 @@ impl TableConfig {
             aggregate: aggregate
                 .map(|name| {
                     Aggregate::from_name(name)
-                        .ok_or_else(|| unknown("aggregate", name, "sum, min, max or count"))
+                        .ok_or_else(|| unknown_name("aggregate", name, "sum, min, max or count"))
                 })
                 .transpose()?,
             logic: logic.map(LogicName::from_name).transpose()?,

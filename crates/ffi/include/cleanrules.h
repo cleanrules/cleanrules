@@ -88,6 +88,10 @@ typedef struct cr_limits cr_limits;
 // One node: a condition or a value, as in a rule's `when` or payload.
 typedef struct cr_node cr_node;
 
+// A rule: a name, a condition, a payload and descriptive data. It never
+// changes: each `cr_rule_with_*` gives a new rule.
+typedef struct cr_rule cr_rule;
+
 // A rule set, ready to evaluate.
 typedef struct cr_ruleset cr_ruleset;
 
@@ -408,6 +412,26 @@ cr_status cr_decision_explain(const struct cr_decision *decision,
                               size_t *len,
                               struct cr_error **error);
 
+// The decision's explanation (`spec/explain.md`) as a new value, freed with
+// `cr_value_free`, for bindings that build objects of it: the structure of
+// the explanation document (`spec/json-format.md`, *Explanations*: the map
+// under `explanation`, with `hit_policy`, `logic`, `selected` and `rules`),
+// where values are the values themselves (an opaque one keeps its token), a
+// cause's `condition` is the JSON text of its node, a truth is a boolean or
+// null, and a gap is a number or a map of `days` or `microseconds` to an int.
+// It adds two keys to the document's: `text`, the part of the explanation's
+// text of each rule and of each cause, and `holds`, whether each cause went
+// the way its rule needed. Maps may gain keys in later versions.
+//
+// # Safety
+//
+// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to
+// a writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_decision_explain_value(const struct cr_decision *decision,
+                                    struct cr_value **out,
+                                    struct cr_error **error);
+
 // Whether the rule at position `rule` fired: its condition passed the logic's
 // activation test (`spec/rules.md`).
 //
@@ -662,6 +686,32 @@ const char *cr_error_json(const struct cr_error *error);
 // `error` is `NULL` or a live `cr_error`. The message lives as long as it.
 const char *cr_error_message(const struct cr_error *error);
 
+// A new `action_error` (`spec/rules.md`, *Actions*), made by the core as for
+// every binding that runs actions itself (Java's and JavaScript's idiomatic
+// `run`): the action of `rule` (named `action`, or `NULL` for an action
+// given as code) threw what `detail` describes, after the actions of the
+// rules in `executed` (`NULL`, or a list of strings) had run. The error has
+// the message, the hint and the JSON form the core writes, with `rule`,
+// `executed` and the detail as `cause`; it is given through `out`, owned by
+// the caller and freed with `cr_error_free`. The call's own failures go to
+// `error`.
+//
+// # Safety
+//
+// `rule`, `action` and `detail` are `NULL` or point to as many readable
+// bytes as their lengths say; `executed` is `NULL` or a live `cr_value`;
+// `out` is `NULL` or points to a writable `cr_error *`; `error` is `NULL` or
+// points to a writable `cr_error *` set to `NULL`.
+cr_status cr_error_new_action(const char *rule,
+                              size_t rule_len,
+                              const char *action,
+                              size_t action_len,
+                              const char *detail,
+                              size_t detail_len,
+                              const struct cr_value *executed,
+                              struct cr_error **out,
+                              struct cr_error **error);
+
 // The parent of an error code in the hierarchy of `spec/errors.md`
 // (`CR_FORMAT_ERROR` for `CR_LIMIT_EXCEEDED`); `CR_OK` for a code
 // without a parent and for any other number.
@@ -766,6 +816,41 @@ cr_status cr_limits_set(struct cr_limits *limits,
                         size_t value,
                         struct cr_error **error);
 
+// A copy of the node's child at `index`, in order (a comparison's left then
+// right, `between`'s operand, low and high), freed with `cr_node_free`.
+//
+// # Safety
+//
+// `node` is `NULL` or a live `cr_node`; `out` is `NULL` or points to a
+// writable `cr_node *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_node_child(const struct cr_node *node,
+                        size_t index,
+                        struct cr_node **out,
+                        struct cr_error **error);
+
+// The number of the node's direct children; 0 for `NULL`.
+//
+// # Safety
+//
+// `node` is `NULL` or a live `cr_node`.
+size_t cr_node_children_len(const struct cr_node *node);
+
+// The node's own data, as a new value freed with `cr_value_free`: a field's
+// path (a list of strings and ints), a constant's value, the values of an
+// `in` (a list, sorted), `between`'s `closed` (`both`, `left`, `right` or
+// `none`), the pattern of `matches` and the text of a string test (strings);
+// a null for every other node.
+//
+// # Safety
+//
+// `node` is `NULL` or a live `cr_node`; `out` is `NULL` or points to a
+// writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_node_detail(const struct cr_node *node,
+                         struct cr_value **out,
+                         struct cr_error **error);
+
 // Evaluate a node as a condition on an input (`spec/ast.md`, *Evaluating one
 // node*: `evaluate_tree`), under a logic by name (`boolean` for `NULL`; an
 // unknown one is `CR_REGISTRY_ERROR`), strict or not: its result tree as JSON
@@ -827,6 +912,214 @@ cr_status cr_node_field_paths(const struct cr_node *node,
 // `node` is `NULL` or a `cr_node` from this library, not freed before.
 void cr_node_free(struct cr_node *node);
 
+// A hash of the node's structure, equal for nodes that `cr_node_same` finds
+// identical (so `0.0` and `-0.0`, or the decimals `1.0` and `1.00`, hash
+// alike). It is the same on every platform and in every run for one version
+// of the library, but may change between versions: never store it. 0 for
+// `NULL`.
+//
+// # Safety
+//
+// `node` is `NULL` or a live `cr_node`.
+uint64_t cr_node_hash(const struct cr_node *node);
+
+// Where the node may appear (`spec/ast.md`, *Node kinds*): `condition`,
+// `value` or `any` (a field or a boolean constant), a static string; `NULL`
+// for `NULL`.
+//
+// # Safety
+//
+// `node` is `NULL` or a live `cr_node`.
+const char *cr_node_kind(const struct cr_node *node);
+
+// The absolute value of a number.
+//
+// # Safety
+//
+// As `cr_node_new_not`.
+cr_status cr_node_new_abs(const struct cr_node *operand,
+                          struct cr_node **out,
+                          struct cr_error **error);
+
+// The conjunction of `len` conditions, at least two after flattening: an
+// operand that is an `and` is spliced in (`spec/ast.md`, `and`, `or`).
+//
+// # Safety
+//
+// `operands` is `NULL` or points to `len` readable pointers, each `NULL` or a
+// live `cr_node`; `out` is `NULL` or points to a writable `cr_node *`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_node_new_and(const struct cr_node *const *operands,
+                          size_t len,
+                          struct cr_node **out,
+                          struct cr_error **error);
+
+// Arithmetic `left op right`, `op` one of `add`, `sub`, `mul` and `div`
+// (`CR_INVALID_ARGUMENT` otherwise).
+//
+// # Safety
+//
+// As `cr_node_new_compare`.
+cr_status cr_node_new_arith(const char *op,
+                            size_t op_len,
+                            const struct cr_node *left,
+                            const struct cr_node *right,
+                            struct cr_node **out,
+                            struct cr_error **error);
+
+// A range test `low <= operand <= high`; `closed` names the ends included:
+// `both` (also for `NULL`), `left`, `right` or `none` (`CR_INVALID_ARGUMENT`
+// otherwise).
+//
+// # Safety
+//
+// `operand`, `low` and `high` are `NULL` or live `cr_node`s; `closed` is
+// `NULL` or points to `closed_len` readable bytes; `out` is `NULL` or points
+// to a writable `cr_node *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_node_new_between(const struct cr_node *operand,
+                              const struct cr_node *low,
+                              const struct cr_node *high,
+                              const char *closed,
+                              size_t closed_len,
+                              struct cr_node **out,
+                              struct cr_error **error);
+
+// A comparison `left op right`, with `op` one of `eq`, `ne`, `lt`, `le`,
+// `gt`, `ge` (`CR_INVALID_ARGUMENT` otherwise). The operands are copied and
+// stay the caller's, as in every constructor.
+//
+// # Safety
+//
+// `op` is `NULL` or points to `op_len` readable bytes; `left` and `right` are
+// `NULL` or live `cr_node`s; `out` is `NULL` or points to a writable
+// `cr_node *`; `error` is `NULL` or points to a writable `cr_error *` set to
+// `NULL`.
+cr_status cr_node_new_compare(const char *op,
+                              size_t op_len,
+                              const struct cr_node *left,
+                              const struct cr_node *right,
+                              struct cr_node **out,
+                              struct cr_error **error);
+
+// A constant (`spec/ast.md`, `const`): a copy of `value`, which stays the
+// caller's. A list, a map, an opaque value, or a null with the reason
+// `CR_REASON_INT_OVERFLOW`, `CR_REASON_DECIMAL_OVERFLOW` or
+// `CR_REASON_READ_ERROR` is a `CR_EXPRESSION_ERROR` (`spec/data-model.md`,
+// *Constants*). A value cannot hold a NaN or a datetime finer than a
+// microsecond, which a binding rejects before it builds the value.
+//
+// # Safety
+//
+// `value` is `NULL` or a live `cr_value`; `out` is `NULL` or points to a
+// writable `cr_node *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_node_new_constant(const struct cr_value *value,
+                               struct cr_node **out,
+                               struct cr_error **error);
+
+// A field (`spec/ast.md`, `field`): `path` is a list of strings (keys, never
+// split at dots) and ints from 0 (indexes), as `cr_node_field_paths` gives
+// them; it stays the caller's. An empty path, an empty key, or a segment of
+// another kind (a negative int, a boolean...) is a `CR_EXPRESSION_ERROR`; a
+// `path` that is not a list is `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `path` is `NULL` or a live `cr_value`; `out` is `NULL` or points to a
+// writable `cr_node *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_node_new_field(const struct cr_value *path,
+                            struct cr_node **out,
+                            struct cr_error **error);
+
+// Membership in constants (`spec/ast.md`, `in`): `values` is a list, copied,
+// whose items are checked as `cr_node_new_constant` checks one, then by the core
+// (non-empty, no null, one type group); they are kept sorted and without
+// repeats. A `values` that is not a list is `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `operand` is `NULL` or a live `cr_node`; `values` is `NULL` or a live
+// `cr_value`; `out` is `NULL` or points to a writable `cr_node *`; `error` is
+// `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_node_new_is_in(const struct cr_node *operand,
+                            const struct cr_value *values,
+                            struct cr_node **out,
+                            struct cr_error **error);
+
+// Whether a value is null: never unknown, and the only place for the null
+// constant.
+//
+// # Safety
+//
+// As `cr_node_new_not`.
+cr_status cr_node_new_is_null(const struct cr_node *operand,
+                              struct cr_node **out,
+                              struct cr_error **error);
+
+// A regular expression search, in the syntax of Rust's `regex` crate: no
+// lookaround, no backreferences (a pattern that does not compile is a
+// `CR_EXPRESSION_ERROR`).
+//
+// # Safety
+//
+// `operand` is `NULL` or a live `cr_node`; `pattern` is `NULL` or points to
+// `len` readable bytes; `out` is `NULL` or points to a writable `cr_node *`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_node_new_matches(const struct cr_node *operand,
+                              const char *pattern,
+                              size_t len,
+                              struct cr_node **out,
+                              struct cr_error **error);
+
+// The negation of a number.
+//
+// # Safety
+//
+// As `cr_node_new_not`.
+cr_status cr_node_new_neg(const struct cr_node *operand,
+                          struct cr_node **out,
+                          struct cr_error **error);
+
+// The negation of a condition.
+//
+// # Safety
+//
+// `operand` is `NULL` or a live `cr_node`; `out` is `NULL` or points to a
+// writable `cr_node *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_node_new_not(const struct cr_node *operand,
+                          struct cr_node **out,
+                          struct cr_error **error);
+
+// The disjunction of `len` conditions, at least two after flattening.
+//
+// # Safety
+//
+// As `cr_node_new_and`.
+cr_status cr_node_new_or(const struct cr_node *const *operands,
+                         size_t len,
+                         struct cr_node **out,
+                         struct cr_error **error);
+
+// A literal string test, `op` one of `starts_with`, `ends_with` and
+// `contains` (`CR_INVALID_ARGUMENT` otherwise).
+//
+// # Safety
+//
+// `op` is `NULL` or points to `op_len` readable bytes; `operand` is `NULL` or
+// a live `cr_node`; `text` is `NULL` or points to `len` readable bytes; `out`
+// is `NULL` or points to a writable `cr_node *`; `error` is `NULL` or points
+// to a writable `cr_error *` set to `NULL`.
+cr_status cr_node_new_string_test(const char *op,
+                                  size_t op_len,
+                                  const struct cr_node *operand,
+                                  const char *text,
+                                  size_t len,
+                                  struct cr_node **out,
+                                  struct cr_error **error);
+
 // Read a node in JSON or YAML (`spec/json-format.md`, *Conditions*: the node
 // itself, not a document), or in the rule syntax (`spec/text.md`, *Conditions
 // and values*), such as `customer.years > 5` or `order.total * 0.9`.
@@ -843,6 +1136,25 @@ cr_status cr_node_read(const char *text,
                        struct cr_node **out,
                        struct cr_error **error);
 
+// Whether two nodes are structurally identical (`spec/ast.md`, *Structural
+// identity*): the same shape, tags and constants, compared by type and value
+// (`0.0` and `-0.0`, or the decimals `1.0` and `1.00`, are the same). False
+// when either is `NULL`.
+//
+// # Safety
+//
+// `left` and `right` are `NULL` or live `cr_node`s.
+bool cr_node_same(const struct cr_node *left,
+                  const struct cr_node *right);
+
+// The node's tag (`spec/ast.md`, *Catalogue*), such as `gt` or `and`, a
+// static string; `NULL` for `NULL`.
+//
+// # Safety
+//
+// `node` is `NULL` or a live `cr_node`.
+const char *cr_node_tag(const struct cr_node *node);
+
 // Write a node in JSON or YAML (the node itself), or in the rule syntax.
 //
 // # Safety
@@ -855,6 +1167,141 @@ cr_status cr_node_write(const struct cr_node *node,
                         char **out,
                         size_t *len,
                         struct cr_error **error);
+
+// Free a rule. `NULL` is ignored. Rule sets made with it keep their own copy.
+//
+// # Safety
+//
+// `rule` is `NULL` or a `cr_rule` from this library, not freed before.
+void cr_rule_free(struct cr_rule *rule);
+
+// The rule's metadata as the core keeps it: a new map, freed with
+// `cr_value_free`.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `out` is `NULL` or points to a
+// writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_rule_metadata(const struct cr_rule *rule,
+                           struct cr_value **out,
+                           struct cr_error **error);
+
+// A rule with a name and a condition, and nothing else: priority 0, no
+// payload, tags, description, metadata or action. The condition is copied.
+// An empty name, or a value as the condition, is a
+// `CR_RULE_DEFINITION_ERROR`; the null constant, a `CR_EXPRESSION_ERROR`.
+//
+// # Safety
+//
+// `name` is `NULL` or points to `name_len` readable bytes; `when` is `NULL`
+// or a live `cr_node`; `out` is `NULL` or points to a writable `cr_rule *`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_rule_new(const char *name,
+                      size_t name_len,
+                      const struct cr_node *when,
+                      struct cr_rule **out,
+                      struct cr_error **error);
+
+// The rule's tags as the core keeps them, sorted and without repeats: a new
+// list of strings, freed with `cr_value_free`.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `out` is `NULL` or points to a
+// writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_rule_tags(const struct cr_rule *rule,
+                       struct cr_value **out,
+                       struct cr_error **error);
+
+// The rule naming its action, which a program resolves in its registry
+// (`spec/rules.md`, *Actions*). An empty name is a
+// `CR_RULE_DEFINITION_ERROR`.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `name` is `NULL` or points to `len`
+// readable bytes; `out` is `NULL` or points to a writable `cr_rule *`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_rule_with_action(const struct cr_rule *rule,
+                              const char *name,
+                              size_t len,
+                              struct cr_rule **out,
+                              struct cr_error **error);
+
+// The rule with a description.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `text` is `NULL` or points to `len`
+// readable bytes; `out` is `NULL` or points to a writable `cr_rule *`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_rule_with_description(const struct cr_rule *rule,
+                                   const char *text,
+                                   size_t len,
+                                   struct cr_rule **out,
+                                   struct cr_error **error);
+
+// The rule with this metadata instead of its own: `metadata` is a map of
+// data values (copied), in its order. An opaque value or a null with a
+// reason other than `CR_REASON_NULL` anywhere in it is a
+// `CR_RULE_DEFINITION_ERROR` that names where; a `metadata` that is not a
+// map, `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `metadata` is `NULL` or a live
+// `cr_value`; `out` is `NULL` or points to a writable `cr_rule *`; `error` is
+// `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_rule_with_metadata(const struct cr_rule *rule,
+                                const struct cr_value *metadata,
+                                struct cr_rule **out,
+                                struct cr_error **error);
+
+// The rule with `key` in its payload, given `value` (copied): a new key goes
+// last, and a key it has keeps its place and takes the new value. A
+// condition as the value is a `CR_RULE_DEFINITION_ERROR`.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `key` is `NULL` or points to
+// `key_len` readable bytes; `value` is `NULL` or a live `cr_node`; `out` is
+// `NULL` or points to a writable `cr_rule *`; `error` is `NULL` or points to
+// a writable `cr_error *` set to `NULL`.
+cr_status cr_rule_with_payload(const struct cr_rule *rule,
+                               const char *key,
+                               size_t key_len,
+                               const struct cr_node *value,
+                               struct cr_rule **out,
+                               struct cr_error **error);
+
+// The rule with a priority, for the `priority` hit policy.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `out` is `NULL` or points to a
+// writable `cr_rule *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_rule_with_priority(const struct cr_rule *rule,
+                                int64_t priority,
+                                struct cr_rule **out,
+                                struct cr_error **error);
+
+// The rule with these tags instead of its own: `tags` is a list of strings,
+// which the rule keeps sorted and without repeats (`cr_rule_tags`). An item
+// that is not a string is a `CR_RULE_DEFINITION_ERROR`; a `tags` that is not
+// a list, `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `tags` is `NULL` or a live
+// `cr_value`; `out` is `NULL` or points to a writable `cr_rule *`; `error` is
+// `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_rule_with_tags(const struct cr_rule *rule,
+                            const struct cr_value *tags,
+                            struct cr_rule **out,
+                            struct cr_error **error);
 
 // The rule set's aggregate (`sum`, `min`, `max`, `count`), a static string;
 // `NULL` when it has none, and for `NULL`. With one, the single output of a
@@ -989,6 +1436,32 @@ size_t cr_ruleset_len(const struct cr_ruleset *ruleset);
 // `ruleset` is `NULL` or a live `cr_ruleset`.
 const char *cr_ruleset_logic(const struct cr_ruleset *ruleset);
 
+// A rule set of `len` rules, in order (copied; they stay the caller's), with
+// a hit policy, an aggregate and a logic by name, as in JSON
+// (`spec/rules.md`; the core's `Config::from_names`): `NULL` leaves each out,
+// which is `first`, no aggregate and `boolean`. An unknown hit policy or aggregate, a repeated rule name or
+// an aggregate without `collect` is a `CR_RULE_DEFINITION_ERROR`; an unknown
+// logic, a `CR_REGISTRY_ERROR`.
+//
+// # Safety
+//
+// `rules` is `NULL` or points to `len` readable pointers, each `NULL` or a
+// live `cr_rule`; `hit_policy`, `aggregate` and `logic` are `NULL` or point
+// to as many readable bytes as their lengths say; `out` is `NULL` or points
+// to a writable `cr_ruleset *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_ruleset_new(const struct cr_rule *const *rules,
+                         size_t len,
+                         const char *hit_policy,
+                         size_t hit_policy_len,
+                         const char *aggregate,
+                         size_t aggregate_len,
+                         const char *logic,
+                         size_t logic_len,
+                         bool strict,
+                         struct cr_ruleset **out,
+                         struct cr_error **error);
+
 // Read a rule set in `format` (`CR_FORMAT_*`): a rule set, a decision table,
 // which is compiled, or one rule (`cr_ruleset_from_document`).
 //
@@ -1038,6 +1511,21 @@ cr_status cr_ruleset_rule_name(const struct cr_ruleset *ruleset,
                                size_t *len,
                                struct cr_error **error);
 
+// The position of the rule named `name`, for a lookup by name: a name the
+// rule set lacks is a `CR_RULE_NOT_FOUND` with the name and the rule names
+// (`available`, sorted).
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`; `name` is `NULL` or points to
+// `len` readable bytes; `out` is `NULL` or points to a writable `size_t`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_ruleset_rule_position(const struct cr_ruleset *ruleset,
+                                   const char *name,
+                                   size_t len,
+                                   size_t *out,
+                                   struct cr_error **error);
+
 // Evaluate the rule set on an input, then call the actions of the selected
 // rules, in rule order (`spec/rules.md`, *Actions*). Every action the rule set
 // names must be registered, which is checked before evaluating, so nothing
@@ -1084,6 +1572,26 @@ cr_status cr_ruleset_summary(const struct cr_ruleset *ruleset,
                              char **out,
                              size_t *len,
                              struct cr_error **error);
+
+// The rule set's summary, as `cr_ruleset_summary` gives it, with the rules
+// whose action is code of the program marked (`spec/explain.md`,
+// *Summaries*): `actions` holds one flag per rule, in rule order, or none
+// (`actions_len` 0); a rule that names its action is marked anyway. Another
+// number of flags, or `NULL` with flags, is `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`; `actions` is `NULL` or points
+// to `actions_len` readable `bool`s; `out` is `NULL` or points to a writable
+// `char *`; `len` is `NULL` or points to a writable `size_t`; `error` is
+// `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_ruleset_summary_actions(const struct cr_ruleset *ruleset,
+                                     const bool *actions,
+                                     size_t actions_len,
+                                     cr_format format,
+                                     char **out,
+                                     size_t *len,
+                                     struct cr_error **error);
 
 // Write a rule set in `format` (`CR_FORMAT_*`): JSON, YAML or the rule syntax.
 //

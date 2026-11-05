@@ -408,6 +408,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   those from native data when it evaluates a node; and `cr_ruleset_logic`, the
   rule set's logic as a static string, like `cr_ruleset_hit_policy`. C++:
   `ruleset::logic()` and `node::field_paths()` (both overloads).
+- Idiomatic Java API (task G.1b, package `io.github.cleanrules`): conditions
+  built with static imports and methods (`Conditions.field`, `constant`,
+  `and`, `or`, `not`; `Expr` with `eq`...`ge`, `and`, `or`, `not`, `isIn`,
+  `between` with `Closed`, `isNull`, `matches`, `startsWith`, `endsWith`,
+  `contains`, `add`, `sub`, `mul`, `div`, `neg`, `abs`; `Field` with `path()`
+  and `at(...)`, `Const` with `value()`), Java values as constants, the core's
+  checks and messages, and the node's `tag()`, `kind()`, `children()`,
+  `walk()`, `fieldPaths()`, `toJson()` and text; `equals` and `hashCode` are
+  structural identity, with the core's platform-independent hash. Rules as
+  immutable steps (`Rule.named(name).when(condition).then(key, value)
+  .priority(n).tags(...).description(...).metadata(...).action(name or
+  code)`); `RuleSet.of(...)` and `RuleSet.builder()` (hit policy, aggregate,
+  logic, strict), an `Iterable<Rule>` with `get(name)`, `rule(name)` (the
+  core's `RuleNotFoundException`), `evaluate`, `evaluateMany`,
+  `readDecision`, `bind`, `run` (with or without `Limits`) and `summary()`;
+  `Decision` (`AutoCloseable`, closing optional: `results()`, `selected()`,
+  `fired()`, `outputs()`, `output()`, `aggregated()`, `explain()`,
+  `whyNot(name)`, `toJson()`), `RuleResult`, `Action` and `ActionContext`,
+  with the core's `action_error`; explanations and summaries as objects
+  (`Explanation`, `RuleExplanation`, `Requirement`, `Cause` with
+  `Cause.FieldValue`, `CauseGroup` with `GroupKind`, `Counterfactual` with a
+  gap as a number, a `Period` of days or a `Duration`, `Note` with
+  `NoteKind`, `Reason`, `Status`, `Summary`, `RuleSummary`, `FieldUsage` with
+  `FieldUsage.Payload`), with the core's texts as `toString()`. Example
+  `docs/examples/DiscountRules.java`, run by a test.
+- C ABI, to build in code (task G.1b), with the core's checks and errors:
+  `cr_node_new_field`, `cr_node_new_constant`, `cr_node_new_compare`,
+  `cr_node_new_and`, `cr_node_new_or`, `cr_node_new_not`, `cr_node_new_is_in`,
+  `cr_node_new_between`, `cr_node_new_is_null`, `cr_node_new_matches`,
+  `cr_node_new_string_test`, `cr_node_new_arith`, `cr_node_new_abs` and
+  `cr_node_new_neg`; what a node says about itself (`cr_node_tag`,
+  `cr_node_kind`, `cr_node_children_len`, `cr_node_child`, `cr_node_detail`,
+  `cr_node_same`, and `cr_node_hash`, FNV-1a over a fixed-width
+  little-endian encoding, the same on every platform for one version); rules
+  (`cr_rule`: `cr_rule_new`, `cr_rule_with_payload`, `cr_rule_with_priority`,
+  `cr_rule_with_tags`, `cr_rule_with_description`, `cr_rule_with_metadata`,
+  `cr_rule_with_action`, `cr_rule_tags`, `cr_rule_metadata`,
+  `cr_rule_free`); `cr_ruleset_new`; `cr_ruleset_rule_position`, a lookup by
+  name whose miss is the core's `rule_not_found`; `cr_ruleset_summary_actions`,
+  the summary with the rules whose action is code marked;
+  `cr_decision_explain_value`, the explanation document's structure as a
+  value with the texts of each rule and cause and `holds`
+  (`spec/json-format.md`, *Explanations*); and `cr_error_new_action`, the
+  core's `action_error` for bindings that run actions themselves. The C
+  example `docs/examples/discounts.c` builds a rule with them. C++:
+  `node::field`, `constant`, `compare`, `arith`, `and_` and `or_` (named nodes
+  and temporaries), `not_`, `is_in`, `between`, `is_null`, `matches`,
+  `string_test`, `abs`, `neg`, and `tag()`, `kind()`, `children()`,
+  `detail()`, `same_as()`, `hash()`, with `std::hash` and `std::equal_to`;
+  `rule` with `make` and `with_*`; `ruleset::make` with `ruleset_settings`,
+  `rule_position` and `summary(actions, format)`; `decision::explanation()`.
+- Core: `RuleSet::rule_position`, the lookup of a rule by name, with the
+  `rule_not_found` error (`no rule named "x"`, the names there are);
+  `Config::from_names`, a rule set's settings by name (whose hints
+  `TableConfig::from_names` shares); `Rule::with_payload_entry` and
+  `Rule::try_metadata`, which checks that metadata is data;
+  `rules::action_error` and `ActionFailure`, the `action_error` of an action a
+  binding ran, now shared by JavaScript (same messages) and the C ABI; and
+  `format::explanation_value`, the explanation as a value with its texts.
+- Specification: in Java, `equals` and `hashCode` of nodes are structural
+  identity (`spec/ast.md`); the Java values given back include constants,
+  metadata, explanation values and gaps (`spec/data-model.md`); the C ABI's
+  explanation value (`spec/json-format.md`, *Explanations*).
 - WebAssembly build of the JavaScript binding (task F.1b): the same npm
   package `cleanrules` runs in browsers, Deno (2.6 or later) and other runtimes
   on a WebAssembly module built with wasm-bindgen, with the same API as the
@@ -610,6 +673,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Java: `ActionException.decision()` is the idiomatic `Decision` of
+  `RuleSet.run` (task G.1b); the native layer's decision, from
+  `io.github.cleanrules.ffi.RuleSet.run`, is `nativeDecision()`.
 - The license is now the Apache License 2.0 (it was MIT), with a NOTICE that
   names Jose L. Salmeron as the author and that every redistribution, and
   every derived work, must keep (section 4(d) of the license).

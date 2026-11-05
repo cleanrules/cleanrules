@@ -9,16 +9,21 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** docs/examples/Discounts.java runs as its comment says, with the source launcher. */
+/** docs/examples/Discounts.java and DiscountRules.java run as their comments say, with the source launcher. */
 class ExampleTest {
-    /** The example's output, run with the source launcher and {@code options}. */
+    /** The output of docs/examples/Discounts.java, run with the source launcher and {@code options}. */
     private static String run(String... options) throws Exception {
+        return runExample("Discounts.java", options);
+    }
+
+    /** The output of an example, run with the source launcher and {@code options}. */
+    private static String runExample(String example, String... options) throws Exception {
         Path examples = Path.of(System.getProperty("cleanrules.examples"));
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         command.add("-Dcleanrules.library.path=" + System.getProperty("cleanrules.library.path"));
         command.addAll(List.of(options));
-        command.add(examples.resolve("Discounts.java").toString());
+        command.add(examples.resolve(example).toString());
         command.add(examples.resolve("discounts.rules").toString());
         Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
         String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -42,6 +47,26 @@ class ExampleTest {
                 "--add-modules",
                 "io.github.cleanrules");
         check(output);
+        assertTrue(!output.contains("WARNING"), output);
+    }
+
+    @Test
+    void theIdiomaticExampleRunsOnTheModulePath() throws Exception {
+        String output = runExample(
+                "DiscountRules.java",
+                "--enable-native-access=io.github.cleanrules",
+                "--illegal-native-access=deny",
+                "--module-path",
+                System.getProperty("cleanrules.module"),
+                "--add-modules",
+                "io.github.cleanrules");
+        List<String> lines = output.lines().toList();
+        assertEquals("discount: 0.15", lines.get(0), output);
+        assertEquals("fired: vip, loyal", lines.get(1), output);
+        assertTrue(lines.contains("HIT POLICY priority: selected vip"), output);
+        assertTrue(lines.contains("vip: order.total > 1000 is false; needs gt, short by 100.00"), output);
+        assertTrue(lines.contains("notify_sales for vip: 0.15"), output);
+        assertEquals("missing_field in rule adult: [customer, age]", lines.getLast(), output);
         assertTrue(!output.contains("WARNING"), output);
     }
 

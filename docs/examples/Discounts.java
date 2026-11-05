@@ -56,7 +56,7 @@ public class Discounts {
                 }));
             } catch (ActionException error) {
                 System.out.println(error.code() + " in " + error.rule().orElseThrow() + ": " + error.getCause().getMessage());
-                error.decision().ifPresent(Decision::close);
+                error.nativeDecision().ifPresent(Decision::close);
             }
         }
 

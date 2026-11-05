@@ -11,6 +11,7 @@
 #include <string>
 #include <thread>
 #include <type_traits>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -515,6 +516,80 @@ void grids_nodes_and_batches() {
     }
 }
 
+void building() {
+    // Conditions, rules and rule sets built in code, checked by the core.
+    auto years = cr::node::field(cr::value::list({"customer", "years"}));
+    auto total = cr::node::field(cr::value::list({"order", "total"}));
+    auto old = cr::node::compare("gt", years, cr::node::constant(5));
+    // Named nodes and temporaries mix.
+    auto vip_when = cr::node::and_({old, cr::node::compare("gt", total, cr::node::constant(1000))});
+    CHECK(vip_when.write(cr::format::text) == "customer.years > 5 AND order.total > 1000");
+    CHECK(vip_when.tag() == "and");
+    CHECK(vip_when.kind() == "condition");
+    CHECK(years.kind() == "any");
+    auto children = vip_when.children();
+    CHECK(children.size() == 2);
+    CHECK(children[0].same_as(cr::node::compare("gt", years, cr::node::constant(5))));
+    CHECK(children[0].hash() == cr::node::compare("gt", years, cr::node::constant(5)).hash());
+    CHECK(!children[0].same_as(children[1]));
+    CHECK(years.detail()[1].as_string() == "years");
+    auto country = cr::node::field(cr::value::list({"country"}));
+    auto in = cr::node::is_in(country, cr::value::list({"PT", "ES"}));
+    CHECK(in.write(cr::format::text) == "country IN (\"ES\", \"PT\")");
+    CHECK(cr::node::between(years, cr::node::constant(1), cr::node::constant(3), "left").detail()
+              .as_string() == "left");
+    CHECK(cr::node::not_(cr::node::is_null(years)).write(cr::format::text) ==
+          "NOT customer.years IS NULL");
+    CHECK(cr::node::string_test("starts_with", country, "E").tag() == "starts_with");
+    CHECK(cr::node::matches(country, "^E").tag() == "matches");
+    auto price = cr::node::neg(cr::node::abs(cr::node::arith("mul", total, cr::node::constant(2))));
+    CHECK(price.kind() == "value");
+    CHECK_THROWS(cr::node::compare("gt", vip_when, years), cr::expression_error);
+    CHECK_THROWS(cr::node::or_({years}), cr::expression_error);
+    CHECK_THROWS(cr::node::constant(cr::value::list({1})), cr::expression_error);
+    CHECK_THROWS(cr::node::compare("near", years, total), cr::invalid_argument_error);
+    cr::error_info error;
+    CHECK(!cr::node::matches(country, "(?=a)", error));
+    CHECK(error.code() == cr::errc::expression_error);
+
+    auto vip = cr::rule::make("vip", vip_when)
+                   .with_payload("discount", cr::node::constant(cr::value::decimal("0.15")))
+                   .with_priority(10)
+                   .with_tags(cr::value::list({"b", "a", "b"}))
+                   .with_description("big spenders")
+                   .with_metadata(cr::value::map({{"owner", "sales"}}))
+                   .with_action("notify");
+    CHECK(vip.tags().size() == 2);
+    CHECK(vip.tags()[0].as_string() == "a");
+    CHECK(vip.metadata()["owner"].as_string() == "sales");
+    auto loyal = cr::rule::make("loyal", cr::node::compare("gt", years, cr::node::constant(2)))
+                     .with_payload("discount", cr::node::constant(cr::value::decimal("0.05")));
+    CHECK_THROWS(cr::rule::make("", vip_when), cr::rule_definition_error);
+    CHECK_THROWS(loyal.with_payload("ok", vip_when), cr::rule_definition_error);
+    auto rules = cr::ruleset::make({vip, loyal}, cr::ruleset_settings{"priority", {}, {}, false});
+    std::unordered_set<cr::node> nodes;
+    nodes.insert(cr::node::compare("gt", years, cr::node::constant(5)));
+    nodes.insert(cr::node::compare("gt", years, cr::node::constant(5)));
+    nodes.insert(years.children().empty() ? cr::node::constant(1) : cr::node::constant(2));
+    CHECK(nodes.size() == 2);
+    CHECK(nodes.count(old) == 1);
+    CHECK(rules.hit_policy() == "priority");
+    CHECK(rules.rule_position("loyal") == 1);
+    CHECK_THROWS(rules.rule_position("nope"), cr::rule_not_found_error);
+    CHECK_THROWS(cr::ruleset::make({vip, vip}), cr::rule_definition_error);
+    CHECK(!cr::ruleset::make({vip}, {"best", {}, {}, false}, error));
+    CHECK(error.code() == cr::errc::rule_definition_error);
+    CHECK(rules.summary(std::vector<bool>{false, true}, cr::format::json).find(R"("action":true)") !=
+          std::string::npos);
+    auto decision = rules.evaluate(input(3, 1200));
+    CHECK(decision.selected() == std::vector<std::size_t>{1});
+    auto explanation = decision.explanation();
+    CHECK(explanation["hit_policy"].as_string() == "priority");
+    CHECK(explanation["rules"][0]["status"].as_string() == "not_fired");
+    CHECK(explanation["rules"][1]["requirement"]["holds"].as_bool());
+    CHECK(decision.explain().find(explanation["rules"][1]["text"].as_string()) != std::string::npos);
+}
+
 }  // namespace
 
 int main() {
@@ -525,5 +600,6 @@ int main() {
     errors();
     actions();
     grids_nodes_and_batches();
+    building();
     return check::report("api");
 }

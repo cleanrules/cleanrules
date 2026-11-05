@@ -29,6 +29,38 @@ fn rule_error(rule: &str, message: impl Into<String>) -> Error {
     error
 }
 
+fn check_payload_value(rule: &str, key: &str, value: &Node) -> Result<()> {
+    if value.kind() == Kind::Condition {
+        return Err(rule_error(
+            rule,
+            format!(
+                "the payload value {key:?} is a condition ('{}')",
+                value.tag()
+            ),
+        )
+        .with_hint("payload values are constants or value expressions"));
+    }
+    Ok(())
+}
+
+/// Where, in metadata at `at`, the first value that is not data is, said in words.
+fn not_data(value: &Value, at: &str) -> Option<String> {
+    match value {
+        Value::Null(cause) if *cause != NullCause::Null => {
+            Some(format!("{at} is out of range or unreadable"))
+        }
+        Value::Opaque(opaque) => Some(format!("{at} is not a data value: a {}", opaque.type_name)),
+        Value::List(items) => items
+            .iter()
+            .enumerate()
+            .find_map(|(i, item)| not_data(item, &format!("{at}[{i}]"))),
+        Value::Map(map) => map
+            .iter()
+            .find_map(|(key, item)| not_data(item, &format!("{at}[{key:?}]"))),
+        _ => None,
+    }
+}
+
 impl Rule {
     /// A rule with a name and a condition, and no payload.
     ///
@@ -75,16 +107,7 @@ impl Rule {
         }
         let mut payload: Vec<(String, Node)> = Vec::with_capacity(then.len());
         for (key, value) in then {
-            if value.kind() == Kind::Condition {
-                return Err(rule_error(
-                    &name,
-                    format!(
-                        "the payload value {key:?} is a condition ('{}')",
-                        value.tag()
-                    ),
-                )
-                .with_hint("payload values are constants or value expressions"));
-            }
+            check_payload_value(&name, &key, &value)?;
             match payload.iter_mut().find(|(k, _)| *k == key) {
                 Some(entry) => entry.1 = value,
                 None => payload.push((key, value)),
@@ -131,6 +154,41 @@ impl Rule {
     pub fn metadata(mut self, metadata: Map) -> Self {
         self.metadata = metadata;
         self
+    }
+
+    /// Set the metadata, checked to be data: an opaque value, or a null that
+    /// stands for a native value out of range or unreadable, is not.
+    ///
+    /// # Errors
+    ///
+    /// `rule_definition_error` naming where the first value that is not data
+    /// is, such as `metadata["who"][0]`.
+    pub fn try_metadata(self, metadata: Map) -> Result<Self> {
+        let problem = metadata
+            .iter()
+            .find_map(|(key, item)| not_data(item, &format!("metadata[{key:?}]")));
+        if let Some(problem) = problem {
+            return Err(rule_error(&self.name, problem).with_hint(
+                "metadata holds data: null, booleans, numbers, strings, dates, lists and maps",
+            ));
+        }
+        Ok(self.metadata(metadata))
+    }
+
+    /// The rule with `key` in its payload, given `value`: a new key goes last,
+    /// a key it has keeps its place and takes the new value.
+    ///
+    /// # Errors
+    ///
+    /// As [`Rule::with_payload`], for a value that is a condition.
+    pub fn with_payload_entry(mut self, key: impl Into<String>, value: Node) -> Result<Self> {
+        let key = key.into();
+        check_payload_value(&self.name, &key, &value)?;
+        match self.then.iter_mut().find(|(k, _)| *k == key) {
+            Some(entry) => entry.1 = value,
+            None => self.then.push((key, value)),
+        }
+        Ok(self)
     }
 
     /// Name the rule's action, which a binding resolves in its action registry
@@ -302,6 +360,107 @@ pub struct Config {
     pub strict: bool,
 }
 
+/// The error of a setting named `name` that is not one of `known`.
+pub(crate) fn unknown_name(what: &str, name: &str, known: &str) -> Error {
+    Error::new(
+        ErrorCode::RuleDefinitionError,
+        format!("unknown {what} {name:?}"),
+    )
+    .with_hint(format!("use {known}"))
+}
+
+impl Config {
+    /// A configuration from the names of its settings, as in JSON
+    /// (`spec/json-format.md`, *Rule sets*): `None` leaves each out, which is
+    /// `first`, no aggregate and `boolean`.
+    ///
+    /// # Errors
+    ///
+    /// `rule_definition_error` for an unknown hit policy or aggregate, and
+    /// `registry_error` for an unknown logic.
+    pub fn from_names(
+        hit_policy: Option<&str>,
+        aggregate: Option<&str>,
+        logic: Option<&str>,
+        strict: bool,
+    ) -> Result<Self> {
+        Ok(Self {
+            hit_policy: hit_policy
+                .map(|name| {
+                    HitPolicy::from_name(name).ok_or_else(|| {
+                        unknown_name(
+                            "hit policy",
+                            name,
+                            "first, priority, unique, any, rule_order or collect",
+                        )
+                    })
+                })
+                .transpose()?
+                .unwrap_or_default(),
+            aggregate: aggregate
+                .map(|name| {
+                    Aggregate::from_name(name)
+                        .ok_or_else(|| unknown_name("aggregate", name, "sum, min, max or count"))
+                })
+                .transpose()?,
+            logic: Some(logic.map_or(Ok(LogicName::Boolean), LogicName::from_name)?),
+            strict,
+        })
+    }
+}
+
+/// How an action failed when a binding ran it (`spec/rules.md`, *Actions*).
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub enum ActionFailure {
+    /// It threw; the text describes what, such as `IOException: down`.
+    Threw(String),
+    /// It returned a promise (JavaScript): actions are synchronous.
+    Promise,
+}
+
+/// What an action threw, as the cause of its `action_error`.
+#[derive(Debug)]
+struct Thrown(String);
+
+impl std::fmt::Display for Thrown {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for Thrown {}
+
+/// The `action_error` of the action of `rule` that failed when a binding ran
+/// it (`spec/rules.md`, *Actions*), after the actions of the rules in
+/// `executed` ran; `action` is its name, or `None` for an action given as
+/// code. The description of what failed is the error's cause.
+#[must_use]
+pub fn action_error(
+    rule: &str,
+    action: Option<&str>,
+    failure: &ActionFailure,
+    executed: Vec<String>,
+) -> Error {
+    let action = action.map_or_else(|| "action".to_owned(), |name| format!("action {name:?}"));
+    let (message, detail) = match failure {
+        ActionFailure::Threw(detail) => (
+            format!("the {action} of rule {rule:?} threw {detail}"),
+            detail.clone(),
+        ),
+        ActionFailure::Promise => (
+            format!("the {action} of rule {rule:?} returned a Promise; actions are synchronous"),
+            "a Promise".to_owned(),
+        ),
+    };
+    let mut error = Error::new(ErrorCode::ActionError, message)
+        .with_hint("later actions did not run; the error carries the decision")
+        .caused_by(Thrown(detail));
+    error.context_mut().rule = Some(rule.to_owned());
+    error.context_mut().executed = executed;
+    error
+}
+
 /// Rules evaluated together under a hit policy.
 #[derive(Clone, Debug)]
 pub struct RuleSet {
@@ -379,6 +538,28 @@ impl RuleSet {
     #[must_use]
     pub fn rules(&self) -> &[Rule] {
         &self.rules
+    }
+
+    /// The position of the rule named `name`, for a lookup by name.
+    ///
+    /// # Errors
+    ///
+    /// `rule_not_found` when no rule has that name, with the name and the
+    /// rule names, sorted.
+    pub fn rule_position(&self, name: &str) -> Result<usize> {
+        if let Some(position) = self.rules.iter().position(|rule| rule.name == name) {
+            return Ok(position);
+        }
+        let mut available: Vec<String> = self.rules.iter().map(|r| r.name.clone()).collect();
+        available.sort();
+        let mut error = Error::new(ErrorCode::RuleNotFound, format!("no rule named {name:?}"));
+        if !available.is_empty() {
+            error = error.with_hint(format!("the rules are: {}", available.join(", ")));
+        }
+        let context = error.context_mut();
+        context.name = Some(name.to_owned());
+        context.available = available;
+        Err(error)
     }
 
     /// The hit policy.
@@ -812,6 +993,112 @@ mod tests {
     }
 
     #[test]
+    fn steps_names_and_action_errors() {
+        use super::{ActionFailure, action_error};
+        use crate::logic::LogicName;
+        use crate::value::Opaque;
+        let gt = || field("x").gt(1).build().unwrap();
+        let rule = Rule::new("r", gt())
+            .unwrap()
+            .with_payload_entry("a", constant(1).build().unwrap())
+            .unwrap()
+            .with_payload_entry("b", constant(2).build().unwrap())
+            .unwrap()
+            .with_payload_entry("a", constant(3).build().unwrap())
+            .unwrap();
+        let keys: Vec<&str> = rule.then().iter().map(|(k, _)| k.as_str()).collect();
+        assert_eq!(keys, ["a", "b"]);
+        assert_eq!(
+            rule.clone()
+                .with_payload_entry("c", gt())
+                .unwrap_err()
+                .code(),
+            ErrorCode::RuleDefinitionError
+        );
+        let mut inner = Map::new();
+        inner.insert(
+            "t",
+            Value::Opaque(Opaque {
+                type_name: "Thread".into(),
+                token: 1,
+            }),
+        );
+        let mut metadata = Map::new();
+        metadata.insert("ok", Value::Int(1));
+        metadata.insert("who", Value::List(vec![Value::Map(inner)]));
+        let error = rule.clone().try_metadata(metadata).unwrap_err();
+        assert_eq!(
+            error.message(),
+            "metadata[\"who\"][0][\"t\"] is not a data value: a Thread"
+        );
+        assert_eq!(error.context().rule.as_deref(), Some("r"));
+        let mut overflow = Map::new();
+        overflow.insert("n", Value::Null(crate::value::NullCause::IntOverflow));
+        assert!(
+            rule.clone()
+                .try_metadata(overflow)
+                .unwrap_err()
+                .message()
+                .contains("out of range")
+        );
+        let mut fine = Map::new();
+        fine.insert("n", Value::Null(crate::value::NullCause::Null));
+        assert_eq!(rule.try_metadata(fine).unwrap().get_metadata().len(), 1);
+
+        let config = Config::from_names(Some("collect"), Some("sum"), None, true).unwrap();
+        assert_eq!(config.hit_policy, HitPolicy::Collect);
+        assert_eq!(config.aggregate, Some(Aggregate::Sum));
+        assert_eq!(config.logic, Some(LogicName::Boolean));
+        assert!(config.strict);
+        assert_eq!(
+            Config::from_names(None, None, None, false)
+                .unwrap()
+                .hit_policy,
+            HitPolicy::First
+        );
+        let error = Config::from_names(Some("best"), None, None, false).unwrap_err();
+        assert_eq!(error.message(), "unknown hit policy \"best\"");
+        assert_eq!(
+            error.hint(),
+            Some("use first, priority, unique, any, rule_order or collect")
+        );
+        assert_eq!(
+            Config::from_names(None, Some("avg"), None, false)
+                .unwrap_err()
+                .hint(),
+            Some("use sum, min, max or count")
+        );
+        assert_eq!(
+            Config::from_names(None, None, Some("fuzzy"), false)
+                .unwrap_err()
+                .code(),
+            ErrorCode::RegistryError
+        );
+
+        let error = action_error(
+            "r",
+            Some("log"),
+            &ActionFailure::Threw("boom".into()),
+            vec!["q".into()],
+        );
+        assert_eq!(error.code(), ErrorCode::ActionError);
+        assert_eq!(
+            error.message(),
+            "the action \"log\" of rule \"r\" threw boom"
+        );
+        assert_eq!(error.context().executed, ["q"]);
+        let error = action_error("r", None, &ActionFailure::Promise, vec![]);
+        assert_eq!(
+            error.message(),
+            "the action of rule \"r\" returned a Promise; actions are synchronous"
+        );
+        assert_eq!(
+            std::error::Error::source(&error).map(ToString::to_string),
+            Some("a Promise".into())
+        );
+    }
+
+    #[test]
     fn rule_construction() {
         let gt = || field("x").gt(1).build().unwrap();
         assert_eq!(
@@ -854,6 +1141,15 @@ mod tests {
             (Some("r"), Some("notify"))
         );
         assert_eq!(context.available, ["log", "zz"]);
+        assert_eq!(ruleset.rule_position("r").unwrap(), 1);
+        let error = ruleset.rule_position("nope").unwrap_err();
+        assert_eq!(error.code(), ErrorCode::RuleNotFound);
+        assert_eq!(error.message(), "no rule named \"nope\"");
+        assert_eq!(error.hint(), Some("the rules are: q, r"));
+        assert_eq!(error.context().name.as_deref(), Some("nope"));
+        assert_eq!(error.context().available, ["q", "r"]);
+        let empty = RuleSet::new(vec![], Config::default()).unwrap();
+        assert_eq!(empty.rule_position("x").unwrap_err().hint(), None);
         let twice = vec![Rule::new("r", gt()).unwrap(), Rule::new("r", gt()).unwrap()];
         assert_eq!(
             RuleSet::new(twice, Config::default()).unwrap_err().code(),

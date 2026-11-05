@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use cleanrules::explain::explain;
 use cleanrules::format::{
-    ValueContext, parse_as, read_parsed_decision_document, read_value, write_decision_as,
-    write_explanation_as, write_value,
+    ValueContext, explanation_value, parse_as, read_parsed_decision_document, read_value,
+    write_decision_as, write_explanation_as, write_value,
 };
 use cleanrules::json::{Json, Limits, parse_bytes, to_string};
 use cleanrules::logic::Truth;
@@ -391,6 +391,39 @@ pub unsafe extern "C" fn cr_decision_explain(
     };
     // SAFETY: `error` is NULL or writable (# Safety).
     unsafe { call("cr_decision_explain", error, body) }
+}
+
+/// The decision's explanation (`spec/explain.md`) as a new value, freed with
+/// `cr_value_free`, for bindings that build objects of it: the structure of
+/// the explanation document (`spec/json-format.md`, *Explanations*: the map
+/// under `explanation`, with `hit_policy`, `logic`, `selected` and `rules`),
+/// where values are the values themselves (an opaque one keeps its token), a
+/// cause's `condition` is the JSON text of its node, a truth is a boolean or
+/// null, and a gap is a number or a map of `days` or `microseconds` to an int.
+/// It adds two keys to the document's: `text`, the part of the explanation's
+/// text of each rule and of each cause, and `holds`, whether each cause went
+/// the way its rule needed. Maps may gain keys in later versions.
+///
+/// # Safety
+///
+/// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to
+/// a writable `cr_value *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_decision_explain_value(
+    decision: *const cr_decision,
+    out: *mut *mut cr_value,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `decision` is NULL or live (# Safety).
+        let decision = unsafe { handle(decision, "decision") }?;
+        let value = decision.with(|d| Ok(explanation_value(&explain(d))))?;
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { give_new_value(out, value) }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_decision_explain_value", error, body) }
 }
 
 /// A copy of a decision that the caller owns, freed with `cr_decision_free`:

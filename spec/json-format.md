@@ -676,6 +676,12 @@ between datetimes, with `n` an int value (*Values*), so a large one is written
 The text of `explain()` is generated from the same structure (`explain.md`,
 *Text*); it is not part of the JSON document.
 
+The C ABI also gives an explanation as a value (`cr_decision_explain_value`),
+for bindings that build objects of it: the same structure, with the values
+themselves instead of their JSON encoding, a cause's `condition` as the JSON
+text of its node, and two added keys, `text` on each rule explanation and each
+cause (its part of the text) and `holds` on each cause.
+
 **Reserved for later versions.** Graded explanations (phase J) will add the
 rule set's `alpha` to the explanation, a rule's degree, and graded fields on
 causes (such as the degree reached and the degree needed), as optional keys.

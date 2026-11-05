@@ -22,7 +22,7 @@ use crate::{cr_format, cr_status};
 
 /// One node: a condition or a value, as in a rule's `when` or payload.
 pub struct cr_node {
-    node: Node,
+    pub(crate) node: Node,
 }
 
 /// Read a node in JSON or YAML (`spec/json-format.md`, *Conditions*: the node

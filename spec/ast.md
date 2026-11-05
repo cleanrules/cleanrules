@@ -106,7 +106,9 @@ hashable `structural_key` in Python, and their idiomatic equivalents).
 
 In languages with operator overloading, `==` on a node builds an `eq` node (as
 it does in polars and SQLAlchemy), so structural identity always has its own
-method, and nodes keep identity hashing.
+method, and nodes keep identity hashing. In Java, which has no operator overloading
+(comparisons are methods such as `eq`), `equals` and `hashCode` are structural
+identity.
 
 ## Evaluation semantics
 

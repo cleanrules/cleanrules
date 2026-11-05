@@ -53,6 +53,16 @@ public final class Decision implements AutoCloseable {
         return new Decision(copy, opaques);
     }
 
+    /** The handle, for the idiomatic API ({@code Bridge}). */
+    Handle handle() {
+        return handle;
+    }
+
+    /** The objects of the opaque values, by token, for the idiomatic API. */
+    List<Object> opaques() {
+        return opaques;
+    }
+
     private <T> T with(java.util.function.Function<MemorySegment, T> call) {
         MemorySegment pointer = handle.acquire();
         try {

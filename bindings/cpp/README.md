@@ -280,7 +280,38 @@ value it comes from changes, moves or is destroyed; `clone()` makes it a
 `ruleset::evaluate_many` returns a `batch`, whose `decision_ref`s live as long
 as it, and `clone()` keeps one longer; `read_decision` reads a recorded one
 back. A `node` evaluates on its own: `evaluate_tree(input, logic, strict)`
-and `evaluate_value_tree(input, strict)`.
+and `evaluate_value_tree(input, strict)`. `decision.explanation()` gives the
+explanation as a `value`: the explanation document's structure with the
+values themselves, and the `text` of each rule and cause and whether each
+cause `holds` (`cr_decision_explain_value`).
+
+## Building in code
+
+The C ABI's constructors, checked by the core (an `expression_error` or a
+`rule_definition_error` for what breaks a construction rule):
+
+```cpp
+auto years = cr::node::field(cr::value::list({"customer", "years"}));
+auto total = cr::node::field(cr::value::list({"order", "total"}));
+auto old = cr::node::compare("gt", years, cr::node::constant(5));
+auto vip = cr::rule::make("vip", cr::node::and_({old, cr::node::compare("gt", total, cr::node::constant(1000))}))
+               .with_payload("discount", cr::node::constant(cr::value::decimal("0.15")))
+               .with_priority(10)
+               .with_action("notify_sales");
+auto rules = cr::ruleset::make({vip}, cr::ruleset_settings{"priority", {}, {}, false});
+auto position = rules.rule_position("vip");  // rule_not_found_error otherwise
+```
+
+`node::` `field`, `constant`, `compare` and `arith` (by tag), `and_` and
+`or_` (named nodes and temporaries), `not_`, `is_null`, `abs`, `neg`, `is_in`, `between`,
+`matches` and `string_test`; a node's `tag()`, `kind()`, `children()`,
+`detail()`, `same_as()` and `hash()` (the same on every platform for one
+version of the library), with `std::hash` and `std::equal_to` for unordered
+containers. `rule::make(name, when)` and its
+`with_*` steps, each a new rule, with `tags()` and `metadata()`.
+`ruleset::make(rules, settings)` takes `ruleset_settings` (the same as a
+decision table's `table_settings`), and `ruleset::summary(actions, format)` marks the rules
+whose action is code.
 
 ## Actions
 

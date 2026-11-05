@@ -1252,6 +1252,12 @@ public:
     std::string explain(error_info &error) const { return explain_(format::text, &error); }
     std::string explain(format f, error_info &error) const { return explain_(f, &error); }
 
+    // The explanation as a value, to build objects of it: the explanation
+    // document's structure with the values themselves, and the `text` of each
+    // rule and cause and whether each cause `holds` (`cr_decision_explain_value`).
+    CLEANRULES_THROWING([[nodiscard]] value explanation() const { return explanation_(nullptr); })
+    [[nodiscard]] value explanation(error_info &error) const { return explanation_(&error); }
+
     // A copy that owns itself, to keep beyond what lends this one.
     [[nodiscard]] cleanrules::decision clone() const;
 
@@ -1296,6 +1302,11 @@ private:
         return text(sink, [&](char **o, std::size_t *n, cr_error **e) {
             return cr_decision_explain(raw(), static_cast<cr_format>(f), o, n, e);
         });
+    }
+    value explanation_(error_info *sink) const {
+        cr_value *out = nullptr;
+        check(sink, [&](cr_error **e) { return cr_decision_explain_value(raw(), &out, e); });
+        return value::adopt(out);
     }
 };
 
@@ -1616,10 +1627,46 @@ private:
     detail::owned<cr_document, cr_document_free> handle_;
 };
 
+class rule;
+struct table_settings;
+
+// A rule passed to `ruleset::make`: a named rule or a temporary, which lives
+// until the call returns.
+class rule_ref {
+public:
+    rule_ref(const rule &r) noexcept : ptr_(&r) {}
+    const rule &get() const noexcept { return *ptr_; }
+
+private:
+    const rule *ptr_;
+};
+
+// Rules passed to `ruleset::make`, in order: `{vip, loyal}`.
+using rule_refs = std::vector<rule_ref>;
+
 // A rule set, ready to evaluate.
 class ruleset {
 public:
     ruleset() noexcept = default;
+
+    // A rule set of rules built in code, in order (copied), with the hit
+    // policy, aggregate and logic of `settings` (empty: `first`, none and
+    // `boolean`); defined after `rule`.
+    CLEANRULES_THROWING([[nodiscard]] static ruleset make(const rule_refs &rules);)
+    CLEANRULES_THROWING([[nodiscard]] static ruleset make(const rule_refs &rules,
+                                                          const table_settings &settings);)
+    [[nodiscard]] static ruleset make(const rule_refs &rules, error_info &error);
+    [[nodiscard]] static ruleset make(const rule_refs &rules, const table_settings &settings,
+                                      error_info &error);
+
+    // The position of the rule named `name`; a `rule_not_found_error`, with
+    // the names there are, when there is none.
+    CLEANRULES_THROWING(std::size_t rule_position(std::string_view name) const {
+        return rule_position_(name, nullptr);
+    })
+    std::size_t rule_position(std::string_view name, error_info &error) const {
+        return rule_position_(name, &error);
+    }
 
     // Read a rule set: a rule set, a decision table (compiled), or one rule.
     CLEANRULES_THROWING([[nodiscard]] static ruleset read(std::string_view text, format f) {
@@ -1695,6 +1742,16 @@ public:
     })
     std::string summary(error_info &error) const { return summary_(format::text, &error); }
     std::string summary(format f, error_info &error) const { return summary_(f, &error); }
+
+    // The summary with the rules whose action is code of the program marked:
+    // one flag per rule, in rule order.
+    CLEANRULES_THROWING(std::string summary(const std::vector<bool> &actions,
+                                            format f = format::text) const {
+        return summary_actions_(actions, f, nullptr);
+    })
+    std::string summary(const std::vector<bool> &actions, format f, error_info &error) const {
+        return summary_actions_(actions, f, &error);
+    }
 
     // The paths of the input that the rule set reads: a list of paths, each a
     // list of strings (keys) and ints (indexes).
@@ -1834,6 +1891,26 @@ private:
             return cr_ruleset_summary(raw(), static_cast<cr_format>(f), o, n, e);
         });
     }
+    static ruleset make_(const rule_refs &rules, const table_settings &s, error_info *sink);
+    std::size_t rule_position_(std::string_view name, error_info *sink) const {
+        std::size_t position = 0;
+        detail::check(sink, [&](cr_error **e) {
+            return cr_ruleset_rule_position(raw(), name.data(), name.size(), &position, e);
+        });
+        return position;
+    }
+    std::string summary_actions_(const std::vector<bool> &actions, format f,
+                                 error_info *sink) const {
+        // `std::vector<bool>` packs its bits: the flags are copied to bools.
+        std::unique_ptr<bool[]> flags(new bool[actions.size() + 1]);
+        for (std::size_t i = 0; i < actions.size(); ++i) {
+            flags[i] = actions[i];
+        }
+        return detail::text(sink, [&](char **o, std::size_t *n, cr_error **e) {
+            return cr_ruleset_summary_actions(raw(), flags.get(), actions.size(),
+                                              static_cast<cr_format>(f), o, n, e);
+        });
+    }
     value field_paths_(error_info *sink) const {
         cr_value *out = nullptr;
         detail::check(sink, [&](cr_error **e) { return cr_ruleset_field_paths(raw(), &out, e); });
@@ -1960,10 +2037,225 @@ public:
     CLEANRULES_THROWING([[nodiscard]] value field_paths() const { return field_paths_(nullptr); })
     [[nodiscard]] value field_paths(error_info &error) const { return field_paths_(&error); }
 
+    // --- Building (spec/ast.md, *Construction rules*): the core checks each
+    // node and throws an `expression_error` for one it rejects. Operands are
+    // copied.
+
+    // An operand of `and_` and `or_`: a named node or a temporary, which lives
+    // until the call returns.
+    class ref {
+    public:
+        ref(const node &n) noexcept : ptr_(&n) {}
+        const node &get() const noexcept { return *ptr_; }
+
+    private:
+        const node *ptr_;
+    };
+    // Operands of `and_` and `or_`, in order: `{a, node::compare(...)}`.
+    using refs = std::vector<ref>;
+
+    // A field: a list of strings (keys, never split at dots) and ints.
+    CLEANRULES_THROWING([[nodiscard]] static node field(value_ref path) {
+        return make_(nullptr, [&](cr_node **o, cr_error **e) { return cr_node_new_field(path.c_ptr(), o, e); });
+    })
+    [[nodiscard]] static node field(value_ref path, error_info &error) {
+        return make_(&error, [&](cr_node **o, cr_error **e) { return cr_node_new_field(path.c_ptr(), o, e); });
+    }
+    // A constant: null, a boolean, a number, a string, a date or a datetime.
+    CLEANRULES_THROWING([[nodiscard]] static node constant(value_ref v) {
+        return make_(nullptr, [&](cr_node **o, cr_error **e) { return cr_node_new_constant(v.c_ptr(), o, e); });
+    })
+    [[nodiscard]] static node constant(value_ref v, error_info &error) {
+        return make_(&error, [&](cr_node **o, cr_error **e) { return cr_node_new_constant(v.c_ptr(), o, e); });
+    }
+    // From anything a `value` is made of: `node::constant(5)`.
+    CLEANRULES_THROWING([[nodiscard]] static node constant(const value &v) {
+        return constant(v.ref());
+    })
+    [[nodiscard]] static node constant(const value &v, error_info &error) {
+        return constant(v.ref(), error);
+    }
+    // `left op right`: `op` is `eq`, `ne`, `lt`, `le`, `gt` or `ge`.
+    CLEANRULES_THROWING([[nodiscard]] static node compare(std::string_view op, const node &left,
+                                                          const node &right) {
+        return compare_(op, left, right, nullptr);
+    })
+    [[nodiscard]] static node compare(std::string_view op, const node &left, const node &right,
+                                      error_info &error) {
+        return compare_(op, left, right, &error);
+    }
+    // `left op right`: `op` is `add`, `sub`, `mul` or `div`.
+    CLEANRULES_THROWING([[nodiscard]] static node arith(std::string_view op, const node &left,
+                                                        const node &right) {
+        return arith_(op, left, right, nullptr);
+    })
+    [[nodiscard]] static node arith(std::string_view op, const node &left, const node &right,
+                                    error_info &error) {
+        return arith_(op, left, right, &error);
+    }
+    // The conjunction and the disjunction of two or more conditions.
+    CLEANRULES_THROWING([[nodiscard]] static node and_(const refs &operands) {
+        return connective_(cr_node_new_and, operands, nullptr);
+    })
+    [[nodiscard]] static node and_(const refs &operands, error_info &error) {
+        return connective_(cr_node_new_and, operands, &error);
+    }
+    CLEANRULES_THROWING([[nodiscard]] static node or_(const refs &operands) {
+        return connective_(cr_node_new_or, operands, nullptr);
+    })
+    [[nodiscard]] static node or_(const refs &operands, error_info &error) {
+        return connective_(cr_node_new_or, operands, &error);
+    }
+    // `not`, `is_null`, `abs` and `neg` of one operand.
+    CLEANRULES_THROWING([[nodiscard]] static node not_(const node &n) { return unary_(cr_node_new_not, n, nullptr); })
+    [[nodiscard]] static node not_(const node &n, error_info &error) { return unary_(cr_node_new_not, n, &error); }
+    CLEANRULES_THROWING([[nodiscard]] static node is_null(const node &n) { return unary_(cr_node_new_is_null, n, nullptr); })
+    [[nodiscard]] static node is_null(const node &n, error_info &error) { return unary_(cr_node_new_is_null, n, &error); }
+    CLEANRULES_THROWING([[nodiscard]] static node abs(const node &n) { return unary_(cr_node_new_abs, n, nullptr); })
+    [[nodiscard]] static node abs(const node &n, error_info &error) { return unary_(cr_node_new_abs, n, &error); }
+    CLEANRULES_THROWING([[nodiscard]] static node neg(const node &n) { return unary_(cr_node_new_neg, n, nullptr); })
+    [[nodiscard]] static node neg(const node &n, error_info &error) { return unary_(cr_node_new_neg, n, &error); }
+    // Membership in a list of constants, kept sorted and without repeats.
+    CLEANRULES_THROWING([[nodiscard]] static node is_in(const node &n, value_ref values) {
+        return is_in_(n, values, nullptr);
+    })
+    [[nodiscard]] static node is_in(const node &n, value_ref values, error_info &error) {
+        return is_in_(n, values, &error);
+    }
+    // `low <= n <= high`; `closed` is `both` (also when empty), `left`,
+    // `right` or `none`.
+    CLEANRULES_THROWING([[nodiscard]] static node between(const node &n, const node &low,
+                                                          const node &high,
+                                                          std::string_view closed = {}) {
+        return between_(n, low, high, closed, nullptr);
+    })
+    [[nodiscard]] static node between(const node &n, const node &low, const node &high,
+                                      std::string_view closed, error_info &error) {
+        return between_(n, low, high, closed, &error);
+    }
+    // A regular expression search (Rust's `regex` syntax).
+    CLEANRULES_THROWING([[nodiscard]] static node matches(const node &n, std::string_view pattern) {
+        return matches_(n, pattern, nullptr);
+    })
+    [[nodiscard]] static node matches(const node &n, std::string_view pattern, error_info &error) {
+        return matches_(n, pattern, &error);
+    }
+    // A literal string test: `op` is `starts_with`, `ends_with` or `contains`.
+    CLEANRULES_THROWING([[nodiscard]] static node string_test(std::string_view op, const node &n,
+                                                              std::string_view text) {
+        return string_test_(op, n, text, nullptr);
+    })
+    [[nodiscard]] static node string_test(std::string_view op, const node &n,
+                                          std::string_view text, error_info &error) {
+        return string_test_(op, n, text, &error);
+    }
+
+    // --- What the node says about itself.
+
+    // Its tag (`gt`, `and`...) and kind (`condition`, `value` or `any`).
+    std::string_view tag() const noexcept { return name_(cr_node_tag(handle_.get())); }
+    std::string_view kind() const noexcept { return name_(cr_node_kind(handle_.get())); }
+    // Its direct children, copied, in order.
+    CLEANRULES_THROWING([[nodiscard]] std::vector<node> children() const { return children_(nullptr); })
+    [[nodiscard]] std::vector<node> children(error_info &error) const { return children_(&error); }
+    // Its own data: a field's path, a constant's value, an `in`'s values, a
+    // `between`'s `closed`, a pattern or a text; null otherwise.
+    CLEANRULES_THROWING([[nodiscard]] value detail() const { return detail_(nullptr); })
+    [[nodiscard]] value detail(error_info &error) const { return detail_(&error); }
+    // Structural identity (spec/ast.md), and a hash consistent with it.
+    bool same_as(const node &other) const noexcept {
+        return cr_node_same(handle_.get(), other.handle_.get());
+    }
+    std::uint64_t hash() const noexcept { return cr_node_hash(handle_.get()); }
+
     explicit operator bool() const noexcept { return handle_ != nullptr; }
     const cr_node *c_ptr() const noexcept { return handle_.get(); }
 
 private:
+    template <class Call>
+    static node make_(error_info *sink, Call &&call) {
+        node made;
+        cr_node *out = nullptr;
+        detail::check(sink, [&](cr_error **e) { return std::forward<Call>(call)(&out, e); });
+        made.handle_.reset(out);
+        return made;
+    }
+    static node compare_(std::string_view op, const node &l, const node &r, error_info *sink) {
+        return make_(sink, [&](cr_node **o, cr_error **e) {
+            return cr_node_new_compare(op.data(), op.size(), l.c_ptr(), r.c_ptr(), o, e);
+        });
+    }
+    static node arith_(std::string_view op, const node &l, const node &r, error_info *sink) {
+        return make_(sink, [&](cr_node **o, cr_error **e) {
+            return cr_node_new_arith(op.data(), op.size(), l.c_ptr(), r.c_ptr(), o, e);
+        });
+    }
+    static node connective_(cr_status (*join)(const cr_node *const *, std::size_t, cr_node **,
+                                              cr_error **),
+                            const refs &operands, error_info *sink) {
+        std::vector<const cr_node *> pointers;
+        pointers.reserve(operands.size());
+        for (const ref &operand : operands) {
+            pointers.push_back(operand.get().c_ptr());
+        }
+        return make_(sink, [&](cr_node **o, cr_error **e) {
+            return join(pointers.data(), pointers.size(), o, e);
+        });
+    }
+    static node unary_(cr_status (*make)(const cr_node *, cr_node **, cr_error **), const node &n,
+                       error_info *sink) {
+        return make_(sink, [&](cr_node **o, cr_error **e) { return make(n.c_ptr(), o, e); });
+    }
+    static node is_in_(const node &n, value_ref values, error_info *sink) {
+        return make_(sink, [&](cr_node **o, cr_error **e) {
+            return cr_node_new_is_in(n.c_ptr(), values.c_ptr(), o, e);
+        });
+    }
+    static node between_(const node &n, const node &low, const node &high, std::string_view closed,
+                         error_info *sink) {
+        return make_(sink, [&](cr_node **o, cr_error **e) {
+            return cr_node_new_between(n.c_ptr(), low.c_ptr(), high.c_ptr(),
+                                   closed.empty() ? nullptr : closed.data(), closed.size(), o, e);
+        });
+    }
+    static node matches_(const node &n, std::string_view pattern, error_info *sink) {
+        return make_(sink, [&](cr_node **o, cr_error **e) {
+            return cr_node_new_matches(n.c_ptr(), pattern.data(), pattern.size(), o, e);
+        });
+    }
+    static node string_test_(std::string_view op, const node &n, std::string_view text,
+                             error_info *sink) {
+        return make_(sink, [&](cr_node **o, cr_error **e) {
+            return cr_node_new_string_test(op.data(), op.size(), n.c_ptr(), text.data(), text.size(),
+                                       o, e);
+        });
+    }
+    static std::string_view name_(const char *name) noexcept {
+        return name != nullptr ? std::string_view(name) : std::string_view();
+    }
+    std::vector<node> children_(error_info *sink) const {
+        std::vector<node> children;
+        std::size_t count = cr_node_children_len(handle_.get());
+        for (std::size_t i = 0; i < count; ++i) {
+            node child = make_(sink, [&](cr_node **o, cr_error **e) {
+                return cr_node_child(handle_.get(), i, o, e);
+            });
+            if (!child) {
+                return {};
+            }
+            children.push_back(std::move(child));
+        }
+        if (handle_ == nullptr) {
+            // The error of a NULL node.
+            detail::check(sink, [&](cr_error **e) { return cr_node_child(nullptr, 0, nullptr, e); });
+        }
+        return children;
+    }
+    value detail_(error_info *sink) const {
+        cr_value *out = nullptr;
+        detail::check(sink, [&](cr_error **e) { return cr_node_detail(handle_.get(), &out, e); });
+        return value::adopt(out);
+    }
     value field_paths_(error_info *sink) const {
         cr_value *out = nullptr;
         detail::check(sink,
@@ -2007,6 +2299,146 @@ struct table_settings {
     std::string_view logic;
     bool strict = false;
 };
+
+// The settings of a rule set built in code (`ruleset::make`): the same.
+using ruleset_settings = table_settings;
+
+// A rule built in code (spec/rules.md, *Rules*): a name and a condition,
+// then each `with_*` gives a new rule, checked by the core.
+class rule {
+public:
+    rule() noexcept = default;
+
+    // A rule with a name and a condition (copied).
+    CLEANRULES_THROWING([[nodiscard]] static rule make(std::string_view name, const node &when) {
+        return make_(nullptr, [&](cr_rule **o, cr_error **e) {
+            return cr_rule_new(name.data(), name.size(), when.c_ptr(), o, e);
+        });
+    })
+    [[nodiscard]] static rule make(std::string_view name, const node &when, error_info &error) {
+        return make_(&error, [&](cr_rule **o, cr_error **e) {
+            return cr_rule_new(name.data(), name.size(), when.c_ptr(), o, e);
+        });
+    }
+    // With `key` in its payload, given a value node (a repeated key keeps its
+    // place and takes the new value).
+    CLEANRULES_THROWING([[nodiscard]] rule with_payload(std::string_view key, const node &v) const {
+        return payload_(key, v, nullptr);
+    })
+    [[nodiscard]] rule with_payload(std::string_view key, const node &v, error_info &error) const {
+        return payload_(key, v, &error);
+    }
+    CLEANRULES_THROWING([[nodiscard]] rule with_priority(std::int64_t priority) const {
+        return priority_(priority, nullptr);
+    })
+    [[nodiscard]] rule with_priority(std::int64_t priority, error_info &error) const {
+        return priority_(priority, &error);
+    }
+    // With these tags (a list of strings), kept sorted and without repeats.
+    CLEANRULES_THROWING([[nodiscard]] rule with_tags(value_ref tags) const {
+        return value_step_(cr_rule_with_tags, tags, nullptr);
+    })
+    [[nodiscard]] rule with_tags(value_ref tags, error_info &error) const {
+        return value_step_(cr_rule_with_tags, tags, &error);
+    }
+    // With this metadata: a map of data values.
+    CLEANRULES_THROWING([[nodiscard]] rule with_metadata(value_ref metadata) const {
+        return value_step_(cr_rule_with_metadata, metadata, nullptr);
+    })
+    [[nodiscard]] rule with_metadata(value_ref metadata, error_info &error) const {
+        return value_step_(cr_rule_with_metadata, metadata, &error);
+    }
+    CLEANRULES_THROWING([[nodiscard]] rule with_description(std::string_view text) const {
+        return text_step_(cr_rule_with_description, text, nullptr);
+    })
+    [[nodiscard]] rule with_description(std::string_view text, error_info &error) const {
+        return text_step_(cr_rule_with_description, text, &error);
+    }
+    // Naming its action, which a registry resolves (`actions`).
+    CLEANRULES_THROWING([[nodiscard]] rule with_action(std::string_view name) const {
+        return text_step_(cr_rule_with_action, name, nullptr);
+    })
+    [[nodiscard]] rule with_action(std::string_view name, error_info &error) const {
+        return text_step_(cr_rule_with_action, name, &error);
+    }
+
+    // The tags as the core keeps them, and the metadata.
+    CLEANRULES_THROWING([[nodiscard]] value tags() const { return read_(cr_rule_tags, nullptr); })
+    [[nodiscard]] value tags(error_info &error) const { return read_(cr_rule_tags, &error); }
+    CLEANRULES_THROWING([[nodiscard]] value metadata() const { return read_(cr_rule_metadata, nullptr); })
+    [[nodiscard]] value metadata(error_info &error) const { return read_(cr_rule_metadata, &error); }
+
+    explicit operator bool() const noexcept { return handle_ != nullptr; }
+    const cr_rule *c_ptr() const noexcept { return handle_.get(); }
+
+private:
+    template <class Call>
+    static rule make_(error_info *sink, Call &&call) {
+        rule made;
+        cr_rule *out = nullptr;
+        detail::check(sink, [&](cr_error **e) { return std::forward<Call>(call)(&out, e); });
+        made.handle_.reset(out);
+        return made;
+    }
+    rule payload_(std::string_view key, const node &v, error_info *sink) const {
+        return make_(sink, [&](cr_rule **o, cr_error **e) {
+            return cr_rule_with_payload(c_ptr(), key.data(), key.size(), v.c_ptr(), o, e);
+        });
+    }
+    rule priority_(std::int64_t priority, error_info *sink) const {
+        return make_(sink, [&](cr_rule **o, cr_error **e) {
+            return cr_rule_with_priority(c_ptr(), priority, o, e);
+        });
+    }
+    rule value_step_(cr_status (*step)(const cr_rule *, const cr_value *, cr_rule **, cr_error **),
+                     value_ref v, error_info *sink) const {
+        return make_(sink, [&](cr_rule **o, cr_error **e) { return step(c_ptr(), v.c_ptr(), o, e); });
+    }
+    rule text_step_(cr_status (*step)(const cr_rule *, const char *, std::size_t, cr_rule **,
+                                      cr_error **),
+                    std::string_view text, error_info *sink) const {
+        return make_(sink, [&](cr_rule **o, cr_error **e) {
+            return step(c_ptr(), text.data(), text.size(), o, e);
+        });
+    }
+    value read_(cr_status (*read)(const cr_rule *, cr_value **, cr_error **),
+                error_info *sink) const {
+        cr_value *out = nullptr;
+        detail::check(sink, [&](cr_error **e) { return read(c_ptr(), &out, e); });
+        return value::adopt(out);
+    }
+
+    detail::owned<cr_rule, cr_rule_free> handle_;
+};
+
+inline ruleset ruleset::make_(const rule_refs &rules, const table_settings &s, error_info *sink) {
+    std::vector<const cr_rule *> pointers;
+    pointers.reserve(rules.size());
+    for (const rule_ref &r : rules) {
+        pointers.push_back(r.get().c_ptr());
+    }
+    auto name = [](std::string_view n) { return n.empty() ? nullptr : n.data(); };
+    cr_ruleset *out = nullptr;
+    detail::check(sink, [&](cr_error **e) {
+        return cr_ruleset_new(pointers.data(), pointers.size(), name(s.hit_policy),
+                              s.hit_policy.size(), name(s.aggregate), s.aggregate.size(),
+                              name(s.logic), s.logic.size(), s.strict, &out, e);
+    });
+    return adopt(out);
+}
+#if CLEANRULES_EXCEPTIONS
+inline ruleset ruleset::make(const rule_refs &rules) { return make_(rules, table_settings(), nullptr); }
+inline ruleset ruleset::make(const rule_refs &rules, const table_settings &settings) {
+    return make_(rules, settings, nullptr);
+}
+#endif
+inline ruleset ruleset::make(const rule_refs &rules, error_info &error) {
+    return make_(rules, table_settings(), &error);
+}
+inline ruleset ruleset::make(const rule_refs &rules, const table_settings &settings,
+                             error_info &error) {
+    return make_(rules, settings, &error);
+}
 
 // A decision table built from a grid (spec/tables.md, *Grids*): a header and
 // rows of cells, pushed one at a time. After a row fails, the grid can only
@@ -2091,6 +2523,23 @@ private:
 
 }  // inline namespace eh / noeh
 }  // namespace cleanrules
+
+// Nodes as keys of unordered containers, by structural identity
+// (spec/ast.md): `std::unordered_set<cleanrules::node>`.
+namespace std {
+template <>
+struct hash<cleanrules::node> {
+    std::size_t operator()(const cleanrules::node &n) const noexcept {
+        return static_cast<std::size_t>(n.hash());
+    }
+};
+template <>
+struct equal_to<cleanrules::node> {
+    bool operator()(const cleanrules::node &a, const cleanrules::node &b) const noexcept {
+        return a.same_as(b);
+    }
+};
+}  // namespace std
 
 #undef CLEANRULES_THROWING
 

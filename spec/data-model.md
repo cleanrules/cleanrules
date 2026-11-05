@@ -362,8 +362,10 @@ it, and otherwise reading it gives a null with reason `read_error`. A map's
 `containsKey` decides whether a key is present, and one that refuses a string
 key (a map with other key types) has none.
 
-**Values given back.** Outputs, payloads, aggregates and the values of an
-action's call come back to Java as follows:
+**Values given back.** Outputs, payloads, aggregates, metadata, constants (a
+constant node's `value()`), the values of an action's call and the values in
+an explanation (the values a cause read, a counterfactual's target) come back
+to Java as follows:
 
 | Value | Java |
 |---|---|
@@ -379,6 +381,11 @@ action's call come back to Java as follows:
 | list | an unmodifiable `List` |
 | map | an unmodifiable `SequencedMap`, in the value's order |
 | opaque | the native object it was read from, the same object; `null` in a decision read from a document, which keeps only the type's name |
+
+A counterfactual's gap is a `Long`, `Double` or `BigDecimal`, like the int,
+float or decimal above; between dates it is a `java.time.Period` of days, and
+between datetimes a `java.time.Duration`, to the microsecond. Priorities in
+notes and summaries are `long`s (`OptionalLong` where a note may lack them).
 
 Each value reads back as the same value, so an output can be fed to another
 evaluation, except a decimal infinity, which reads back as a float, and an

@@ -2,7 +2,7 @@
  * The rules of discounts.rules, from C: read them, evaluate one input given as
  * JSON and then built natively, print the output, the explanation and which
  * rules fired, run the rules' named action (notify_sales) as a C function,
- * and report an error.
+ * report an error, and build the vip rule in code with the constructors.
  *
  *     cargo build -p cleanrules-ffi
  *     cc -I crates/ffi/include docs/examples/discounts.c \
@@ -97,6 +97,55 @@ static int32_t notify_sales(void *data, cr_action_call *call) {
     *calls += 1;
     printf("notify_sales: rule %.*s was selected\n", (int)len, name);
     return 0;
+}
+
+/* Move a string into a list at a position. */
+static cr_status set_string(cr_value *list, size_t at, const char *text, cr_error **error) {
+    cr_value *item = NULL;
+    cr_status status = cr_value_new_string(text, strlen(text), &item, error);
+    return status != CR_OK ? status : cr_value_list_set(list, at, item, error);
+}
+
+/*
+ * The vip rule built in code: customer.years > 5, with the payload discount = 5
+ * and priority 10. The core checks each step; every argument is copied, so
+ * each node, value and rule is freed by whoever made it.
+ */
+static int built_in_code(void) {
+    cr_error *error = NULL;
+    cr_value *path = cr_value_new_list(2);
+    cr_value *five = cr_value_new_int(5);
+    cr_node *years = NULL, *limit = NULL, *when = NULL;
+    cr_rule *named = NULL, *paid = NULL, *vip = NULL;
+    cr_ruleset *built = NULL;
+    char *text = NULL;
+    int failed = set_string(path, 0, "customer", &error) != CR_OK ||
+                 set_string(path, 1, "years", &error) != CR_OK ||
+                 cr_node_new_field(path, &years, &error) != CR_OK ||
+                 cr_node_new_constant(five, &limit, &error) != CR_OK ||
+                 cr_node_new_compare("gt", 2, years, limit, &when, &error) != CR_OK ||
+                 cr_rule_new("vip", 3, when, &named, &error) != CR_OK ||
+                 cr_rule_with_payload(named, "discount", 8, limit, &paid, &error) != CR_OK ||
+                 cr_rule_with_priority(paid, 10, &vip, &error) != CR_OK;
+    if (!failed) {
+        const cr_rule *rules[1] = {vip};
+        failed = cr_ruleset_new(rules, 1, "priority", 8, NULL, 0, NULL, 0, false, &built, &error) != CR_OK ||
+                 cr_ruleset_write(built, CR_FORMAT_TEXT, &text, NULL, &error) != CR_OK;
+    }
+    if (!failed) {
+        printf("\nbuilt in code:\n%s\n", text);
+    }
+    cr_string_free(text);
+    cr_ruleset_free(built);
+    cr_rule_free(vip);
+    cr_rule_free(paid);
+    cr_rule_free(named);
+    cr_node_free(when);
+    cr_node_free(limit);
+    cr_node_free(years);
+    cr_value_free(five);
+    cr_value_free(path);
+    return failed ? fail("building", error) : 0;
 }
 
 /* The whole file, or NULL. */
@@ -213,5 +262,5 @@ int main(int argc, char **argv) {
     printf("\nerror: %s\n", cr_error_json(error));
     int expected = cr_error_is(status, CR_FORMAT_ERROR);
     cr_error_free(error);
-    return expected ? 0 : 1;
+    return expected ? built_in_code() : 1;
 }

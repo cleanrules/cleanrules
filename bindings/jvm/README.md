@@ -7,20 +7,146 @@ Memory API of Java 25. There is no native code of its own: the bindings of
 [`cleanrules.h`](../../crates/ffi/include/cleanrules.h) are written by hand in
 Java, and Java data is read straight into the engine's values.
 
-This is the native layer (task G.1a): documents, rule sets, decisions, single
-nodes, Java data in and Java values out, errors as exceptions and actions as
-lambdas. Building conditions and rules in code, and explanations and summaries
-as objects, come with the idiomatic API (G.1b); the native libraries inside the
-jar with G.1c; Scala 3 with G.2.
+It has two layers. The idiomatic API (task G.1b) builds conditions and rules
+in code with static imports and methods, evaluates them, and gives decisions,
+explanations and summaries as objects. The native layer (task G.1a) reads and
+writes documents in every format and evaluates them on Java data or JSON.
+Documents, the rule syntax, decision tables and result trees in the idiomatic
+API come with G.1d; the native libraries inside the jar with G.1c; Scala 3
+with G.2.
 
 Java 25 or later. Module `io.github.cleanrules`, artifact
 `io.github.cleanrules:cleanrules` (not published yet), with two packages:
-`io.github.cleanrules`, what every layer shares (the errors, the enums,
-`Limits`, `CleanRules`), and `io.github.cleanrules.ffi`, the native layer
-(`Document`, `RuleSet`, `Decision`, `Node`, `Action`, `ActionCall`), as
-`cleanrules/native` is in JavaScript. The idiomatic API will build on both.
+`io.github.cleanrules`, the idiomatic API and what every layer shares (the
+errors, the enums, `Limits`, `CleanRules`), and `io.github.cleanrules.ffi`,
+the native layer (`Document`, `RuleSet`, `Decision`, `Node`, `Action`,
+`ActionCall`), as `cleanrules/native` is in JavaScript.
 
-## Example
+## Conditions and rules in code
+
+```java
+import static io.github.cleanrules.Conditions.*;
+
+import io.github.cleanrules.*;
+import java.math.BigDecimal;
+import java.util.Map;
+
+Rule vip = Rule.named("vip")
+        .when(field("customer", "years").gt(5).and(field("order", "total").gt(1000)))
+        .then("discount", new BigDecimal("0.15"))
+        .priority(10)
+        .tags("loyalty")
+        .action("notify_sales");
+Rule loyal = Rule.named("loyal")
+        .when(field("customer", "years").gt(2).or(field("customer", "newsletter")))
+        .then("discount", new BigDecimal("0.05"))
+        .priority(5);
+RuleSet rules = RuleSet.builder().add(vip, loyal).hitPolicy(HitPolicy.PRIORITY).build();
+
+var order = Map.of(
+        "customer", Map.of("years", 7, "newsletter", false),
+        "order", Map.of("total", new BigDecimal("900.00")));
+Decision decision = rules.evaluate(order);
+decision.output();                    // Optional[{discount=0.05}], a BigDecimal
+decision.fired();                     // [loyal]
+System.out.println(decision.explain());
+for (Cause cause : decision.whyNot("vip").causes()) {
+    cause.counterfactual();           // Optional[Counterfactual[path=[order, total], op=gt, target=1000, gap=Optional[100.00]]]
+}
+rules.bind(Map.of("notify_sales", context -> System.out.println(context.output()))).run(order);
+```
+
+- **Conditions** (`Conditions`, `Expr`, `Field`, `Const`): `field(...)` takes
+  the path's segments, keys as `String`s (never split at dots: a key may hold
+  one) and indexes as `int`s (`field("items", 0, "price")`; `Field.at(...)`
+  goes further down); `constant(value)`, and Java values next to a node become
+  constants on their own (`ge(18)`); `and(...)`, `or(...)` and `not(x)`, also
+  as methods (`a.and(b)`, `a.or(b)`, `a.not()`). Comparisons `eq`, `ne`, `lt`,
+  `le`, `gt`, `ge`; `isIn(values...)` (or a collection), `between(low, high[,
+  Closed])`, `isNull()`, `matches(pattern)`, `startsWith`, `endsWith`,
+  `contains`; arithmetic `add`, `sub`, `mul`, `div`, `neg()`, `abs()`.
+  The core builds every node and applies the construction rules of
+  `spec/ast.md`: a node that breaks one, a NaN, an integer beyond 64 bits, a
+  decimal beyond 38 digits, a datetime finer than a microsecond or a constant
+  that is not a scalar is an `ExpressionException`. A node gives its `tag()`,
+  `kind()` (`Kind`), `children()`, `walk()`, `fieldPaths()`, `toJson()` and,
+  as `toString()`, its text in the rule syntax (`customer.years > 5 AND ...`).
+  `equals` and `hashCode` are structural identity (`sameAs`): Java has no
+  operator overloading, so `equals` never builds a node, and it is an
+  equivalence relation (constants compare by type and value: `1`, `1.0` and
+  `true` differ, `0.0` and `-0.0` do not).
+- **Rules** (`Rule`): `Rule.named(name).when(condition)`, then
+  `then(key, value)` (a node or a Java constant; `then(map)` adds a map's
+  entries, in order for a `SequencedMap` and sorted otherwise),
+  `priority(n)`, `tags(...)`, `description(text)`, `metadata(map)`, and
+  `action(name)` (data, bound later) or `action(context -> ...)` (code). Each
+  step gives a new immutable rule, checked by the core
+  (`RuleDefinitionException`). `tags()` and `metadata()` are what the core
+  keeps (tags sorted, without repeats).
+- **Rule sets** (`RuleSet`): `RuleSet.of(rules...)`, or
+  `RuleSet.builder().add(...).hitPolicy(...).aggregate(...).logic(...).strict(...).build()`;
+  an immutable `Iterable<Rule>` with `rules()`, `size()`, `get(name)` (an
+  `Optional`), `rule(name)` (a `RuleNotFoundException` from the core, with the
+  names there are), `contains(name)`, `hitPolicy()`, `aggregate()`, `logic()`,
+  `isStrict()`, `fieldPaths()`, `evaluate(data[, limits])`,
+  `evaluateMany(rows[, limits])`, `readDecision(text[, format])`,
+  `bind(actions)`, `run(data[, limits])` and `summary()`.
+- **Decisions** (`Decision`): `ruleSet()`, `hitPolicy()`, `results()` and
+  `selected()` (`RuleResult`: `rule()`, `fired()`, `truth()`, `output()`),
+  `fired()` (names), `outputs()`, `output()` and `aggregated()` (`Optional`
+  maps; `output()` of a policy with several outputs is a
+  `HitPolicyException`), `explain()`, `whyNot(name)`, `toJson()` and
+  `write(format)`. A decision is `AutoCloseable`: `close()` frees its native
+  memory at once, which is optional (the `Cleaner` frees it otherwise); what
+  was already read stays readable.
+- **Explanations** (`Explanation`, `RuleExplanation`, `Requirement`, `Cause`,
+  `CauseGroup` with `GroupKind`, `Counterfactual`, `Note` with `NoteKind`,
+  `Reason`, `Status`): the core's
+  explanation as objects, with `rules()`, `selected()`, `forRule(name)`,
+  `toJson()` (the explanation document) and, as `toString()`, its text; a
+  rule's `status()`, `requirement()`, `causes()`, `note()`, `achievable()` and
+  its part of the text; a cause's `node()`, `truth()`, `negated()`, `holds()`,
+  `values()` (`Cause.FieldValue`: path and value), `reason()`,
+  `counterfactual()` (a gap is a number, a `java.time.Period` of days between
+  dates, or a `java.time.Duration` between datetimes) and its line of the
+  text.
+- **Summaries** (`Summary`, `RuleSummary`, `FieldUsage` with
+  `FieldUsage.Payload`): `hitPolicy()`,
+  `aggregate()`, `logic()`, `isStrict()`, `rules()`, `fields()`, `outputs()`,
+  `tags()`, `toJson()` and the text; rules whose action is code are marked.
+- **Actions** (`Action`, `ActionContext`): `run(data)` checks that every named
+  action is bound (`bind(Map.of(name, action))`, a `RegistryException` from
+  the core otherwise), evaluates, and calls the actions of the selected rules,
+  in rule order, each with an `ActionContext` (`rule()`, `data()`, `result()`,
+  `output()`, `decision()`: the object `run` returns). An action that throws
+  stops the run with an `ActionException` whose cause is what it threw, with
+  `rule()`, `executed()` and `decision()`; the core writes its message, hint
+  and JSON form, as for every binding.
+
+Rules, rule sets, decisions and nodes are immutable and may be shared between
+threads; a `Cleaner` frees their native memory once they are unreachable, so
+rules, rule sets and nodes have no `close()` (decisions may be closed early).
+`Expr.hashCode()` is the core's, the same on every platform for one version of
+the library: never store it. Values come back as in *Values given back*
+below.
+
+The same concepts in JavaScript, where Java's names differ:
+
+| Java | JavaScript |
+|---|---|
+| `ruleSet.contains(name)` | `ruleSet.has(name)` |
+| `ruleSet.get(name)` (an `Optional`) | `ruleSet.get(name)` (or `undefined`) |
+| `Rule.named(name).when(c).then(k, v)...` | `new Rule(name, c, { k: v }, { ... })` |
+| `RuleSet.builder()...build()`, `RuleSet.of(...)` | `new RuleSet([...], { ... })` |
+| `decision.output()` (an `Optional`) | `decision.output` (or `null`) |
+| `explanation.forRule(name)` | `explanation.forRule(name)` |
+| `expr.equals(other)`, `hashCode()` | `expr.sameAs(other)` |
+
+[`docs/examples/DiscountRules.java`](../../docs/examples/DiscountRules.java)
+builds the rules of `discounts.rules` in code and runs with the source
+launcher, as its comment says; a test runs it.
+
+## The native layer
 
 ```java
 import io.github.cleanrules.Format;
@@ -109,7 +235,7 @@ version (`CleanRules.FORMAT_VERSION`) is not the binding's, is an
 version, and `CleanRules.libraryPath()` where it came from. The binding needs
 a 64-bit platform.
 
-## The API
+## The native layer's API
 
 | Class (package) | What it is |
 |---|---|
@@ -205,7 +331,7 @@ with `String` keys and `Integer` indexes (`Long` beyond them), `types()`, `name(
 `executed()`, `node()` as JSON, `operation()`, `reason()`: empty where they do
 not apply) and `json()`, the error's JSON form. The cause is `getCause()`.
 Exceptions are immutable and serializable (an `ActionException` loses its
-decision when serialized). Misuses are Java's own exceptions:
+decisions when serialized). Misuses are Java's own exceptions:
 `NullPointerException`; `IllegalArgumentException` (a negative limit, an
 empty or repeated action name, anything the C ABI calls
 `CR_INVALID_ARGUMENT`); `IllegalStateException` (a closed object, an action
@@ -219,7 +345,8 @@ report); and `IndexOutOfBoundsException`.
 reads anything (`RegistryException`), evaluates, and calls the actions of the
 selected rules in rule order, on the calling thread, each with an
 `ActionCall`. An action fails by throwing: the run stops with an `ActionException` whose
-cause is what it threw, with `rule()`, `executed()` and the `decision()`; an
+cause is what it threw, with `rule()`, `executed()` and the decision
+(`nativeDecision()`; `decision()` is the idiomatic `run`'s); an
 error of the virtual machine (`StackOverflowError`...) is thrown by `run` as
 it is. Nothing an action throws ever crosses the native frames: the binding
 catches it in the upcall and the C ABI reports the failure. An action may run

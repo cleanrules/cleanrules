@@ -19,7 +19,7 @@ pub use document::{
 #[cfg(feature = "yaml")]
 pub use document::{read_yaml_decision_document, read_yaml_document};
 pub use error::write_error;
-pub use explain::{write_explanation, write_summary};
+pub use explain::{explanation_value, write_explanation, write_summary};
 pub use result::{write_path, write_reason, write_result, write_truth};
 pub use rules::{write_decision, write_rule, write_ruleset};
 pub use table::write_table;

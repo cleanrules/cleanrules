@@ -69,6 +69,30 @@ public final class Scope implements AutoCloseable {
         return bytes.length == 0 ? MemorySegment.NULL : arena.allocateFrom(JAVA_BYTE, bytes);
     }
 
+    /** An array of pointers passed in, borrowed for the call: NULL for none. */
+    public MemorySegment pointers(MemorySegment... pointers) {
+        if (pointers.length == 0) {
+            return MemorySegment.NULL;
+        }
+        MemorySegment array = arena.allocate(ADDRESS, pointers.length);
+        for (int i = 0; i < pointers.length; i++) {
+            array.setAtIndex(ADDRESS, i, pointers[i]);
+        }
+        return array;
+    }
+
+    /** An array of {@code bool}s passed in, borrowed for the call: NULL for none. */
+    public MemorySegment bools(boolean... flags) {
+        if (flags.length == 0) {
+            return MemorySegment.NULL;
+        }
+        MemorySegment array = arena.allocate(JAVA_BOOLEAN, flags.length);
+        for (int i = 0; i < flags.length; i++) {
+            array.setAtIndex(JAVA_BOOLEAN, i, flags[i]);
+        }
+        return array;
+    }
+
     private MemorySegment scratch = MemorySegment.NULL;
 
     /**

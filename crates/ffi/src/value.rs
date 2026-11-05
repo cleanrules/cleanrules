@@ -147,7 +147,7 @@ fn check_nesting(item: &Value) -> Outcome {
     Ok(())
 }
 
-fn type_name(value: &Value) -> &'static str {
+pub(crate) fn type_name(value: &Value) -> &'static str {
     match value {
         Value::Null(_) => "a null",
         Value::Bool(_) => "a boolean",

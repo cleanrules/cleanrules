@@ -3,7 +3,7 @@
  * Function &amp; Memory API: documents, rule sets, decisions and single nodes,
  * read and written in every format, evaluated on Java data or on JSON, with
  * actions as lambdas. The idiomatic API (conditions and rules built in code,
- * explanations as objects) comes on top of it.
+ * explanations as objects) is {@link io.github.cleanrules}, on top of it.
  *
  * <p>{@link io.github.cleanrules.ffi.Document},
  * {@link io.github.cleanrules.ffi.RuleSet},

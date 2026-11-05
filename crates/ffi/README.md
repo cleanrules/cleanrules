@@ -41,10 +41,10 @@ The whole program, with explanations and errors, is
 
 - **Names.** Functions and types start with `cr_`, constants with `CR_`.
 - **Handles.** `cr_document`, `cr_ruleset`, `cr_decision`, `cr_node`,
-  `cr_batch`, `cr_value`, `cr_grid`, `cr_actions`, `cr_limits` and `cr_error`
+  `cr_rule`, `cr_batch`, `cr_value`, `cr_grid`, `cr_actions`, `cr_limits` and `cr_error`
   are opaque. Whoever receives one owns it and frees it with its `cr_*_free`
   function, which accepts `NULL`. Documents, rule sets, decisions, nodes,
-  batches and errors never change once made, so one may be used from several
+  rules, batches and errors never change once made, so one may be used from several
   threads at once, but not while it is freed; limits, values, grids and
   registries change while they are built, so finish them before sharing them.
   A finished registry may be used by several threads at once, and its actions
@@ -95,16 +95,52 @@ The whole program, with explanations and errors, is
   JSON, though not losslessly: null reasons are written as plain nulls, and
   opaque values cannot be read back.
   `cr_value_clone` copies a value without losing either.
+- **Building in code.** Conditions, rules and rule sets are built through the
+  core's constructors, which apply every construction rule (`spec/ast.md`,
+  `spec/rules.md`) with the core's errors, as Python's and JavaScript's
+  builders do. Nodes: `cr_node_new_field` (a list of strings and ints, never split
+  at dots), `cr_node_new_constant` (a scalar `cr_value`; an overflowing or
+  unreadable null, an opaque value, a list or a map is a
+  `CR_EXPRESSION_ERROR`), `cr_node_new_compare` and `cr_node_new_arith` (by tag:
+  `eq`..., `add`...), `cr_node_new_and` and `cr_node_new_or` (an array of nodes),
+  `cr_node_new_not`, `cr_node_new_is_in` (a list of constants), `cr_node_new_between`
+  (`closed` by name, `NULL` for `both`), `cr_node_new_is_null`, `cr_node_new_matches`,
+  `cr_node_new_string_test`, `cr_node_new_abs` and `cr_node_new_neg`. Every argument is
+  copied: the caller keeps and frees its own nodes and values, and each call
+  gives a new node. An unknown tag or name is `CR_INVALID_ARGUMENT`. A binding
+  rejects a NaN or a datetime finer than a microsecond before it builds the
+  value, which cannot hold them. What a node says about itself:
+  `cr_node_tag`, `cr_node_kind` (static strings), `cr_node_children_len` and
+  `cr_node_child` (a copy), `cr_node_detail` (a field's path, a constant's
+  value, an `in`'s values, `between`'s `closed`, a pattern or a text),
+  `cr_node_same` (structural identity) and `cr_node_hash` (consistent with
+  it: 64-bit FNV-1a over a fixed-width little-endian encoding, the same on
+  every platform for one version of the library, never to be stored),
+  besides `cr_node_write`. Rules: `cr_rule_new` (a name and a condition),
+  then each `cr_rule_with_payload`, `cr_rule_with_priority`,
+  `cr_rule_with_tags`, `cr_rule_with_description`, `cr_rule_with_metadata`
+  (a map of data) or `cr_rule_with_action` (a name) gives a new rule;
+  `cr_rule_tags` and `cr_rule_metadata` give what the core keeps.
+  `cr_ruleset_new` makes a rule set of an array of rules (copied) with a hit
+  policy, an aggregate and a logic by name (`NULL` for the defaults) and
+  strictness, read by the core as JSON's are.
 - **Describing a rule set.** `cr_ruleset_len`, `cr_ruleset_rule_name`,
   `cr_ruleset_hit_policy`, `cr_ruleset_logic`, `cr_ruleset_aggregate` and
-  `cr_ruleset_strict` describe one; its summary has the rest.
+  `cr_ruleset_strict` describe one; its summary has the rest, and
+  `cr_ruleset_summary_actions` marks the rules whose action is code of the
+  program (one `bool` per rule, or none). `cr_ruleset_rule_position` looks a rule up by
+  name: a name it lacks is a `CR_RULE_NOT_FOUND` with the names there are.
 - **Decisions.** Which rules fired (`cr_decision_fired`, `cr_decision_truth`),
   which were selected (`cr_decision_selected`) and the outputs
   (`cr_decision_output_value`, `cr_decision_outputs_value`) are kept when the
   decision is made, so reading them is free. Writing and explaining a decision
   evaluate its input again, or check its recorded decision again.
   `cr_decision_clone` keeps a decision borrowed from a batch, an action call
-  or an error after what lends it is freed.
+  or an error after what lends it is freed. `cr_decision_explain_value` gives
+  the explanation as a `cr_value`, for bindings that build objects of it: the
+  structure of the explanation document (`spec/json-format.md`,
+  *Explanations*) with the values themselves (opaque tokens included), plus
+  the `text` of each rule and cause and whether each cause `holds`.
 - **Actions.** A rule may name its action (`DO notify` in text, `"do"` in
   JSON). Register C functions under those names (`cr_actions_new`,
   `cr_actions_add`, with a `void *` passed back to them) and call
@@ -121,7 +157,10 @@ The whole program, with explanations and errors, is
   free the registry, the decision or the input, and must not unwind: a C++
   action catches its exceptions in a `noexcept` function, a JVM upcall catches
   everything, and Go passes its data as a `cgo.Handle`.
-  `cr_ruleset_evaluate*` never run actions.
+  `cr_ruleset_evaluate*` never run actions. A binding that runs actions
+  itself (Java's and JavaScript's idiomatic `run`) makes the `action_error`
+  of one that failed with `cr_error_new_action`, so that its message, hint and
+  JSON form are the core's.
 - **Grids.** `cr_grid_new` starts a decision table from its settings and a
   header of strings, `cr_grid_push_row` adds rows of cells (a string is text,
   as in CSV; any other value a constant; null an empty cell), and

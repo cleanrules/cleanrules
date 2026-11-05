@@ -177,40 +177,19 @@ pub(crate) struct ActionStep {
     pub(crate) output: String,
 }
 
-/// How an action failed.
-pub(crate) enum ActionFailure {
-    /// It threw; `detail` describes what.
-    Threw(String),
-    /// It returned a promise (any thenable): actions are synchronous.
-    Promise,
-}
+/// How an action failed: the core's.
+pub(crate) use cleanrules::rules::ActionFailure;
 
 /// The `action_error` of the action of `rule` that failed (`spec/rules.md`,
 /// *Actions*), after the actions of `executed` ran; `action` is its name, or
-/// `None` for an action given as a function.
+/// `None` for an action given as a function. The core makes it, as for Java.
 pub(crate) fn action_error(
     rule: &str,
     action: Option<&str>,
     failure: &ActionFailure,
     executed: Vec<String>,
 ) -> Error {
-    let action = action.map_or_else(|| "action".to_owned(), |name| format!("action {name:?}"));
-    let (message, detail) = match failure {
-        ActionFailure::Threw(detail) => (
-            format!("the {action} of rule {rule:?} threw {detail}"),
-            detail.clone(),
-        ),
-        ActionFailure::Promise => (
-            format!("the {action} of rule {rule:?} returned a Promise; actions are synchronous"),
-            "a Promise".to_owned(),
-        ),
-    };
-    let mut error = Error::new(ErrorCode::ActionError, message)
-        .with_hint("later actions did not run; error.decision is the decision")
-        .caused_by(Thrown(detail));
-    error.context_mut().rule = Some(rule.to_owned());
-    error.context_mut().executed = executed;
-    error
+    cleanrules::rules::action_error(rule, action, failure, executed)
 }
 
 /// The JSON form of [`action_error`] (`spec/errors.md`), for the idiomatic
@@ -225,19 +204,6 @@ pub(crate) fn action_error_json(
     super::out::stringifiable(&mut json);
     to_string(&json)
 }
-
-/// What an action threw, described, as the core error's cause: its JSON form
-/// gives the description as `cause`, and JavaScript gets the value itself.
-#[derive(Debug)]
-struct Thrown(String);
-
-impl std::fmt::Display for Thrown {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::error::Error for Thrown {}
 
 impl RulesCore {
     pub(crate) fn new(ruleset: RuleSet) -> Self {

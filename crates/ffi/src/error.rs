@@ -4,12 +4,14 @@
 use std::ffi::{CStr, CString, c_char};
 use std::ptr;
 
-use cleanrules::ErrorCode;
 use cleanrules::format::write_error;
 use cleanrules::json::{Json, to_string};
+use cleanrules::rules::{ActionFailure, action_error};
+use cleanrules::{ErrorCode, Value};
 
-use crate::boundary::{Failure, free};
+use crate::boundary::{Failure, bytes, call, clear, free, give, utf8_arg};
 use crate::decision::cr_decision;
+use crate::value::borrow_value;
 use crate::{CR_INTERNAL_ERROR, CR_INVALID_ARGUMENT, cr_status};
 
 /// `format_error`.
@@ -142,6 +144,90 @@ impl From<Failure> for cr_error {
             }
         }
     }
+}
+
+/// A new `action_error` (`spec/rules.md`, *Actions*), made by the core as for
+/// every binding that runs actions itself (Java's and JavaScript's idiomatic
+/// `run`): the action of `rule` (named `action`, or `NULL` for an action
+/// given as code) threw what `detail` describes, after the actions of the
+/// rules in `executed` (`NULL`, or a list of strings) had run. The error has
+/// the message, the hint and the JSON form the core writes, with `rule`,
+/// `executed` and the detail as `cause`; it is given through `out`, owned by
+/// the caller and freed with `cr_error_free`. The call's own failures go to
+/// `error`.
+///
+/// # Safety
+///
+/// `rule`, `action` and `detail` are `NULL` or point to as many readable
+/// bytes as their lengths say; `executed` is `NULL` or a live `cr_value`;
+/// `out` is `NULL` or points to a writable `cr_error *`; `error` is `NULL` or
+/// points to a writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn cr_error_new_action(
+    rule: *const c_char,
+    rule_len: usize,
+    action: *const c_char,
+    action_len: usize,
+    detail: *const c_char,
+    detail_len: usize,
+    executed: *const crate::value::cr_value,
+    out: *mut *mut cr_error,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: the texts and their lengths (# Safety).
+        let (rule, detail) = unsafe {
+            (
+                utf8_arg(bytes(rule, rule_len, "rule")?, "rule")?,
+                utf8_arg(bytes(detail, detail_len, "detail")?, "detail")?,
+            )
+        };
+        let action = if action.is_null() {
+            None
+        } else {
+            // SAFETY: `action` and `action_len` (# Safety).
+            Some(utf8_arg(
+                unsafe { bytes(action, action_len, "action") }?,
+                "action",
+            )?)
+        };
+        let names = if executed.is_null() {
+            Vec::new()
+        } else {
+            // SAFETY: `executed` is live (# Safety).
+            let Value::List(items) = (unsafe { borrow_value(executed, "executed") })? else {
+                return Err(Failure::Invalid(
+                    "executed is not a list".into(),
+                    "pass a list of rule names, or NULL",
+                ));
+            };
+            let mut names = Vec::with_capacity(items.len());
+            for item in items {
+                let Value::String(name) = item else {
+                    return Err(Failure::Invalid(
+                        "executed holds something other than a string".into(),
+                        "pass a list of rule names",
+                    ));
+                };
+                names.push(name.clone());
+            }
+            names
+        };
+        let failed = action_error(
+            rule,
+            action,
+            &ActionFailure::Threw(detail.to_owned()),
+            names,
+        );
+        // SAFETY: `out` passed `clear`.
+        unsafe { give(out, cr_error::core(&failed, None)) };
+        Ok(())
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_error_new_action", error, body) }
 }
 
 /// The error's status: an error code, `CR_INVALID_ARGUMENT` or

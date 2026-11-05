@@ -6,15 +6,17 @@ use std::sync::Arc;
 use cleanrules::explain::summary;
 use cleanrules::format::{Document, read_document_as, write_document_as, write_summary_as};
 use cleanrules::logic::LogicName;
-use cleanrules::rules::{Aggregate, HitPolicy, RuleSet};
+use cleanrules::rules::{Aggregate, Config, HitPolicy, RuleSet};
 use cleanrules::{Segment, Value};
 
 use crate::boundary::{
-    Failure, bytes, call, clear, clear_borrowed, format, free, give, give_text, handle, limits_of,
+    Failure, Outcome, bytes, call, clear, clear_borrowed, format, free, give, give_text, handle,
+    limits_of, utf8_arg, write_out,
 };
 use crate::document::cr_document;
 use crate::error::cr_error;
 use crate::limits::cr_limits;
+use crate::rule::cr_rule;
 use crate::value::{cr_value, give_new_value};
 use crate::{cr_format, cr_status};
 
@@ -156,6 +158,181 @@ pub unsafe extern "C" fn cr_ruleset_summary(
     };
     // SAFETY: `error` is NULL or writable (# Safety).
     unsafe { call("cr_ruleset_summary", error, body) }
+}
+
+/// A name argument that may be left out (`NULL`).
+///
+/// # Safety
+///
+/// `name` is `NULL` or points to `len` readable bytes.
+unsafe fn optional_name<'a>(
+    name: *const c_char,
+    len: usize,
+    what: &str,
+) -> Outcome<Option<&'a str>> {
+    if name.is_null() {
+        return Ok(None);
+    }
+    // SAFETY: the caller's promise is `bytes`'.
+    utf8_arg(unsafe { bytes(name, len, what) }?, what).map(Some)
+}
+
+/// A rule set of `len` rules, in order (copied; they stay the caller's), with
+/// a hit policy, an aggregate and a logic by name, as in JSON
+/// (`spec/rules.md`; the core's `Config::from_names`): `NULL` leaves each out,
+/// which is `first`, no aggregate and `boolean`. An unknown hit policy or aggregate, a repeated rule name or
+/// an aggregate without `collect` is a `CR_RULE_DEFINITION_ERROR`; an unknown
+/// logic, a `CR_REGISTRY_ERROR`.
+///
+/// # Safety
+///
+/// `rules` is `NULL` or points to `len` readable pointers, each `NULL` or a
+/// live `cr_rule`; `hit_policy`, `aggregate` and `logic` are `NULL` or point
+/// to as many readable bytes as their lengths say; `out` is `NULL` or points
+/// to a writable `cr_ruleset *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn cr_ruleset_new(
+    rules: *const *const cr_rule,
+    len: usize,
+    hit_policy: *const c_char,
+    hit_policy_len: usize,
+    aggregate: *const c_char,
+    aggregate_len: usize,
+    logic: *const c_char,
+    logic_len: usize,
+    strict: bool,
+    out: *mut *mut cr_ruleset,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        let pointers: &[*const cr_rule] = if rules.is_null() {
+            if len != 0 {
+                return Err(Failure::Invalid(
+                    format!("rules is NULL with a length of {len}"),
+                    "pass an array of rules, or a length of 0",
+                ));
+            }
+            &[]
+        } else {
+            // SAFETY: the caller promises `len` readable pointers at `rules`.
+            unsafe { std::slice::from_raw_parts(rules, len) }
+        };
+        let mut list = Vec::with_capacity(len);
+        for &rule in pointers {
+            // SAFETY: each pointer is NULL or a live rule (# Safety).
+            list.push(unsafe { handle(rule, "a rule") }?.rule.clone());
+        }
+        // SAFETY: the names and their lengths (# Safety).
+        let (policy, aggregate, logic) = unsafe {
+            (
+                optional_name(hit_policy, hit_policy_len, "hit_policy")?,
+                optional_name(aggregate, aggregate_len, "aggregate")?,
+                optional_name(logic, logic_len, "logic")?,
+            )
+        };
+        let config = Config::from_names(policy, aggregate, logic, strict)?;
+        let ruleset = RuleSet::new(list, config)?;
+        // SAFETY: `out` passed `clear`.
+        unsafe {
+            give(
+                out,
+                cr_ruleset {
+                    ruleset: Arc::new(ruleset),
+                },
+            );
+        };
+        Ok(())
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_ruleset_new", error, body) }
+}
+
+/// The position of the rule named `name`, for a lookup by name: a name the
+/// rule set lacks is a `CR_RULE_NOT_FOUND` with the name and the rule names
+/// (`available`, sorted).
+///
+/// # Safety
+///
+/// `ruleset` is `NULL` or a live `cr_ruleset`; `name` is `NULL` or points to
+/// `len` readable bytes; `out` is `NULL` or points to a writable `size_t`;
+/// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_ruleset_rule_position(
+    ruleset: *const cr_ruleset,
+    name: *const c_char,
+    len: usize,
+    out: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `ruleset` is NULL or live (# Safety).
+        let ruleset = &unsafe { handle(ruleset, "ruleset") }?.ruleset;
+        // SAFETY: `name` and `len` (# Safety).
+        let name = utf8_arg(unsafe { bytes(name, len, "name") }?, "name")?;
+        let position = ruleset.rule_position(name)?;
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { write_out(out, position, "out") }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_ruleset_rule_position", error, body) }
+}
+
+/// The rule set's summary, as `cr_ruleset_summary` gives it, with the rules
+/// whose action is code of the program marked (`spec/explain.md`,
+/// *Summaries*): `actions` holds one flag per rule, in rule order, or none
+/// (`actions_len` 0); a rule that names its action is marked anyway. Another
+/// number of flags, or `NULL` with flags, is `CR_INVALID_ARGUMENT`.
+///
+/// # Safety
+///
+/// `ruleset` is `NULL` or a live `cr_ruleset`; `actions` is `NULL` or points
+/// to `actions_len` readable `bool`s; `out` is `NULL` or points to a writable
+/// `char *`; `len` is `NULL` or points to a writable `size_t`; `error` is
+/// `NULL` or points to a writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_ruleset_summary_actions(
+    ruleset: *const cr_ruleset,
+    actions: *const bool,
+    actions_len: usize,
+    format: cr_format,
+    out: *mut *mut c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `ruleset` is NULL or live (# Safety).
+        let ruleset = &unsafe { handle(ruleset, "ruleset") }?.ruleset;
+        let count = ruleset.rules().len();
+        if actions_len != 0 && actions_len != count {
+            return Err(Failure::Invalid(
+                format!("actions_len is {actions_len}, and the rule set has {count} rules"),
+                "pass one flag per rule, or none",
+            ));
+        }
+        let flags: &[bool] = if actions_len == 0 {
+            &[]
+        } else if actions.is_null() {
+            return Err(Failure::Invalid(
+                format!("actions is NULL with a length of {actions_len}"),
+                "pass the flags, or a length of 0",
+            ));
+        } else {
+            // SAFETY: the caller promises `actions_len` readable flags.
+            unsafe { std::slice::from_raw_parts(actions, actions_len) }
+        };
+        let overview = summary(ruleset).with_actions(flags.iter().copied());
+        let text = write_summary_as(&overview, self::format(format)?)?;
+        // SAFETY: `out` passed `clear`; `len` is NULL or writable (# Safety).
+        unsafe { give_text(out, len, text) }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_ruleset_summary_actions", error, body) }
 }
 
 /// Paths as a list of paths, each a list of strings (keys) and ints (indexes),

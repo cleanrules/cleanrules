@@ -196,24 +196,6 @@ fn definition(rule: &str, message: impl Into<String>, hint: &str) -> Problem {
     Problem::Core(error)
 }
 
-/// The path, in metadata, of the first value that is not data.
-fn metadata_problem(value: &Value, at: &str) -> Option<String> {
-    match value {
-        Value::Null(cause) if *cause != NullCause::Null => {
-            Some(format!("{at} is out of range or unreadable"))
-        }
-        Value::Opaque(opaque) => Some(format!("{at} is not a data value: a {}", opaque.type_name)),
-        Value::List(items) => items
-            .iter()
-            .enumerate()
-            .find_map(|(i, item)| metadata_problem(item, &format!("{at}[{i}]"))),
-        Value::Map(map) => map
-            .iter()
-            .find_map(|(key, item)| metadata_problem(item, &format!("{at}[{key:?}]"))),
-        _ => None,
-    }
-}
-
 /// A rule.
 pub(crate) fn rule(args: RuleArgs) -> Outcome<Rule> {
     let RuleArgs {
@@ -243,19 +225,16 @@ pub(crate) fn rule(args: RuleArgs) -> Outcome<Rule> {
         rule = rule.action_name(action)?;
     }
     if let Some(metadata) = metadata {
-        let value = data(&metadata)?;
-        if let Some(problem) = metadata_problem(&value, "metadata") {
-            return Err(definition(
-                &name,
-                problem,
-                "metadata holds data: null, booleans, numbers, strings, dates, arrays and objects",
-            ));
-        }
-        let Value::Map(map) = value else {
+        let Value::Map(map) = data(&metadata)? else {
             return Err(Problem::Internal("metadata is a map".to_owned()));
         };
         if !map.is_empty() {
-            rule = rule.metadata(map);
+            // The core checks the metadata; the hint names JavaScript's types.
+            rule = rule.try_metadata(map).map_err(|error| {
+                Problem::Core(error.with_hint(
+                    "metadata holds data: null, booleans, numbers, strings, dates, arrays and objects",
+                ))
+            })?;
         }
     }
     Ok(rule)

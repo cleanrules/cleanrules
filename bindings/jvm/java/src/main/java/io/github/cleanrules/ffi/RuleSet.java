@@ -13,6 +13,7 @@ import io.github.cleanrules.HitPolicyException;
 import io.github.cleanrules.Limits;
 import io.github.cleanrules.RegistryException;
 import io.github.cleanrules.UnsupportedException;
+import io.github.cleanrules.internal.Bridge;
 import io.github.cleanrules.internal.DataReader;
 import io.github.cleanrules.internal.Errors;
 import io.github.cleanrules.internal.Handle;
@@ -63,6 +64,30 @@ import java.util.Optional;
  * thread evaluates frees it when that evaluation ends.
  */
 public final class RuleSet implements AutoCloseable {
+    static {
+        Bridge.register(new Bridge.Ffi() {
+            @Override
+            public RuleSet ruleSet(MemorySegment owned) {
+                return new RuleSet(owned);
+            }
+
+            @Override
+            public Handle handle(RuleSet ruleset) {
+                return ruleset.handle;
+            }
+
+            @Override
+            public Handle handle(Decision decision) {
+                return decision.handle();
+            }
+
+            @Override
+            public List<Object> opaques(Decision decision) {
+                return decision.opaques();
+            }
+        });
+    }
+
     private final Handle handle;
     private volatile PathTree tree;
 
@@ -643,7 +668,7 @@ public final class RuleSet implements AutoCloseable {
                     // An error of the virtual machine is never wrapped: it goes on as it is.
                     if (frame.failure instanceof VirtualMachineError fatal) {
                         if (failure instanceof ActionException action) {
-                            action.decision().ifPresent(Decision::close);
+                            action.nativeDecision().ifPresent(Decision::close);
                         }
                         throw fatal;
                     }

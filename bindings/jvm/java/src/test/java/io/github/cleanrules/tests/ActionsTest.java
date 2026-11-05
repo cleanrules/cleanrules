@@ -90,7 +90,7 @@ class ActionsTest {
             assertEquals(List.of("first"), error.executed());
             assertTrue(error.json().contains("disk full"), error.json());
             assertEquals(List.of("first"), calls);
-            try (Decision decision = error.decision().orElseThrow()) {
+            try (Decision decision = error.nativeDecision().orElseThrow()) {
                 assertEquals(List.of(0, 2, 3), decision.selected());
                 assertEquals(Map.of("level", 2L, "thing", Map.of()), withoutNull(decision.ruleOutput(2)));
             }

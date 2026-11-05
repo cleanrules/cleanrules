@@ -305,6 +305,50 @@ public final class Native {
             bind("cr_node_evaluate_value_tree", fn(I, P, P, B, P, P, P));
     private static final MethodHandle NODE_FREE = bind("cr_node_free", proc(P));
 
+    // Building nodes, rules and rule sets (G.1b).
+    private static final MethodHandle NODE_FIELD = bind("cr_node_new_field", fn(I, P, P, P));
+    private static final MethodHandle NODE_CONSTANT = bind("cr_node_new_constant", fn(I, P, P, P));
+    private static final MethodHandle NODE_COMPARE = bind("cr_node_new_compare", fn(I, P, SIZE_T, P, P, P, P));
+    private static final MethodHandle NODE_ARITH = bind("cr_node_new_arith", fn(I, P, SIZE_T, P, P, P, P));
+    private static final MethodHandle NODE_AND = bind("cr_node_new_and", fn(I, P, SIZE_T, P, P));
+    private static final MethodHandle NODE_OR = bind("cr_node_new_or", fn(I, P, SIZE_T, P, P));
+    private static final MethodHandle NODE_NOT = bind("cr_node_new_not", fn(I, P, P, P));
+    private static final MethodHandle NODE_IS_NULL = bind("cr_node_new_is_null", fn(I, P, P, P));
+    private static final MethodHandle NODE_ABS = bind("cr_node_new_abs", fn(I, P, P, P));
+    private static final MethodHandle NODE_NEG = bind("cr_node_new_neg", fn(I, P, P, P));
+    private static final MethodHandle NODE_IS_IN = bind("cr_node_new_is_in", fn(I, P, P, P, P));
+    private static final MethodHandle NODE_BETWEEN = bind("cr_node_new_between", fn(I, P, P, P, P, SIZE_T, P, P));
+    private static final MethodHandle NODE_MATCHES = bind("cr_node_new_matches", fn(I, P, P, SIZE_T, P, P));
+    private static final MethodHandle NODE_STRING_TEST =
+            bind("cr_node_new_string_test", fn(I, P, SIZE_T, P, P, SIZE_T, P, P));
+    private static final MethodHandle NODE_TAG = bind("cr_node_tag", fn(P, P));
+    private static final MethodHandle NODE_KIND = bind("cr_node_kind", fn(P, P));
+    private static final MethodHandle NODE_CHILDREN_LEN = bind("cr_node_children_len", fn(SIZE_T, P));
+    private static final MethodHandle NODE_CHILD = bind("cr_node_child", fn(I, P, SIZE_T, P, P));
+    private static final MethodHandle NODE_SAME = bind("cr_node_same", fn(B, P, P));
+    private static final MethodHandle NODE_HASH = bind("cr_node_hash", fn(L, P));
+    private static final MethodHandle NODE_DETAIL = bind("cr_node_detail", fn(I, P, P, P));
+    private static final MethodHandle RULE_NEW = bind("cr_rule_new", fn(I, P, SIZE_T, P, P, P));
+    private static final MethodHandle RULE_WITH_PAYLOAD = bind("cr_rule_with_payload", fn(I, P, P, SIZE_T, P, P, P));
+    private static final MethodHandle RULE_WITH_PRIORITY = bind("cr_rule_with_priority", fn(I, P, L, P, P));
+    private static final MethodHandle RULE_WITH_TAGS = bind("cr_rule_with_tags", fn(I, P, P, P, P));
+    private static final MethodHandle RULE_WITH_METADATA = bind("cr_rule_with_metadata", fn(I, P, P, P, P));
+    private static final MethodHandle RULE_WITH_DESCRIPTION =
+            bind("cr_rule_with_description", fn(I, P, P, SIZE_T, P, P));
+    private static final MethodHandle RULE_WITH_ACTION = bind("cr_rule_with_action", fn(I, P, P, SIZE_T, P, P));
+    private static final MethodHandle RULE_TAGS = bind("cr_rule_tags", fn(I, P, P, P));
+    private static final MethodHandle RULE_METADATA = bind("cr_rule_metadata", fn(I, P, P, P));
+    private static final MethodHandle RULE_FREE = bind("cr_rule_free", proc(P));
+    private static final MethodHandle RULESET_NEW =
+            bind("cr_ruleset_new", fn(I, P, SIZE_T, P, SIZE_T, P, SIZE_T, P, SIZE_T, B, P, P));
+    private static final MethodHandle RULESET_RULE_POSITION =
+            bind("cr_ruleset_rule_position", fn(I, P, P, SIZE_T, P, P));
+    private static final MethodHandle RULESET_SUMMARY_ACTIONS =
+            bind("cr_ruleset_summary_actions", fn(I, P, P, SIZE_T, I, P, P, P));
+    private static final MethodHandle ERROR_NEW_ACTION =
+            bind("cr_error_new_action", fn(I, P, SIZE_T, P, SIZE_T, P, SIZE_T, P, P, P));
+    private static final MethodHandle DECISION_EXPLANATION = bind("cr_decision_explain_value", fn(I, P, P, P));
+
     // Actions.
     private static final MethodHandle ACTIONS_NEW = bind("cr_actions_new", fn(P));
     private static final MethodHandle ACTIONS_ADD = bind("cr_actions_add", fn(I, P, P, SIZE_T, P, P, P));
@@ -1385,6 +1429,317 @@ public final class Native {
             MemorySegment error) {
         try {
             return (int) VALUE_MAP_ENTRY.invokeExact(value, index, key, len, item, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+    // ---- Building nodes, rules and rule sets.
+
+    public static int nodeField(MemorySegment path, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_FIELD.invokeExact(path, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeConstant(MemorySegment value, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_CONSTANT.invokeExact(value, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeCompare(
+            MemorySegment op, long opLen, MemorySegment left, MemorySegment right, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_COMPARE.invokeExact(op, opLen, left, right, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeArith(
+            MemorySegment op, long opLen, MemorySegment left, MemorySegment right, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_ARITH.invokeExact(op, opLen, left, right, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeAnd(MemorySegment operands, long len, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_AND.invokeExact(operands, len, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeOr(MemorySegment operands, long len, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_OR.invokeExact(operands, len, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeNot(MemorySegment operand, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_NOT.invokeExact(operand, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeIsNull(MemorySegment operand, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_IS_NULL.invokeExact(operand, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeAbs(MemorySegment operand, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_ABS.invokeExact(operand, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeNeg(MemorySegment operand, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_NEG.invokeExact(operand, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeIsIn(MemorySegment operand, MemorySegment values, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_IS_IN.invokeExact(operand, values, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeBetween(
+            MemorySegment operand, MemorySegment low, MemorySegment high, MemorySegment closed, long closedLen, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_BETWEEN.invokeExact(operand, low, high, closed, closedLen, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeMatches(
+            MemorySegment operand, MemorySegment pattern, long len, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_MATCHES.invokeExact(operand, pattern, len, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeStringTest(
+            MemorySegment op, long opLen, MemorySegment operand, MemorySegment text, long len, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_STRING_TEST.invokeExact(op, opLen, operand, text, len, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static String nodeTag(MemorySegment node) {
+        try {
+            return cString((MemorySegment) NODE_TAG.invokeExact(node));
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static String nodeKind(MemorySegment node) {
+        try {
+            return cString((MemorySegment) NODE_KIND.invokeExact(node));
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static long nodeChildrenLen(MemorySegment node) {
+        try {
+            return (long) NODE_CHILDREN_LEN.invokeExact(node);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeChild(MemorySegment node, long index, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_CHILD.invokeExact(node, index, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static boolean nodeSame(MemorySegment left, MemorySegment right) {
+        try {
+            return (boolean) NODE_SAME.invokeExact(left, right);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static long nodeHash(MemorySegment node) {
+        try {
+            return (long) NODE_HASH.invokeExact(node);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeDetail(MemorySegment node, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_DETAIL.invokeExact(node, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleNew(
+            MemorySegment name, long nameLen, MemorySegment when, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULE_NEW.invokeExact(name, nameLen, when, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleWithPayload(
+            MemorySegment rule, MemorySegment key, long keyLen, MemorySegment value, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULE_WITH_PAYLOAD.invokeExact(rule, key, keyLen, value, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleWithPriority(MemorySegment rule, long priority, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULE_WITH_PRIORITY.invokeExact(rule, priority, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleWithTags(MemorySegment rule, MemorySegment tags, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULE_WITH_TAGS.invokeExact(rule, tags, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleWithMetadata(
+            MemorySegment rule, MemorySegment metadata, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULE_WITH_METADATA.invokeExact(rule, metadata, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleWithDescription(
+            MemorySegment rule, MemorySegment text, long len, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULE_WITH_DESCRIPTION.invokeExact(rule, text, len, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleWithAction(
+            MemorySegment rule, MemorySegment name, long len, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULE_WITH_ACTION.invokeExact(rule, name, len, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleTags(MemorySegment rule, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULE_TAGS.invokeExact(rule, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleMetadata(MemorySegment rule, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULE_METADATA.invokeExact(rule, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static void ruleFree(MemorySegment rule) {
+        try {
+            RULE_FREE.invokeExact(rule);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int rulesetNew(
+            MemorySegment rules, long len, MemorySegment hitPolicy, long hitPolicyLen, MemorySegment aggregate, long aggregateLen, MemorySegment logic, long logicLen, boolean strict, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULESET_NEW.invokeExact(rules, len, hitPolicy, hitPolicyLen, aggregate, aggregateLen, logic, logicLen, strict, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int rulesetRulePosition(
+            MemorySegment ruleset, MemorySegment name, long len, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULESET_RULE_POSITION.invokeExact(ruleset, name, len, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int rulesetSummaryActions(
+            MemorySegment ruleset, MemorySegment actions, long actionsLen, int format, MemorySegment out, MemorySegment len, MemorySegment error) {
+        try {
+            return (int) RULESET_SUMMARY_ACTIONS.invokeExact(ruleset, actions, actionsLen, format, out, len, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int decisionExplanation(MemorySegment decision, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) DECISION_EXPLANATION.invokeExact(decision, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int errorNewAction(
+            MemorySegment rule,
+            long ruleLen,
+            MemorySegment action,
+            long actionLen,
+            MemorySegment detail,
+            long detailLen,
+            MemorySegment executed,
+            MemorySegment out,
+            MemorySegment error) {
+        try {
+            return (int) ERROR_NEW_ACTION.invokeExact(rule, ruleLen, action, actionLen, detail, detailLen, executed, out, error);
         } catch (Throwable thrown) {
             throw rethrow(thrown);
         }
