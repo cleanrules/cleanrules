@@ -4,8 +4,9 @@
 //   (npm/<platform>) all have the Cargo workspace's version, which the native
 //   addon reports;
 // - the `wasm-bindgen` crate is pinned (`=x.y.z` in Cargo.toml), locked
-//   (Cargo.lock) and installed in CI (`wasm-bindgen@x.y.z` in ci.yml) at one
-//   version, as the CLI that writes the module's glue must match the crate.
+//   (Cargo.lock) and installed in CI (`wasm-bindgen@x.y.z` in ci.yml and
+//   node-binaries.yml) at one version, as the CLI that writes the module's
+//   glue must match the crate.
 //
 // CI runs it: node bindings/js/scripts/check-versions.js
 
@@ -35,9 +36,14 @@ for (const dir of fs.readdirSync(path.join(js, 'npm'))) {
 
 const pinned = /^wasm-bindgen = "=([^"]+)"/m.exec(read(js, 'Cargo.toml'))?.[1]
 const locked = /\[\[package\]\]\nname = "wasm-bindgen"\nversion = "([^"]+)"/.exec(read(root, 'Cargo.lock'))?.[1]
-const installed = /wasm-bindgen@([0-9][^\s"']*)/.exec(read(root, '.github', 'workflows', 'ci.yml'))?.[1]
 found.push(['wasm-bindgen in Cargo.lock', locked, pinned])
-found.push(['wasm-bindgen-cli in ci.yml', installed, pinned])
+// Every workflow that builds the module installs the CLI (at least once).
+for (const workflow of ['ci.yml', 'node-binaries.yml']) {
+  const text = read(root, '.github', 'workflows', workflow)
+  const installed = [...text.matchAll(/wasm-bindgen@([0-9][^\s"']*)/g)].map((match) => match[1])
+  if (installed.length === 0) installed.push(undefined)
+  for (const version of installed) found.push([`wasm-bindgen-cli in ${workflow}`, version, pinned])
+}
 
 const wrong = found.filter(([, version, expected]) => version !== expected || version === undefined)
 for (const [where, version, expected] of wrong) {

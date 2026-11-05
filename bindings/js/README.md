@@ -200,14 +200,58 @@ it is a loading mistake, not one of the engine's error codes
 
 ## Installing and building
 
-Users install `cleanrules` only. On Node, the addon ships in one optional
-package per platform, `@cleanrules/node-<platform>` ([`npm/`](npm)), and npm
-installs the one for the machine: Linux (x64 and arm64, glibc and musl), macOS
-(x64 and arm64) and Windows (x64 and arm64, MSVC). The package refuses to load
-an addon of another version, and says to reinstall it. The WebAssembly module
-is in the package itself (`npm pack` refuses to pack without it, or with one older
-than the Rust sources: `scripts/prepack.js`). Nothing is published yet (task
-M.2).
+Users install `cleanrules` only (Node 22.12 or later). On Node, the addon
+ships in one optional package per platform, `@cleanrules/node-<platform>`
+([`npm/`](npm)), and npm installs the one whose `os`, `cpu` and `libc` fit the
+machine:
+
+| Platform package | System |
+|---|---|
+| `linux-x64-gnu`, `linux-arm64-gnu` | Linux with glibc 2.28 or later (built on manylinux_2_28, the floor of Node 22's own binaries: RHEL 8, Debian 10, Ubuntu 20.04 and later) |
+| `linux-x64-musl`, `linux-arm64-musl` | Linux with musl (Alpine) |
+| `darwin-x64`, `darwin-arm64` | macOS on Intel and Apple silicon |
+| `win32-x64-msvc`, `win32-arm64-msvc` | Windows on x64 and arm64 |
+
+The package refuses to load an addon of another version, and says to
+reinstall it. Where no platform package fits (another system or processor), or
+when optional dependencies are left out (`npm install --omit=optional`),
+`cleanrules` cannot load an addon on Node and says so; the WebAssembly build,
+which is in the package itself, runs there instead with `node
+--conditions=browser`, or through `cleanrules/wasm` (*Initialising the
+WebAssembly module yourself*, above). Nothing is published yet (task M.2).
+
+### Packing
+
+`npm pack` packs the main package with the WebAssembly module, and refuses
+without it or with one older than the Rust sources (`scripts/prepack.js`). CI
+(`.github/workflows/node-binaries.yml`) builds every addon (the glibc ones in
+manylinux_2_28 containers, checked to need glibc 2.28 at most), packs the nine
+packages, checks what each tarball holds, and installs the tarballs into a new
+project on every platform. The same scripts run by hand, from `bindings/js`:
+
+```sh
+npm run build:wasm
+cp cleanrules.darwin-arm64.node npm/darwin-arm64/    # this machine's addon (npm run build:release)
+node scripts/check-pack.js --platforms darwin-arm64              # npm pack --dry-run, and the checks
+node scripts/check-pack.js --platforms darwin-arm64 --out dist   # the tarballs, checked
+node scripts/install-packed.js dist                              # a new project from them, and the smoke scripts
+```
+
+`scripts/check-pack.js` checks each package against an explicit list: the
+main package holds its entries and declarations, `binding.cjs`, `lib/`,
+`wasm/cleanrules.js` and `wasm/cleanrules_bg.wasm`, README, LICENSE and NOTICE,
+and no tests, sources, addons or source maps; each platform package holds
+exactly its addon (a binary of its system and processor; for glibc, needing
+2.28 at most), README, LICENSE and NOTICE; every package has one version.
+Without `--platforms` it checks all eight platform packages.
+`scripts/install-packed.js` installs the tarballs as a user would, without the
+registry: `cleanrules` as a `file:` dependency and each platform package
+through `overrides` with a `file:` spec, under `npm install --offline` with a
+cache of its own (npm still picks the platform package by `os`, `cpu` and
+`libc`). Then it imports and requires `cleanrules` and `cleanrules/native`,
+evaluates a rule, checks that the addon came from the installed platform
+package and from nowhere else, and that `node --conditions=browser` runs the
+WebAssembly build (`scripts/smoke/`).
 
 From the repository, with a Rust toolchain:
 

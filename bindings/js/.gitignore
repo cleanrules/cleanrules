@@ -1,5 +1,8 @@
 node_modules/
 *.node
 npm/*/*.node
+# Copied into each platform package before packing (scripts/check-pack.js).
+npm/*/LICENSE
+npm/*/NOTICE
 # The WebAssembly build (npm run build:wasm).
 /wasm/

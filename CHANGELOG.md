@@ -338,6 +338,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `JSON.stringify` of every decision, explanation, summary and result tree
   against the vectors, and reads every rule set, condition and document back
   with `loads` and `readDecision`.
+- npm packages ready to publish, not published (task F.3b): the Linux glibc
+  addons (`@cleanrules/node-linux-x64-gnu` and `-arm64-gnu`) are built in
+  manylinux_2_28 containers and need glibc 2.28 or later, the floor of Node
+  22's own binaries (they were built on Ubuntu 22.04 and needed 2.35); CI
+  checks the symbol versions and runs the tests there on Node 22. The "Node
+  binaries" workflow now also builds the WebAssembly module into the main
+  package, runs `npm pack` for the nine packages, checks each tarball against
+  an explicit list of files (`bindings/js/scripts/check-pack.js`: no tests,
+  sources, addons or source maps in `cleanrules`; exactly its addon, a binary
+  of its system and processor, in each platform package; one version
+  throughout), and installs the tarballs into a new project on every platform
+  (`bindings/js/scripts/install-packed.js`: `file:` specs and `overrides`,
+  `npm install --offline`), where `import` and `require` of `cleanrules` and
+  `cleanrules/native` must run on the platform package's addon and
+  `--conditions=browser` on WebAssembly. The README lists the platforms and
+  the WebAssembly fallback.
 - WebAssembly build of the JavaScript binding (task F.1b): the same npm
   package `cleanrules` runs in browsers, Deno (2.6 or later) and other runtimes
   on a WebAssembly module built with wasm-bindgen, with the same API as the

@@ -1,10 +1,23 @@
 name: Node binaries
 
-# Builds the native addon of the `cleanrules` npm package in release mode for
-# every platform package (`@cleanrules/node-<platform>`, bindings/js/npm),
-# runs the binding's tests on each one, and uploads the addons. Every target
-# has a runner, so every addon is tested where it runs. Publishing to npm comes
-# in M.2.
+# Builds the npm packages and installs them as users would, without
+# publishing (that comes in M.2, as for the Python wheels):
+#
+# 1. The native addon of each platform package (`@cleanrules/node-<platform>`,
+#    bindings/js/npm), in release mode, tested where it runs. The glibc ones
+#    are built in manylinux_2_28 containers, so they need glibc 2.28 at most
+#    (as Node 22's own binaries), which the build checks; the musl ones in
+#    Alpine.
+# 2. The packages: each addon into its platform package (`napi artifacts`),
+#    the WebAssembly module into the main package (`npm run build:wasm`), then
+#    `npm pack` of all nine, each tarball checked against the list of files it
+#    must hold and nothing else (scripts/check-pack.js).
+# 3. The tarballs installed into a new project on every platform, from the
+#    tarballs alone (scripts/install-packed.js: `file:` specs and `overrides`,
+#    with `npm install --offline`, as the platform packages are not on the
+#    registry), and a smoke run: `import` and `require` of `cleanrules` and
+#    `cleanrules/native` on the platform package's addon, and
+#    `--conditions=browser` on WebAssembly.
 
 on:
   push:
@@ -33,10 +46,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # glibc: built on the oldest Ubuntu runner, so the addon needs glibc
-          # 2.35 at most.
-          - { runner: ubuntu-22.04, target: x86_64-unknown-linux-gnu, platform: linux-x64-gnu }
-          - { runner: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu, platform: linux-arm64-gnu }
           - { runner: macos-15-intel, target: x86_64-apple-darwin, platform: darwin-x64 }
           - { runner: macos-latest, target: aarch64-apple-darwin, platform: darwin-arm64 }
           - { runner: windows-latest, target: x86_64-pc-windows-msvc, platform: win32-x64-msvc }
@@ -58,6 +67,69 @@ jobs:
       - run: test -f cleanrules.${{ matrix.platform }}.node
       # The release addon, on the oldest supported Node.
       - run: node --test "test/**/*.test.js"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bindings-${{ matrix.platform }}
+          path: bindings/js/cleanrules.${{ matrix.platform }}.node
+          if-no-files-found: error
+
+  gnu:
+    name: Addon (${{ matrix.platform }}, glibc 2.28)
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            image: quay.io/pypa/manylinux_2_28_x86_64
+            target: x86_64-unknown-linux-gnu
+            platform: linux-x64-gnu
+            node-arch: x64
+          - runner: ubuntu-24.04-arm
+            image: quay.io/pypa/manylinux_2_28_aarch64
+            target: aarch64-unknown-linux-gnu
+            platform: linux-arm64-gnu
+            node-arch: arm64
+    steps:
+      - uses: actions/checkout@v7
+      # Built, checked and tested natively in manylinux_2_28 (AlmaLinux 8,
+      # glibc 2.28), the image of the Python wheels. The container runs by
+      # hand, as the musl one below.
+      - env:
+          IMAGE: ${{ matrix.image }}
+          TARGET: ${{ matrix.target }}
+          PLATFORM: ${{ matrix.platform }}
+          NODE_ARCH: ${{ matrix.node-arch }}
+        run: |
+          docker run --rm -v "$PWD:/work" -e TARGET -e PLATFORM -e NODE_ARCH "$IMAGE" bash -euxo pipefail -c '
+            # Node 22 (the latest 22.x), the official build, which needs glibc
+            # 2.28 itself, checked against the SHA-256 sums of the release.
+            cd /tmp
+            base=https://nodejs.org/dist/latest-v22.x
+            curl -fsSLO "$base/SHASUMS256.txt"
+            tarball=$(grep -oE "node-v22\.[0-9]+\.[0-9]+-linux-$NODE_ARCH\.tar\.gz" SHASUMS256.txt | head -n 1)
+            curl -fsSLO "$base/$tarball"
+            grep " $tarball\$" SHASUMS256.txt | sha256sum -c -
+            mkdir /opt/node
+            tar -xzf "$tarball" -C /opt/node --strip-components=1
+            export PATH="/opt/node/bin:$PATH"
+            node --version
+            # Rust stable, the toolchain of every other job, by rustup.
+            curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+            . "$HOME/.cargo/env"
+            cd /work/bindings/js
+            npm install --no-audit --no-fund
+            npm run build:release -- --target "$TARGET"
+            addon="cleanrules.$PLATFORM.node"
+            test -f "$addon"
+            # The glibc symbol versions the addon needs: 2.28 at most.
+            objdump -T "$addon" | grep -oE "GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?" | sort -uV > /tmp/glibc.txt
+            cat /tmp/glibc.txt
+            highest=$(tail -n 1 /tmp/glibc.txt | sed "s/^GLIBC_//")
+            test "$(printf "%s\n" "$highest" 2.28 | sort -V | tail -n 1)" = 2.28
+            # The release addon, on glibc 2.28 and the oldest supported Node.
+            node --test "test/**/*.test.js"
+          '
       - uses: actions/upload-artifact@v7
         with:
           name: bindings-${{ matrix.platform }}
@@ -97,33 +169,103 @@ jobs:
           if-no-files-found: error
 
   packages:
-    name: Platform packages
-    needs: [native, musl]
+    name: Pack and check the npm packages
+    needs: [native, gnu, musl]
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: bindings/js
     steps:
       - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      # The CLI at the version of the wasm-bindgen crate, as in ci.yml
+      # (scripts/check-versions.js compares both lines with the crate).
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen@0.2.130
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+      # The package, its optional dependencies, its platform packages and the
+      # Cargo workspace have one version (what `napi pre-publish` would align).
+      - run: node scripts/check-versions.js
       - run: npm install --no-audit --no-fund
+      # The WebAssembly module the main package ships (its `prepack` refuses
+      # to pack without a current one).
+      - run: npm run build:wasm
       - uses: actions/download-artifact@v8
         with:
           pattern: bindings-*
           path: bindings/js/artifacts
       # Each addon into its platform package (npm/<platform>), as napi-rs lays
-      # them out for publishing; nothing is published.
+      # them out for publishing.
       - run: npx napi artifacts
-      # Every package has its addon, and the licence files it ships with.
-      - run: |
-          for dir in npm/*/; do
-            platform=$(basename "$dir")
-            test -f "$dir/cleanrules.$platform.node"
-            cp LICENSE NOTICE "$dir"
-          done
+      # npm pack of the nine packages into dist/, and each tarball against the
+      # files it must hold and nothing else: the main package without tests,
+      # sources or addons, and with its declarations, loader and WebAssembly
+      # module; each platform package with exactly its addon, a binary of its
+      # system and processor (glibc 2.28 at most for the gnu ones).
+      - run: node scripts/check-pack.js --out dist
       - uses: actions/upload-artifact@v7
         with:
-          name: npm-platform-packages
-          path: bindings/js/npm
+          name: npm-packages
+          path: bindings/js/dist/*.tgz
+          if-no-files-found: error
+
+  install:
+    name: Install the packages (${{ matrix.platform }})
+    needs: packages
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, platform: linux-x64-gnu }
+          - { runner: ubuntu-24.04-arm, platform: linux-arm64-gnu }
+          - { runner: macos-15-intel, platform: darwin-x64 }
+          - { runner: macos-latest, platform: darwin-arm64 }
+          - { runner: windows-latest, platform: win32-x64-msvc }
+          - { runner: windows-11-arm, platform: win32-arm64-msvc }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Only for the scripts: the project installs nothing from the checkout.
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v8
+        with:
+          name: npm-packages
+          path: ${{ runner.temp }}/npm-packages
+      # A new project outside the checkout, from the tarballs alone, then the
+      # smoke scripts (scripts/smoke/).
+      - run: >-
+          node bindings/js/scripts/install-packed.js "$RUNNER_TEMP/npm-packages"
+          --project "$RUNNER_TEMP/smoke" --platform ${{ matrix.platform }} --all
+
+  install-musl:
+    name: Install the packages (${{ matrix.platform }})
+    needs: packages
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, platform: linux-x64-musl }
+          - { runner: ubuntu-24.04-arm, platform: linux-arm64-musl }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: npm-packages
+          path: npm-packages
+      # In Alpine, by hand as the musl build; the project is outside the
+      # checkout.
+      - run: |
+          docker run --rm -v "$PWD:/work" -w /work node:22-alpine \
+            node bindings/js/scripts/install-packed.js npm-packages \
+            --project /tmp/smoke --platform ${{ matrix.platform }} --all
