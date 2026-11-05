@@ -405,6 +405,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `number` that is not a safe integer is a float, infinities included, and
   `Uint8Array`, `Buffer`, `ArrayBuffer` and `DataView` are opaque like bytes in
   other languages. Native data only, so no conformance vector changes.
+- Data model (`spec/data-model.md`, *JavaScript and TypeScript*): objects of
+  the runtime (`Error`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`,
+  `FinalizationRegistry`, `Promise`, `RegExp`, boxed primitives, iterators,
+  generators, module namespaces, and the binding's own objects) are opaque,
+  recognised by brand or by `Symbol.toStringTag`; they were "anything not
+  listed". Native data only, so no conformance vector changes.
 - Errors (`spec/errors.md`): in JavaScript the context fields are in `context`,
   because an error's `name` is its class, and an `ActionError` has the
   `decision`.

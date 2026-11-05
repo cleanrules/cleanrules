@@ -283,6 +283,7 @@ module, records included.
 | `Array`, typed arrays except `Uint8Array` (and `Buffer`) | list; holes and `undefined` elements are null (a list cannot hold a missing element) |
 | `Uint8Array`, `Buffer`, `ArrayBuffer`, `DataView` | opaque, like bytes in other languages |
 | `Map` | map, in insertion order; an entry whose key is not a string is left out |
+| objects of the runtime: `Error`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `Promise`, `RegExp`, boxed primitives, iterators, generators, module namespaces, and the binding's own objects (rule sets, decisions...) | opaque, never read through; recognised by brand (a built-in method or getter that works across realms) or by `Symbol.toStringTag` |
 | plain objects and class instances | map of own enumerable string-keyed properties (checked with `Object.hasOwn`), plus getters defined by the object's classes, never by `Object.prototype`; `constructor` and `__proto__` are always missing |
 
 Temporal values are recognised by `Symbol.toStringTag`, so polyfills work;
