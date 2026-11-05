@@ -710,7 +710,8 @@ would have been written:
 
 - a rule with an action given as code, without a name (pointer to
   `…/rules/<i>/do`), unless the caller passes the option `omit_actions`, which
-  every binding names the same way; a named action is written as its name;
+  every binding names the same way in its language's case (`omitActions` in
+  JavaScript); a named action is written as its name;
 - a metadata value that is not a data value, or a float NaN in metadata, which
   would otherwise silently become null;
 - a logic that is not one of the core's named logics, or one configured with

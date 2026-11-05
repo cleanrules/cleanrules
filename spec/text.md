@@ -132,7 +132,8 @@ A text holds:
   `HIT POLICY <policy>`, `AGGREGATE <aggregate>`, `LOGIC <logic>`, `STRICT`
   (the names of `rules.md`).
 
-A reader asked for one rule (`rule_from_text`) refuses a condition or a rule
+A reader asked for one rule (`rule_from_text`; `ruleFromText` where camel
+case is the idiom) refuses a condition or a rule
 set with a `rule_syntax_error` where the rule should start or the text end.
 
 ## Errors and limits

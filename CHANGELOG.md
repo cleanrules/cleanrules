@@ -527,3 +527,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path of the build) and the SONAME `libcleanrules_ffi.so` on Linux (it had
   none).
 
+- Data model (`spec/data-model.md`, *Values given back*): a decision table's
+  output values and the values of a result tree also come back to JavaScript
+  by its rules, and they, a table row's priority and a table output's values
+  follow its rules for priorities and shallow freezing. JSON format
+  (`spec/json-format.md`, *Writing errors*): bindings name `omit_actions` in
+  their language's case (`omitActions` in JavaScript). Text syntax
+  (`spec/text.md`): `ruleFromText` where camel case is the idiom. Tables
+  (`spec/tables.md`, *Grids*): in JavaScript, `null`, `undefined` and holes are
+  empty cells. No conformance vector changes.

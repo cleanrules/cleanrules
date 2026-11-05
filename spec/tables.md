@@ -240,7 +240,8 @@ a decimal.
   are empty.
 - **Cells**: text is read as an unquoted CSV field: `-`, `> 5`, `'VIP'`, names
   and descriptions without the space around them, and nothing or only space
-  for an empty cell. Null is an empty cell. Any other value `v` is, under an
+  for an empty cell. Null is an empty cell (in JavaScript, `null`, `undefined`
+  and holes). Any other value `v` is, under an
   input `x`, the condition `x = v`; under an output, the value `v`; under
   `RULE` or `DESCRIPTION`, a string is read as text; and under `PRIORITY`, an
   int, or a float with an integral value (data frames store ints with missing

@@ -294,9 +294,10 @@ from a JavaScript object may come out in a different order than the same data
 in Python; equality ignores that order.
 
 **Values given back.** Outputs, payloads, aggregates, metadata, constants (a
-constant node's value) and the values in an explanation (the values a cause
-read, a counterfactual's target) come back to JavaScript as follows, the same
-in Node, Deno and browsers:
+constant node's value, a decision table's output values), the values in an
+explanation (the values a cause read, a counterfactual's target) and in a
+result tree come back to JavaScript as follows, the same in Node, Deno and
+browsers:
 
 | Value | JavaScript |
 |---|---|
@@ -316,10 +317,12 @@ in Node, Deno and browsers:
 A counterfactual's gap is a `number`, `bigint` or `cr.Decimal`, like the int,
 float or decimal above; between dates it is a frozen `{ days }`, and between
 datetimes a frozen `{ microseconds }`, each holding an int by the rule above.
-Priorities in notes and summaries are ints by the same rule.
+Priorities in notes, summaries and a decision table's rows are ints by the
+same rule.
 
-These classes are frozen, and payloads and outputs are frozen shallowly (the
-arrays and objects inside them are not). Each value reads back as the same
+These classes are frozen, and payloads, outputs, the lists and maps of a
+result tree and a table output's values are frozen shallowly (the arrays and
+objects inside them are not). Each value reads back as the same
 value (the table above), so an output can be fed to another evaluation, with
 three exceptions: a plain object never yields the keys `__proto__` and
 `constructor` (pass such a map as a `Map`); an opaque value given back as
