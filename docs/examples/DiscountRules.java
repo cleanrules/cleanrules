@@ -5,10 +5,8 @@
  * and as text, why a rule did not fire, the summary, a named action bound to
  * a lambda, and a strict-mode error.
  *
- *     cargo build -p cleanrules-ffi
- *     (cd bindings/jvm && ./gradlew jar)
+ *     (cd bindings/jvm && ./gradlew jar)    # with this platform's library inside
  *     java --enable-native-access=io.github.cleanrules \
- *          -Dcleanrules.library.path=target/debug \
  *          --module-path bindings/jvm/java/build/libs --add-modules io.github.cleanrules \
  *          docs/examples/DiscountRules.java
  */

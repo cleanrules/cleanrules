@@ -1,0 +1,287 @@
+name: JVM natives
+
+# Builds the one jar of the Java binding with the C ABI library of all eight
+# platforms inside, and runs it as users would, without publishing (Maven
+# Central comes in G.3 and M.2):
+#
+# 1. The library (`cargo build --release -p cleanrules-ffi`) of each platform
+#    of the npm packages: natively on macOS and Windows; the glibc ones in
+#    manylinux_2_28 containers, so they need glibc 2.28 at most, which the
+#    build checks (as for the Node addons); the musl ones in Alpine.
+# 2. The jar: the eight libraries at /native/<platform>/<file>, each with its
+#    SHA-256 (`./gradlew jar -Pcleanrules.natives.dir=...`), checked against
+#    what it must hold and nothing else (bindings/jvm/scripts/check-jar.py:
+#    exactly the eight libraries, each a binary of its system and processor,
+#    glibc 2.28 at most for the gnu ones, musl's libc for the musl ones).
+# 3. A smoke run on every platform there is a runner for, from outside the
+#    checkout with no override: the binding must extract its platform's
+#    library from the jar, load it and evaluate rules, on the class path and
+#    on the module path (bindings/jvm/scripts/JarSmoke.java); the glibc ones
+#    also in manylinux_2_28 (glibc 2.28) with a checked Temurin 25 tarball, and
+#    the musl ones in Alpine containers with Temurin 25. Windows on arm64 uses
+#    Microsoft's OpenJDK 25 (Temurin has none there).
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "bindings/jvm/**"
+      - "crates/core/**"
+      - "crates/ffi/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/jvm-natives.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jvm-natives-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: Library (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-15-intel, target: x86_64-apple-darwin, platform: darwin-x64, file: libcleanrules_ffi.dylib }
+          - { runner: macos-latest, target: aarch64-apple-darwin, platform: darwin-arm64, file: libcleanrules_ffi.dylib }
+          - { runner: windows-latest, target: x86_64-pc-windows-msvc, platform: win32-x64-msvc, file: cleanrules_ffi.dll }
+          - { runner: windows-11-arm, target: aarch64-pc-windows-msvc, platform: win32-arm64-msvc, file: cleanrules_ffi.dll }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - run: cargo build --locked --release -p cleanrules-ffi --target ${{ matrix.target }}
+      # natives/<platform>/<file>, the layout -Pcleanrules.natives.dir reads.
+      - run: |
+          mkdir -p "natives/${{ matrix.platform }}"
+          cp "target/${{ matrix.target }}/release/${{ matrix.file }}" "natives/${{ matrix.platform }}/"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: jvm-native-${{ matrix.platform }}
+          path: natives/
+          if-no-files-found: error
+
+  gnu:
+    name: Library (${{ matrix.platform }}, glibc 2.28)
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, image: quay.io/pypa/manylinux_2_28_x86_64, platform: linux-x64-gnu }
+          - { runner: ubuntu-24.04-arm, image: quay.io/pypa/manylinux_2_28_aarch64, platform: linux-arm64-gnu }
+    steps:
+      - uses: actions/checkout@v7
+      # Built natively in manylinux_2_28 (AlmaLinux 8, glibc 2.28), as the
+      # Node addons are; the container runs by hand.
+      - env:
+          IMAGE: ${{ matrix.image }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work -e PLATFORM "$IMAGE" bash -euxo pipefail -c '
+            # Rust stable, the toolchain of every other job, by rustup.
+            curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+            . "$HOME/.cargo/env"
+            cargo build --locked --release -p cleanrules-ffi
+            library=target/release/libcleanrules_ffi.so
+            # The glibc symbol versions the library needs: 2.28 at most.
+            objdump -T "$library" | grep -oE "GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?" | sort -uV > /tmp/glibc.txt
+            cat /tmp/glibc.txt
+            highest=$(tail -n 1 /tmp/glibc.txt | sed "s/^GLIBC_//")
+            test "$(printf "%s\n" "$highest" 2.28 | sort -V | tail -n 1)" = 2.28
+            mkdir -p "natives/$PLATFORM"
+            cp "$library" "natives/$PLATFORM/"
+          '
+      - uses: actions/upload-artifact@v7
+        with:
+          name: jvm-native-${{ matrix.platform }}
+          path: natives/
+          if-no-files-found: error
+
+  musl:
+    name: Library (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, platform: linux-x64-musl }
+          - { runner: ubuntu-24.04-arm, platform: linux-arm64-musl }
+    steps:
+      - uses: actions/checkout@v7
+      # Built natively in Alpine; the container runs by hand, as for the Node
+      # addons.
+      - env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work -e PLATFORM alpine:3.22 sh -euxc '
+            apk add --no-cache build-base curl
+            curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+            . "$HOME/.cargo/env"
+            # Rust links musl statically by default, and then builds no
+            # shared library: this one links it dynamically (and libgcc_s).
+            RUSTFLAGS="-C target-feature=-crt-static" cargo build --locked --release -p cleanrules-ffi
+            mkdir -p "natives/$PLATFORM"
+            cp target/release/libcleanrules_ffi.so "natives/$PLATFORM/"
+          '
+      - uses: actions/upload-artifact@v7
+        with:
+          name: jvm-native-${{ matrix.platform }}
+          path: natives/
+          if-no-files-found: error
+
+  jar:
+    name: Assemble and check the jar
+    needs: [native, gnu, musl]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bindings/jvm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+          cache: gradle
+      # The wrapper jar, before it runs (as in ci.yml).
+      - run: bash scripts/check-wrapper.sh
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: jvm-native-*
+          merge-multiple: true
+          path: natives
+      # The eight libraries into the jar, without cargo.
+      - run: ./gradlew jar --no-daemon "-Pcleanrules.natives.dir=$GITHUB_WORKSPACE/natives"
+      # Exactly the eight libraries, each of its system and processor, glibc
+      # 2.28 at most, musl's libc for musl, with their SHA-256 and manifest.
+      - run: python3 scripts/check-jar.py java/build/libs/cleanrules-*.jar
+      - uses: actions/upload-artifact@v7
+        with:
+          name: jvm-jar
+          path: bindings/jvm/java/build/libs/cleanrules-*.jar
+          if-no-files-found: error
+
+  smoke:
+    name: Smoke (${{ matrix.platform }})
+    needs: jar
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, platform: linux-x64-gnu, java: temurin }
+          - { runner: ubuntu-24.04-arm, platform: linux-arm64-gnu, java: temurin }
+          - { runner: macos-15-intel, platform: darwin-x64, java: temurin }
+          - { runner: macos-latest, platform: darwin-arm64, java: temurin }
+          - { runner: windows-latest, platform: win32-x64-msvc, java: temurin }
+          # Temurin has no JDK 25 for Windows on arm64; Microsoft's build does.
+          - { runner: windows-11-arm, platform: win32-arm64-msvc, java: microsoft }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Only for JarSmoke.java: the jar is the artifact.
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: ${{ matrix.java }}
+          java-version: 25
+      - uses: actions/download-artifact@v8
+        with:
+          name: jvm-jar
+          path: ${{ runner.temp }}/jar
+      # From outside the checkout, with no cleanrules.library.path or
+      # CLEANRULES_LIBRARY_PATH: the library must come from the jar.
+      - run: |
+          cd "$RUNNER_TEMP/jar"
+          jar=$(ls cleanrules-*.jar)
+          smoke="$GITHUB_WORKSPACE/bindings/jvm/scripts/JarSmoke.java"
+          java --enable-native-access=ALL-UNNAMED --illegal-native-access=deny -cp "$jar" "$smoke"
+          java --enable-native-access=io.github.cleanrules --illegal-native-access=deny \
+            --module-path "$jar" --add-modules io.github.cleanrules "$smoke"
+
+  smoke-glibc:
+    name: Smoke (${{ matrix.platform }}, glibc 2.28)
+    needs: jar
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, image: quay.io/pypa/manylinux_2_28_x86_64, platform: linux-x64-gnu, arch: x64 }
+          - { runner: ubuntu-24.04-arm, image: quay.io/pypa/manylinux_2_28_aarch64, platform: linux-arm64-gnu, arch: aarch64 }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: jvm-jar
+          path: jar
+      # The oldest glibc the library supports (2.28, AlmaLinux 8), with
+      # Temurin 25 for Linux, checked against the SHA-256 Adoptium publishes
+      # next to it (as node-binaries.yml checks Node's SHASUMS256.txt).
+      - env:
+          IMAGE: ${{ matrix.image }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          docker run --rm -v "$PWD:/work:ro" -w /tmp -e ARCH "$IMAGE" bash -euxo pipefail -c '
+            ldd --version | head -n 1
+            # The latest GA build: Adoptium redirects to the release asset.
+            api="https://api.adoptium.net/v3/binary/latest/25/ga/linux/$ARCH/jdk/hotspot/normal/eclipse"
+            url=$(curl -fsS -o /dev/null -w "%{redirect_url}" "$api")
+            test -n "$url"
+            curl -fsSL -o jdk.tar.gz "$url"
+            expected=$(curl -fsSL "$url.sha256.txt" | cut -d " " -f 1)
+            test ${#expected} -eq 64
+            echo "$expected  jdk.tar.gz" | sha256sum -c -
+            mkdir /opt/jdk
+            tar -xzf jdk.tar.gz -C /opt/jdk --strip-components=1
+            export PATH="/opt/jdk/bin:$PATH"
+            java -version
+            jar=$(ls /work/jar/cleanrules-*.jar)
+            smoke=/work/bindings/jvm/scripts/JarSmoke.java
+            java --enable-native-access=ALL-UNNAMED --illegal-native-access=deny -cp "$jar" "$smoke"
+            java --enable-native-access=io.github.cleanrules --illegal-native-access=deny \
+              --module-path "$jar" --add-modules io.github.cleanrules "$smoke"
+          '
+
+  smoke-musl:
+    name: Smoke (${{ matrix.platform }})
+    needs: jar
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, platform: linux-x64-musl }
+          - { runner: ubuntu-24.04-arm, platform: linux-arm64-musl }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: jvm-jar
+          path: jar
+      # Temurin 25 on Alpine, by hand as the musl build.
+      - run: |
+          docker run --rm -v "$PWD:/work:ro" -w /tmp eclipse-temurin:25-jdk-alpine sh -euxc '
+            # Rust libraries on musl unwind with libgcc_s, which the README
+            # asks for; say whether the image had it.
+            apk info -e libgcc || echo "the image has no libgcc: installing it"
+            apk add --no-cache libgcc
+            jar=$(ls /work/jar/cleanrules-*.jar)
+            smoke=/work/bindings/jvm/scripts/JarSmoke.java
+            java --enable-native-access=ALL-UNNAMED --illegal-native-access=deny -cp "$jar" "$smoke"
+            java --enable-native-access=io.github.cleanrules --illegal-native-access=deny \
+              --module-path "$jar" --add-modules io.github.cleanrules "$smoke"
+          '

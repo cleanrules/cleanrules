@@ -480,6 +480,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ResultTree` (`node()`, `truth()`, `value()`, `reason()`, `children()`,
   `toJson()`), and `ActionContext.tree()` the tree of the rule's condition.
   Example `docs/examples/RiskTable.java`, run by a test.
+- The Java jar carries the native library (task G.1c): one jar,
+  `io.github.cleanrules:cleanrules` (not published), with the C ABI library
+  of the eight platforms of the npm packages at
+  `/native/<platform>/<file>` (`darwin-x64`, `darwin-arm64`, `linux-x64-gnu`
+  and `linux-arm64-gnu` for glibc 2.28 or later, `linux-x64-musl` and
+  `linux-arm64-musl`, `win32-x64-msvc` and `win32-arm64-msvc`), each with its
+  SHA-256 in `<file>.sha256`, and the platforms in the manifest
+  (`Cleanrules-Native-Platforms`). After `cleanrules.library.path` and
+  `CLEANRULES_LIBRARY_PATH`, which still come first, the binding takes this
+  platform's library from the jar (on Linux, glibc or musl as the JVM's own C
+  library, read from `/proc/self/maps` or the `java` launcher's program
+  interpreter), extracts it into a new directory `cleanrules-native-<random>`
+  under the new system property `cleanrules.tmpdir` or `java.io.tmpdir`
+  (`rwx------` where there are POSIX permissions; on Windows with the access
+  control lists of that directory, private in the default per-user
+  `%TEMP%`), checks its size and SHA-256, loads it, and deletes it at once on
+  Linux and macOS, so nothing is left unless the JVM dies while loading it; on
+  Windows, which cannot delete a loaded DLL, a later JVM of the same user
+  deletes such directories once they are an hour old and hold nothing but an
+  unloaded library, never through a symbolic link or a junction. `java.library.path` and
+  the system's loader are searched only when the jar has no library for the
+  platform; a platform without one, a directory that cannot be written, a
+  library that does not load and a damaged jar are each an
+  `UnsatisfiedLinkError` naming the platform and the properties to set.
+  `./gradlew jar` bundles the host's library (`cargo build --release --target
+  <host's triple>`, musl linked dynamically on musl), and
+  `-Pcleanrules.natives.dir=<dir>` prebuilt ones. New workflow "JVM natives"
+  (`.github/workflows/jvm-natives.yml`, manual, pull requests that touch the
+  binding, the core or the C ABI, and tags; it publishes nothing): the eight
+  libraries (glibc ones in manylinux_2_28 containers, checked to need glibc
+  2.28 at most; musl ones in Alpine), one jar checked by
+  `bindings/jvm/scripts/check-jar.py` (exactly the eight, each a binary of its
+  system and processor, glibc 2.28 at most, musl's libc for musl), and a
+  smoke run from the jar with no override on the class path and the module
+  path on Linux, macOS and Windows, x64 and arm64 (Microsoft's OpenJDK 25 on
+  Windows arm64, where Temurin has none), on glibc 2.28 in manylinux_2_28
+  with a checked Temurin 25 tarball, and in Alpine with Temurin 25. The
+  examples run from the jar without `-Dcleanrules.library.path`. The Java
+  README has a section on restricted environments (read-only containers,
+  GraalVM native image, the macOS hardened runtime, jlink and jpackage,
+  profilers).
 - C ABI, for what rules, documents, tables and result trees hold (task
   G.1d): `cr_ruleset_rule`, `cr_rule_name`, `cr_rule_description`,
   `cr_rule_action`, `cr_rule_priority`, `cr_rule_when`, `cr_rule_payload_len`,
@@ -803,6 +844,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already did (task D.5).
 ### Fixed
 
+- Java binding (found in task G.1c): on a Java runtime with no native linker
+  for the platform (`Linker.nativeLinker()` throws), loading the library was
+  an `ExceptionInInitializerError` that hid why; it is now an
+  `UnsatisfiedLinkError` that says so, every time, like any other loading
+  failure.
 - The C header now declares `cr_value_get_bool`, `cr_value_get_int`,
   `cr_value_get_float` and `cr_value_get_opaque_token`, which the library
   exported but cbindgen skipped, since a macro defined them; a test now checks

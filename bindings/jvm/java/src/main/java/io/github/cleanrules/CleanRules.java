@@ -11,10 +11,15 @@ import java.util.Optional;
  * first time the binding needs it, from the path of the system property
  * {@code cleanrules.library.path} or the environment variable
  * {@code CLEANRULES_LIBRARY_PATH} (a file, or a directory that holds
- * {@code System.mapLibraryName("cleanrules_ffi")}), else from
+ * {@code System.mapLibraryName("cleanrules_ffi")}); else from the jar, which
+ * holds the library of eight platforms (macOS, Linux with glibc or musl, and
+ * Windows, each on x64 and arm64) and extracts this platform's to a new
+ * private directory under the system property {@code cleanrules.tmpdir} or
+ * {@code java.io.tmpdir}, deleted once loaded (on Windows, by a later run);
+ * only when the jar has none for this platform, from
  * {@code java.library.path}, else by the system's dynamic loader. A library
- * that cannot be found, or whose ABI or format version is not this binding's,
- * is an {@link UnsatisfiedLinkError} that says why.
+ * that cannot be found, extracted or loaded, or whose ABI or format version
+ * is not this binding's, is an {@link UnsatisfiedLinkError} that says why.
  */
 public final class CleanRules {
     private CleanRules() {}
@@ -49,7 +54,8 @@ public final class CleanRules {
 
     /**
      * The file the native library was loaded from, when the system property
-     * or the environment variable gave it.
+     * or the environment variable gave it, or it was extracted from the jar
+     * (a file already deleted, except on Windows).
      *
      * @return the path, or empty when it was found on {@code java.library.path}
      *     or by the system's loader

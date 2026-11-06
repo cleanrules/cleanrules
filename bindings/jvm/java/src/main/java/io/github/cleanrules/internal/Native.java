@@ -32,9 +32,13 @@ import java.util.List;
  * <p>The library is found, in order, at the path of the system property
  * {@code cleanrules.library.path} or the environment variable
  * {@code CLEANRULES_LIBRARY_PATH} (a file, or a directory holding
- * {@code System.mapLibraryName("cleanrules_ffi")}), then with
- * {@code System.loadLibrary("cleanrules_ffi")} ({@code java.library.path}),
- * then by the system's dynamic loader. Loading never throws while this class
+ * {@code System.mapLibraryName("cleanrules_ffi")}), then in the jar, for this
+ * platform ({@link Platform}), extracted by {@link Bundled}; only when the jar
+ * has none for it, with {@code System.loadLibrary("cleanrules_ffi")}
+ * ({@code java.library.path}), then by the system's dynamic loader. A
+ * library of the jar that cannot be extracted or loaded is an error, not a
+ * reason to look elsewhere, so which library runs never depends on a
+ * failure. Loading never throws while this class
  * initialises: a failure is kept and {@link #ensureLoaded()} throws it as an
  * {@link UnsatisfiedLinkError} each time, so the message is never lost to a
  * {@code NoClassDefFoundError}. Every restricted call (loading, linking, upcall
@@ -95,7 +99,23 @@ public final class Native {
     public static final int CR_LIMIT_MAX_YAML_SIZE = 5;
     public static final int CR_LIMIT_MAX_TEXT_SIZE = 6;
 
-    private static final Linker LINKER = Linker.nativeLinker();
+    /** The native linker, or null on a Java runtime that has none for this platform. */
+    private static final Linker LINKER;
+    /** Why there is no native linker, or null. */
+    private static final UnsupportedOperationException NO_LINKER;
+
+    static {
+        Linker linker = null;
+        UnsupportedOperationException none = null;
+        try {
+            linker = Linker.nativeLinker();
+        } catch (UnsupportedOperationException unsupported) {
+            none = unsupported;
+        }
+        LINKER = linker;
+        NO_LINKER = none;
+    }
+
     private static final MemoryLayout SIZE_T = JAVA_LONG;
 
     private static final SymbolLookup LOOKUP;
@@ -108,6 +128,14 @@ public final class Native {
         Path from = null;
         Throwable failure = null;
         try {
+            if (LINKER == null) {
+                UnsatisfiedLinkError error = new UnsatisfiedLinkError("this Java runtime has no native linker for"
+                        + " os.name " + System.getProperty("os.name") + ", os.arch " + System.getProperty("os.arch")
+                        + " (" + NO_LINKER.getMessage() + "): cleanrules needs the linker of the Foreign Function"
+                        + " & Memory API; use a JDK 25 or later that has one for this platform");
+                error.initCause(NO_LINKER);
+                throw error;
+            }
             long sizeT = LINKER.canonicalLayouts().get("size_t").byteSize();
             if (sizeT != 8) {
                 throw new UnsatisfiedLinkError(
@@ -125,7 +153,14 @@ public final class Native {
                     throw error;
                 }
             } else {
-                lookup = searched();
+                Platform platform = Platform.current();
+                Path bundled = extracted(platform);
+                if (bundled != null) {
+                    from = bundled;
+                    lookup = bundledLookup(platform, bundled);
+                } else {
+                    lookup = searched(platform);
+                }
             }
         } catch (IllegalCallerException denied) {
             failure = nativeAccessDenied(denied);
@@ -169,8 +204,58 @@ public final class Native {
         return error;
     }
 
+    /**
+     * The library of the jar for {@code platform}, extracted to a private
+     * temporary directory, or null when the jar has none for it.
+     */
+    private static Path extracted(Platform platform) {
+        Path root = Bundled.root();
+        try {
+            Path library = Bundled.extract(Bundled.jar(), platform, root);
+            if (library != null && platform.windows()) {
+                // The directories that earlier JVMs of this user could not delete.
+                try {
+                    Bundled.sweep(root, java.time.Instant.now(), Bundled.STALE,
+                            Files.getOwner(library.getParent(), java.nio.file.LinkOption.NOFOLLOW_LINKS));
+                } catch (java.io.IOException | RuntimeException noOwner) {
+                    // Nothing swept.
+                }
+            }
+            return library;
+        } catch (Bundled.ExtractionException failed) {
+            UnsatisfiedLinkError error = new UnsatisfiedLinkError(failed.getMessage()
+                    + "; or set the system property " + PROPERTY + " or the environment variable " + VARIABLE
+                    + " to a cleanrules library of this release for " + platform);
+            error.initCause(failed);
+            throw error;
+        }
+    }
+
+    /** Load the library extracted from the jar, then delete it where the system allows. */
+    private static SymbolLookup bundledLookup(Platform platform, Path library) {
+        boolean loaded = false;
+        try {
+            SymbolLookup lookup = SymbolLookup.libraryLookup(library, Arena.global());
+            loaded = true;
+            return lookup;
+        } catch (IllegalArgumentException cannotOpen) {
+            String glibc = "gnu".equals(platform.abi()) ? " (it needs glibc 2.28 or later)" : "";
+            String musl = "musl".equals(platform.abi()) ? " (it needs libgcc: apk add libgcc)" : "";
+            UnsatisfiedLinkError error = new UnsatisfiedLinkError("cannot load the cleanrules library for "
+                    + platform + glibc + musl + ", extracted from the jar to " + library + ": "
+                    + cannotOpen.getMessage() + ". If that directory does not allow programs (mounted noexec), set"
+                    + " the system property " + Bundled.TMPDIR + " to one that does; or set the system property "
+                    + PROPERTY + " or the environment variable " + VARIABLE
+                    + " to a cleanrules library of this release built for this system");
+            error.initCause(cannotOpen);
+            throw error;
+        } finally {
+            Bundled.release(library, loaded, platform.windows());
+        }
+    }
+
     /** The library from {@code java.library.path}, or else from the system's loader. */
-    private static SymbolLookup searched() {
+    private static SymbolLookup searched(Platform platform) {
         try {
             System.loadLibrary(LIBRARY);
             return SymbolLookup.loaderLookup();
@@ -180,14 +265,26 @@ public final class Native {
             try {
                 return SymbolLookup.libraryLookup(System.mapLibraryName(LIBRARY), Arena.global());
             } catch (IllegalArgumentException notFound) {
-                UnsatisfiedLinkError error = new UnsatisfiedLinkError(
-                        "cannot find the cleanrules library ("
-                                + System.mapLibraryName(LIBRARY)
-                                + "): set the system property "
-                                + PROPERTY
-                                + " or the environment variable "
-                                + VARIABLE
-                                + " to its path, or put it on java.library.path");
+                List<String> bundled = Bundled.platforms(Bundled.jar());
+                String has = bundled.isEmpty() ? "none" : String.join(", ", bundled);
+                String why = platform.bundleable()
+                        ? "this jar has no cleanrules library for " + platform + " (it has " + has + ")"
+                        : "cleanrules bundles no library for " + platform + " (os.name " + System.getProperty("os.name")
+                                + ", os.arch " + System.getProperty("os.arch") + "; the jar has " + has + ")";
+                UnsatisfiedLinkError error = new UnsatisfiedLinkError(why
+                        + ", and there is no "
+                        + System.mapLibraryName(LIBRARY)
+                        + " on java.library.path or the system's library path: build it for this platform (cargo"
+                        + " build --release -p cleanrules-ffi) and set the system property "
+                        + PROPERTY
+                        + " or the environment variable "
+                        + VARIABLE
+                        + " to its path"
+                        // GraalVM sets it in a native image, which has only the resources registered for it.
+                        + (System.getProperty("org.graalvm.nativeimage.imagecode") != null
+                                ? " (native image: register the resources /native/" + platform + "/*,"
+                                        + " or set cleanrules.library.path)"
+                                : ""));
                 error.initCause(notInJavaPath);
                 throw error;
             }
@@ -497,7 +594,10 @@ public final class Native {
         }
     }
 
-    /** Where the library was loaded from, when a path gave it. */
+    /**
+     * Where the library was loaded from, when a path gave it or it was
+     * extracted from the jar (a file deleted once loaded, but on Windows).
+     */
     public static Path loadedFrom() {
         return LOADED_FROM;
     }

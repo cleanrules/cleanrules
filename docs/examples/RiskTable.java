@@ -5,10 +5,8 @@
  * text, a result tree, and a rule set written as a document and read back
  * with its action bound by name.
  *
- *     cargo build -p cleanrules-ffi
- *     (cd bindings/jvm && ./gradlew jar)
+ *     (cd bindings/jvm && ./gradlew jar)    # with this platform's library inside
  *     java --enable-native-access=io.github.cleanrules \
- *          -Dcleanrules.library.path=target/debug \
  *          --module-path bindings/jvm/java/build/libs --add-modules io.github.cleanrules \
  *          docs/examples/RiskTable.java docs/examples/risk.csv
  */
