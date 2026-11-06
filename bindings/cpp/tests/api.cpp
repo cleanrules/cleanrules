@@ -590,6 +590,55 @@ void building() {
     CHECK(decision.explain().find(explanation["rules"][1]["text"].as_string()) != std::string::npos);
 }
 
+void rules_and_documents() {
+    // Rules read back from rule sets, documents and text, with all they hold.
+    auto rules = cr::ruleset::read(
+        "HIT POLICY priority\n"
+        "RULE vip PRIORITY 10 DESCRIPTION \"big\"\n"
+        "IF customer.years > 5 THEN discount = 0.15, label = \"VIP\" DO notify\n"
+        "RULE plain IF true\n",
+        cr::format::text);
+    auto vip = rules.rule_at(0);
+    CHECK(vip.name() == "vip");
+    CHECK(vip.priority() == 10);
+    CHECK(vip.description() == std::optional<std::string>("big"));
+    CHECK(vip.action_name() == std::optional<std::string>("notify"));
+    CHECK(cr::rule::from_text("RULE t IF x").name() == "t");  // owned from a temporary
+    CHECK(vip.when().write(cr::format::text) == "customer.years > 5");
+    auto payload = vip.payload();
+    CHECK(payload.size() == 2);
+    CHECK(payload[0].first == "discount");
+    CHECK(payload[1].second.write(cr::format::text) == "\"VIP\"");
+    auto plain = rules.rule_at(1);
+    CHECK(!plain.description() && !plain.action_name() && plain.payload().empty());
+    cr::rule empty;
+    CHECK_THROWS(empty.name(), cr::invalid_argument_error);
+    cr::error_info missing;
+    CHECK(empty.name(missing).empty() && missing.code() == cr::errc::invalid_argument);
+    CHECK_THROWS(rules.rule_at(2), cr::invalid_argument_error);
+    cr::error_info error;
+    CHECK(!rules.rule_at(2, error) && error.code() == cr::errc::invalid_argument);
+
+    // Documents made of a rule or a condition, and what a document holds.
+    auto written = cr::document::from_rule(vip).write(cr::format::text);
+    CHECK(cr::document::read(written, cr::format::text).as_rule().name() == "vip");
+    auto condition = cr::document::read("age >= 18", cr::format::text).as_condition();
+    CHECK(condition.write(cr::format::text) == "age >= 18");
+    CHECK(cr::document::from_condition(condition).write() ==
+          cr::document::read("age >= 18", cr::format::text).write());
+    auto price = cr::node::arith("mul", cr::node::field(cr::value::list({"price"})), cr::node::constant(2));
+    CHECK_THROWS(cr::document::from_condition(price), cr::expression_error);
+    CHECK_THROWS(cr::document::read("age >= 18", cr::format::text).as_rule(), cr::invalid_argument_error);
+
+    // One rule from text.
+    auto unnamed = cr::rule::from_text("IF x > 1 THEN y = 2");
+    CHECK(unnamed.name() == "rule_1");
+    CHECK_THROWS(cr::rule::from_text("x > 1"), cr::rule_syntax_error);
+    cr::error_info syntax;
+    CHECK(!cr::rule::from_text("RULE a IF x RULE b IF y", syntax) &&
+          syntax.code() == cr::errc::rule_syntax_error);
+}
+
 }  // namespace
 
 int main() {
@@ -601,5 +650,6 @@ int main() {
     actions();
     grids_nodes_and_batches();
     building();
+    rules_and_documents();
     return check::report("api");
 }

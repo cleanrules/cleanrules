@@ -41,10 +41,10 @@ The whole program, with explanations and errors, is
 
 - **Names.** Functions and types start with `cr_`, constants with `CR_`.
 - **Handles.** `cr_document`, `cr_ruleset`, `cr_decision`, `cr_node`,
-  `cr_rule`, `cr_batch`, `cr_value`, `cr_grid`, `cr_actions`, `cr_limits` and `cr_error`
-  are opaque. Whoever receives one owns it and frees it with its `cr_*_free`
-  function, which accepts `NULL`. Documents, rule sets, decisions, nodes,
-  rules, batches and errors never change once made, so one may be used from several
+  `cr_rule`, `cr_tree`, `cr_batch`, `cr_value`, `cr_grid`, `cr_actions`, `cr_limits`
+  and `cr_error` are opaque. Whoever receives one owns it and frees it with its
+  `cr_*_free` function, which accepts `NULL`. Documents, rule sets, decisions,
+  nodes, rules, result trees, batches and errors never change once made, so one may be used from several
   threads at once, but not while it is freed; limits, values, grids and
   registries change while they are built, so finish them before sharing them.
   A finished registry may be used by several threads at once, and its actions
@@ -124,6 +124,21 @@ The whole program, with explanations and errors, is
   `cr_ruleset_new` makes a rule set of an array of rules (copied) with a hit
   policy, an aggregate and a logic by name (`NULL` for the defaults) and
   strictness, read by the core as JSON's are.
+  `cr_rule_from_text` reads one rule written in the rule syntax (fuzzytool's
+  `rule_from_text`: without a `RULE` line it is `rule_1`).
+- **What a rule holds.** For rules read from documents and rule sets, so a
+  binding can make its own objects of them while it keeps the core's rule
+  (which writes back exactly): `cr_ruleset_rule` (a copy of the rule at a
+  position), `cr_rule_name`, `cr_rule_description` and `cr_rule_action`
+  (borrowed texts, `NULL` when the rule has none), `cr_rule_priority`,
+  `cr_rule_when` (a copy of the condition), `cr_rule_payload_len`,
+  `cr_rule_payload_key` (borrowed) and `cr_rule_payload_value` (a copy of the
+  value node), in the payload's order.
+- **Documents of a condition or a rule.** `cr_document_new_condition` (a
+  value node is a `CR_EXPRESSION_ERROR`) and `cr_document_new_rule` make a
+  document to write with `cr_document_write`; `cr_document_condition` and
+  `cr_document_rule` give a copy of what a document of that kind holds (another
+  kind is `CR_INVALID_ARGUMENT`).
 - **Describing a rule set.** `cr_ruleset_len`, `cr_ruleset_rule_name`,
   `cr_ruleset_hit_policy`, `cr_ruleset_logic`, `cr_ruleset_aggregate` and
   `cr_ruleset_strict` describe one; its summary has the rest, and
@@ -165,7 +180,18 @@ The whole program, with explanations and errors, is
   header of strings, `cr_grid_push_row` adds rows of cells (a string is text,
   as in CSV; any other value a constant; null an empty cell), and
   `cr_grid_finish` gives the table's document (`spec/tables.md`, *Grids*).
-  After a row fails, the grid can only be freed.
+  After a row fails, the grid can only be freed. A binding with nodes and
+  constants of its own starts with `cr_grid_new_open` instead, adds the
+  columns one at a time (`cr_grid_add_column_text`, `cr_grid_add_column_input`
+  with a node, `cr_grid_add_column_output` with a key and a list of output
+  values), which are read and checked at the first row or at
+  `cr_grid_finish`, and may push rows whose cells are nodes
+  (`cr_grid_push_row_nodes`, one node pointer or `NULL` per cell). Errors
+  point at `/header/<c>` or `/rows/<r>/<c>`. What a table holds:
+  `cr_document_table_value` (its settings, the number of inputs and rows, and
+  the outputs with their values), `cr_document_table_row` (a row's name,
+  priority and description), `cr_document_table_input` and
+  `cr_document_table_cell` (copies of the nodes; `NULL` for an empty cell).
 - **Single nodes.** `cr_node_read` reads one condition or value (the node of
   format version 1, not a document), in JSON, YAML or the rule syntax;
   `cr_node_evaluate_tree` (with a logic and strictness) and
@@ -173,7 +199,13 @@ The whole program, with explanations and errors, is
   give its result tree as JSON, as `evaluate_tree` and `evaluate_value_tree`
   do in every language (`spec/ast.md`, *Evaluating one node*);
   `cr_node_field_paths` lists the paths it reads, as `cr_ruleset_field_paths`
-  does for a rule set. Python calls a node `Expr`; C, Go and the JVM call it a
+  does for a rule set. For bindings that give the tree as objects,
+  `cr_tree_new_condition` and `cr_tree_new_value` give it as a `cr_tree`, and
+  `cr_decision_rule_tree` gives the tree of a rule's condition in a decision:
+  `cr_tree_value` is the tree as a `cr_value` in the structure of the JSON
+  result tree (opaque values keep their token; `cr_value_to_json` of it is the
+  JSON), and `cr_tree_len` and `cr_tree_node` give the node of each result, in
+  pre-order. Python calls a node `Expr`; C, Go and the JVM call it a
   node.
 - **Batches.** `cr_ruleset_evaluate_many` evaluates a list of inputs; the first
   that fails gives the error, with its `row`. `cr_batch_get` borrows each

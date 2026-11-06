@@ -415,6 +415,44 @@ pub unsafe extern "C" fn cr_ruleset_rule_name(
     unsafe { call("cr_ruleset_rule_name", error, body) }
 }
 
+/// A copy of the rule at position `rule`, freed with `cr_rule_free`: its
+/// name, condition, payload and the rest, as the rule set holds it
+/// (`cr_rule_name`, `cr_rule_when`...).
+///
+/// # Safety
+///
+/// `ruleset` is `NULL` or a live `cr_ruleset`; `out` is `NULL` or points to a
+/// writable `cr_rule *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_ruleset_rule(
+    ruleset: *const cr_ruleset,
+    rule: usize,
+    out: *mut *mut cr_rule,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `ruleset` is NULL or live (# Safety).
+        let rules = unsafe { handle(ruleset, "ruleset") }?.ruleset.rules();
+        let found = rules.get(rule).ok_or_else(|| {
+            Failure::Invalid(
+                format!("rule {rule} is out of the rule set of {}", rules.len()),
+                "pass a position below cr_ruleset_len",
+            )
+        })?;
+        let copy = cr_rule {
+            rule: found.clone(),
+        };
+        // SAFETY: `out` passed `clear`.
+        unsafe { give(out, copy) };
+        Ok(())
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_ruleset_rule", error, body) }
+}
+
 /// The rule set's hit policy (`first`, `priority`, `unique`, `any`,
 /// `rule_order`, `collect`), a static string; `NULL` for `NULL`.
 ///

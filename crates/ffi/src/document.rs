@@ -1,13 +1,18 @@
 //! Documents (`spec/json-format.md`, *Documents*): read and written in JSON,
-//! YAML, the rule syntax or CSV.
+//! YAML, the rule syntax or CSV; made of a condition or a rule, and what they
+//! hold.
 
 use std::ffi::c_char;
 
 use cleanrules::format::{Document, read_document_as, write_document_as};
 
-use crate::boundary::{bytes, call, clear, format, free, give, give_text, handle, limits_of};
+use crate::boundary::{
+    Failure, Outcome, bytes, call, clear, format, free, give, give_text, handle, limits_of,
+};
 use crate::error::cr_error;
 use crate::limits::cr_limits;
+use crate::node::cr_node;
+use crate::rule::cr_rule;
 use crate::{cr_format, cr_status};
 
 /// What a document holds, its content (`CR_DOCUMENT_*`).
@@ -108,6 +113,146 @@ pub unsafe extern "C" fn cr_document_write(
     };
     // SAFETY: `error` is NULL or writable (# Safety).
     unsafe { call("cr_document_write", error, body) }
+}
+
+/// Hand a new document out.
+///
+/// # Safety
+///
+/// `out` is `NULL` or points to a writable `cr_document *`; `error` is `NULL`
+/// or points to a writable `cr_error *` set to `NULL`.
+unsafe fn make(
+    name: &str,
+    out: *mut *mut cr_document,
+    error: *mut *mut cr_error,
+    content: impl FnOnce() -> Outcome<Document>,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        let document = content()?;
+        // SAFETY: `out` passed `clear`.
+        unsafe { give(out, cr_document { document }) };
+        Ok(())
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call(name, error, body) }
+}
+
+/// A document holding a condition (copied), to write it with
+/// `cr_document_write`. A value node, such as `a + 1`, or the null constant is
+/// a `CR_EXPRESSION_ERROR`: only a condition can be a document.
+///
+/// # Safety
+///
+/// `node` is `NULL` or a live `cr_node`; `out` is `NULL` or points to a
+/// writable `cr_document *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_document_new_condition(
+    node: *const cr_node,
+    out: *mut *mut cr_document,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let content = || {
+        // SAFETY: `node` is NULL or live (# Safety).
+        let node = &unsafe { handle(node, "node") }?.node;
+        Ok(Document::condition(node.clone())?)
+    };
+    // SAFETY: `out` and `error` (# Safety).
+    unsafe { make("cr_document_new_condition", out, error, content) }
+}
+
+/// A document holding a rule (copied), to write it with `cr_document_write`.
+///
+/// # Safety
+///
+/// `rule` is `NULL` or a live `cr_rule`; `out` is `NULL` or points to a
+/// writable `cr_document *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_document_new_rule(
+    rule: *const cr_rule,
+    out: *mut *mut cr_document,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let content = || {
+        // SAFETY: `rule` is NULL or live (# Safety).
+        let rule = unsafe { handle(rule, "rule") }?;
+        Ok(Document::Rule(rule.rule.clone()))
+    };
+    // SAFETY: `out` and `error` (# Safety).
+    unsafe { make("cr_document_new_rule", out, error, content) }
+}
+
+/// A document of another kind than the function reads.
+pub(crate) fn not_holding(what: &str, document: &Document) -> Failure {
+    let held = match document {
+        Document::Condition(_) => "a condition",
+        Document::Rule(_) => "a rule",
+        Document::RuleSet(_) => "a rule set",
+        Document::DecisionTable(_) => "a decision table",
+        _ => "something else",
+    };
+    Failure::Invalid(
+        format!("the document holds {held}, not {what}"),
+        "check what it holds with cr_document_kind first",
+    )
+}
+
+/// A copy of the condition a `CR_DOCUMENT_CONDITION` document holds, freed
+/// with `cr_node_free`. A document of another kind is `CR_INVALID_ARGUMENT`.
+///
+/// # Safety
+///
+/// `document` is `NULL` or a live `cr_document`; `out` is `NULL` or points to a
+/// writable `cr_node *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_document_condition(
+    document: *const cr_document,
+    out: *mut *mut cr_node,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let make = || {
+        // SAFETY: `document` is NULL or live (# Safety).
+        match &unsafe { handle(document, "document") }?.document {
+            Document::Condition(node) => Ok(node.clone()),
+            other => Err(not_holding("a condition", other)),
+        }
+    };
+    // SAFETY: `out` and `error` (# Safety).
+    unsafe { crate::construct::build("cr_document_condition", out, error, make) }
+}
+
+/// A copy of the rule a `CR_DOCUMENT_RULE` document holds, freed with
+/// `cr_rule_free`. A document of another kind is `CR_INVALID_ARGUMENT`.
+///
+/// # Safety
+///
+/// `document` is `NULL` or a live `cr_document`; `out` is `NULL` or points to a
+/// writable `cr_rule *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_document_rule(
+    document: *const cr_document,
+    out: *mut *mut cr_rule,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `document` is NULL or live (# Safety).
+        let rule = match &unsafe { handle(document, "document") }?.document {
+            Document::Rule(rule) => rule.clone(),
+            other => return Err(not_holding("a rule", other)),
+        };
+        // SAFETY: `out` passed `clear`.
+        unsafe { give(out, cr_rule { rule }) };
+        Ok(())
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_document_rule", error, body) }
 }
 
 /// Free a document. `NULL` is ignored.

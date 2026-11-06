@@ -53,4 +53,19 @@ final class Read {
             default -> throw new IllegalStateException("cleanrules gave " + value + " for an int; please report it");
         };
     }
+
+    /** A reason, as the core gives it ({@code write_reason}'s structure); null for none. */
+    static Reason reason(Object value) {
+        if (value == null) {
+            return null;
+        }
+        Map<String, Object> reason = map(value);
+        Object paths = reason.get("paths");
+        Object types = reason.get("types");
+        return new Reason(
+                (String) reason.get("code"),
+                paths == null ? List.of() : paths(paths),
+                types == null ? List.of() : strings(types),
+                (String) reason.get("detail"));
+    }
 }

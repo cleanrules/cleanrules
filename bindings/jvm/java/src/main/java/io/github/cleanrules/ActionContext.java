@@ -5,7 +5,8 @@ import java.util.Map;
 /**
  * What an {@link Action} receives ({@code spec/rules.md}, <i>Actions</i>):
  * the rule, the input as given to {@link RuleSet#run(Object)}, the rule's
- * result and evaluated payload, and the whole decision. The engine makes these.
+ * result and evaluated payload, the result tree of its condition, and the
+ * whole decision. The engine makes these.
  */
 public final class ActionContext {
     private final Rule rule;
@@ -13,8 +14,12 @@ public final class ActionContext {
     private final RuleResult result;
     private final Map<String, Object> output;
     private final Decision decision;
+    private final int position;
+    private volatile ResultTree tree;
 
-    ActionContext(Rule rule, Object data, RuleResult result, Map<String, Object> output, Decision decision) {
+    ActionContext(
+            Rule rule, int position, Object data, RuleResult result, Map<String, Object> output, Decision decision) {
+        this.position = position;
         this.rule = rule;
         this.data = data;
         this.result = result;
@@ -56,6 +61,22 @@ public final class ActionContext {
      */
     public Map<String, Object> output() {
         return output;
+    }
+
+    /**
+     * The result tree of the rule's condition ({@code spec/json-format.md},
+     * <i>Result trees</i>): each node's truth value or value, and why one is
+     * unknown or null. Made by the core when first asked for, once.
+     *
+     * @return the result tree
+     */
+    public ResultTree tree() {
+        ResultTree made = tree;
+        if (made == null) {
+            made = decision.tree(position);
+            tree = made;
+        }
+        return made;
     }
 
     /**

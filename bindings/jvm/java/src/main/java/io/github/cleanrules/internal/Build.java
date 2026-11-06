@@ -35,26 +35,37 @@ public final class Build {
 
     /** An owned value of a constant, after the checks that only Java can make. */
     public static MemorySegment constant(Object value) {
-        check(value);
+        check(value, null);
         return data(value);
     }
 
     /** An owned list of constants, each checked. */
     public static MemorySegment constants(Collection<?> values) {
+        return constants(values, null);
+    }
+
+    /** An owned list of constants, each checked; an error points at {@code pointer}, if any. */
+    public static MemorySegment constants(Collection<?> values, String pointer) {
         List<Object> items = new ArrayList<>(values.size());
         for (Object value : values) {
-            check(value);
+            check(value, pointer);
             items.add(value);
         }
         return data(items);
     }
 
-    private static void check(Object value) {
+    /**
+     * Check that {@code value} can be carried to the C ABI as a constant (no
+     * NaN, nothing finer than a microsecond); an error points at
+     * {@code pointer}, if any.
+     */
+    public static void check(Object value, String pointer) {
         while (value instanceof Optional<?> optional) {
             value = optional.orElse(null);
         }
         if (value instanceof Double number && number.isNaN() || value instanceof Float small && small.isNaN()) {
-            throw expression("a constant cannot be NaN (" + value + ")", "test for missing values with isNull()");
+            throw expression(
+                    "a constant cannot be NaN (" + value + ")", "test for missing values with isNull()", pointer);
         }
         int nanos = switch (value) {
             case LocalDateTime local -> local.getNano();
@@ -68,15 +79,37 @@ public final class Build {
         if (nanos % 1000 != 0) {
             throw expression(
                     "the datetime " + value + " is finer than a microsecond",
-                    "datetimes hold microseconds; round the constant first");
+                    "datetimes hold microseconds; round the constant first",
+                    pointer);
         }
     }
 
     /** An {@code expression_error} that the binding finds, with its JSON form. */
     public static ExpressionException expression(String message, String hint) {
-        String json = "{\"code\":\"expression_error\",\"message\":" + quote(message) + ",\"hint\":" + quote(hint)
-                + "}";
-        return new ExpressionException("expression_error", message, hint, json, null);
+        return expression(message, hint, null);
+    }
+
+    /** An {@code expression_error} that the binding finds at {@code pointer} (or nowhere, for null). */
+    public static ExpressionException expression(String message, String hint, String pointer) {
+        return new ExpressionException(
+                "expression_error", message, hint, json("expression_error", message, hint, pointer, null), null);
+    }
+
+    /**
+     * The JSON form of an error that the binding finds ({@code spec/errors.md}):
+     * its code, message and hint, and a pointer and a rule when not null.
+     */
+    public static String json(String code, String message, String hint, String pointer, String rule) {
+        StringBuilder json = new StringBuilder("{\"code\":").append(quote(code))
+                .append(",\"message\":").append(quote(message))
+                .append(",\"hint\":").append(quote(hint));
+        if (pointer != null) {
+            json.append(",\"pointer\":").append(quote(pointer));
+        }
+        if (rule != null) {
+            json.append(",\"rule\":").append(quote(rule));
+        }
+        return json.append('}').toString();
     }
 
     /**

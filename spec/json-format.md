@@ -556,6 +556,12 @@ releases. Writers omit empty `paths` and
 Writers write every key in the order of its table, and omit `aggregate`,
 `aggregated`, `then`, `path`, `reason` and `children` when they do not apply.
 
+The C ABI also gives a result tree as a value (`cr_tree_value`), for bindings
+that build objects of it: the same structure and keys, with the values
+themselves instead of their JSON encoding (an opaque value keeps its token),
+an unknown truth as a plain null, and paths as lists of strings and ints.
+Written as a JSON value, it is the result tree.
+
 ### Reading a decision
 
 A decision is read with the rule set that produced it, already read

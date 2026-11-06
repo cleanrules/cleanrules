@@ -67,23 +67,9 @@ public final class Explanation {
                 (Boolean) value.get("negated"),
                 (Boolean) value.get("holds"),
                 values,
-                reason(value.get("reason")),
+                Read.reason(value.get("reason")),
                 counterfactual(value.get("counterfactual")),
                 (String) value.get("text"));
-    }
-
-    private static Reason reason(Object value) {
-        if (value == null) {
-            return null;
-        }
-        Map<String, Object> reason = Read.map(value);
-        Object paths = reason.get("paths");
-        Object types = reason.get("types");
-        return new Reason(
-                (String) reason.get("code"),
-                paths == null ? List.of() : Read.paths(paths),
-                types == null ? List.of() : Read.strings(types),
-                (String) reason.get("detail"));
     }
 
     private static Counterfactual counterfactual(Object value) {

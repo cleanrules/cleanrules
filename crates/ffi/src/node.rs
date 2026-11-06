@@ -117,7 +117,7 @@ pub unsafe extern "C" fn cr_node_write(
 /// # Safety
 ///
 /// `name` is `NULL` or points to `len` readable bytes.
-unsafe fn logic(name: *const c_char, len: usize) -> Outcome<Kleene> {
+pub(crate) unsafe fn logic(name: *const c_char, len: usize) -> Outcome<Kleene> {
     let name = if name.is_null() {
         "boolean"
     } else {

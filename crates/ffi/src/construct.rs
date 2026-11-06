@@ -76,7 +76,7 @@ unsafe fn operand(node: *const cr_node, what: &str) -> Outcome<Node> {
 ///
 /// `out` is `NULL` or points to a writable `cr_node *`; `error` is `NULL` or
 /// points to a writable `cr_error *` set to `NULL`.
-unsafe fn build(
+pub(crate) unsafe fn build(
     name: &str,
     out: *mut *mut cr_node,
     error: *mut *mut cr_error,

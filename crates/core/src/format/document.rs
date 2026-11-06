@@ -39,6 +39,25 @@ pub enum Document {
 }
 
 impl Document {
+    /// A document holding a condition (`spec/json-format.md`, *Documents*):
+    /// every reader of condition documents and every writer of one built in
+    /// code goes through this check.
+    ///
+    /// # Errors
+    ///
+    /// `expression_error` for a value node, such as `x + 1`, or the null
+    /// constant: only a condition can be a document. The caller locates it.
+    pub fn condition(node: Node) -> Result<Self> {
+        if node.is_null_constant() || node.kind() == Kind::Value {
+            return Err(Error::new(
+                ErrorCode::ExpressionError,
+                format!("only a condition can be a document, not the value {node}"),
+            )
+            .with_hint("compare it first, such as x > 0"));
+        }
+        Ok(Document::Condition(node))
+    }
+
     /// The rule set the document gives (`spec/json-format.md`, *A rule set from
     /// a document*): its rule set, the one its decision table compiles to, or a
     /// rule set of its one rule with the default settings.
@@ -107,15 +126,7 @@ pub fn read_parsed_document(json: &Json, limits: &Limits) -> Result<Document> {
                 limits,
             )?;
             check_top_level()?;
-            let node = build(raw)?;
-            if node.is_null_constant() || node.kind() == Kind::Value {
-                return Err(Error::new(
-                    ErrorCode::ExpressionError,
-                    format!("'{}' is not a condition", node.tag()),
-                )
-                .at_pointer("/condition"));
-            }
-            Ok(Document::Condition(node))
+            Document::condition(build(raw)?).map_err(|e| e.at_pointer("/condition"))
         }
         "rule" => {
             let raw = shape_rule(get("rule").unwrap_or(&Json::Null), "/rule", limits)?;

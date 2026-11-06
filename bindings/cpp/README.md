@@ -313,6 +313,15 @@ containers. `rule::make(name, when)` and its
 decision table's `table_settings`), and `ruleset::summary(actions, format)` marks the rules
 whose action is code.
 
+Rules read back: `ruleset::rule_at(i)` and `document::as_rule()` give a
+`rule` (a copy), and `rule::from_text(text)` reads one rule in the rule
+syntax (`rule_1` without a `RULE` line). A rule gives its `name()` (borrowed,
+like `ruleset::rule_name`), `description()` and `action_name()` (copied,
+`std::nullopt` when it has none), `priority()`, `when()` and `payload()` (each
+key with its value node, in order). `document::from_condition(node)` and `document::from_rule(rule)`
+make documents to `write`, and `document::as_condition()` reads a condition
+document's node.
+
 ## Actions
 
 ```cpp

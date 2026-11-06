@@ -1,17 +1,24 @@
 //! Rules built in code (`spec/rules.md`, *Rules*): a name and a condition,
 //! then one step at a time, each a new rule made by the core's constructors,
-//! so that every step is checked as Python and JavaScript check it.
+//! so that every step is checked as Python and JavaScript check it. And what
+//! a rule holds, for the rules read from documents and rule sets, and one
+//! rule read from text (`rule_from_text`).
 
 use std::ffi::c_char;
 
+use cleanrules::json::utf8_text;
 use cleanrules::rules::Rule;
 use cleanrules::{Error, ErrorCode, Map, Value};
 
-use crate::boundary::{Failure, Outcome, bytes, call, clear, free, give, handle, utf8_arg};
+use crate::boundary::{
+    Failure, Outcome, bytes, call, clear, clear_borrowed, free, give, handle, limits_of, utf8_arg,
+};
+use crate::construct::build;
 use crate::cr_status;
 use crate::error::cr_error;
+use crate::limits::cr_limits;
 use crate::node::cr_node;
-use crate::value::{borrow_value, cr_value, give_new_value};
+use crate::value::{borrow_text, borrow_value, cr_value, give_new_value};
 
 /// A rule: a name, a condition, a payload and descriptive data. It never
 /// changes: each `cr_rule_with_*` gives a new rule.
@@ -326,6 +333,240 @@ pub unsafe extern "C" fn cr_rule_metadata(
     };
     // SAFETY: `error` is NULL or writable (# Safety).
     unsafe { call("cr_rule_metadata", error, body) }
+}
+
+/// One rule written in the rule syntax (`spec/text.md`), as fuzzytool's
+/// `rule_from_text` reads it: without a `RULE` line it is named `rule_1`. A
+/// text that does not follow the syntax, or holds a condition or more than one
+/// rule, is a `CR_RULE_SYNTAX_ERROR`; bytes that are not UTF-8, a
+/// `CR_FORMAT_ERROR`. To read a condition or a rule set written as text, use
+/// `cr_document_read` with `CR_FORMAT_TEXT`.
+///
+/// # Safety
+///
+/// `text` is `NULL` or points to `len` readable bytes; `limits` is `NULL` or a
+/// live `cr_limits`; `out` is `NULL` or points to a writable `cr_rule *`;
+/// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_rule_from_text(
+    text: *const c_char,
+    len: usize,
+    limits: *const cr_limits,
+    out: *mut *mut cr_rule,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `text` and `len` (# Safety).
+        let text = utf8_text(unsafe { bytes(text, len, "text") }?)?;
+        // SAFETY: `limits` is NULL or live (# Safety).
+        let limits = unsafe { limits_of(limits) };
+        let rule = cleanrules::text::parse_rule(text, &limits)?;
+        // SAFETY: `out` passed `clear`.
+        unsafe { give(out, cr_rule { rule }) };
+        Ok(())
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call("cr_rule_from_text", error, body) }
+}
+
+/// Lend a text of a rule: `pick` chooses it, `None` for a text the rule
+/// lacks, which is `NULL` with a length of 0.
+///
+/// # Safety
+///
+/// `rule` is `NULL` or a live `cr_rule`; `text` and `len` are `NULL` or point
+/// to a writable `const char *` and `size_t`; `error` is `NULL` or points to a
+/// writable `cr_error *` set to `NULL`.
+unsafe fn lend(
+    name: &str,
+    rule: *const cr_rule,
+    text: *mut *const c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+    pick: impl FnOnce(&Rule) -> Outcome<Option<&str>>,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `text` and `len` are NULL or writable (# Safety).
+        unsafe { clear_borrowed(text, len) };
+        // SAFETY: `rule` is NULL or live (# Safety).
+        let rule = &unsafe { handle(rule, "rule") }?.rule;
+        let found = pick(rule)?;
+        // SAFETY: `text` and `len` are NULL or writable (# Safety).
+        unsafe { borrow_text(found, text, len) };
+        Ok(())
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call(name, error, body) }
+}
+
+/// The rule's name, borrowed from the rule and not NUL-terminated.
+///
+/// # Safety
+///
+/// `rule` is `NULL` or a live `cr_rule`; `name` and `len` are `NULL` or point
+/// to a writable `const char *` and `size_t`; `error` is `NULL` or points to a
+/// writable `cr_error *` set to `NULL`. The name lives as long as the rule.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_rule_name(
+    rule: *const cr_rule,
+    name: *mut *const c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    // SAFETY: the caller's promises are `lend`'s.
+    unsafe {
+        lend("cr_rule_name", rule, name, len, error, |r| {
+            Ok(Some(r.name()))
+        })
+    }
+}
+
+/// The rule's description, borrowed from the rule and not NUL-terminated;
+/// `NULL` with a length of 0 when it has none.
+///
+/// # Safety
+///
+/// As `cr_rule_name`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_rule_description(
+    rule: *const cr_rule,
+    text: *mut *const c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    // SAFETY: the caller's promises are `lend`'s.
+    unsafe {
+        lend("cr_rule_description", rule, text, len, error, |r| {
+            Ok(r.get_description())
+        })
+    }
+}
+
+/// The name of the rule's action (`spec/rules.md`, *Actions*), borrowed from
+/// the rule and not NUL-terminated; `NULL` with a length of 0 when it names
+/// none.
+///
+/// # Safety
+///
+/// As `cr_rule_name`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_rule_action(
+    rule: *const cr_rule,
+    name: *mut *const c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    // SAFETY: the caller's promises are `lend`'s.
+    unsafe {
+        lend("cr_rule_action", rule, name, len, error, |r| {
+            Ok(r.get_action_name())
+        })
+    }
+}
+
+/// The rule's priority; 0 for `NULL`.
+///
+/// # Safety
+///
+/// `rule` is `NULL` or a live `cr_rule`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_rule_priority(rule: *const cr_rule) -> i64 {
+    // SAFETY: `rule` is NULL or live (# Safety).
+    unsafe { rule.as_ref() }.map_or(0, |r| r.rule.get_priority())
+}
+
+/// A copy of the rule's condition, freed with `cr_node_free`.
+///
+/// # Safety
+///
+/// `rule` is `NULL` or a live `cr_rule`; `out` is `NULL` or points to a
+/// writable `cr_node *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_rule_when(
+    rule: *const cr_rule,
+    out: *mut *mut cr_node,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    // SAFETY: `rule` is NULL or live (# Safety).
+    let make = || Ok(unsafe { handle(rule, "rule") }?.rule.when().clone());
+    // SAFETY: `out` and `error` (# Safety).
+    unsafe { build("cr_rule_when", out, error, make) }
+}
+
+/// The number of entries in the rule's payload; 0 for `NULL`.
+///
+/// # Safety
+///
+/// `rule` is `NULL` or a live `cr_rule`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_rule_payload_len(rule: *const cr_rule) -> usize {
+    // SAFETY: `rule` is NULL or live (# Safety).
+    unsafe { rule.as_ref() }.map_or(0, |r| r.rule.then().len())
+}
+
+/// The payload entry at `index`, in the payload's order.
+fn entry(rule: &Rule, index: usize) -> Outcome<&(String, cleanrules::ast::Node)> {
+    let payload = rule.then();
+    payload.get(index).ok_or_else(|| {
+        Failure::Invalid(
+            format!(
+                "entry {index} is out of the payload of {} entries",
+                payload.len()
+            ),
+            "pass an index below cr_rule_payload_len",
+        )
+    })
+}
+
+/// The key of the payload entry at `index`, in order, borrowed from the rule
+/// and not NUL-terminated.
+///
+/// # Safety
+///
+/// `rule` is `NULL` or a live `cr_rule`; `key` and `len` are `NULL` or point
+/// to a writable `const char *` and `size_t`; `error` is `NULL` or points to a
+/// writable `cr_error *` set to `NULL`. The key lives as long as the rule.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_rule_payload_key(
+    rule: *const cr_rule,
+    index: usize,
+    key: *mut *const c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    // SAFETY: the caller's promises are `lend`'s.
+    unsafe {
+        lend("cr_rule_payload_key", rule, key, len, error, |r| {
+            Ok(Some(entry(r, index)?.0.as_str()))
+        })
+    }
+}
+
+/// A copy of the value node of the payload entry at `index`, in order, freed
+/// with `cr_node_free`.
+///
+/// # Safety
+///
+/// `rule` is `NULL` or a live `cr_rule`; `out` is `NULL` or points to a
+/// writable `cr_node *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_rule_payload_value(
+    rule: *const cr_rule,
+    index: usize,
+    out: *mut *mut cr_node,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let make = || {
+        // SAFETY: `rule` is NULL or live (# Safety).
+        let rule = &unsafe { handle(rule, "rule") }?.rule;
+        Ok(entry(rule, index)?.1.clone())
+    };
+    // SAFETY: `out` and `error` (# Safety).
+    unsafe { build("cr_rule_payload_value", out, error, make) }
 }
 
 /// Free a rule. `NULL` is ignored. Rule sets made with it keep their own copy.

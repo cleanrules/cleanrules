@@ -231,14 +231,14 @@ pub fn value_to_json(value: *const cr_value) -> String {
 }
 
 /// Run a call that only reports a status, and panic on failure.
-fn ok(call: impl FnOnce(*mut *mut cr_error) -> cr_status) {
+pub fn ok(call: impl FnOnce(*mut *mut cr_error) -> cr_status) {
     let mut error = ptr::null_mut();
     let status = call(&raw mut error);
     assert!(status == CR_OK, "{:?}", take(error));
 }
 
 /// A borrowed text read through a `const char **` and a length.
-fn borrowed(
+pub fn borrowed(
     call: impl FnOnce(*mut *const c_char, *mut usize, *mut *mut cr_error) -> cr_status,
 ) -> Vec<u8> {
     let (mut text, mut len) = (ptr::null(), 0);

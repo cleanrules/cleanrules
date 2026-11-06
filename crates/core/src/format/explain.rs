@@ -40,12 +40,13 @@ fn pointers<'d>(decision: &'d Decision<'_>) -> Vec<(*const Evaluated<'d, Truth>,
     out
 }
 
-/// Where an explanation is written: a JSON document, or a value (the C ABI's
-/// `cr_decision_explain_value`), which keeps the values themselves (opaque
-/// ones included) and adds the texts of each rule and cause and whether each
-/// cause holds. Both have the structure of `spec/json-format.md`,
-/// *Explanations*.
-trait Out: Sized {
+/// Where an explanation or a result tree is written: a JSON document, or a
+/// value (the C ABI's `cr_decision_explain_value` and `cr_tree_value`), which
+/// keeps the values themselves (opaque ones included) and, in explanations,
+/// adds the texts of each rule and cause and whether each cause holds. Both
+/// have the structure of `spec/json-format.md`, *Explanations* and *Result
+/// trees*.
+pub(super) trait Out: Sized {
     /// Whether to add `text` to rules and causes and `holds` to causes.
     const EXTRAS: bool;
     fn text(text: &str) -> Self;
@@ -139,7 +140,7 @@ impl Out for Value {
     }
 }
 
-fn truth<O: Out>(truth: Truth) -> O {
+pub(super) fn truth<O: Out>(truth: Truth) -> O {
     match truth {
         Truth::True => O::boolean(true),
         Truth::False => O::boolean(false),
@@ -148,7 +149,7 @@ fn truth<O: Out>(truth: Truth) -> O {
 }
 
 /// A reason, as `write_reason` writes it.
-fn reason<O: Out>(reason: &Reason) -> O {
+pub(super) fn reason<O: Out>(reason: &Reason) -> O {
     let mut members = vec![("code", O::text(reason.code.as_str()))];
     if !reason.paths.is_empty() {
         members.push((

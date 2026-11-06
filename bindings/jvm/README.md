@@ -7,12 +7,12 @@ Memory API of Java 25. There is no native code of its own: the bindings of
 [`cleanrules.h`](../../crates/ffi/include/cleanrules.h) are written by hand in
 Java, and Java data is read straight into the engine's values.
 
-It has two layers. The idiomatic API (task G.1b) builds conditions and rules
-in code with static imports and methods, evaluates them, and gives decisions,
-explanations and summaries as objects. The native layer (task G.1a) reads and
-writes documents in every format and evaluates them on Java data or JSON.
-Documents, the rule syntax, decision tables and result trees in the idiomatic
-API come with G.1d; the native libraries inside the jar with G.1c; Scala 3
+It has two layers. The idiomatic API (tasks G.1b and G.1d) builds conditions
+and rules in code with static imports and methods, reads and writes them as
+documents, builds decision tables, evaluates them, and gives decisions,
+explanations, summaries and result trees as objects. The native layer (task
+G.1a) reads and writes documents in every format and evaluates them on Java
+data or JSON. The native libraries inside the jar come with G.1c, and Scala 3
 with G.2.
 
 Java 25 or later. Module `io.github.cleanrules`, artifact
@@ -123,9 +123,10 @@ rules.bind(Map.of("notify_sales", context -> System.out.println(context.output()
   `rule()`, `executed()` and `decision()`; the core writes its message, hint
   and JSON form, as for every binding.
 
-Rules, rule sets, decisions and nodes are immutable and may be shared between
-threads; a `Cleaner` frees their native memory once they are unreachable, so
-rules, rule sets and nodes have no `close()` (decisions may be closed early).
+Rules, rule sets, decisions, nodes, decision tables and result trees are
+immutable and may be shared between threads; a `Cleaner` frees their native
+memory once they are unreachable, so they have no `close()` (decisions may be
+closed early).
 `Expr.hashCode()` is the core's, the same on every platform for one version of
 the library: never store it. Values come back as in *Values given back*
 below.
@@ -137,6 +138,10 @@ The same concepts in JavaScript, where Java's names differ:
 | `ruleSet.contains(name)` | `ruleSet.has(name)` |
 | `ruleSet.get(name)` (an `Optional`) | `ruleSet.get(name)` (or `undefined`) |
 | `Rule.named(name).when(c).then(k, v)...` | `new Rule(name, c, { k: v }, { ... })` |
+| `Documents.loads(text, Format.YAML, actions)` | `loads(text, { format: 'yaml', actions })` |
+| `DecisionTable.builder().header(...).row(...).build()` | `new DecisionTable(header, rows, { ... })` |
+| `table.ruleSet()` | `table.ruleset` |
+| `expr.evaluateTree(data)` | `evaluateTree(expr, data)` |
 | `RuleSet.builder()...build()`, `RuleSet.of(...)` | `new RuleSet([...], { ... })` |
 | `decision.output()` (an `Optional`) | `decision.output` (or `null`) |
 | `explanation.forRule(name)` | `explanation.forRule(name)` |
@@ -145,6 +150,73 @@ The same concepts in JavaScript, where Java's names differ:
 [`docs/examples/DiscountRules.java`](../../docs/examples/DiscountRules.java)
 builds the rules of `discounts.rules` in code and runs with the source
 launcher, as its comment says; a test runs it.
+
+## Documents, decision tables and result trees
+
+```java
+import static io.github.cleanrules.Conditions.field;
+import static io.github.cleanrules.Documents.*;
+
+if (load(Path.of("discounts.rules"), Map.of("notify_sales", notify)) instanceof RuleSet rules) {
+    String yaml = dumps(rules, Format.YAML);
+}
+Rule vip = ruleFromText("RULE vip IF customer.years > 5 THEN discount = 0.15");
+
+DecisionTable table = DecisionTable.builder()
+        .hitPolicy(TablePolicy.PRIORITY)
+        .header("RULE", field("customer", "years"), "order.total", TableOutput.of("risk", "high", "low"))
+        .row("new", field("customer", "years").lt(1), "> 1000", "'high'")
+        .row("default", null, null, "'low'")
+        .build();
+ResultTree tree = vip.when().evaluateTree(Map.of("customer", Map.of("years", 7)));
+```
+
+- **Documents** (`Documents`, for static imports): `loads(text[, format[,
+  limits], actions])` (a `String`, or UTF-8 bytes) and `load(path[, format,
+  limits], actions)` read a condition, rule, rule set or decision table
+  document as a `DocumentContent`, a sealed interface of `Expr`, `Rule`,
+  `RuleSet` and `DecisionTable` to take apart with a `switch`; a file's format
+  is its extension's (`.json`, `.yaml`, `.yml`, `.rules`, `.csv`) unless
+  given, and a file beyond the size limit of its format is not read
+  (`limit_exceeded`). `actions`, a registry, binds the rules read
+  (`RuleSet.bind`); without it named actions stay unbound. `dumps(value[,
+  format[, omitActions]])` and `dump(value, path[, format, omitActions])`
+  write one in canonical form (a rule text ends with a line break in a file):
+  a value node is an `ExpressionException`, and a rule whose action is code
+  without a name an `UnsupportedException` at `/rule/do` or
+  `/ruleset/rules/<i>/do`, unless `omitActions`. Rules and rule sets read
+  keep the core's own rules, so they write back exactly.
+  `ruleFromText(text[, action | actions | limits])` and
+  `ruleFromText(text, limits, actions)` (both may be null; a bare `null` in
+  the two-argument form matches all three and does not compile) read one rule
+  in the rule syntax (fuzzytool's verb; `rule_1` without a `RULE` line; text
+  naming an action binds the code to that name).
+- **Decision tables** (`DecisionTable`, `TablePolicy`, `TableOutput`,
+  `TableRow`): `DecisionTable.of(header, rows)` or `DecisionTable.builder()`
+  (`header(...)`, `row(...)`, `rows(...)`, `hitPolicy`, `aggregate`, `logic`,
+  `strict`, `limits`), as Python's and JavaScript's: header items are a CSV
+  header field's text, an input `Expr` or a `TableOutput`; a `String` cell is
+  read as the table's CSV writes it (`"> 5"`, `"-"`, `"'VIP'"` for the string),
+  an `Expr` cell is an input's condition or an output's value, `null` and
+  `Optional.empty()` are empty, and anything else is a constant. The core
+  reads the grid one row at a time; its errors point at `/header/<c>` or
+  `/rows/<r>/<c>` (also for a NaN, which Java rejects). A table gives
+  `hitPolicy()`, `aggregate()`, `logic()`, `isStrict()`, `inputs()`,
+  `outputs()`, `rows()` (each `TableRow`: `name()`, `priority()`,
+  `description()`, `inputs()` and `outputs()` as `Optional<Expr>`s),
+  `ruleSet()`, `evaluate`, `evaluateMany`, `summary()` and `toJson()`.
+- **Result trees** (`ResultTree`): `expr.evaluateTree(data[, logic, strict])`
+  and `expr.evaluateValueTree(data[, strict])` evaluate one node, and
+  `ActionContext.tree()` gives the tree of the rule's condition in an action;
+  each result has `node()`, `truth()` (an `Optional`, empty for a value),
+  `value()`, `reason()`, `children()` and `toJson()` (the core's JSON result
+  tree of that result).
+
+[`docs/examples/RiskTable.java`](../../docs/examples/RiskTable.java) does what
+`risk.mjs` does in JavaScript (the table of `risk.csv`, built again, a rule
+from text, a result tree, a rule set written and read back with its action
+bound) and runs like `DiscountRules.java`, with `docs/examples/risk.csv` as its
+argument; a test runs it.
 
 ## The native layer
 
@@ -294,8 +366,9 @@ throws an error of the virtual machine (`StackOverflowError`,
 
 ## Values given back
 
-Outputs, payloads and aggregates come back as Java values (*Values given
-back* in [`spec/data-model.md`](../../spec/data-model.md)):
+Outputs, payloads, aggregates, a table's output values and a result tree's
+values come back as Java values (*Values given back* in
+[`spec/data-model.md`](../../spec/data-model.md)):
 
 | Value | Java |
 |---|---|

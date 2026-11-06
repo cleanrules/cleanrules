@@ -39,7 +39,7 @@ import java.util.function.Function;
  * nodes, or Java constants as in {@link Expr}. Rules compare by identity, and
  * may be shared between threads.
  */
-public final class Rule {
+public final class Rule implements DocumentContent {
     /** The core's rule, shared by the rules that differ only in their action's code. */
     private static final class Core {
         private final Handle handle;
@@ -382,6 +382,43 @@ public final class Rule {
      */
     public Optional<Action> action() {
         return Optional.ofNullable(action);
+    }
+
+    @FunctionalInterface
+    private interface Lend {
+        int call(MemorySegment text, MemorySegment len, MemorySegment error);
+    }
+
+    /** A text the core lends, copied; null when it lends none. */
+    private static String lend(Lend call) {
+        try (Scope scope = new Scope()) {
+            MemorySegment text = scope.pointer();
+            MemorySegment len = scope.size();
+            scope.check(call.call(text, len, scope.error()));
+            return text.get(ADDRESS, 0).equals(MemorySegment.NULL) ? null : Scope.borrowedText(text, len);
+        }
+    }
+
+    /**
+     * The rule of an owned {@code cr_rule *}, read from a document or a rule
+     * set: it keeps the core's own rule, so it writes back exactly.
+     */
+    static Rule fromCore(MemorySegment owned) {
+        Core core = new Core(owned);
+        return core.with(pointer -> {
+            String name = lend((text, len, error) -> Native.ruleName(pointer, text, len, error));
+            Expr when = Expr.make((out, error, scope) -> Native.ruleWhen(pointer, out, error));
+            SequencedMap<String, Expr> payload = new LinkedHashMap<>();
+            long entries = Native.rulePayloadLen(pointer);
+            for (long i = 0; i < entries; i++) {
+                long index = i;
+                String key = lend((text, len, error) -> Native.rulePayloadKey(pointer, index, text, len, error));
+                payload.put(key, Expr.make((out, error, scope) -> Native.rulePayloadValue(pointer, index, out, error)));
+            }
+            String description = lend((text, len, error) -> Native.ruleDescription(pointer, text, len, error));
+            String actionName = lend((text, len, error) -> Native.ruleAction(pointer, text, len, error));
+            return new Rule(core, name, when, payload, Native.rulePriority(pointer), description, actionName, null);
+        });
     }
 
     /** The core's rule, held until {@link #release()}. */

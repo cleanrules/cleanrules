@@ -3,8 +3,10 @@ package io.github.cleanrules;
 import static java.lang.foreign.ValueLayout.ADDRESS;
 
 import io.github.cleanrules.internal.Build;
+import io.github.cleanrules.internal.DataReader;
 import io.github.cleanrules.internal.Handle;
 import io.github.cleanrules.internal.Native;
+import io.github.cleanrules.internal.PathTree;
 import io.github.cleanrules.internal.Scope;
 import io.github.cleanrules.internal.Text;
 import io.github.cleanrules.internal.Values;
@@ -52,11 +54,12 @@ import java.util.function.Function;
  * <p>A node holds native memory, which the cleaner frees once the node is
  * unreachable.
  */
-public abstract sealed class Expr permits Field, Const, Expr.Composite {
+public abstract sealed class Expr implements DocumentContent permits Field, Const, Expr.Composite {
     private final Handle handle;
     private volatile String text;
     private volatile int hash;
     private volatile boolean hashed;
+    private volatile PathTree paths;
 
     Expr(MemorySegment pointer) {
         this.handle = Handle.own(this, pointer, Native::nodeFree, "Expr");
@@ -225,6 +228,95 @@ public abstract sealed class Expr permits Field, Const, Expr.Composite {
      */
     public List<List<Object>> fieldPaths() {
         return with(pointer -> Values.paths(Scope.value((out, error) -> Native.nodeFieldPaths(pointer, out, error))));
+    }
+
+    // ---- Evaluating one node.
+
+    /**
+     * Evaluate this condition on {@code data} and give its result tree
+     * ({@code spec/ast.md}, <i>Evaluating one node</i>), under Boolean logic
+     * and not strict. Data is read as {@link RuleSet#evaluate(Object)} reads
+     * it: only the paths this node reads.
+     *
+     * @param data the input
+     * @return the result tree, whose root holds the truth value
+     * @throws ExpressionException if this is a value node, such as {@code a + 1}
+     */
+    public ResultTree evaluateTree(Object data) {
+        return evaluateTree(data, "boolean", false);
+    }
+
+    /**
+     * Evaluate this condition on {@code data} under a logic, strict or not,
+     * and give its result tree.
+     *
+     * @param data the input
+     * @param logic the logic, by name ({@code boolean})
+     * @param strict whether a missing field or a type mismatch is an error instead of unknown
+     * @return the result tree
+     * @throws ExpressionException if this is a value node
+     * @throws RegistryException for an unknown logic
+     * @throws EvaluationException in strict mode, for a missing field or a type mismatch
+     */
+    public ResultTree evaluateTree(Object data, String logic, boolean strict) {
+        byte[] name = Text.name(Objects.requireNonNull(logic, "logic"));
+        return tree(data, (node, input, out, scope) -> Native.treeNewCondition(
+                node,
+                input,
+                // An empty name is not NULL: the core refuses it.
+                name.length == 0 ? scope.bytes(new byte[] {0}) : scope.bytes(name),
+                name.length,
+                strict,
+                out,
+                scope.error()));
+    }
+
+    /**
+     * Evaluate this value node on {@code data} and give its result tree, not strict.
+     *
+     * @param data the input
+     * @return the result tree, whose root holds the value
+     * @throws ExpressionException if this is a condition, such as {@code a > 1}
+     */
+    public ResultTree evaluateValueTree(Object data) {
+        return evaluateValueTree(data, false);
+    }
+
+    /**
+     * Evaluate this value node on {@code data}, strict or not, and give its result tree.
+     *
+     * @param data the input
+     * @param strict whether a missing field or a type mismatch is an error instead of null
+     * @return the result tree
+     * @throws ExpressionException if this is a condition
+     * @throws EvaluationException in strict mode, for a missing field or a type mismatch
+     */
+    public ResultTree evaluateValueTree(Object data, boolean strict) {
+        return tree(data, (node, input, out, scope) -> Native.treeNewValue(node, input, strict, out, scope.error()));
+    }
+
+    @FunctionalInterface
+    private interface TreeCall {
+        int call(MemorySegment node, MemorySegment input, MemorySegment out, Scope scope);
+    }
+
+    private ResultTree tree(Object data, TreeCall call) {
+        PathTree read = paths;
+        if (read == null) {
+            read = PathTree.of(fieldPaths());
+            paths = read;
+        }
+        PathTree along = read;
+        return with(pointer -> {
+            try (Scope scope = new Scope();
+                    DataReader reader = new DataReader()) {
+                MemorySegment input = reader.read(data, along);
+                scope.onClose(() -> Native.valueFree(input));
+                MemorySegment out = scope.pointer();
+                scope.check(call.call(pointer, input, out, scope), reader.causes);
+                return ResultTree.of(out.get(ADDRESS, 0), reader.causes.opaques);
+            }
+        });
     }
 
     /**

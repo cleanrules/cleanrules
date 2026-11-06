@@ -32,10 +32,11 @@ header = """/*
  * argument, cr_error **error, may be NULL; otherwise *error must be NULL on
  * entry, receives a new cr_error on failure and is left alone on success.
  *
- * Threads: documents, rule sets, decisions, nodes, batches and errors never
- * change once made, so one may be used from several threads at once, but not
- * while it is freed. Limits, values, grids and action registries change while
- * they are built (cr_limits_set, cr_value_list_set, cr_value_map_insert,
+ * Threads: documents, rule sets, decisions, nodes, rules, result trees,
+ * batches and errors never change once made, so one may be used from several
+ * threads at once, but not while it is freed. Limits, values, grids and
+ * action registries change while they are built (cr_limits_set,
+ * cr_value_list_set, cr_value_map_insert, cr_grid_add_column_*,
  * cr_grid_push_row, cr_actions_add): finish them first. A finished registry
  * may be used by several threads at once; its actions then run concurrently,
  * each on the thread that called cr_ruleset_run, with the same data, which
@@ -48,8 +49,8 @@ header = """/*
  * then owns them. A value read from inside another (cr_value_list_get,
  * cr_value_map_entry, cr_value_map_get), and a string read from a value, are
  * borrowed: valid until the value that holds them, or one above it, is
- * changed, moved or freed. Strings borrowed from values and rule sets are not
- * NUL-terminated.
+ * changed, moved or freed. Strings borrowed from values, rules and rule sets
+ * are not NUL-terminated.
  */"""
 
 [export]

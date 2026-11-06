@@ -9,9 +9,11 @@ public final class RuleResult {
     private final boolean fired;
     private final Truth truth;
     private final Map<String, Object> output;
+    private final int position;
 
-    RuleResult(Rule rule, boolean fired, Truth truth, Map<String, Object> output) {
+    RuleResult(Rule rule, int position, boolean fired, Truth truth, Map<String, Object> output) {
         this.rule = rule;
+        this.position = position;
         this.fired = fired;
         this.truth = truth;
         this.output = output;
@@ -52,6 +54,11 @@ public final class RuleResult {
      */
     public Optional<Map<String, Object>> output() {
         return Optional.ofNullable(output);
+    }
+
+    /** The rule's position in its rule set. */
+    int position() {
+        return position;
     }
 
     @Override

@@ -70,6 +70,7 @@ public final class Decision implements AutoCloseable {
         for (int i = 0; i < rules.size(); i++) {
             all.add(new RuleResult(
                     rules.get(i),
+                    i,
                     nativeDecision.firedAt(i),
                     nativeDecision.truth(i),
                     nativeDecision.ruleOutput(i).orElse(null)));
@@ -174,6 +175,14 @@ public final class Decision implements AutoCloseable {
      */
     public Optional<Map<String, Object>> aggregated() {
         return ruleSet.aggregate().isEmpty() ? Optional.empty() : output();
+    }
+
+    /** The result tree of the condition of the rule at {@code position}. */
+    ResultTree tree(int position) {
+        List<Object> opaques = Bridge.ffi().opaques(nativeDecision);
+        MemorySegment tree = withNative(pointer ->
+                Scope.value((out, error) -> Native.decisionRuleTree(pointer, position, out, error)));
+        return ResultTree.of(tree, opaques);
     }
 
     /**

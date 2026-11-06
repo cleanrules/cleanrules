@@ -25,6 +25,7 @@ pub mod node;
 pub mod rule;
 pub mod ruleset;
 pub mod run;
+pub mod tree;
 pub mod value;
 
 mod boundary;
@@ -41,6 +42,7 @@ pub use node::*;
 pub use rule::*;
 pub use ruleset::*;
 pub use run::*;
+pub use tree::*;
 pub use value::*;
 
 /// The version of the ABI that this header describes.
@@ -82,6 +84,7 @@ const _: () = {
     shared::<cr_node>();
     shared::<cr_rule>();
     shared::<cr_batch>();
+    shared::<cr_tree>();
 };
 
 /// The version of the ABI that the library implements: `CR_ABI_VERSION` of

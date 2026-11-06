@@ -66,6 +66,11 @@ public final class Native {
     public static final int CR_INTERNAL_ERROR = -2;
     public static final int CR_ACTION_ERROR = 14;
 
+    public static final int CR_DOCUMENT_CONDITION = 1;
+    public static final int CR_DOCUMENT_RULE = 2;
+    public static final int CR_DOCUMENT_RULESET = 3;
+    public static final int CR_DOCUMENT_DECISION_TABLE = 4;
+
     public static final int CR_VALUE_NULL = 1;
     public static final int CR_VALUE_BOOL = 2;
     public static final int CR_VALUE_INT = 3;
@@ -349,6 +354,46 @@ public final class Native {
             bind("cr_error_new_action", fn(I, P, SIZE_T, P, SIZE_T, P, SIZE_T, P, P, P));
     private static final MethodHandle DECISION_EXPLANATION = bind("cr_decision_explain_value", fn(I, P, P, P));
 
+    // Documents, rules, decision tables and result trees (G.1d).
+    private static final MethodHandle VALUE_MAP_GET = bind("cr_value_map_get", fn(P, P, P, SIZE_T));
+    private static final MethodHandle VALUE_TO_JSON = bind("cr_value_to_json", fn(I, P, P, P, P));
+    private static final MethodHandle RULE_FROM_TEXT = bind("cr_rule_from_text", fn(I, P, SIZE_T, P, P, P));
+    private static final MethodHandle RULE_NAME = bind("cr_rule_name", fn(I, P, P, P, P));
+    private static final MethodHandle RULE_DESCRIPTION = bind("cr_rule_description", fn(I, P, P, P, P));
+    private static final MethodHandle RULE_ACTION = bind("cr_rule_action", fn(I, P, P, P, P));
+    private static final MethodHandle RULE_PRIORITY = bind("cr_rule_priority", fn(L, P));
+    private static final MethodHandle RULE_WHEN = bind("cr_rule_when", fn(I, P, P, P));
+    private static final MethodHandle RULE_PAYLOAD_LEN = bind("cr_rule_payload_len", fn(SIZE_T, P));
+    private static final MethodHandle RULE_PAYLOAD_KEY = bind("cr_rule_payload_key", fn(I, P, SIZE_T, P, P, P));
+    private static final MethodHandle RULE_PAYLOAD_VALUE = bind("cr_rule_payload_value", fn(I, P, SIZE_T, P, P));
+    private static final MethodHandle RULESET_RULE = bind("cr_ruleset_rule", fn(I, P, SIZE_T, P, P));
+    private static final MethodHandle DOCUMENT_NEW_CONDITION = bind("cr_document_new_condition", fn(I, P, P, P));
+    private static final MethodHandle DOCUMENT_NEW_RULE = bind("cr_document_new_rule", fn(I, P, P, P));
+    private static final MethodHandle DOCUMENT_CONDITION = bind("cr_document_condition", fn(I, P, P, P));
+    private static final MethodHandle DOCUMENT_RULE = bind("cr_document_rule", fn(I, P, P, P));
+    private static final MethodHandle DOCUMENT_TABLE_VALUE = bind("cr_document_table_value", fn(I, P, P, P));
+    private static final MethodHandle DOCUMENT_TABLE_ROW = bind("cr_document_table_row", fn(I, P, SIZE_T, P, P));
+    private static final MethodHandle DOCUMENT_TABLE_INPUT = bind("cr_document_table_input", fn(I, P, SIZE_T, P, P));
+    private static final MethodHandle DOCUMENT_TABLE_CELL =
+            bind("cr_document_table_cell", fn(I, P, SIZE_T, SIZE_T, P, P));
+    private static final MethodHandle GRID_NEW_OPEN =
+            bind("cr_grid_new_open", fn(I, P, SIZE_T, P, SIZE_T, P, SIZE_T, B, P, P, P));
+    private static final MethodHandle GRID_ADD_COLUMN_TEXT = bind("cr_grid_add_column_text", fn(I, P, P, SIZE_T, P));
+    private static final MethodHandle GRID_ADD_COLUMN_INPUT = bind("cr_grid_add_column_input", fn(I, P, P, P));
+    private static final MethodHandle GRID_ADD_COLUMN_OUTPUT =
+            bind("cr_grid_add_column_output", fn(I, P, P, SIZE_T, P, P));
+    private static final MethodHandle GRID_PUSH_ROW_NODES = bind("cr_grid_push_row_nodes", fn(I, P, P, P, SIZE_T, P));
+    private static final MethodHandle GRID_FINISH = bind("cr_grid_finish", fn(I, P, P, P));
+    private static final MethodHandle GRID_FREE = bind("cr_grid_free", proc(P));
+    private static final MethodHandle TREE_NEW_CONDITION =
+            bind("cr_tree_new_condition", fn(I, P, P, P, SIZE_T, B, P, P));
+    private static final MethodHandle TREE_NEW_VALUE = bind("cr_tree_new_value", fn(I, P, P, B, P, P));
+    private static final MethodHandle DECISION_RULE_TREE = bind("cr_decision_rule_tree", fn(I, P, SIZE_T, P, P));
+    private static final MethodHandle TREE_VALUE = bind("cr_tree_value", fn(I, P, P, P));
+    private static final MethodHandle TREE_LEN = bind("cr_tree_len", fn(SIZE_T, P));
+    private static final MethodHandle TREE_NODE = bind("cr_tree_node", fn(I, P, SIZE_T, P, P));
+    private static final MethodHandle TREE_FREE = bind("cr_tree_free", proc(P));
+
     // Actions.
     private static final MethodHandle ACTIONS_NEW = bind("cr_actions_new", fn(P));
     private static final MethodHandle ACTIONS_ADD = bind("cr_actions_add", fn(I, P, P, SIZE_T, P, P, P));
@@ -489,10 +534,10 @@ public final class Native {
     /** The kind of a {@code CR_DOCUMENT_*} number. */
     public static DocumentKind documentKind(int code) {
         return switch (code) {
-            case 1 -> DocumentKind.CONDITION;
-            case 2 -> DocumentKind.RULE;
-            case 3 -> DocumentKind.RULESET;
-            case 4 -> DocumentKind.DECISION_TABLE;
+            case CR_DOCUMENT_CONDITION -> DocumentKind.CONDITION;
+            case CR_DOCUMENT_RULE -> DocumentKind.RULE;
+            case CR_DOCUMENT_RULESET -> DocumentKind.RULESET;
+            case CR_DOCUMENT_DECISION_TABLE -> DocumentKind.DECISION_TABLE;
             default -> throw new IllegalStateException("cleanrules gave an unknown document kind " + code);
         };
     }
@@ -1740,6 +1785,286 @@ public final class Native {
             MemorySegment error) {
         try {
             return (int) ERROR_NEW_ACTION.invokeExact(rule, ruleLen, action, actionLen, detail, detailLen, executed, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleFromText(
+            MemorySegment text, long len, MemorySegment limits, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULE_FROM_TEXT.invokeExact(text, len, limits, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleName(MemorySegment rule, MemorySegment name, MemorySegment len, MemorySegment error) {
+        try {
+            return (int) RULE_NAME.invokeExact(rule, name, len, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleDescription(MemorySegment rule, MemorySegment text, MemorySegment len, MemorySegment error) {
+        try {
+            return (int) RULE_DESCRIPTION.invokeExact(rule, text, len, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleAction(MemorySegment rule, MemorySegment name, MemorySegment len, MemorySegment error) {
+        try {
+            return (int) RULE_ACTION.invokeExact(rule, name, len, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static long rulePriority(MemorySegment rule) {
+        try {
+            return (long) RULE_PRIORITY.invokeExact(rule);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleWhen(MemorySegment rule, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULE_WHEN.invokeExact(rule, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static long rulePayloadLen(MemorySegment rule) {
+        try {
+            return (long) RULE_PAYLOAD_LEN.invokeExact(rule);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int rulePayloadKey(
+            MemorySegment rule, long index, MemorySegment key, MemorySegment len, MemorySegment error) {
+        try {
+            return (int) RULE_PAYLOAD_KEY.invokeExact(rule, index, key, len, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int rulePayloadValue(MemorySegment rule, long index, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULE_PAYLOAD_VALUE.invokeExact(rule, index, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int rulesetRule(MemorySegment ruleset, long rule, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULESET_RULE.invokeExact(ruleset, rule, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int documentNewCondition(MemorySegment node, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) DOCUMENT_NEW_CONDITION.invokeExact(node, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int documentNewRule(MemorySegment rule, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) DOCUMENT_NEW_RULE.invokeExact(rule, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int documentCondition(MemorySegment document, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) DOCUMENT_CONDITION.invokeExact(document, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int documentRule(MemorySegment document, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) DOCUMENT_RULE.invokeExact(document, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int documentTableValue(MemorySegment document, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) DOCUMENT_TABLE_VALUE.invokeExact(document, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int documentTableRow(MemorySegment document, long row, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) DOCUMENT_TABLE_ROW.invokeExact(document, row, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int documentTableInput(MemorySegment document, long input, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) DOCUMENT_TABLE_INPUT.invokeExact(document, input, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int documentTableCell(
+            MemorySegment document, long row, long column, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) DOCUMENT_TABLE_CELL.invokeExact(document, row, column, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int gridNewOpen(
+            MemorySegment hitPolicy, long hitPolicyLen, MemorySegment aggregate, long aggregateLen, MemorySegment logic, long logicLen, boolean strict, MemorySegment limits, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) GRID_NEW_OPEN.invokeExact(hitPolicy, hitPolicyLen, aggregate, aggregateLen, logic, logicLen, strict, limits, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int gridAddColumnText(MemorySegment grid, MemorySegment text, long len, MemorySegment error) {
+        try {
+            return (int) GRID_ADD_COLUMN_TEXT.invokeExact(grid, text, len, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int gridAddColumnInput(MemorySegment grid, MemorySegment input, MemorySegment error) {
+        try {
+            return (int) GRID_ADD_COLUMN_INPUT.invokeExact(grid, input, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int gridAddColumnOutput(
+            MemorySegment grid, MemorySegment name, long len, MemorySegment values, MemorySegment error) {
+        try {
+            return (int) GRID_ADD_COLUMN_OUTPUT.invokeExact(grid, name, len, values, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int gridPushRowNodes(
+            MemorySegment grid, MemorySegment row, MemorySegment nodes, long nodesLen, MemorySegment error) {
+        try {
+            return (int) GRID_PUSH_ROW_NODES.invokeExact(grid, row, nodes, nodesLen, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int gridFinish(MemorySegment grid, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) GRID_FINISH.invokeExact(grid, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static void gridFree(MemorySegment grid) {
+        try {
+            GRID_FREE.invokeExact(grid);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int treeNewCondition(
+            MemorySegment node, MemorySegment input, MemorySegment logic, long logicLen, boolean strict, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) TREE_NEW_CONDITION.invokeExact(node, input, logic, logicLen, strict, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int treeNewValue(
+            MemorySegment node, MemorySegment input, boolean strict, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) TREE_NEW_VALUE.invokeExact(node, input, strict, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int decisionRuleTree(MemorySegment decision, long rule, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) DECISION_RULE_TREE.invokeExact(decision, rule, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int treeValue(MemorySegment tree, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) TREE_VALUE.invokeExact(tree, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static long treeLen(MemorySegment tree) {
+        try {
+            return (long) TREE_LEN.invokeExact(tree);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int treeNode(MemorySegment tree, long index, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) TREE_NODE.invokeExact(tree, index, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static void treeFree(MemorySegment tree) {
+        try {
+            TREE_FREE.invokeExact(tree);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static MemorySegment valueMapGet(MemorySegment value, MemorySegment key, long len) {
+        try {
+            return (MemorySegment) VALUE_MAP_GET.invokeExact(value, key, len);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int valueToJson(MemorySegment value, MemorySegment out, MemorySegment len, MemorySegment error) {
+        try {
+            return (int) VALUE_TO_JSON.invokeExact(value, out, len, error);
         } catch (Throwable thrown) {
             throw rethrow(thrown);
         }

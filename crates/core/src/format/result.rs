@@ -2,9 +2,10 @@
 
 use crate::error::Segment;
 use crate::eval::{Evaluated, Outcome, Reason};
-use crate::format::value::write_value;
+use crate::format::explain::{Out, reason, truth};
 use crate::json::{Json, JsonNumber};
 use crate::logic::Truth;
+use crate::value::Value;
 
 /// A field path as JSON: strings and integers.
 #[must_use]
@@ -53,25 +54,97 @@ pub fn write_truth(truth: Truth) -> Json {
     }
 }
 
-/// A result tree under Kleene logic, in canonical form.
-#[must_use]
-pub fn write_result(result: &Evaluated<'_, Truth>) -> Json {
-    let mut members = vec![("op".to_owned(), Json::String(result.node.tag().into()))];
+/// A result and its children, in the structure of `spec/json-format.md`,
+/// *Result trees*.
+fn result<O: Out>(result: &Evaluated<'_, Truth>) -> O {
+    let mut members = vec![("op", O::text(result.node.tag()))];
     if let crate::ast::Expr::Field(path) = result.node.expr() {
-        members.push(("path".into(), write_path(path)));
+        members.push(("path", O::path(path)));
     }
     match &result.outcome {
-        Outcome::Truth(truth) => members.push(("truth".into(), write_truth(*truth))),
-        Outcome::Value(value) => members.push(("value".into(), write_value(value))),
+        Outcome::Truth(found) => members.push(("truth", truth(*found))),
+        Outcome::Value(value) => members.push(("value", O::data(value))),
     }
-    if let Some(reason) = &result.reason {
-        members.push(("reason".into(), write_reason(reason)));
+    if let Some(found) = &result.reason {
+        members.push(("reason", reason(found)));
     }
     if !result.children.is_empty() {
         members.push((
-            "children".into(),
-            Json::Array(result.children.iter().map(write_result).collect()),
+            "children",
+            O::list(result.children.iter().map(self::result).collect()),
         ));
     }
-    Json::Object(members)
+    O::object(members)
+}
+
+/// A result tree under Kleene logic, in canonical form.
+#[must_use]
+pub fn write_result(result: &Evaluated<'_, Truth>) -> Json {
+    self::result(result)
+}
+
+/// A result tree as a value (the C ABI's `cr_tree_value`), in the structure of
+/// [`write_result`]'s JSON (`spec/json-format.md`, *Result trees*): a map per
+/// result, a truth as a boolean or a plain null, paths as lists of strings and
+/// ints, and the values themselves, opaque ones included. Writing it with
+/// [`write_value`](crate::format::write_value) gives [`write_result`]'s JSON.
+#[must_use]
+pub fn result_value(result: &Evaluated<'_, Truth>) -> Value {
+    self::result(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{result_value, write_result};
+    use crate::eval::{Options, evaluate_tree, evaluate_value_tree};
+    use crate::format::write_value;
+    use crate::json::Limits;
+    use crate::logic::Kleene;
+    use crate::text::parse_node;
+    use crate::value::{Map, Value};
+
+    /// The value has the tree's JSON structure: written, it is the JSON.
+    #[test]
+    fn the_value_writes_as_the_json_tree() {
+        let limits = Limits::default();
+        let mut input = Map::new();
+        input.insert("age", Value::Int(20));
+        input.insert(
+            "thing",
+            Value::Opaque(crate::value::Opaque {
+                type_name: "Thing".into(),
+                token: 3,
+            }),
+        );
+        input.insert(
+            "price",
+            Value::Decimal(crate::value::Decimal::parse("1.25").unwrap()),
+        );
+        let input = Value::Map(input);
+        let options = || Options {
+            strict: false,
+            rule: None,
+        };
+        let condition = parse_node(
+            "age >= 18 AND country IN (\"ES\") AND age BETWEEN 1 AND 30",
+            &limits,
+        )
+        .unwrap();
+        let tree = evaluate_tree(&condition, &input, &Kleene, options()).unwrap();
+        assert_eq!(write_value(&result_value(&tree)), write_result(&tree));
+        let Value::Map(root) = result_value(&tree) else {
+            panic!("not a map")
+        };
+        assert!(matches!(root.get("truth"), Some(Value::Null(_))));
+        let value = parse_node("abs(price * 2) + missing", &limits).unwrap();
+        let tree = evaluate_value_tree(&value, &input, &Kleene, options()).unwrap();
+        assert_eq!(write_value(&result_value(&tree)), write_result(&tree));
+        // An opaque value is itself in the value.
+        let value = parse_node("thing", &limits).unwrap();
+        let tree = evaluate_value_tree(&value, &input, &Kleene, options()).unwrap();
+        let Value::Map(root) = result_value(&tree) else {
+            panic!("not a map")
+        };
+        assert!(matches!(root.get("value"), Some(Value::Opaque(o)) if o.token == 3));
+    }
 }

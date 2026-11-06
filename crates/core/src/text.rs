@@ -1225,16 +1225,8 @@ impl<'a> Parser<'a> {
             return Err(self.unexpected("AND, OR or the end of the text"));
         }
         let (line, column) = (condition.line, condition.column);
-        let node = condition.build()?;
         // As in a JSON condition document.
-        if node.is_null_constant() || node.kind() == crate::ast::Kind::Value {
-            return Err(Error::new(
-                ErrorCode::ExpressionError,
-                format!("'{}' is not a condition", node.tag()),
-            )
-            .at_position(line, column));
-        }
-        Ok(Document::Condition(node))
+        Document::condition(condition.build()?).map_err(|e| e.at_position(line, column))
     }
 }
 

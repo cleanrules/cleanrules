@@ -459,6 +459,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `detail()`, `same_as()`, `hash()`, with `std::hash` and `std::equal_to`;
   `rule` with `make` and `with_*`; `ruleset::make` with `ruleset_settings`,
   `rule_position` and `summary(actions, format)`; `decision::explanation()`.
+- Idiomatic Java API, second part (task G.1d): documents with `Documents`
+  (`loads` from a `String` or UTF-8 bytes, `load(Path)` with the format of its
+  extension, both with `Limits` and an action registry that binds the rules
+  read; `dumps` and `dump(Path)`, with `omitActions`), returning a
+  `DocumentContent`, a sealed
+  interface of `Expr`, `Rule`, `RuleSet` and `DecisionTable` to take apart
+  with a `switch`; rules and rule sets read keep the core's rules and write
+  back exactly. `Documents.ruleFromText` (fuzzytool's verb: one rule, `rule_1`
+  without a `RULE` line, with code, a registry, limits, or limits and a
+  registry).
+  `DecisionTable` from a grid (`DecisionTable.of(header, rows)` and
+  `DecisionTable.builder()`: header items as text, `Expr` or `TableOutput`,
+  cells as text, `Expr` or constants, `TablePolicy`, aggregate, logic,
+  strict, limits; errors point at `/header/<c>` or `/rows/<r>/<c>`), with
+  `hitPolicy()`, `aggregate()`, `logic()`, `isStrict()`, `inputs()`,
+  `outputs()`, `rows()` (`TableRow`), `ruleSet()`, `evaluate`,
+  `evaluateMany`, `summary()` and `toJson()`. `Expr.evaluateTree(data[,
+  logic, strict])` and `evaluateValueTree(data[, strict])` give a
+  `ResultTree` (`node()`, `truth()`, `value()`, `reason()`, `children()`,
+  `toJson()`), and `ActionContext.tree()` the tree of the rule's condition.
+  Example `docs/examples/RiskTable.java`, run by a test.
+- C ABI, for what rules, documents, tables and result trees hold (task
+  G.1d): `cr_ruleset_rule`, `cr_rule_name`, `cr_rule_description`,
+  `cr_rule_action`, `cr_rule_priority`, `cr_rule_when`, `cr_rule_payload_len`,
+  `cr_rule_payload_key`, `cr_rule_payload_value` and `cr_rule_from_text`;
+  `cr_document_new_condition`, `cr_document_new_rule`,
+  `cr_document_condition` and `cr_document_rule`; grids with an open header
+  (`cr_grid_new_open`, `cr_grid_add_column_text`, `cr_grid_add_column_input`,
+  `cr_grid_add_column_output`) and cells that are nodes
+  (`cr_grid_push_row_nodes`); `cr_document_table_value`,
+  `cr_document_table_row`, `cr_document_table_input` and
+  `cr_document_table_cell`; result trees as handles (`cr_tree`:
+  `cr_tree_new_condition`, `cr_tree_new_value`, `cr_decision_rule_tree`,
+  `cr_tree_value`, `cr_tree_len`, `cr_tree_node`, `cr_tree_free`). C++:
+  `ruleset::rule_at`, `rule::from_text`, `name()` (borrowed),
+  `description()`, `action_name()`, `priority()`, `when()` and `payload()` of
+  a rule, `document::from_condition`, `from_rule`, `as_condition` and
+  `as_rule`.
+- Core (task G.1d): `format::result_value`, a result tree as a value, written
+  by the same generic writer as `write_result` (the C ABI's `cr_tree_value`);
+  and `Document::condition`, the one check that only a condition is a
+  condition document, used by the JSON and YAML readers, the text reader and
+  `cr_document_new_condition`.
 - Core: `RuleSet::rule_position`, the lookup of a rule by name, with the
   `rule_not_found` error (`no rule named "x"`, the names there are);
   `Config::from_names`, a rule set's settings by name (whose hints
@@ -470,7 +513,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specification: in Java, `equals` and `hashCode` of nodes are structural
   identity (`spec/ast.md`); the Java values given back include constants,
   metadata, explanation values and gaps (`spec/data-model.md`); the C ABI's
-  explanation value (`spec/json-format.md`, *Explanations*).
+  explanation value (`spec/json-format.md`, *Explanations*). With G.1d, the
+  Java values given back also cover a decision table's output values and row
+  priorities and the values of a result tree (`spec/data-model.md`); the C
+  ABI's result tree value (`spec/json-format.md`, *Result trees*); and Java's
+  empty cells in grids (`spec/tables.md`, *Grids*).
 - WebAssembly build of the JavaScript binding (task F.1b): the same npm
   package `cleanrules` runs in browsers, Deno (2.6 or later) and other runtimes
   on a WebAssembly module built with wasm-bindgen, with the same API as the
@@ -673,6 +720,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Core: a value or the null constant read as a condition document (JSON, YAML
+  or text) says "only a condition can be a document, not the value ..." (it
+  was "'add' is not a condition"), with a hint; the code and the pointer or
+  position are the same (task G.1d).
 - Java: `ActionException.decision()` is the idiomatic `Decision` of
   `RuleSet.run` (task G.1b); the native layer's decision, from
   `io.github.cleanrules.ffi.RuleSet.run`, is `nativeDecision()`.

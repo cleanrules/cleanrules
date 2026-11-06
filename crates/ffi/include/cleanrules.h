@@ -22,10 +22,11 @@
  * argument, cr_error **error, may be NULL; otherwise *error must be NULL on
  * entry, receives a new cr_error on failure and is left alone on success.
  *
- * Threads: documents, rule sets, decisions, nodes, batches and errors never
- * change once made, so one may be used from several threads at once, but not
- * while it is freed. Limits, values, grids and action registries change while
- * they are built (cr_limits_set, cr_value_list_set, cr_value_map_insert,
+ * Threads: documents, rule sets, decisions, nodes, rules, result trees,
+ * batches and errors never change once made, so one may be used from several
+ * threads at once, but not while it is freed. Limits, values, grids and
+ * action registries change while they are built (cr_limits_set,
+ * cr_value_list_set, cr_value_map_insert, cr_grid_add_column_*,
  * cr_grid_push_row, cr_actions_add): finish them first. A finished registry
  * may be used by several threads at once; its actions then run concurrently,
  * each on the thread that called cr_ruleset_run, with the same data, which
@@ -38,8 +39,8 @@
  * then owns them. A value read from inside another (cr_value_list_get,
  * cr_value_map_entry, cr_value_map_get), and a string read from a value, are
  * borrowed: valid until the value that holds them, or one above it, is
- * changed, moved or freed. Strings borrowed from values and rule sets are not
- * NUL-terminated.
+ * changed, moved or freed. Strings borrowed from values, rules and rule sets
+ * are not NUL-terminated.
  */
 
 #ifndef CLEANRULES_H
@@ -94,6 +95,9 @@ typedef struct cr_rule cr_rule;
 
 // A rule set, ready to evaluate.
 typedef struct cr_ruleset cr_ruleset;
+
+// A result tree: what evaluating a node gave, and each child's result.
+typedef struct cr_tree cr_tree;
 
 // A value: a null with a reason, a boolean, a number, a string, a date or
 // datetime, a list, a map or an opaque value.
@@ -543,6 +547,19 @@ cr_status cr_decision_rule_output(const struct cr_decision *decision,
                                   struct cr_value **out,
                                   struct cr_error **error);
 
+// The result tree of the condition of the rule at position `rule` in a
+// decision (as its explanation reads it), freed with `cr_tree_free`.
+//
+// # Safety
+//
+// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to
+// a writable `cr_tree *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_decision_rule_tree(const struct cr_decision *decision,
+                                size_t rule,
+                                struct cr_tree **out,
+                                struct cr_error **error);
+
 // The position in the rule set of the `index`-th selected rule, in rule order.
 //
 // # Safety
@@ -589,6 +606,18 @@ cr_status cr_decision_write(const struct cr_decision *decision,
                             size_t *len,
                             struct cr_error **error);
 
+// A copy of the condition a `CR_DOCUMENT_CONDITION` document holds, freed
+// with `cr_node_free`. A document of another kind is `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `document` is `NULL` or a live `cr_document`; `out` is `NULL` or points to a
+// writable `cr_node *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_document_condition(const struct cr_document *document,
+                                struct cr_node **out,
+                                struct cr_error **error);
+
 // Free a document. `NULL` is ignored.
 //
 // # Safety
@@ -602,6 +631,30 @@ void cr_document_free(struct cr_document *document);
 //
 // `document` is `NULL` or a live `cr_document`.
 cr_document_content cr_document_kind(const struct cr_document *document);
+
+// A document holding a condition (copied), to write it with
+// `cr_document_write`. A value node, such as `a + 1`, or the null constant is
+// a `CR_EXPRESSION_ERROR`: only a condition can be a document.
+//
+// # Safety
+//
+// `node` is `NULL` or a live `cr_node`; `out` is `NULL` or points to a
+// writable `cr_document *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_document_new_condition(const struct cr_node *node,
+                                    struct cr_document **out,
+                                    struct cr_error **error);
+
+// A document holding a rule (copied), to write it with `cr_document_write`.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `out` is `NULL` or points to a
+// writable `cr_document *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_document_new_rule(const struct cr_rule *rule,
+                               struct cr_document **out,
+                               struct cr_error **error);
 
 // Read a document in `format` (`CR_FORMAT_*`): JSON, YAML or the rule syntax,
 // or CSV for a decision table. Bytes that are not UTF-8 are a
@@ -618,6 +671,80 @@ cr_status cr_document_read(const char *text,
                            const struct cr_limits *limits,
                            struct cr_document **out,
                            struct cr_error **error);
+
+// A copy of the rule a `CR_DOCUMENT_RULE` document holds, freed with
+// `cr_rule_free`. A document of another kind is `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `document` is `NULL` or a live `cr_document`; `out` is `NULL` or points to a
+// writable `cr_rule *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_document_rule(const struct cr_document *document,
+                           struct cr_rule **out,
+                           struct cr_error **error);
+
+// A copy of the node of the cell at row `row` and column `column`, freed
+// with `cr_node_free`, counting the inputs first, then the outputs: an
+// input's condition, which tests its column, or an output's value; `*out` is
+// `NULL` for an empty cell (any value, or no output).
+//
+// # Safety
+//
+// `document` is `NULL` or a live `cr_document`; `out` is `NULL` or points to
+// a writable `cr_node *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_document_table_cell(const struct cr_document *document,
+                                 size_t row,
+                                 size_t column,
+                                 struct cr_node **out,
+                                 struct cr_error **error);
+
+// A copy of the expression of the input at position `input`, freed with
+// `cr_node_free`.
+//
+// # Safety
+//
+// `document` is `NULL` or a live `cr_document`; `out` is `NULL` or points to
+// a writable `cr_node *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_document_table_input(const struct cr_document *document,
+                                  size_t input,
+                                  struct cr_node **out,
+                                  struct cr_error **error);
+
+// The row at position `row` of a decision table, apart from its cells, as a
+// new map freed with `cr_value_free`: `name`, `priority` and `description`,
+// each null when the row has none (a row without a name is the rule
+// `row_<n>`, counting from 1).
+//
+// # Safety
+//
+// `document` is `NULL` or a live `cr_document`; `out` is `NULL` or points to
+// a writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_document_table_row(const struct cr_document *document,
+                                size_t row,
+                                struct cr_value **out,
+                                struct cr_error **error);
+
+// What a decision table holds apart from its cells (`spec/tables.md`,
+// *Model*), as a new map freed with `cr_value_free`: `hit_policy` (a
+// table's, `output_order` included), `aggregate` (or null), `logic` (its
+// name, `boolean` when the table names none), `strict`, `input_count` (the
+// inputs, read with `cr_document_table_input`), `outputs` (a list of maps
+// with `name` and `values`, highest priority first, empty for any value) and
+// `row_count` (the rows, read with `cr_document_table_row` and
+// `cr_document_table_cell`). Maps may gain keys in later versions.
+//
+// # Safety
+//
+// `document` is `NULL` or a live `cr_document`; `out` is `NULL` or points to
+// a writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_document_table_value(const struct cr_document *document,
+                                  struct cr_value **out,
+                                  struct cr_error **error);
 
 // Write a document in `format` (`CR_FORMAT_*`), in canonical form. CSV holds
 // decision tables only; the rule syntax holds no decision tables, metadata,
@@ -720,6 +847,52 @@ cr_status cr_error_parent(cr_status status);
 // The version of the JSON format the library reads and writes.
 uint32_t cr_format_version(void);
 
+// Add an input column to an open header: its expression, a value node such
+// as a field (copied). A condition is a `CR_EXPRESSION_ERROR` when the header
+// is read.
+//
+// # Safety
+//
+// `grid` is `NULL` or a live `cr_grid` that no other thread uses during the
+// call; `input` is `NULL` or a live `cr_node`; `error` is `NULL` or points to
+// a writable `cr_error *` set to `NULL`.
+cr_status cr_grid_add_column_input(struct cr_grid *grid,
+                                   const struct cr_node *input,
+                                   struct cr_error **error);
+
+// Add an output column to an open header: its payload key and its output
+// values, highest priority first, as the column `THEN key IN (...)` holds
+// them; `values` is a list (copied), or `NULL` for any value. Values that
+// are not scalars, or repeat, are a `CR_RULE_DEFINITION_ERROR` when the
+// header is read.
+//
+// # Safety
+//
+// `grid` is `NULL` or a live `cr_grid` that no other thread uses during the
+// call; `name` is `NULL` or points to `len` readable bytes; `values` is
+// `NULL` or a live `cr_value`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_grid_add_column_output(struct cr_grid *grid,
+                                    const char *name,
+                                    size_t len,
+                                    const struct cr_value *values,
+                                    struct cr_error **error);
+
+// Add a column to an open header as its CSV header text: `RULE`,
+// `PRIORITY`, `DESCRIPTION`, `THEN key [IN (...)]` or an input expression.
+// After the header is closed (by `cr_grid_new`, or by a row), adding a
+// column is `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `grid` is `NULL` or a live `cr_grid` that no other thread uses during the
+// call; `text` is `NULL` or points to `len` readable bytes; `error` is `NULL`
+// or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_grid_add_column_text(struct cr_grid *grid,
+                                  const char *text,
+                                  size_t len,
+                                  struct cr_error **error);
+
 // Check and compile the table: a document holding it, which
 // `cr_ruleset_from_document` turns into a rule set and `cr_document_write`
 // writes as CSV. The grid is consumed, even when the call fails, and also
@@ -767,6 +940,29 @@ cr_status cr_grid_new(const char *hit_policy,
                       struct cr_grid **out,
                       struct cr_error **error);
 
+// Start a table from its settings, as `cr_grid_new` does, with its header
+// open: add its columns in order with `cr_grid_add_column_text`,
+// `cr_grid_add_column_input` and `cr_grid_add_column_output`, then its rows.
+// The header is read, and checked, when the first row comes or the grid is
+// finished; its errors then point at `/header/<c>`.
+//
+// # Safety
+//
+// Each name is `NULL` or points to its length's readable bytes; `limits` is
+// `NULL` or a live `cr_limits`; `out` is `NULL` or points to a writable
+// `cr_grid *`; `error` is `NULL` or points to a writable `cr_error *` set to
+// `NULL`.
+cr_status cr_grid_new_open(const char *hit_policy,
+                           size_t hit_policy_len,
+                           const char *aggregate,
+                           size_t aggregate_len,
+                           const char *logic,
+                           size_t logic_len,
+                           bool strict,
+                           const struct cr_limits *limits,
+                           struct cr_grid **out,
+                           struct cr_error **error);
+
 // Add a row: a list of cells in column order. A string is text, read as a
 // CSV field (`'VIP'` is the string, `VIP` the field); null is an empty cell;
 // any other value is a constant. The row stays the caller's. After a row
@@ -781,6 +977,24 @@ cr_status cr_grid_new(const char *hit_policy,
 cr_status cr_grid_push_row(struct cr_grid *grid,
                            const struct cr_value *row,
                            struct cr_error **error);
+
+// Add a row whose cells may be nodes: cell `c` is `nodes[c]` when it is not
+// `NULL` (an input's condition, which tests its column, or an output's
+// value; copied), and the row's item `c` otherwise, read as
+// `cr_grid_push_row` reads it. `nodes_len` is the row's length. As with
+// `cr_grid_push_row`, after a row fails the grid can only be freed.
+//
+// # Safety
+//
+// `grid` is `NULL` or a live `cr_grid` that no other thread uses during the
+// call; `row` is `NULL` or a live `cr_value`; `nodes` is `NULL` or points to
+// `nodes_len` readable pointers, each `NULL` or a live `cr_node`; `error` is
+// `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_grid_push_row_nodes(struct cr_grid *grid,
+                                 const struct cr_value *row,
+                                 const struct cr_node *const *nodes,
+                                 size_t nodes_len,
+                                 struct cr_error **error);
 
 // Free limits. `NULL` is ignored.
 //
@@ -1168,12 +1382,53 @@ cr_status cr_node_write(const struct cr_node *node,
                         size_t *len,
                         struct cr_error **error);
 
+// The name of the rule's action (`spec/rules.md`, *Actions*), borrowed from
+// the rule and not NUL-terminated; `NULL` with a length of 0 when it names
+// none.
+//
+// # Safety
+//
+// As `cr_rule_name`.
+cr_status cr_rule_action(const struct cr_rule *rule,
+                         const char **name,
+                         size_t *len,
+                         struct cr_error **error);
+
+// The rule's description, borrowed from the rule and not NUL-terminated;
+// `NULL` with a length of 0 when it has none.
+//
+// # Safety
+//
+// As `cr_rule_name`.
+cr_status cr_rule_description(const struct cr_rule *rule,
+                              const char **text,
+                              size_t *len,
+                              struct cr_error **error);
+
 // Free a rule. `NULL` is ignored. Rule sets made with it keep their own copy.
 //
 // # Safety
 //
 // `rule` is `NULL` or a `cr_rule` from this library, not freed before.
 void cr_rule_free(struct cr_rule *rule);
+
+// One rule written in the rule syntax (`spec/text.md`), as fuzzytool's
+// `rule_from_text` reads it: without a `RULE` line it is named `rule_1`. A
+// text that does not follow the syntax, or holds a condition or more than one
+// rule, is a `CR_RULE_SYNTAX_ERROR`; bytes that are not UTF-8, a
+// `CR_FORMAT_ERROR`. To read a condition or a rule set written as text, use
+// `cr_document_read` with `CR_FORMAT_TEXT`.
+//
+// # Safety
+//
+// `text` is `NULL` or points to `len` readable bytes; `limits` is `NULL` or a
+// live `cr_limits`; `out` is `NULL` or points to a writable `cr_rule *`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_rule_from_text(const char *text,
+                            size_t len,
+                            const struct cr_limits *limits,
+                            struct cr_rule **out,
+                            struct cr_error **error);
 
 // The rule's metadata as the core keeps it: a new map, freed with
 // `cr_value_free`.
@@ -1186,6 +1441,18 @@ void cr_rule_free(struct cr_rule *rule);
 cr_status cr_rule_metadata(const struct cr_rule *rule,
                            struct cr_value **out,
                            struct cr_error **error);
+
+// The rule's name, borrowed from the rule and not NUL-terminated.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `name` and `len` are `NULL` or point
+// to a writable `const char *` and `size_t`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`. The name lives as long as the rule.
+cr_status cr_rule_name(const struct cr_rule *rule,
+                       const char **name,
+                       size_t *len,
+                       struct cr_error **error);
 
 // A rule with a name and a condition, and nothing else: priority 0, no
 // payload, tags, description, metadata or action. The condition is copied.
@@ -1203,6 +1470,47 @@ cr_status cr_rule_new(const char *name,
                       struct cr_rule **out,
                       struct cr_error **error);
 
+// The key of the payload entry at `index`, in order, borrowed from the rule
+// and not NUL-terminated.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `key` and `len` are `NULL` or point
+// to a writable `const char *` and `size_t`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`. The key lives as long as the rule.
+cr_status cr_rule_payload_key(const struct cr_rule *rule,
+                              size_t index,
+                              const char **key,
+                              size_t *len,
+                              struct cr_error **error);
+
+// The number of entries in the rule's payload; 0 for `NULL`.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`.
+size_t cr_rule_payload_len(const struct cr_rule *rule);
+
+// A copy of the value node of the payload entry at `index`, in order, freed
+// with `cr_node_free`.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `out` is `NULL` or points to a
+// writable `cr_node *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_rule_payload_value(const struct cr_rule *rule,
+                                size_t index,
+                                struct cr_node **out,
+                                struct cr_error **error);
+
+// The rule's priority; 0 for `NULL`.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`.
+int64_t cr_rule_priority(const struct cr_rule *rule);
+
 // The rule's tags as the core keeps them, sorted and without repeats: a new
 // list of strings, freed with `cr_value_free`.
 //
@@ -1213,6 +1521,17 @@ cr_status cr_rule_new(const char *name,
 // `cr_error *` set to `NULL`.
 cr_status cr_rule_tags(const struct cr_rule *rule,
                        struct cr_value **out,
+                       struct cr_error **error);
+
+// A copy of the rule's condition, freed with `cr_node_free`.
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `out` is `NULL` or points to a
+// writable `cr_node *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_rule_when(const struct cr_rule *rule,
+                       struct cr_node **out,
                        struct cr_error **error);
 
 // The rule naming its action, which a program resolves in its registry
@@ -1496,6 +1815,20 @@ cr_status cr_ruleset_read_decision(const struct cr_ruleset *ruleset,
                                    struct cr_decision **out,
                                    struct cr_error **error);
 
+// A copy of the rule at position `rule`, freed with `cr_rule_free`: its
+// name, condition, payload and the rest, as the rule set holds it
+// (`cr_rule_name`, `cr_rule_when`...).
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`; `out` is `NULL` or points to a
+// writable `cr_rule *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_ruleset_rule(const struct cr_ruleset *ruleset,
+                          size_t rule,
+                          struct cr_rule **out,
+                          struct cr_error **error);
+
 // The name of the rule at position `rule`, borrowed from the rule set and not
 // NUL-terminated.
 //
@@ -1618,6 +1951,86 @@ const char *cr_status_name(cr_status status);
 // `text` is `NULL` or a text from a `char **out` parameter of this library,
 // not freed before.
 void cr_string_free(char *text);
+
+// Free a result tree. `NULL` is ignored.
+//
+// # Safety
+//
+// `tree` is `NULL` or a `cr_tree` from this library, not freed before.
+void cr_tree_free(struct cr_tree *tree);
+
+// The number of results in the tree, its root and every descendant; 0 for
+// `NULL`.
+//
+// # Safety
+//
+// `tree` is `NULL` or a live `cr_tree`.
+size_t cr_tree_len(const struct cr_tree *tree);
+
+// Evaluate a node as a condition on an input, as `cr_node_evaluate_tree`
+// does (a logic by name, `boolean` for `NULL`; strict or not; a value node is
+// a `CR_EXPRESSION_ERROR`), and give its result tree as a handle, freed with
+// `cr_tree_free`. The input stays the caller's.
+//
+// # Safety
+//
+// `node` is `NULL` or a live `cr_node`; `input` is `NULL` or a live
+// `cr_value`; `logic` is `NULL` or points to `logic_len` readable bytes; `out`
+// is `NULL` or points to a writable `cr_tree *`; `error` is `NULL` or points
+// to a writable `cr_error *` set to `NULL`.
+cr_status cr_tree_new_condition(const struct cr_node *node,
+                                const struct cr_value *input,
+                                const char *logic,
+                                size_t logic_len,
+                                bool strict,
+                                struct cr_tree **out,
+                                struct cr_error **error);
+
+// Evaluate a node as a value on an input, as `cr_node_evaluate_value_tree`
+// does (a condition is a `CR_EXPRESSION_ERROR`), and give its result tree as
+// a handle, freed with `cr_tree_free`. The input stays the caller's.
+//
+// # Safety
+//
+// `node` is `NULL` or a live `cr_node`; `input` is `NULL` or a live
+// `cr_value`; `out` is `NULL` or points to a writable `cr_tree *`; `error` is
+// `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_tree_new_value(const struct cr_node *node,
+                            const struct cr_value *input,
+                            bool strict,
+                            struct cr_tree **out,
+                            struct cr_error **error);
+
+// A copy of the node of the result at `index`, counting the results in
+// pre-order (the root, then each child's subtree in order), freed with
+// `cr_node_free`. The halves of a `between` are comparisons the evaluation
+// made.
+//
+// # Safety
+//
+// `tree` is `NULL` or a live `cr_tree`; `out` is `NULL` or points to a
+// writable `cr_node *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_tree_node(const struct cr_tree *tree,
+                       size_t index,
+                       struct cr_node **out,
+                       struct cr_error **error);
+
+// The tree as a new value, freed with `cr_value_free`, in the structure of
+// the JSON result tree (`spec/json-format.md`, *Result trees*): each result a
+// map with `op`, `path` (a field's), `truth` (a boolean, or null for unknown)
+// or `value` (the value itself: an opaque one keeps its token), `reason` (a
+// map with `code`, and `paths`, `types` and `detail` when it has them) and
+// `children`. `cr_value_to_json` of it is the tree's JSON.
+//
+// # Safety
+//
+// `tree` is `NULL` or a live `cr_tree`; `out` is `NULL` or points to a
+// writable `cr_value *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_tree_value(const struct cr_tree *tree,
+                        struct cr_value **out,
+                        struct cr_error **error);
 
 // A deep copy of a value, freed with `cr_value_free`: the same value, null
 // reasons and opaque tokens included, which JSON would not keep.

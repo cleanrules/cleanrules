@@ -42,7 +42,7 @@ import java.util.function.Function;
  * paths the rules read. Rule sets may be shared between threads, and hold
  * native memory, which the cleaner frees once they are unreachable.
  */
-public final class RuleSet implements Iterable<Rule> {
+public final class RuleSet implements Iterable<Rule>, DocumentContent {
     private final io.github.cleanrules.ffi.RuleSet nativeRuleSet;
     private final List<Rule> rules;
     private final Map<String, Rule> byName;
@@ -55,6 +55,31 @@ public final class RuleSet implements Iterable<Rule> {
             names.put(rule.name(), rule);
         }
         this.byName = names;
+    }
+
+    /**
+     * The rule set of a native one, read from a document: its rules are the
+     * core's own, so it writes back exactly.
+     */
+    static RuleSet fromNative(io.github.cleanrules.ffi.RuleSet made) {
+        Handle handle = Bridge.ffi().handle(made);
+        MemorySegment pointer = handle.acquire();
+        try {
+            long count = Native.rulesetLen(pointer);
+            List<Rule> rules = new ArrayList<>(Math.toIntExact(count));
+            for (long i = 0; i < count; i++) {
+                long position = i;
+                rules.add(Rule.fromCore(Scope.value((out, error) -> Native.rulesetRule(pointer, position, out, error))));
+            }
+            return new RuleSet(made, rules);
+        } finally {
+            handle.release();
+        }
+    }
+
+    /** The native rule set, to write it. */
+    io.github.cleanrules.ffi.RuleSet nativeRuleSet() {
+        return nativeRuleSet;
     }
 
     /**
@@ -486,7 +511,8 @@ public final class RuleSet implements Iterable<Rule> {
                 continue;
             }
             Map<String, Object> output = result.output().orElse(Map.of());
-            ActionContext context = new ActionContext(result.rule(), data, result, output, decision);
+            ActionContext context =
+                    new ActionContext(result.rule(), result.position(), data, result, output, decision);
             try {
                 action.get().run(context);
             } catch (VirtualMachineError fatal) {

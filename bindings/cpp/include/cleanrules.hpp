@@ -1567,6 +1567,9 @@ private:
 
 // --- Documents, rule sets, nodes and grids ----------------------------------
 
+class node;
+class rule;
+
 // A document read in any format: a condition, a rule, a rule set or a
 // decision table.
 class document {
@@ -1590,10 +1593,24 @@ public:
         return read_(text, f, &l, &error);
     }
 
+    // A document holding a condition or a rule (copied), to write it; a
+    // value node is an `expression_error`. Defined after `rule`.
+    CLEANRULES_THROWING([[nodiscard]] static document from_condition(const node &condition);)
+    [[nodiscard]] static document from_condition(const node &condition, error_info &error);
+    CLEANRULES_THROWING([[nodiscard]] static document from_rule(const rule &r);)
+    [[nodiscard]] static document from_rule(const rule &r, error_info &error);
+
     // What it holds.
     document_content content() const noexcept {
         return static_cast<document_content>(cr_document_kind(handle_.get()));
     }
+
+    // A copy of the condition or the rule it holds; a document of another
+    // kind is an `invalid_argument_error`. Defined after `rule`.
+    CLEANRULES_THROWING([[nodiscard]] node as_condition() const;)
+    [[nodiscard]] node as_condition(error_info &error) const;
+    CLEANRULES_THROWING([[nodiscard]] rule as_rule() const;)
+    [[nodiscard]] rule as_rule(error_info &error) const;
 
     // Write it in canonical form: JSON by default.
     CLEANRULES_THROWING(std::string write(format f = format::json) const {
@@ -1608,6 +1625,15 @@ public:
 private:
     friend class grid;
 
+    static document from_condition_(const node &condition, error_info *sink);
+    static document from_rule_(const rule &r, error_info *sink);
+    node as_condition_(error_info *sink) const;
+    rule as_rule_(error_info *sink) const;
+    static document adopt_(cr_document *raw) noexcept {
+        document d;
+        d.handle_.reset(raw);
+        return d;
+    }
     static document read_(std::string_view text, format f, const limits *l, error_info *sink) {
         document d;
         cr_document *out = nullptr;
@@ -1694,6 +1720,10 @@ public:
 
     // The number of rules.
     std::size_t size() const noexcept { return cr_ruleset_len(raw()); }
+
+    // A copy of the rule at `rule`, with all it holds; defined after `rule`.
+    CLEANRULES_THROWING([[nodiscard]] rule rule_at(std::size_t position) const;)
+    [[nodiscard]] rule rule_at(std::size_t position, error_info &error) const;
 
     // The name of the rule at `rule`, borrowed from the rule set (owned when
     // read from a temporary one).
@@ -1892,6 +1922,7 @@ private:
         });
     }
     static ruleset make_(const rule_refs &rules, const table_settings &s, error_info *sink);
+    rule rule_at_(std::size_t position, error_info *sink) const;
     std::size_t rule_position_(std::string_view name, error_info *sink) const {
         std::size_t position = 0;
         detail::check(sink, [&](cr_error **e) {
@@ -2168,6 +2199,9 @@ public:
     }
     std::uint64_t hash() const noexcept { return cr_node_hash(handle_.get()); }
 
+    friend class document;
+    friend class rule;
+
     explicit operator bool() const noexcept { return handle_ != nullptr; }
     const cr_node *c_ptr() const noexcept { return handle_.get(); }
 
@@ -2362,6 +2396,53 @@ public:
         return text_step_(cr_rule_with_action, name, &error);
     }
 
+    // One rule written in the rule syntax (spec/text.md), as fuzzytool's
+    // `rule_from_text` reads it: without a RULE line it is named `rule_1`; a
+    // condition or several rules are a `rule_syntax_error`.
+    CLEANRULES_THROWING([[nodiscard]] static rule from_text(std::string_view text) {
+        return from_text_(text, nullptr, nullptr);
+    })
+    CLEANRULES_THROWING([[nodiscard]] static rule from_text(std::string_view text, const limits &l) {
+        return from_text_(text, &l, nullptr);
+    })
+    [[nodiscard]] static rule from_text(std::string_view text, error_info &error) {
+        return from_text_(text, nullptr, &error);
+    }
+    [[nodiscard]] static rule from_text(std::string_view text, const limits &l, error_info &error) {
+        return from_text_(text, &l, &error);
+    }
+
+    // The name, borrowed from the rule (owned when read from a temporary one).
+    CLEANRULES_THROWING(std::string_view name() const & { return name_(nullptr); })
+    std::string_view name(error_info &error) const & { return name_(&error); }
+    CLEANRULES_THROWING(std::string name() && { return std::string(name_(nullptr)); })
+    std::string name(error_info &error) && { return std::string(name_(&error)); }
+    // The description and the action's name, copied; `std::nullopt` when the
+    // rule has none (and after a failure reported through `error`).
+    CLEANRULES_THROWING(std::optional<std::string> description() const {
+        return lend_(cr_rule_description, nullptr);
+    })
+    std::optional<std::string> description(error_info &error) const {
+        return lend_(cr_rule_description, &error);
+    }
+    CLEANRULES_THROWING(std::optional<std::string> action_name() const {
+        return lend_(cr_rule_action, nullptr);
+    })
+    std::optional<std::string> action_name(error_info &error) const {
+        return lend_(cr_rule_action, &error);
+    }
+    // The priority, the condition and the payload.
+    std::int64_t priority() const noexcept { return cr_rule_priority(c_ptr()); }
+    CLEANRULES_THROWING([[nodiscard]] node when() const { return when_(nullptr); })
+    [[nodiscard]] node when(error_info &error) const { return when_(&error); }
+    // The payload in order: each key and its value node.
+    CLEANRULES_THROWING([[nodiscard]] std::vector<std::pair<std::string, node>> payload() const {
+        return payload_entries_(nullptr);
+    })
+    [[nodiscard]] std::vector<std::pair<std::string, node>> payload(error_info &error) const {
+        return payload_entries_(&error);
+    }
+
     // The tags as the core keeps them, and the metadata.
     CLEANRULES_THROWING([[nodiscard]] value tags() const { return read_(cr_rule_tags, nullptr); })
     [[nodiscard]] value tags(error_info &error) const { return read_(cr_rule_tags, &error); }
@@ -2372,6 +2453,56 @@ public:
     const cr_rule *c_ptr() const noexcept { return handle_.get(); }
 
 private:
+    friend class document;
+    friend class ruleset;
+
+    static rule from_text_(std::string_view text, const limits *l, error_info *sink) {
+        return make_(sink, [&](cr_rule **o, cr_error **e) {
+            return cr_rule_from_text(text.data(), text.size(), detail::limits_of(l), o, e);
+        });
+    }
+    std::string_view name_(error_info *sink) const {
+        const char *text = nullptr;
+        std::size_t len = 0;
+        detail::check(sink, [&](cr_error **e) { return cr_rule_name(c_ptr(), &text, &len, e); });
+        return detail::view(text, len);
+    }
+    std::optional<std::string> lend_(cr_status (*read)(const cr_rule *, const char **,
+                                                       std::size_t *, cr_error **),
+                                     error_info *sink) const {
+        const char *text = nullptr;
+        std::size_t len = 0;
+        if (!detail::check(sink, [&](cr_error **e) { return read(c_ptr(), &text, &len, e); }) ||
+            text == nullptr) {
+            return std::nullopt;
+        }
+        return std::string(text, len);
+    }
+    node when_(error_info *sink) const {
+        return node::make_(sink, [&](cr_node **o, cr_error **e) { return cr_rule_when(c_ptr(), o, e); });
+    }
+    std::vector<std::pair<std::string, node>> payload_entries_(error_info *sink) const {
+        std::vector<std::pair<std::string, node>> entries;
+        std::size_t count = cr_rule_payload_len(c_ptr());
+        for (std::size_t i = 0; i < count; ++i) {
+            const char *key = nullptr;
+            std::size_t len = 0;
+            if (!detail::check(sink, [&](cr_error **e) {
+                    return cr_rule_payload_key(c_ptr(), i, &key, &len, e);
+                })) {
+                return {};
+            }
+            node v = node::make_(sink, [&](cr_node **o, cr_error **e) {
+                return cr_rule_payload_value(c_ptr(), i, o, e);
+            });
+            if (!v) {
+                return {};
+            }
+            entries.emplace_back(std::string(detail::view(key, len)), std::move(v));
+        }
+        return entries;
+    }
+
     template <class Call>
     static rule make_(error_info *sink, Call &&call) {
         rule made;
@@ -2439,6 +2570,57 @@ inline ruleset ruleset::make(const rule_refs &rules, const table_settings &setti
                              error_info &error) {
     return make_(rules, settings, &error);
 }
+
+inline rule ruleset::rule_at_(std::size_t position, error_info *sink) const {
+    return rule::make_(sink, [&](cr_rule **o, cr_error **e) {
+        return cr_ruleset_rule(raw(), position, o, e);
+    });
+}
+#if CLEANRULES_EXCEPTIONS
+inline rule ruleset::rule_at(std::size_t position) const { return rule_at_(position, nullptr); }
+#endif
+inline rule ruleset::rule_at(std::size_t position, error_info &error) const {
+    return rule_at_(position, &error);
+}
+
+inline document document::from_condition_(const node &condition, error_info *sink) {
+    cr_document *out = nullptr;
+    detail::check(sink, [&](cr_error **e) {
+        return cr_document_new_condition(condition.c_ptr(), &out, e);
+    });
+    return adopt_(out);
+}
+inline document document::from_rule_(const rule &r, error_info *sink) {
+    cr_document *out = nullptr;
+    detail::check(sink, [&](cr_error **e) { return cr_document_new_rule(r.c_ptr(), &out, e); });
+    return adopt_(out);
+}
+inline node document::as_condition_(error_info *sink) const {
+    return node::make_(sink, [&](cr_node **o, cr_error **e) {
+        return cr_document_condition(handle_.get(), o, e);
+    });
+}
+inline rule document::as_rule_(error_info *sink) const {
+    return rule::make_(sink, [&](cr_rule **o, cr_error **e) {
+        return cr_document_rule(handle_.get(), o, e);
+    });
+}
+#if CLEANRULES_EXCEPTIONS
+inline document document::from_condition(const node &condition) {
+    return from_condition_(condition, nullptr);
+}
+inline document document::from_rule(const rule &r) { return from_rule_(r, nullptr); }
+inline node document::as_condition() const { return as_condition_(nullptr); }
+inline rule document::as_rule() const { return as_rule_(nullptr); }
+#endif
+inline document document::from_condition(const node &condition, error_info &error) {
+    return from_condition_(condition, &error);
+}
+inline document document::from_rule(const rule &r, error_info &error) {
+    return from_rule_(r, &error);
+}
+inline node document::as_condition(error_info &error) const { return as_condition_(&error); }
+inline rule document::as_rule(error_info &error) const { return as_rule_(&error); }
 
 // A decision table built from a grid (spec/tables.md, *Grids*): a header and
 // rows of cells, pushed one at a time. After a row fails, the grid can only

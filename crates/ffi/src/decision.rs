@@ -183,6 +183,17 @@ impl cr_decision {
         )
     }
 
+    /// What `make` gives of the result tree of the condition of the rule at
+    /// position `rule`, made again.
+    pub(crate) fn rule_tree<T>(
+        &self,
+        rule: usize,
+        make: impl FnOnce(&cleanrules::eval::Evaluated<'_, Truth>) -> T,
+    ) -> Outcome<T> {
+        let position = self.rule(rule)?;
+        self.with(|d| Ok(make(&d.results()[position].when)))
+    }
+
     fn with<T>(&self, read: impl FnOnce(&Decision<'_>) -> Outcome<T>) -> Outcome<T> {
         let decision = match &self.source {
             Source::Input(input) => self.ruleset.evaluate(input)?,

@@ -363,9 +363,9 @@ it, and otherwise reading it gives a null with reason `read_error`. A map's
 key (a map with other key types) has none.
 
 **Values given back.** Outputs, payloads, aggregates, metadata, constants (a
-constant node's `value()`), the values of an action's call and the values in
-an explanation (the values a cause read, a counterfactual's target) come back
-to Java as follows:
+constant node's `value()`, a decision table's output values), the values of an
+action's call and the values in an explanation (the values a cause read, a
+counterfactual's target) and in a result tree come back to Java as follows:
 
 | Value | Java |
 |---|---|
@@ -385,7 +385,8 @@ to Java as follows:
 A counterfactual's gap is a `Long`, `Double` or `BigDecimal`, like the int,
 float or decimal above; between dates it is a `java.time.Period` of days, and
 between datetimes a `java.time.Duration`, to the microsecond. Priorities in
-notes and summaries are `long`s (`OptionalLong` where a note may lack them).
+notes, summaries and a decision table's rows are `long`s (`OptionalLong` where a
+note or a row may lack them).
 
 Each value reads back as the same value, so an output can be fed to another
 evaluation, except a decimal infinity, which reads back as a float, and an
