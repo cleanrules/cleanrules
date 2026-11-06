@@ -379,29 +379,9 @@ jobs:
           cache: gradle
       # The wrapper jar runs before anything is checked: its sha256 must be the
       # one pinned in the repository (so a changed jar fails even when the
-      # download below does) and the one Gradle publishes for this version.
+      # download fails) and the one Gradle publishes for this version.
       - name: Check the Gradle wrapper jar
-        run: |
-          jar=gradle/wrapper/gradle-wrapper.jar
-          if command -v sha256sum > /dev/null; then
-            actual=$(sha256sum "$jar" | cut -d' ' -f1 | tr -d '\\')
-          else
-            actual=$(shasum -a 256 "$jar" | cut -d' ' -f1)
-          fi
-          pinned=$(tr -d '\r\n ' < "$jar.sha256")
-          if [ "$actual" != "$pinned" ]; then
-            echo "::error::$jar has sha256 $actual; the repository pins $pinned"
-            exit 1
-          fi
-          version=$(sed -n 's/^distributionUrl=.*gradle-\(.*\)-bin\.zip$/\1/p' gradle/wrapper/gradle-wrapper.properties)
-          if published=$(curl -fsSL --retry 3 "https://services.gradle.org/distributions/gradle-$version-wrapper.jar.sha256"); then
-            if [ "$actual" != "$(echo "$published" | tr -d '\r\n ')" ]; then
-              echo "::error::$jar has sha256 $actual; Gradle publishes $published for $version"
-              exit 1
-            fi
-          else
-            echo "::warning::could not download Gradle's checksum for $version; checked the pinned one only"
-          fi
+        run: bash scripts/check-wrapper.sh
       # Builds the C ABI with cargo, compiles with -Xlint:all -Werror, runs
       # the JUnit tests on it (with --illegal-native-access=deny) and the
       # javadoc with -Xdoclint:all -Werror.

@@ -4,10 +4,8 @@
  * and which rules fired, explain the decision, run the rules' named action
  * (notify_sales) as a lambda, and catch a strict-mode error.
  *
- *     cargo build -p cleanrules-ffi
- *     (cd bindings/jvm && ./gradlew jar)
+ *     (cd bindings/jvm && ./gradlew jar)    # with this platform's library inside
  *     java --enable-native-access=io.github.cleanrules \
- *          -Dcleanrules.library.path=target/debug \
  *          --module-path bindings/jvm/java/build/libs --add-modules io.github.cleanrules \
  *          docs/examples/Discounts.java docs/examples/discounts.rules
  */
