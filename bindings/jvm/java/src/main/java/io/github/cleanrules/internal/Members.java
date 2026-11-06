@@ -21,10 +21,11 @@ import java.util.TreeMap;
  *
  * <p>Never a non-public member, a static one, a method with parameters or one
  * that returns nothing, and never a member that a class of the Java platform
- * declares ({@code getClass()}, {@code Enum.getDeclaringClass()}...): objects
- * of the platform are opaque, and so nothing reaches a {@link Class}, a
- * {@link ClassLoader} or a {@link Thread} through them. An accessor wins over
- * a field of the same name, and {@code getX} over {@code isX}.
+ * (or of the Scala library) declares ({@code getClass()},
+ * {@code Enum.getDeclaringClass()}...): objects of the platform are opaque,
+ * and so nothing reaches a {@link Class}, a {@link ClassLoader} or a
+ * {@link Thread} through them. An accessor wins over a field of the same
+ * name, and {@code getX} over {@code isX}.
  */
 public final class Members {
     /** One readable member. */
@@ -66,8 +67,17 @@ public final class Members {
         return MEMBERS.get(type);
     }
 
-    /** Whether {@code type} belongs to the Java platform: a module {@code java.*} or {@code jdk.*}. */
+    /**
+     * Whether {@code type} belongs to the platform: a module {@code java.*} or
+     * {@code jdk.*}, or the Scala library (a package {@code scala} or
+     * {@code scala.*}, whose values the Scala layer converts before the reader
+     * sees them).
+     */
     public static boolean platform(Class<?> type) {
+        String pkg = type.getPackageName();
+        if (pkg.equals("scala") || pkg.startsWith("scala.")) {
+            return true;
+        }
         Module module = type.getModule();
         if (!module.isNamed()) {
             return false;

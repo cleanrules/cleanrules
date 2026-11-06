@@ -229,9 +229,12 @@ public final class DataReader implements AutoCloseable {
         return value;
     }
 
-    /** The packages of the binding, whose objects are opaque as data. */
+    /** The packages of the binding (and of its Scala layer), whose objects are opaque as data. */
     private static final java.util.Set<String> BINDING = java.util.Set.of(
-            "io.github.cleanrules", "io.github.cleanrules.ffi", "io.github.cleanrules.internal");
+            "io.github.cleanrules",
+            "io.github.cleanrules.ffi",
+            "io.github.cleanrules.internal",
+            "io.github.cleanrules.scaladsl");
 
     private static Shape shape(Object value) {
         Class<?> type = value.getClass();
@@ -277,11 +280,36 @@ public final class DataReader implements AutoCloseable {
                 || value instanceof ClassLoader
                 || value instanceof Iterator<?>
                 || type.isHidden()
-                || Members.platform(type)) {
+                || Members.platform(type)
+                || SCALA_PRODUCT.get(type)) {
             return Shape.OPAQUE;
         }
         return Shape.MEMBERS;
     }
+
+    /**
+     * Whether a class implements Scala's {@code scala.Product} (a case class, a
+     * tuple...), by the interface's name: the Scala layer reads case classes
+     * by field name, and the Java reader never reads one as a JavaBean.
+     */
+    private static final ClassValue<Boolean> SCALA_PRODUCT = new ClassValue<>() {
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            java.util.ArrayDeque<Class<?>> pending = new java.util.ArrayDeque<>();
+            pending.add(type);
+            while (!pending.isEmpty()) {
+                Class<?> next = pending.removeFirst();
+                if (next.isInterface() && next.getName().equals("scala.Product")) {
+                    return true;
+                }
+                if (next.getSuperclass() != null) {
+                    pending.add(next.getSuperclass());
+                }
+                pending.addAll(List.of(next.getInterfaces()));
+            }
+            return false;
+        }
+    };
 
     /** The whole of {@code value}, where a path ends. */
     private MemorySegment convert(Object value) {

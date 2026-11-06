@@ -333,6 +333,22 @@ class ValuesTest {
         }
     }
 
+    /** A JavaBean that is also a {@code scala.Product}, as a Scala case class is. */
+    public static class CaseLike implements scala.Product {
+        public int getAge() {
+            return 7;
+        }
+    }
+
+    @Test
+    void scalaProductsAreOpaque() {
+        // A case class reaches the Java reader only inside Java data: the
+        // Scala layer reads it by field name, the Java reader never as a bean.
+        CaseLike product = new CaseLike();
+        assertSame(product, echo(product));
+        assertEquals("[{\"value\":{\"$opaque\":\"" + CaseLike.class.getName() + "\"}}]", echoJson(product));
+    }
+
     @Test
     void opaqueObjectsComeBackByIdentity() {
         Object thing = new Object();

@@ -108,7 +108,8 @@ In languages with operator overloading, `==` on a node builds an `eq` node (as
 it does in polars and SQLAlchemy), so structural identity always has its own
 method, and nodes keep identity hashing. In Java, which has no operator overloading
 (comparisons are methods such as `eq`), `equals` and `hashCode` are structural
-identity.
+identity. So they are in Scala, whose `==` always gives a `Boolean`: equality
+nodes are built with `===` and `=!=`.
 
 ## Evaluation semantics
 

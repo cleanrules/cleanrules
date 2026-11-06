@@ -3,4 +3,4 @@
 // of it (`scala`, artifact io.github.cleanrules:cleanrules-scala_3).
 rootProject.name = "cleanrules-jvm"
 
-include("java")
+include("java", "scala")
