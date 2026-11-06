@@ -12,8 +12,9 @@ and rules in code with static imports and methods, reads and writes them as
 documents, builds decision tables, evaluates them, and gives decisions,
 explanations, summaries and result trees as objects. The native layer (task
 G.1a) reads and writes documents in every format and evaluates them on Java
-data or JSON. The native libraries inside the jar come with G.1c, and Scala 3
-with G.2.
+data or JSON. A Scala 3 layer (task G.2, [below](#scala-3)) wraps the
+idiomatic API with fuzzytool's operators, case classes and Scala types. The
+native libraries inside the jar come with G.1c.
 
 Java 25 or later. Module `io.github.cleanrules`, artifact
 `io.github.cleanrules:cleanrules` (not published yet), with two packages:
@@ -218,6 +219,154 @@ from text, a result tree, a rule set written and read back with its action
 bound) and runs like `DiscountRules.java`, with `docs/examples/risk.csv` as its
 argument; a test runs it.
 
+## Scala 3
+
+The Scala layer (task G.2) is a thin layer over the idiomatic Java API, for
+Scala 3.3 LTS or later: artifact `io.github.cleanrules:cleanrules-scala_3`
+(not published yet), package `io.github.cleanrules.scaladsl` (not `.scala`,
+which `import io.github.cleanrules.*` would bring into scope, hiding the root
+`scala` package). The core still builds, checks, evaluates and explains; the
+layer converts Scala values and delegates. Every Scala object keeps the Java
+one in `asJava`, and each type has `fromJava` for the other way.
+
+```scala
+import io.github.cleanrules.{HitPolicy, Truth}
+import io.github.cleanrules.scaladsl.*
+
+case class Customer(years: Int, newsletter: Boolean)
+case class Purchase(total: BigDecimal)
+case class Order(customer: Customer, order: Purchase)
+
+val vip = Rule(
+  "vip",
+  F.customer.years > 5 & F.order.total > 1000,
+  payload = Map("discount" -> BigDecimal("0.15")),
+  priority = 10,
+  tags = Seq("loyalty"),
+  actionName = Some("notify_sales"),
+)
+val loyal = Rule("loyal", F.customer.years > 2 | F.customer.newsletter, payload = Map("discount" -> BigDecimal("0.05")))
+val rules = RuleSet(Seq(vip, loyal), hitPolicy = HitPolicy.PRIORITY)
+
+val decision = rules.evaluate(Order(Customer(7, false), Purchase(BigDecimal("900"))))
+decision.output                        // Some(VectorMap(discount -> 0.05))
+decision.whyNot("vip").causes.head match
+  case Cause(node, Truth.FALSE, _, _, _, _, Some(Counterfactual(_, op, _, Some(gap)))) =>
+    s"$node needs $op, short by $gap"  // order.total > 1000 needs gt, short by 100
+  case other => other.toString
+println(decision.explain)              // the text, the same in every language
+```
+
+**Conditions.** `Expr` (with `Field` and `Const`) wraps the Java node, with
+fuzzytool's operators and Scala's precedence (comparisons above `&`, `&` above
+`|`, so `F.a > 1 & F.b < 2 | F.c` needs no parentheses):
+
+| Scala | Node | Java |
+|---|---|---|
+| `a & b`, `a \| b`, `~a` | `and`, `or` (flattened), `not` | `and`, `or`, `not` |
+| `a === b`, `a =!= b` | `eq`, `ne` | `eq`, `ne` |
+| `a < b`, `a <= b`, `a > b`, `a >= b` | `lt`, `le`, `gt`, `ge` | `lt`, `le`, `gt`, `ge` |
+| `a + b`, `a - b`, `a * b`, `a / b`, `-a`, `a.abs` | arithmetic | `add`, `sub`, `mul`, `div`, `neg`, `abs` |
+| `a.isIn("ES", "PT")`, `a.isIn(set)` | `in` | `isIn` |
+| `a.between(1, 10[, Closed.LEFT])` | `between` | `between` |
+| `a.isNull`, `a.matches(re)`, `a.startsWith(s)`, `a.endsWith(s)`, `a.contains(s)` | tests | the same |
+
+`==` is Scala's own equality: on nodes, the structural identity of
+`spec/ast.md`, as `equals` in Java, so nodes work in sets and maps. Constants
+go on the right and are typed (`Constant`: booleans, numbers, `BigDecimal`
+and `BigInt`, strings, `java.time` dates and datetimes, Java enums and Scala 3
+enum cases); on the left, `Const(1000) < F.total`. `toString` is the core's
+text, `toJson` the JSON node, `fieldPaths` the paths read, and
+`evaluateTree(data[, logic, strict])` and `evaluateValueTree(data[, strict])`
+give a `ResultTree`; the rest is on `asJava` (`tag()`, `kind()`,
+`children()`...).
+
+**Field paths.** `F.customer.age`, `F.items(0).price`, `F("customer", "age")`
+and `F.customer("age")` (`F` and `Field` are `Dynamic`: `selectDynamic` and
+`applyDynamic`, because any key must work and `Selectable` needs the keys in a
+type). Keys are never split at dots. A key that is a member of a field (the
+operators, `isIn`, `between`, `isNull`, `matches`, `startsWith`, `endsWith`,
+`contains`, `abs`, `evaluateTree`, `evaluateValueTree`, `fieldPaths`,
+`toJson`, `asJava`, `apply`, or a method every Scala object has, such as
+`equals`, `toString` or `Predef`'s `->` and `ensuring`) is reached with `apply`:
+`F.customer("contains")`. At the top only `apply` and the methods of every
+object clash, so `F.contains` is the field `contains`. A key that is not an
+identifier takes backquotes (`` F.`type` ``) or `apply`.
+
+**Rules and rule sets.** `Rule(name, when, payload, priority, tags,
+description, metadata, actionName, action)`, with every argument after `when`
+named and optional, and the steps `withPayload`, `withPriority`, `withTags`,
+`withDescription`, `withMetadata`, `withActionName` and `withAction`, each a
+new rule (`then` is a keyword in Scala 3, hence `payload`). A payload in a
+`SeqMap` (`ListMap`, `VectorMap`) keeps its order; any other map is sorted by
+key. A rule gives back `name`, `when`, `payload` (a `SeqMap` of nodes),
+`priority`, `tags`, `description` and `actionName` (`Option`s), `metadata`
+and `action` (the very function). `RuleSet(rules*)`, or `RuleSet(rules,
+hitPolicy, aggregate, logic, strict)` with named arguments, gives `rules`,
+`size`, `get(name)` (`Option`), `apply(name)` (`RuleNotFoundException`),
+`contains`, `hitPolicy`, `aggregate`, `logic`, `isStrict`, `fieldPaths`,
+`evaluate`, `evaluateMany`, `readDecision`, `bind`, `run` and `summary`.
+`ruleFromText(text[, actions])` reads a rule of the rule syntax. Rules, rule
+sets and decisions compare by identity, that of their Java objects.
+
+**Decisions.** `fired`, `results` and `selected` (`RuleResult`, a case class
+of `rule`, `fired`, `truth` and `output`), `outputs`, `output` and
+`aggregated` (`Option`s of `SeqMap`), `explain` (cached), `whyNot(name)`,
+`toJson`, `write(format)` and `close()`. Explanations, summaries and result
+trees are case classes to match on: `Explanation(selected, rules)`,
+`RuleExplanation(rule, status, requirement, note, achievable)` with
+`causes`, the sealed `Requirement` (`Cause(node, truth, negated, holds,
+values, reason, counterfactual)` and `CauseGroup(kind, items)`),
+`FieldValue`, `Counterfactual(path, op, target, gap)`, `Note`, `Reason`,
+`Summary`, `RuleSummary`, `FieldUsage` (with `FieldUsage.Payload(rule,
+key)`) and `ResultTree`; `toString` is the core's text and `asJava` the Java
+object. The enums are Java's (`Truth`, `Status`, `HitPolicy`, `GroupKind`...),
+which match as `case Truth.FALSE =>`.
+
+**Data.** Scala data is read as `spec/data-model.md` says (*Java and Scala*),
+lazily: the layer hands the Java reader views, so only the paths the rules
+read are read, each object once.
+
+| Scala | Value |
+|---|---|
+| `None`; `Some(x)` | null (the key is there: `null`, not `missing_field`); `x` |
+| `Int`, `Long`, `Short`, `Byte`, `BigInt` | int; beyond 64 bits, a null with reason `int_overflow` |
+| `Double`, `Float` | float |
+| `BigDecimal` | decimal, exact; beyond 38 digits, a null with reason `decimal_overflow` |
+| `String`, `Boolean`, `java.time` | as in Java |
+| `Seq` (`List`, `Vector`, `Range`...) and arrays (not `Array[Byte]`) | list |
+| `Map` with `String` keys | map: a `SeqMap` (`ListMap`, `VectorMap`) or `SortedMap` keeps its order, any other map is sorted by key |
+| case classes, and `enum` cases with parameters | map of their fields by name, in their order; `private` fields are left out |
+| Scala 3 `enum` cases without parameters | string: the case's name |
+| Java lists and maps | as in Java, with Scala values inside read as Scala values |
+| sets, tuples, functions, `LazyList` (never forced), iterators and every other object of the Scala library; the binding's objects | opaque, given back as the very object |
+| anything else | as the Java binding reads it (records, JavaBeans...); a Scala value inside a Java record or bean is opaque |
+
+`None` is null and not missing because the field is there, holding nothing,
+as with Java's `Optional.empty()`. An action's `data` is the very object given
+to `run`. Values come back as Scala values: null as `None`, int `Long`, float
+`Double`, decimal `BigDecimal` (exact, with an unlimited `MathContext`), list
+`Vector`, map `VectorMap`, `java.time` as in Java and an opaque value as the
+very object; a gap is a `Long`, `Double`, `BigDecimal`, `Period` or
+`Duration`.
+
+**Actions** are Scala functions, `type Action = ActionContext => Unit`: in a
+rule (`action = Some(ctx => ...)`, `withAction`) or bound to names
+(`rules.bind(Map("notify_sales" -> notify))`). The context gives `rule`,
+`data`, `result`, `output`, `tree` and `decision` (equal to what `run` gives
+back).
+
+**Errors** are the Java binding's exceptions, raised as they are
+(`ExpressionException`, `RuleDefinitionException`, `MissingFieldException`,
+`ActionException`...; [Errors](#errors)): Scala has no checked exceptions, so
+wrapping would only hide the hierarchy that `spec/errors.md` shares with every
+language, and `scala.util.Try` takes them as they are. What an action throws is
+the cause of the `ActionException`, whose decision is
+`Decision.fromJava(error.decision().orElseThrow())`.
+
+[`docs/examples/DiscountRules.scala`](../../docs/examples/DiscountRules.scala)
+is `DiscountRules.java` in Scala; the Scala tests compile and run it.
+
 ## The native layer
 
 ```java
@@ -267,15 +416,18 @@ You need a JDK 25 or later and Rust (the C ABI is built with cargo).
 
 ```bash
 cd bindings/jvm
-./gradlew test    # builds the C ABI (cargo build -p cleanrules-ffi), then the JUnit tests
-./gradlew check   # also the javadoc, with -Xdoclint:all -Werror
-./gradlew jar     # java/build/libs/cleanrules-<version>.jar
+./gradlew test    # builds the C ABI (cargo build -p cleanrules-ffi), then the JUnit and MUnit tests
+./gradlew check   # also the javadoc, with -Xdoclint:all -Werror, and the Scaladoc
+./gradlew jar     # java/build/libs/cleanrules-<version>.jar, scala/build/libs/cleanrules-scala_3-<version>.jar
 ```
 
 The build is Gradle (Kotlin DSL) with the wrapper in the repository, one build
-for Java and, later, Scala (`settings.gradle.kts`). It compiles with
-`--release 25` and `-Xlint:all -Werror` whatever JDK runs it, and has no
-dependencies; the tests use JUnit 5. `-Pcleanrules.library.path=<file>` tests
+for Java (`java`) and Scala (`scala`, with Gradle's own `scala` plugin;
+`settings.gradle.kts`). Java compiles with `--release 25` and
+`-Xlint:all -Werror` whatever JDK runs it, and has no dependencies; the tests
+use JUnit 5. Scala 3.3 LTS compiles with `-release 25 -feature -Wunused:all
+-Wvalue-discard -Werror`, depends on the Scala 3 library only, and its tests
+use MUnit (on JUnit 4). `-Pcleanrules.library.path=<file>` tests
 a library you built yourself, without cargo; cargo's `CARGO_TARGET_DIR` is
 honoured.
 
@@ -348,7 +500,7 @@ and Scala*):
 | `Map` with `String` keys | map: a `SequencedMap` (`LinkedHashMap`, `TreeMap`) keeps its order, any other map is sorted by key; other keys are left out |
 | records | map of their components |
 | other objects | map of their public instance fields and JavaBean accessors (`getAge()`, `isActive()`), sorted by name |
-| sets, `byte[]`, lambdas, threads, class loaders, classes, any other object of the Java platform, and the binding's own objects | opaque: never read through, compared by identity |
+| sets, `byte[]`, lambdas, threads, class loaders, classes, any other object of the Java platform or of the Scala library (`scala.*`), and the binding's own objects (its Scala layer's included) | opaque: never read through, compared by identity |
 
 Dates outside years 1 to 9999 are opaque. An index beyond `Integer.MAX_VALUE`
 (`a[3000000000]`, a `Long` in `fieldPaths()`) is beyond any Java list: it is
@@ -356,7 +508,8 @@ missing. A getter that throws gives a null
 with reason `read_error`; in strict mode the `EvaluationException` has the
 exception as its cause (also in a batch, for the row that failed). Nothing but
 public data is read: no private member, no method with parameters, no static
-member, and nothing that a class of the platform declares (`getClass()`), so a
+member, and nothing that a class of the platform or of the Scala library
+declares (`getClass()`), so a
 rule loaded from a file cannot reach a `Class`, a `ClassLoader` or a `Thread`.
 A public accessor of a class that is not public (a private nested record) is
 read where its package is open to the binding, which it always is on the class

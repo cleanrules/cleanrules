@@ -343,17 +343,19 @@ that order.
 | `BigDecimal`, Scala `BigDecimal` | decimal, or null with `decimal_overflow` |
 | `String`, `CharSequence` | string |
 | enum constants (`Enum`), those of the platform such as `DayOfWeek` included | string: the constant's `name()` |
+| Scala 3 `enum` cases without parameters | string: the case's name |
 | `LocalDate`, `java.sql.Date` | date |
 | `LocalDateTime` | naive datetime |
 | `OffsetDateTime` | aware datetime with that offset |
 | `Instant`, `java.util.Date`, `java.sql.Timestamp` | aware datetime in `Z` |
 | `ZonedDateTime` | aware datetime in its zone, or with a fixed offset when the zone is a `ZoneOffset` |
-| `List`, arrays except `byte[]`, Scala `Seq` | list |
+| `List`, arrays except `byte[]`, Scala `Seq` except `LazyList` | list |
 | `java.util.Map`, Scala `Map`, with `String` keys | map: `SequencedMap` and `SortedMap` (Scala `SeqMap` and `SortedMap`) keep their order, every other map is sorted |
-| records, Scala case classes | map of their components, in their order |
+| records, Scala case classes (and `enum` cases with parameters) | map of their components, in their order; a case class's `private` fields are left out |
 | sets and other collections that are not lists, `byte[]`, iterators, lambdas and other hidden classes, threads, class loaders, `Class` objects, and every other object of the Java platform (a class of a module `java.*` or `jdk.*`) not listed above | opaque, never read through |
-| the binding's own objects (rule sets, decisions, limits, errors, its enums...) | opaque, never read through |
-| other objects | map of their public instance fields and public JavaBean accessors (`getAge()` and `isActive()` read as `age` and `active`; `getURL()` as `URL`), sorted by name by Unicode code point; an accessor wins over a field of the same name, and `getX` over `isX`. Never a member that a class of the platform declares, such as `getClass()` |
+| Scala sets and other collections that are not `Seq` or `Map`, `LazyList` (never forced), tuples, functions, and every other object of the Scala library (a package `scala` or `scala.*`) not listed above | opaque, never read through |
+| the binding's own objects (rule sets, decisions, limits, errors, its enums..., and those of its Scala layer) | opaque, never read through |
+| other objects | map of their public instance fields and public JavaBean accessors (`getAge()` and `isActive()` read as `age` and `active`; `getURL()` as `URL`), sorted by name by Unicode code point; an accessor wins over a field of the same name, and `getX` over `isX`. Never a member that a class of the platform or of the Scala library declares, such as `getClass()` |
 
 A public member of a class that is not public (a private nested record) is
 read where its package is open to the binding, which it always is on the class
@@ -361,6 +363,10 @@ path; elsewhere through its declaration in a public supertype, if one declares
 it, and otherwise reading it gives a null with reason `read_error`. A map's
 `containsKey` decides whether a key is present, and one that refuses a string
 key (a map with other key types) has none.
+
+The Scala rows are read by the Scala layer, which also reads through the Java
+lists and maps it meets (their items are Scala values too); a Scala value held
+by a Java record or JavaBean is read with the Java rows, so it is opaque.
 
 **Values given back.** Outputs, payloads, aggregates, metadata, constants (a
 constant node's `value()`, a decision table's output values), the values of an
@@ -391,6 +397,15 @@ note or a row may lack them).
 Each value reads back as the same value, so an output can be fed to another
 evaluation, except a decimal infinity, which reads back as a float, and an
 opaque value given back as `null`.
+
+The Scala layer gives the same values back as Scala values: null as `None`,
+int as `Long`, float as `Double`, decimal as `scala.math.BigDecimal` (exact,
+with an unlimited `MathContext`; the infinities as `Double`'s), string, date
+and datetimes as in Java, list as an immutable `Vector`, map as an immutable
+`VectorMap` (a `SeqMap`, in the value's order), and opaque as the native object
+it was read from (`None` in a decision read from a document). Gaps and
+priorities are as in Java, with `scala.math.BigDecimal` for a decimal gap and
+`Option[Long]` for an optional priority. Each reads back as the same value.
 
 #### Go
 

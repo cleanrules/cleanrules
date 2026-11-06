@@ -229,9 +229,12 @@ public final class DataReader implements AutoCloseable {
         return value;
     }
 
-    /** The packages of the binding, whose objects are opaque as data. */
+    /** The packages of the binding (and of its Scala layer), whose objects are opaque as data. */
     private static final java.util.Set<String> BINDING = java.util.Set.of(
-            "io.github.cleanrules", "io.github.cleanrules.ffi", "io.github.cleanrules.internal");
+            "io.github.cleanrules",
+            "io.github.cleanrules.ffi",
+            "io.github.cleanrules.internal",
+            "io.github.cleanrules.scaladsl");
 
     private static Shape shape(Object value) {
         Class<?> type = value.getClass();

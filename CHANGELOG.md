@@ -480,6 +480,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ResultTree` (`node()`, `truth()`, `value()`, `reason()`, `children()`,
   `toJson()`), and `ActionContext.tree()` the tree of the rule's condition.
   Example `docs/examples/RiskTable.java`, run by a test.
+- Scala 3 layer over the Java binding (task G.2): artifact
+  `io.github.cleanrules:cleanrules-scala_3` (Scala 3.3 LTS, subproject
+  `bindings/jvm/scala` of the same Gradle build), package
+  `io.github.cleanrules.scaladsl`. Conditions with fuzzytool's operators (`&`,
+  `|`, `~`), comparisons (`<`, `<=`, `>`, `>=`, `===`, `=!=`), arithmetic (`+`,
+  `-`, `*`, `/`, unary `-`, `abs`), `isIn`, `between`, `isNull`, `matches`,
+  `startsWith`, `endsWith` and `contains`, on `Expr`, `Field` and `Const`,
+  which wrap the Java nodes (`==` is structural identity); field paths with
+  `F.customer.age`, `F.items(0).price` and `F("key")` (`Dynamic`); typed
+  constants (`Constant`, `Operand`). `Rule(name, when, payload = ...,
+  priority, tags, description, metadata, actionName, action)` and `with...`
+  steps, `RuleSet(rules*)` and `RuleSet(rules, hitPolicy, aggregate, logic,
+  strict)`, actions as Scala functions (`ActionContext => Unit`), `bind`,
+  `run`, `evaluateMany`, `readDecision` and `ruleFromText`. Decisions with
+  Scala types (`Option`, `Seq`, `VectorMap`), and explanations, summaries and
+  result trees as case classes for pattern matching (`Explanation`,
+  `RuleExplanation`, `Requirement` with `Cause` and `CauseGroup`,
+  `FieldValue`, `Counterfactual`, `Note`, `Reason`, `Summary`,
+  `RuleSummary`, `FieldUsage`, `ResultTree`), each with its Java object in
+  `asJava` and its text as `toString`. Scala data read lazily, only the paths
+  the rules read: case classes by field name, `Option`, `Seq`, arrays, `Map`,
+  `BigDecimal`, `BigInt`, Scala 3 enums, and Java lists and maps holding Scala
+  values. Errors are the Java binding's exceptions. Example
+  `docs/examples/DiscountRules.scala`, run by a test.
 - C ABI, for what rules, documents, tables and result trees hold (task
   G.1d): `cr_ruleset_rule`, `cr_rule_name`, `cr_rule_description`,
   `cr_rule_action`, `cr_rule_priority`, `cr_rule_when`, `cr_rule_payload_len`,
@@ -724,6 +748,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or text) says "only a condition can be a document, not the value ..." (it
   was "'add' is not a condition"), with a hint; the code and the pointer or
   position are the same (task G.1d).
+- Java and Scala data (`spec/data-model.md`, *Java and Scala*; task G.2):
+  Scala 3 `enum` cases without parameters are their names; a `LazyList` is
+  never forced, and Scala sets, tuples, functions and every other object of
+  the Scala library (packages `scala.*`) are opaque, also when given to the
+  Java binding directly, which no longer reads them as JavaBeans nor reads a
+  member that a class of the Scala library declares; a case class's `private`
+  fields are left out; the Scala layer's objects are the binding's own, so
+  opaque; the Scala values given back. In Scala, `==` of nodes is structural
+  identity and `===`/`=!=` build `eq`/`ne` (`spec/ast.md`); Scala raises the
+  Java binding's exceptions (`spec/errors.md`).
 - Java: `ActionException.decision()` is the idiomatic `Decision` of
   `RuleSet.run` (task G.1b); the native layer's decision, from
   `io.github.cleanrules.ffi.RuleSet.run`, is `nativeDecision()`.
