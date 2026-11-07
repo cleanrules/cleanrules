@@ -1,8 +1,9 @@
 name: JVM natives
 
 # Builds the one jar of the Java binding with the C ABI library of all eight
-# platforms inside, and runs it as users would, without publishing (Maven
-# Central comes in G.3 and M.2):
+# platforms inside, stages the two Maven artifacts, and runs them as users
+# would, without publishing anything (signing and uploading to Maven Central
+# are task M.2):
 #
 # 1. The library (`cargo build --release -p cleanrules-ffi`) of each platform
 #    of the npm packages: natively on macOS and Windows; the glibc ones in
@@ -20,6 +21,17 @@ name: JVM natives
 #    also in manylinux_2_28 (glibc 2.28) with a checked Temurin 25 tarball, and
 #    the musl ones in Alpine containers with Temurin 25. Windows on arm64 uses
 #    Microsoft's OpenJDK 25 (Temurin has none there).
+# 4. The Maven artifacts (task G.3b): io.github.cleanrules:cleanrules, with
+#    that jar, and io.github.cleanrules:cleanrules-scala_3, each with its
+#    sources and javadoc jars, POM, Gradle module metadata and checksums, into
+#    a local staging repository (Gradle's own maven-publish), checked against
+#    Maven Central's requirements but the signatures, which are M.2's
+#    (bindings/jvm/scripts/check-staging.py).
+# 5. A clean project resolves them from that repository on every platform
+#    there is a runner for, and in Alpine: with Gradle module metadata and
+#    with the POMs only (as Maven does), and runs a Java and a Scala 3 smoke
+#    program that load the library from the jar
+#    (bindings/jvm/scripts/resolve-staging.sh).
 
 on:
   push:
@@ -162,15 +174,38 @@ jobs:
           pattern: jvm-native-*
           merge-multiple: true
           path: natives
-      # The eight libraries into the jar, without cargo.
-      - run: ./gradlew jar --no-daemon "-Pcleanrules.natives.dir=$GITHUB_WORKSPACE/natives"
+      # The eight libraries into the jar, without cargo, and both artifacts
+      # into the local staging repository, build/staging (nothing remote).
+      - run: |
+          ./gradlew jar publishAllPublicationsToStagingRepository --no-daemon \
+            "-Pcleanrules.natives.dir=$GITHUB_WORKSPACE/natives"
       # Exactly the eight libraries, each of its system and processor, glibc
       # 2.28 at most, musl's libc for musl, with their SHA-256 and manifest.
-      - run: python3 scripts/check-jar.py java/build/libs/cleanrules-*.jar
+      # (The libs directory also holds the -sources and -javadoc jars now.)
+      - run: |
+          jar=$(ls java/build/libs/cleanrules-*.jar | grep -v -e '-sources\.jar$' -e '-javadoc\.jar$')
+          python3 scripts/check-jar.py "$jar"
+      # The staged repository against Maven Central's requirements (the jar
+      # in it again with the eight libraries); on a tag, its version must be
+      # the tag's, and not the 0.0.0 placeholder.
+      - run: |
+          release=()
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            release=(--release "${GITHUB_REF_NAME#v}")
+          fi
+          python3 scripts/check-staging.py build/staging "${release[@]}"
       - uses: actions/upload-artifact@v7
         with:
           name: jvm-jar
-          path: bindings/jvm/java/build/libs/cleanrules-*.jar
+          path: |
+            bindings/jvm/java/build/libs/cleanrules-*.jar
+            !bindings/jvm/java/build/libs/cleanrules-*-sources.jar
+            !bindings/jvm/java/build/libs/cleanrules-*-javadoc.jar
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          name: jvm-staging
+          path: bindings/jvm/build/staging
           if-no-files-found: error
 
   smoke:
@@ -284,4 +319,64 @@ jobs:
             java --enable-native-access=ALL-UNNAMED --illegal-native-access=deny -cp "$jar" "$smoke"
             java --enable-native-access=io.github.cleanrules --illegal-native-access=deny \
               --module-path "$jar" --add-modules io.github.cleanrules "$smoke"
+          '
+
+  resolve:
+    name: Resolve the Maven artifacts (${{ matrix.platform }})
+    needs: jar
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, platform: linux-x64-gnu, java: temurin }
+          - { runner: ubuntu-24.04-arm, platform: linux-arm64-gnu, java: temurin }
+          - { runner: macos-15-intel, platform: darwin-x64, java: temurin }
+          - { runner: macos-latest, platform: darwin-arm64, java: temurin }
+          - { runner: windows-latest, platform: win32-x64-msvc, java: temurin }
+          # Temurin has no JDK 25 for Windows on arm64; Microsoft's build does.
+          - { runner: windows-11-arm, platform: win32-arm64-msvc, java: microsoft }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Only for the scripts: the staged repository is the artifact.
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: ${{ matrix.java }}
+          java-version: 25
+          cache: gradle
+      - uses: actions/download-artifact@v8
+        with:
+          name: jvm-staging
+          path: ${{ runner.temp }}/staging
+      # A clean project outside the checkout, twice (Gradle module metadata,
+      # then the POMs only): cleanrules from the staged repository alone, the
+      # Scala 3 library from Maven Central; JarSmoke.java and a Scala program
+      # run with the library from the jar, with no override.
+      - run: bash bindings/jvm/scripts/resolve-staging.sh "$RUNNER_TEMP/staging" "$RUNNER_TEMP/consumer"
+
+  resolve-musl:
+    name: Resolve the Maven artifacts (${{ matrix.platform }})
+    needs: jar
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, platform: linux-x64-musl }
+          - { runner: ubuntu-24.04-arm, platform: linux-arm64-musl }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: jvm-staging
+          path: staging
+      # The same clean project in Alpine with Temurin 25, by hand as the musl
+      # smoke run.
+      - run: |
+          docker run --rm -v "$PWD:/work:ro" -w /tmp eclipse-temurin:25-jdk-alpine sh -euxc '
+            apk add --no-cache bash curl libgcc
+            bash /work/bindings/jvm/scripts/resolve-staging.sh /work/staging /tmp/consumer
           '

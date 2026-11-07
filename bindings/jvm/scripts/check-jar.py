@@ -194,27 +194,11 @@ def check_library(platform: str, data: bytes) -> tuple[list[str], str]:
     return problems, detail
 
 
-def main() -> int:
-    """Check the jar given on the command line."""
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("jar")
-    parser.add_argument(
-        "--platforms", default="all", help="all (the default), none, or a comma-separated list"
-    )
-    arguments = parser.parse_args()
-    if arguments.platforms == "all":
-        platforms = PLATFORMS
-    elif arguments.platforms == "none":
-        platforms = []
-    else:
-        platforms = [p for p in PLATFORMS if p in arguments.platforms.split(",")]
-        unknown = set(arguments.platforms.split(",")) - set(PLATFORMS)
-        if unknown:
-            parser.error(f"unknown platforms {sorted(unknown)}; they are {PLATFORMS}")
-
+def check_jar(path: str, platforms: list[str]) -> tuple[list[str], list[str]]:
+    """What to print about a jar's native libraries, and its problems."""
     problems: list[str] = []
     lines: list[str] = []
-    with zipfile.ZipFile(arguments.jar) as jar:
+    with zipfile.ZipFile(path) as jar:
         names = set(jar.namelist())
         allowed = {"native/"} if platforms else set()
         for platform in platforms:
@@ -258,7 +242,35 @@ def main() -> int:
                 problems.append(
                     f"the manifest lists the platforms {listed}, not {platforms or ['none']}"
                 )
+    return lines, problems
 
+
+def parse_platforms(value: str) -> list[str]:
+    """The platforms of a --platforms value: all, none or a comma-separated list."""
+    if value == "all":
+        return PLATFORMS
+    if value == "none":
+        return []
+    unknown = set(value.split(",")) - set(PLATFORMS)
+    if unknown:
+        raise ValueError(f"unknown platforms {sorted(unknown)}; they are {PLATFORMS}")
+    return [p for p in PLATFORMS if p in value.split(",")]
+
+
+def main() -> int:
+    """Check the jar given on the command line."""
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("jar")
+    parser.add_argument(
+        "--platforms", default="all", help="all (the default), none, or a comma-separated list"
+    )
+    arguments = parser.parse_args()
+    try:
+        platforms = parse_platforms(arguments.platforms)
+    except ValueError as error:
+        parser.error(str(error))
+
+    lines, problems = check_jar(arguments.jar, platforms)
     for line in lines:
         print(line)
     for problem in problems:

@@ -15,9 +15,31 @@ evaluationDependsOn(":java")
 group = "io.github.cleanrules"
 version = project(":java").version
 
+description = "Explainable rules engine for Scala 3: one Rust core with the same semantics in every language"
+extra["publishedName"] = "cleanrules for Scala 3"
+
 base {
     archivesName = "cleanrules-scala_3"
 }
+
+// The sources jar, and the Scaladoc as the javadoc jar (Maven Central asks
+// for one, and there is no Java source to give javadoc).
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+tasks.named<Jar>("javadocJar") {
+    from(tasks.scaladoc)
+}
+
+// The JVM version in Gradle module metadata (`org.gradle.jvm.version`):
+// Java 25, as the bytecode (-release 25), whatever JDK runs Gradle.
+tasks.compileJava {
+    options.release = 25
+}
+
+// Publishing to the local staging repository: gradle/publishing.gradle.kts.
+apply(from = rootDir.resolve("gradle/publishing.gradle.kts"))
 
 repositories {
     mavenCentral()
@@ -57,6 +79,9 @@ tasks.jar {
         attributes(
             "Implementation-Title" to "cleanrules-scala_3",
             "Implementation-Version" to project.version,
+            // Without it, Java derives "cleanrules.scala.3", which is not a
+            // valid module name, so the jar could not go on the module path.
+            "Automatic-Module-Name" to "io.github.cleanrules.scaladsl",
         )
     }
 }
@@ -85,6 +110,10 @@ tasks.test {
         events("failed", "skipped")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
+}
+
+tasks.scaladoc {
+    title = "cleanrules for Scala 3 ${project.version} API"
 }
 
 tasks.check {

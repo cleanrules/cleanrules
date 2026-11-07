@@ -411,6 +411,11 @@ RuleSet.fromJava(table.ruleSet()).evaluate(order)
 [`docs/examples/DiscountRules.scala`](../../docs/examples/DiscountRules.scala)
 is `DiscountRules.java` in Scala; the Scala tests compile and run it.
 
+**On Java 24 or later**, the Scala 3.3 library (`scala.runtime.LazyVals`)
+makes Java warn once that it calls `sun.misc.Unsafe::objectFieldOffset`,
+which a future Java will remove. It is only a warning, from the Scala library
+and not from cleanrules; `--sun-misc-unsafe-memory-access=allow` silences it.
+
 ## The native layer
 
 ```java
@@ -516,10 +521,63 @@ with its SHA-256, glibc 2.28 at most for the gnu ones) and runs
 `scripts/JarSmoke.java` from the jar on each platform. The manifest's
 `Cleanrules-Native-Platforms` lists the platforms a jar holds.
 
+## Maven artifacts
+
+Nothing is published yet: signing and uploading to Maven Central come with
+the first release. The build stages the two artifacts as Central will get
+them, in a local repository, and checks them:
+
+```bash
+cd bindings/jvm
+./gradlew publishAllPublicationsToStagingRepository   # build/staging, with this platform's library in the jar
+python3 scripts/check-staging.py --platforms darwin-arm64   # yours; CI checks the eight
+bash scripts/resolve-staging.sh build/staging /tmp/cleanrules-consumer   # a directory that does not exist yet
+```
+
+| Artifact | What | Depends on |
+|---|---|---|
+| `io.github.cleanrules:cleanrules` | the Java binding (module `io.github.cleanrules`) and the native libraries | nothing |
+| `io.github.cleanrules:cleanrules-scala_3` | the Scala 3 layer | `io.github.cleanrules:cleanrules` (the same version) and `org.scala-lang:scala3-library_3`, both `compile` |
+
+Each is the jar, a sources jar, a javadoc jar (the Scaladoc, for Scala; the
+Java one documents the exported packages only), the POM and Gradle module
+metadata (Java 25 as `org.gradle.jvm.version`), each with its `.md5`,
+`.sha1`, `.sha256` and `.sha512`. The POM has a name, description, project
+URL (https://cleanrules.github.io), licence (Apache-2.0), developer (the
+author, with their site and ORCID), SCM (https://github.com/cleanrules/cleanrules)
+and issue management. Gradle's own `maven-publish` plugin builds them
+(`gradle/publishing.gradle.kts`, applied by both subprojects), to the
+`staging` repository only, which is `build/staging`: the build declares no
+remote repository, credentials or signing. The version is the workspace's
+(`[workspace.package]` of `Cargo.toml`), today the placeholder 0.0.0.
+
+`scripts/check-staging.py` (Python, standard library only) checks the staged
+repository against Maven Central's requirements: the coordinates (as the path
+says, one release version, never a SNAPSHOT; with `--release <version>`, that
+version, and 0.0.0 is an error rather than a warning), exactly those five
+files of each artifact with checksums that match (`md5` and `sha1` required),
+the POM's fields and dependencies with their scopes, Gradle module metadata
+against the files and the POM, what each jar holds (the licence and NOTICE in
+all of them; the native libraries of the platforms given, as `check-jar.py`
+checks them), and that no internal package is documented. Signatures are
+deferred to the release, and the check says so (`signatures: deferred
+(M.2)`).
+
+`scripts/resolve-staging.sh` copies a clean project (`scripts/consumer`: a
+Java application on `cleanrules` and a Scala 3 one on `cleanrules-scala_3`
+only) and the Gradle wrapper to a new directory, and runs it twice: with
+Gradle module metadata, and with the POMs only, as Maven reads them. Both
+take cleanrules from the staged repository alone (never from Maven Central),
+check that the jars, sources and javadoc jars came from it, and run
+`JarSmoke.java` and a Scala program, which load the native library from the
+jar. CI (the "JVM natives" workflow) stages the artifacts with the eight
+libraries, checks them, and resolves and runs them on Linux, macOS and
+Windows, x64 and arm64, and in Alpine.
+
 ## Installing
 
 One jar, `io.github.cleanrules:cleanrules`, for every platform (not on Maven
-Central yet: G.3). It holds the native library (the C ABI, `cleanrules_ffi`)
+Central yet: see [Maven artifacts](#maven-artifacts)). It holds the native library (the C ABI, `cleanrules_ffi`)
 of each of these, the platforms of the npm packages, and nothing needs
 installing besides it:
 
@@ -623,7 +681,7 @@ a 64-bit platform.
   through the environment: `JAVA_TOOL_OPTIONS=-Dcleanrules.tmpdir=/run/cleanrules`.
   Or set `CLEANRULES_LIBRARY_PATH` to a library installed in the image, and
   nothing is extracted.
-- **GraalVM native image** is not supported until G.3: the image holds only
+- **GraalVM native image** is not supported yet: the image holds only
   the resources registered for it, so the jar's libraries are missing (the
   error then says "native image: register the resources ... or set
   cleanrules.library.path"). Give the library's path with

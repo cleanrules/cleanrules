@@ -570,6 +570,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the native layer, Python and JavaScript have it (found by the conformance
   runner: `format/decisions/tree-too-deep` could not run through the
   idiomatic API).
+- Maven artifacts of the JVM bindings, built and checked but not published
+  (task G.3b; signing and uploading to Maven Central are M.2):
+  `io.github.cleanrules:cleanrules` and
+  `io.github.cleanrules:cleanrules-scala_3`, which depends on it (same
+  version) and on `org.scala-lang:scala3-library_3`, both in `compile` scope.
+  Gradle's own `maven-publish` plugin
+  (`bindings/jvm/gradle/publishing.gradle.kts`) writes each with its sources
+  and javadoc jars (the Scaladoc for Scala), a POM with name, description,
+  project URL, licence (Apache-2.0), developer, SCM and issue management,
+  Gradle module metadata (Java 25) and checksums (`md5`, `sha1`, `sha256`,
+  `sha512`) to a local repository only
+  (`./gradlew publishAllPublicationsToStagingRepository`, into
+  `bindings/jvm/build/staging`). `bindings/jvm/scripts/check-staging.py`
+  checks it against Maven Central's requirements (coordinates, release
+  version, files, checksums, POM fields, dependency scopes, module metadata,
+  what each jar holds, and the native libraries as `check-jar.py` checks
+  them; signatures deferred), and `bindings/jvm/scripts/resolve-staging.sh`
+  resolves both from it in a clean Gradle project, with Gradle module
+  metadata and with the POMs only, and runs a Java and a Scala smoke program
+  with the library from the jar. The "JVM natives" workflow stages them with
+  the eight libraries, checks them (on a tag, at the tag's version), and
+  resolves and runs them on Linux, macOS and Windows, x64 and arm64, and in
+  Alpine. The javadoc now documents the exported packages only (not
+  `io.github.cleanrules.internal`), and its title names cleanrules.
 - C ABI, for what rules, documents, tables and result trees hold (task
   G.1d): `cr_ruleset_rule`, `cr_rule_name`, `cr_rule_description`,
   `cr_rule_action`, `cr_rule_priority`, `cr_rule_when`, `cr_rule_payload_len`,

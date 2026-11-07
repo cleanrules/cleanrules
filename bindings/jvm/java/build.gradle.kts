@@ -22,10 +22,21 @@ val workspaceVersion: String =
 
 group = "io.github.cleanrules"
 version = workspaceVersion
+description = "Explainable rules engine for Java: one Rust core with the same semantics in every language"
+extra["publishedName"] = "cleanrules for Java"
 
 base {
     archivesName = "cleanrules"
 }
+
+// The sources and javadoc jars that Maven Central asks for, next to the jar.
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+// Publishing to the local staging repository: gradle/publishing.gradle.kts.
+apply(from = rootDir.resolve("gradle/publishing.gradle.kts"))
 
 repositories {
     mavenCentral()
@@ -45,11 +56,16 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 tasks.javadoc {
+    title = "cleanrules $workspaceVersion API"
+    // The pages document the exported packages only (the module's API): the
+    // internal package is read from the compiled classes, not documented.
+    exclude("io/github/cleanrules/internal/**")
+    val classes = sourceSets.main.get().output.classesDirs
     (options as StandardJavadocDocletOptions).apply {
+        addStringOption("-patch-module", "io.github.cleanrules=${classes.asPath}")
         encoding = "UTF-8"
         addBooleanOption("Xdoclint:all", true)
-        // The internals are not exported, nor linted (Gradle lists the
-        // sources, so javadoc still writes their pages).
+        // The internals are not exported, nor linted.
         addBooleanOption("Xdoclint/package:-io.github.cleanrules.internal", true)
         addBooleanOption("Werror", true)
         addBooleanOption("quiet", true)
