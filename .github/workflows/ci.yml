@@ -390,6 +390,62 @@ jobs:
       # -Werror, its MUnit tests and its Scaladoc.
       - run: ./gradlew check --no-daemon
 
+  go:
+    name: Go (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, goos: linux, target: "" }
+          - { os: macos-latest, goos: darwin, target: "" }
+          - { os: windows-latest, goos: windows, target: x86_64-pc-windows-gnu }
+    defaults:
+      run:
+        working-directory: bindings/go
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      # On Windows, cgo links with MinGW-w64's gcc, so the library is built
+      # for Rust's GNU target (bindings/go/link.go); elsewhere, for the host.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-go@v7
+        with:
+          go-version: 1.24.x
+          cache-dependency-path: bindings/go/go.mod
+      # The static library cgo links (bindings/go/link.go). The system
+      # libraries rustc asks for are compared with link.go's: a difference is
+      # a warning, since the link below is the real check.
+      - name: Build the C ABI
+        run: |
+          target=${{ matrix.target }}
+          out=$(cargo rustc -p cleanrules-ffi --lib --crate-type staticlib ${target:+--target $target} \
+            -- --print native-static-libs 2>&1) || { echo "$out"; exit 1; }
+          echo "$out"
+          wanted=$(echo "$out" | grep -o 'native-static-libs: .*' | sed 's/native-static-libs: //')
+          linked=$(grep "#cgo ${{ matrix.goos }} LDFLAGS" link.go)
+          for lib in $wanted; do
+            case $lib in -lc|-lSystem) continue ;; esac
+            case " $linked " in *" $lib "*) ;; *) echo "::warning::rustc asks for $lib, which link.go does not give ($wanted)" ;; esac
+          done
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - run: go vet ./...
+      # -count=1 everywhere: Go caches test results by the flags of #cgo
+      # LDFLAGS, not by the bytes of the library they name, and setup-go
+      # restores that cache, so a change in Rust alone could otherwise pass
+      # as "(cached)". Every test: the smoke pass over the conformance vectors
+      # and the example docs/examples/discounts.go included. Then with the
+      # race detector, and with every pointer passed to C checked.
+      - run: go test -count=1 ./...
+      - if: matrix.goos != 'windows'
+        run: go test -count=1 -race -short ./...
+      - if: matrix.goos != 'windows'
+        run: GOEXPERIMENT=cgocheck2 go test -count=1 -short ./...
+
   conformance:
     name: Spec schemas and conformance vectors
     runs-on: ubuntu-latest

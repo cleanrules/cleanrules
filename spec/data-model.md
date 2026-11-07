@@ -95,6 +95,11 @@ be converted is opaque; neither makes the whole value opaque. A list has no
 missing elements: where a native sequence has none (a hole in a JavaScript
 array), the element is null.
 
+A binding that converts a native list, map or object whole, where a path
+ends (Java, JavaScript, Go), makes one that contains itself, met again while
+it is being converted, or one nested more than 256 containers deep, opaque
+at that place.
+
 ### Opaque values
 
 *Not checked by vectors: opaque values only come from native data, so each
@@ -102,8 +107,8 @@ binding's tests check them.*
 
 A native value with no equivalent is **opaque**: bytes, a time of day without a
 date, a duration, a complex number, a set (it has no order), a string with a
-lone surrogate (possible in Python, JavaScript and Java), and anything else the
-tables below do not list. An opaque value:
+lone surrogate (possible in Python, JavaScript and Java) or that is not valid
+UTF-8 (possible in Go), and anything else the tables below do not list. An opaque value:
 
 - is not null, so `is_null` is `FALSE` for it;
 - belongs to the `other` group, so comparing it is a type mismatch;
@@ -415,19 +420,60 @@ priorities are as in Java, with `scala.math.BigDecimal` for a decimal gap and
 |---|---|
 | `nil` pointer, slice, map or interface | null |
 | `bool` | boolean |
-| signed and unsigned integers, `*big.Int` | int, or null with `int_overflow` |
-| `float32` (widened), `float64` | float |
-| `cr.Decimal` (Go has no standard decimal) | decimal |
-| `string` | string |
+| signed and unsigned integers (not `uintptr`), `big.Int` and `*big.Int` | int, or null with `int_overflow` |
+| `float32` (widened), `float64` | float; `NaN` is null |
+| `cr.Decimal` (Go has no standard decimal) | decimal, or null with `decimal_overflow` |
+| `string` that is valid UTF-8 | string; any other `string` is opaque |
 | `cr.Date` | date |
 | `cr.DateTime` (Go has no naive datetime) | naive datetime |
-| `time.Time` | aware datetime: `time.UTC` is `Z`, a location loaded by name is that zone, anything else (`time.Local`, `time.FixedZone`) a fixed offset |
-| slices and arrays except `[]byte` | list |
-| `map[string]T` | map, sorted by key; maps with other key types are opaque |
-| structs | map of their exported fields, including those promoted from embedded structs, named by a `cleanrules:"name"` tag, else a `json` tag, else the field name; `cleanrules:"-"` skips a field |
+| `time.Time` | aware datetime: `time.UTC` is `Z`; `time.Local` and a location with a single offset for all time (`time.FixedZone`, or a fixed zone loaded by name such as `Etc/GMT+5`) are their offset at that instant; any other location (loaded by name, with `time.LoadLocation`) is that zone, by its name |
+| slices and arrays, except those of bytes (element kind `uint8`: `[]byte`, `[16]byte`) | list |
+| maps | map of their entries whose key is a string, sorted by key: every entry when the key kind is `string`; for an interface key type (`map[any]any`), those whose key's dynamic kind is `string`, the key of type `string` winning when two have the same text (else the one whose type's name sorts first); no entry for other key kinds. An entry whose key is not valid UTF-8 is left out too |
+| structs | map of their exported fields, as `encoding/json` chooses them: fields promoted from embedded structs included, the shallowest one or the only tagged one winning a name, and ambiguous ones left out. A field is named by its `cleanrules:"name"` tag, else its `json` tag (a name `encoding/json` accepts), else its name; a field with a `cleanrules` tag is never named or left out by its `json` tag, and a tag `"-"` leaves it out. In their declaration order |
+| slices and arrays of bytes, `time.Duration`, `big.Float`, `big.Rat`, complex numbers, channels, functions, `unsafe.Pointer`, `uintptr`, and the package's own objects (rule sets, rules, expressions, decisions, errors, explanations, summaries…) | opaque, never read through |
 
-Pointers are followed, and named types are matched by their `reflect.Kind`. A
-Go zero value is a value, not a missing one.
+Pointers and interfaces are followed, and named types are matched by their
+`reflect.Kind`, so a `type Status string` is a string. A Go zero value is a
+value, not a missing one. Go has no getters, so reading never runs the
+program's code and never fails. Where a path ends, a container is converted
+whole once per input, even where the data holds it in several places (through
+pointers, slices or maps), and *Lists and maps* says when one is opaque.
+
+An opaque value comes back as the value found in the data, before its
+pointers are followed (the pointer, if it was one). Two opaque values are the
+same object (*Equality*) when they are `==` (two pointers to one variable),
+or when they are slices or maps sharing their storage (slices also of the
+same length); two functions never are.
+
+**Values given back.** Outputs, payloads, aggregates, metadata, the values of
+an action's context and the values in an explanation (the values a cause
+read, a counterfactual's target) come back to Go as follows:
+
+| Value | Go |
+|---|---|
+| null, whatever its reason | `nil` |
+| boolean | `bool` |
+| int | `int64` |
+| float | `float64` (`-0.0` and infinities included) |
+| decimal | `cr.Decimal`, holding the canonical text (`json-format.md`, *Numbers*), `inf` and `-inf` included |
+| string | `string` |
+| date | `cr.Date` |
+| naive datetime | `cr.DateTime` |
+| aware datetime | `time.Time` at its instant: in its IANA zone when Go's zone database knows it (`time.LoadLocation`), whose rules then give the local fields; otherwise at its offset (`time.FixedZone`), and `Z` in `time.UTC` |
+| list | `[]any` |
+| map | `map[string]any`: Go's maps have no order, so the value's order is not kept |
+| opaque | the value it was read from (*Opaque values* above), the same object |
+
+A counterfactual's gap is an `int64`, `float64` or `cr.Decimal`, like the int,
+float or decimal above; between dates it is a `cr.GapDays`, and between
+datetimes a `cr.GapMicroseconds`, each an `int64` (a `time.Duration` cannot
+hold every gap). Priorities in notes and summaries are `int64` (`*int64` where
+a note may lack them). Each value reads back as the same value, except a map,
+whose keys come back sorted, and two kinds of aware datetimes, which read
+back at their offset: one in a zone Go's database does not know, which comes
+back at its offset already, and one in a zone with a single offset for all
+time (`Etc/GMT+5`; the zone `UTC`, which comes back as `time.UTC`, reads back
+as `Z`).
 
 #### C, C++ and Rust
 

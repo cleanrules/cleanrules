@@ -616,6 +616,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolves and runs them on Linux, macOS and Windows, x64 and arm64, and in
   Alpine. The javadoc now documents the exported packages only (not
   `io.github.cleanrules.internal`), and its title names cleanrules.
+- Go binding, first part (task H.1a, `bindings/go`, module
+  `github.com/cleanrules/cleanrules/bindings/go`, package `cleanrules`, not
+  published): cgo over the C ABI, Go 1.24 or later, standard library only. It
+  links the static library cargo builds in the repository by its full path
+  (on Windows, for the `x86_64-pc-windows-gnu` target, since cgo links with
+  MinGW-w64), or another one with the tag `cleanrules_external` and
+  `CGO_LDFLAGS`. Conditions built with functions and methods
+  (`Field("customer", "age").Ge(18).And(Field("country").IsIn("ES", "PT"))`,
+  `And`, `Or`, `Not`, every node of `spec/ast.md`), checked by the core as
+  they are built, with the error carried along the chain (`Err`), the core's
+  text as `String()`, and `Tag`, `Kind`, `Children`, `FieldPaths`, `Equal`
+  and `Hash`; `NewRule` and `NewRuleSet` with functional options (`Then`,
+  `WithPriority`, `WithTags`, `WithDescription`, `WithMetadata`,
+  `WithAction`; `WithHitPolicy` with `HitPolicyFirst`...`HitPolicyCollect`,
+  `WithAggregate` with `AggregateSum`...`AggregateCount`, `WithLogic`,
+  `WithStrict`), `Rule.With` and `Must`; `RuleSet.Evaluate` and
+  `EvaluateMany` on Go data read along the rule set's paths only (maps by
+  their string keys, `map[any]any` included, slices, structs by exported
+  field as `encoding/json` chooses them, with `cleanrules` and `json` tags,
+  pointers, `time.Time`, `math/big`, and the binding's `Decimal`, `Date` and
+  `DateTime`, which marshal to and from their text), each container read once
+  per input; `Decision` with Go values back as copies (results, selected,
+  fired, outputs, output, aggregated, `TruthTrue`/`TruthFalse`/
+  `TruthUnknown`), its JSON document (`JSON`), `Explain` and `WhyNot` as
+  objects from `cr_decision_explain_value` with the core's text and JSON
+  (`Explanation.JSON`, `ForRule`; working after the rule set is closed),
+  `Summary` as objects; `Bind` and `Run` with Go functions as actions, called
+  through one `//export` trampoline and a `cgo.Handle` in C memory, each on a
+  goroutine of its own so that nothing unwinds through the core's frames: an
+  action's error is wrapped in the `action_error`, and a panic or
+  `runtime.Goexit` is raised again by `Run`; errors as values, one `*Error`
+  with the code and context (`Pointer` nil where it does not apply) and a
+  sentinel per code for `errors.Is`, never with a C function's name, and
+  `invalid_argument` never from what a program gives. Rule sets and decisions
+  have `Close` (safe while other goroutines use them) and are freed by
+  `runtime.AddCleanup` otherwise; nil and zero values give errors, never
+  panics. Tests with `testing` only (every operator and its text, each Go kind
+  both ways, structs against `encoding/json`, map keys and their order,
+  errors, actions, panics, `runtime.Goexit`, goroutines, cleanups and shared
+  ownership, `-race` and `cgocheck2`), a strict smoke pass over 623
+  conformance vectors through this API and Go data, and the example
+  `docs/examples/discounts.go`. CI: job `go` on Linux, macOS and Windows
+  (`gofmt`, `go vet`, `go test -count=1`, which a rebuilt Rust library needs,
+  since Go caches test results by the link flags).
 - C ABI, for what rules, documents, tables and result trees hold (task
   G.1d): `cr_ruleset_rule`, `cr_rule_name`, `cr_rule_description`,
   `cr_rule_action`, `cr_rule_priority`, `cr_rule_when`, `cr_rule_payload_len`,
@@ -860,6 +904,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or text) says "only a condition can be a document, not the value ..." (it
   was "'add' is not a condition"), with a hint; the code and the pointer or
   position are the same (task G.1d).
+- Go data and errors (`spec/data-model.md`, *Go*; `spec/errors.md`; task
+  H.1a): `uintptr`, slices and arrays of bytes, `time.Duration`, `big.Float`,
+  `big.Rat`, complex numbers, channels, functions and the binding's own
+  objects are opaque; a string that is not UTF-8 is opaque; `big.Int` (not
+  only `*big.Int`) is an int; `cr.Decimal` can be a null with
+  `decimal_overflow`, and a NaN is a null; maps are read by their string keys
+  (named key types included; for `map[any]any`, the keys whose dynamic kind is
+  string), other entries and keys that are not UTF-8 left out, instead of
+  making a map with other key kinds opaque; `time.Local` and a location with
+  one offset for all time are a fixed offset, any other location its zone;
+  structs are read as `encoding/json` chooses their fields, in declaration
+  order, and a `cleanrules` tag, when a field has one, is the only tag read
+  (so `json:"-"` leaves out only a field without one); a container is read
+  once per input; an opaque value gives back the value before its pointers
+  are followed, and when two opaque Go values are the same object; and the
+  table *Values given back* for Go, with the aware datetimes that read back
+  at their offset (a zone Go does not know, a zone of one offset such as
+  `Etc/GMT+5` or `UTC`). In Go, `*Error` has a field per context field
+  (`Pointer` nil, `Line` and `Column` 0, `Row` -1 where they do not apply),
+  each code has a sentinel, `invalid_argument` and `internal_error` are bugs
+  of the binding, and `ErrClosed` (a closed, nil or zero object) is the one
+  error that is not an `*Error`.
+- Data (`spec/data-model.md`, *Lists and maps*, *Opaque values*): the rule
+  that a container that contains itself, or is nested more than 256 deep, is
+  opaque where a path ends is now general, for every binding that converts
+  containers whole (Java and JavaScript already did it); a string that is not
+  valid UTF-8 (Go) is among the opaque values.
 - Java and Scala data (`spec/data-model.md`, *Java and Scala*; task G.2):
   the rows the Scala layer reads are marked as such; Scala 3 `enum` cases
   without parameters and case objects are their names; a `LazyList` is never

@@ -7,3 +7,7 @@ docs/examples/** text eol=lf
 bindings/jvm/gradlew text eol=lf
 bindings/jvm/gradlew.bat text eol=crlf
 bindings/jvm/gradle/wrapper/gradle-wrapper.jar binary
+
+# gofmt requires LF, and CI runs it on Windows too.
+*.go text eol=lf
+go.mod text eol=lf
