@@ -552,6 +552,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `BigDecimal`, `BigInt`, Scala 3 enums and case objects (their names), and
   Java lists and maps holding Scala values. Errors are the Java binding's exceptions. Example
   `docs/examples/DiscountRules.scala`, run by a test.
+- Scala 3 layer: documents and decision tables (task G.2b), delegating to the
+  Java binding's `Documents` and `DecisionTable`. `loads(text[, format,
+  actions, limits])` (a string or UTF-8 bytes) and `load(path[, format,
+  actions, limits])` give a `DocumentContent`, the union `Expr | Rule |
+  RuleSet | DecisionTable` of the Scala types for an exhaustive `match`
+  (`DocumentContent.fromJava` and `asJava`); `actions` binds named actions to
+  Scala functions on load, and `format` of a file is an `Option`.
+  `dumps(value[, format, omitActions])` and `dump(value, path[, format,
+  omitActions])` write one. `ruleFromText` takes `limits` too
+  (`ruleFromText(text[, actions, limits])`). `DecisionTable(header, rows,
+  hitPolicy, aggregate, logic, strict, limits)` with Scala cells (text,
+  `Expr`, Scala constants, `None` for an empty cell, `Some(x)`) in any Scala
+  collections, `TableOutput(name, values*)` with Scala constants, and
+  `TableRow` as a case class with a private constructor; a table gives its
+  settings (`strict`, `aggregate` as an `Option`), `inputs`, `outputs`, `rows`,
+  `ruleSet`, `evaluate`, `evaluateMany` (also with limits), `summary` and
+  `toJson` with Scala types. An enum case without parameters or a case object
+  in a cell is its name as a string (`'High'`), as `spec/tables.md` (*Grids*)
+  says of every value that is not a string; one with parameters, in a cell or
+  an output's values, is an `ExpressionException` at its pointer
+  (`/rows/<r>/<c>`, `/header/<c>`). `RuleSet.readDecision` takes `limits`, as
+  Java's does. Example `docs/examples/RiskTable.scala`, run by a test.
 - Java conformance runner (task G.3a, `bindings/jvm`, `ConformanceTest`):
   every vector, text, YAML and table reads included, through JSON on the
   native layer (`json:<id>`, decisions also through its readers) and through
@@ -931,6 +953,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already did (task D.5).
 ### Fixed
 
+- Java: an enum constant given as a cell of a `DecisionTable` grid is now a
+  constant, its name as a string (`'HIGH'`), as `spec/tables.md` (*Grids*)
+  says of every value that is not a string; it was read as text, the field
+  named `HIGH` (task G.2b).
 - A condition, result tree or data value at the default limits no longer
   overflows a small thread stack: the core read, evaluated, explained and wrote
   them recursively, so a condition 256 nodes deep needed about 2 MiB of stack

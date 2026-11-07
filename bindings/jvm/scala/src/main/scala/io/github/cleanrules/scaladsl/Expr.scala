@@ -96,7 +96,7 @@ sealed abstract class Expr private[scaladsl] (val asJava: io.github.cleanrules.E
 
   /** Membership in a collection of constants (a `Seq`, a `Set`...). */
   def isIn(values: Iterable[Constant]): Expr =
-    Expr(asJava.isIn(values.iterator.map(Expr.constant).toVector.asJava))
+    Expr(asJava.isIn(values.iterator.map(Expr.constant(_)).toVector.asJava))
 
   /** A range: `low <= this <= high` with both ends included, or the ends `closed` says. */
   def between(low: Operand, high: Operand, closed: Closed = Closed.BOTH): Expr =
@@ -165,15 +165,19 @@ object Expr:
     case node: Expr => node.asJava
     case other => constant(other)
 
-  private[scaladsl] def constant(value: Any): AnyRef = value match
+  /**
+   * What the Java binding takes for a constant; an error points at `pointer`,
+   * if given (a decision table's cell, `/rows/<r>/<c>`).
+   */
+  private[scaladsl] def constant(value: Any, pointer: Option[String] = None): AnyRef = value match
     case parameters: scala.reflect.Enum if parameters.productArity > 0 =>
       val message = s"the enum case $parameters has parameters, so it is not a constant"
       val hint = "only enum cases without parameters are constants (their name)"
-      throw ExpressionException("expression_error", message, hint, Expr.errorJson(message, hint), null)
+      throw ExpressionException("expression_error", message, hint, Expr.errorJson(message, hint, pointer), null)
     case other => ToJava.convert(other)
 
-  /** The JSON form of an `expression_error` this layer finds (`spec/errors.md`). */
-  private def errorJson(message: String, hint: String): String =
+  /** The JSON form of an `expression_error` this layer finds (`spec/errors.md`), with its pointer, if any. */
+  private def errorJson(message: String, hint: String, pointer: Option[String]): String =
     def quote(text: String): String =
       text.flatMap {
         case '"' => "\\\""
@@ -181,7 +185,8 @@ object Expr:
         case c if c < ' ' => f"\\u${c.toInt}%04x"
         case c => c.toString
       }
-    s"""{"code":"expression_error","message":"${quote(message)}","hint":"${quote(hint)}"}"""
+    val at = pointer.fold("")(where => s""","pointer":"${quote(where)}"""")
+    s"""{"code":"expression_error","message":"${quote(message)}","hint":"${quote(hint)}"$at}"""
 
   /** A node that is neither a field nor a constant. */
   private final class Composite(node: io.github.cleanrules.Expr) extends Expr(node)

@@ -84,17 +84,19 @@ final class RuleSet private (val asJava: io.github.cleanrules.RuleSet):
   /**
    * A decision this rule set made, recorded as JSON or YAML ([[Decision.toJson]]).
    *
-   * @throws io.github.cleanrules.FormatException if the document is invalid or not of this rule set
+   * @param limits the limits of reading it (`maxSize`, `maxYamlSize`, `maxNesting`, `maxDepth`)
+   * @throws io.github.cleanrules.FormatException if the document is invalid, beyond the limits
+   *   (`limit_exceeded`) or not of this rule set
    */
-  def readDecision(text: String, format: Format = Format.JSON): Decision =
-    Decision.fromJava(asJava.readDecision(text, format))
+  def readDecision(text: String, format: Format = Format.JSON, limits: Limits = Limits.defaults()): Decision =
+    Decision.fromJava(asJava.readDecision(text, format, limits))
 
   // ---- Actions.
 
   /**
    * This rule set with its named actions bound to code: the only place names are looked up.
    *
-   * @throws io.github.cleanrules.RegistryException for a name no rule uses, or a rule's name not given
+   * @throws io.github.cleanrules.RegistryException for a named action the registry lacks
    */
   def bind(actions: collection.Map[String, Action]): RuleSet =
     new RuleSet(asJava.bind(Rule.javaActions(actions).asJava))

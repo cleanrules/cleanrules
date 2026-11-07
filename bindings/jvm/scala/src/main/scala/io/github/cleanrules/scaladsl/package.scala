@@ -14,6 +14,9 @@
  * decision.whyNot("vip") // the rule's explanation, as case classes
  * }}}
  *
+ * Documents and decision tables: `loads`, `load`, `dumps`, `dump`,
+ * `ruleFromText` and [[DecisionTable]].
+ *
  * The core builds, checks, evaluates and explains; this layer delegates to
  * the Java binding's idiomatic API and converts Scala values. Errors are the
  * Java binding's exceptions (`io.github.cleanrules.CleanRulesException` and
@@ -21,8 +24,7 @@
  */
 package io.github.cleanrules.scaladsl
 
-import io.github.cleanrules.{ActionException, CleanRulesException, Documents}
-import scala.jdk.CollectionConverters.*
+import io.github.cleanrules.{ActionException, CleanRulesException}
 import scala.jdk.OptionConverters.*
 
 /**
@@ -94,17 +96,3 @@ type Segment = String | Int | Long
 
 /** An action: code that a selected rule runs, given its context (`spec/rules.md`, *Actions*). */
 type Action = ActionContext => Unit
-
-/**
- * A rule parsed from the rule syntax (`spec/text.md`), such as
- * `RULE vip IF customer.years > 5 THEN discount = 0.15`.
- *
- * @param text the rule's text
- * @param actions the actions the rule's `DO` may name
- * @throws io.github.cleanrules.RuleSyntaxException for text that does not parse
- */
-def ruleFromText(text: String, actions: Map[String, Action] = Map.empty): Rule =
-  Rule.fromJava(
-    if actions.isEmpty then Documents.ruleFromText(text)
-    else Documents.ruleFromText(text, Rule.javaActions(actions).asJava)
-  )

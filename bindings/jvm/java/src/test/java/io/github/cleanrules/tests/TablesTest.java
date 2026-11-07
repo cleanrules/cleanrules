@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.cleanrules.Aggregate;
 import io.github.cleanrules.CleanRulesException;
+import io.github.cleanrules.Conditions;
 import io.github.cleanrules.Decision;
 import io.github.cleanrules.DecisionTable;
 import io.github.cleanrules.Expr;
@@ -89,6 +90,38 @@ class TablesTest {
         assertEquals(List.of(Optional.empty()), adult.inputs());
         assertEquals("row_2", table.ruleSet().rules().get(1).name());
         assertEquals(rows, table.rows());
+    }
+
+    private enum Risk {
+        HIGH,
+        LOW {
+            @Override
+            public String toString() {
+                return "low risk";
+            }
+        }
+    }
+
+    @Test
+    void enumCellsAreConstantsNotText() {
+        DecisionTable table = DecisionTable.builder()
+                .header("RULE", "x", "THEN t")
+                .row("a", Risk.HIGH, Risk.HIGH)
+                .row("b", Optional.of(Risk.LOW), Optional.of(Risk.LOW))
+                .build();
+        // The constant's name as a string, never the field it would name as text
+        // (and its name, not its toString).
+        assertEquals(List.of(Optional.of(field("x").eq("HIGH"))), table.rows().get(0).inputs());
+        assertEquals(List.of(Optional.of(Conditions.constant("LOW"))), table.rows().get(1).outputs());
+        assertEquals("HIT POLICY,first\nRULE,x,THEN t\na,'HIGH','HIGH'\nb,'LOW','LOW'\n", dumps(table, Format.CSV));
+        assertEquals(Optional.of(Map.of("t", "HIGH")), table.evaluate(Map.of("x", "HIGH")).output());
+        assertEquals(Optional.of(Map.of("t", "LOW")), table.evaluate(Map.of("x", Risk.LOW)).output());
+        // As an output column's values.
+        DecisionTable listed = DecisionTable.builder()
+                .header("x", TableOutput.of("t", Risk.HIGH, Risk.LOW))
+                .row("-", Risk.LOW)
+                .build();
+        assertEquals(List.of(TableOutput.of("t", "HIGH", "LOW")), listed.outputs());
     }
 
     @Test

@@ -142,9 +142,9 @@ Java's names differ:
 | `ruleSet.contains(name)` | `ruleSet.has(name)` | `ruleSet.contains(name)` |
 | `ruleSet.get(name)` (an `Optional`) | `ruleSet.get(name)` (or `undefined`) | `ruleSet.get(name)` (an `Option`) |
 | `Rule.named(name).when(c).then(k, v)...` | `new Rule(name, c, { k: v }, { ... })` | `Rule(name, c, payload = Map(k -> v), ...)` |
-| `Documents.loads(text, Format.YAML, actions)` | `loads(text, { format: 'yaml', actions })` | `Documents.loads(...)`, then `RuleSet.fromJava` |
-| `DecisionTable.builder().header(...).row(...).build()` | `new DecisionTable(header, rows, { ... })` | Java's, then `RuleSet.fromJava(table.ruleSet())` |
-| `table.ruleSet()` | `table.ruleset` | (Java's) |
+| `Documents.loads(text, Format.YAML, actions)` | `loads(text, { format: 'yaml', actions })` | `loads(text, Format.YAML, actions = ...)` |
+| `DecisionTable.builder().header(...).row(...).build()` | `new DecisionTable(header, rows, { ... })` | `DecisionTable(header, rows, hitPolicy = ...)` |
+| `table.ruleSet()` | `table.ruleset` | `table.ruleSet` |
 | `expr.evaluateTree(data)` | `evaluateTree(expr, data)` | `expr.evaluateTree(data)` |
 | `RuleSet.builder()...build()`, `RuleSet.of(...)` | `new RuleSet([...], { ... })` | `RuleSet(rules, hitPolicy = ...)`, `RuleSet(rules*)` |
 | `ruleSet.isStrict()` | `ruleSet.strict` | `ruleSet.strict` |
@@ -203,7 +203,8 @@ ResultTree tree = vip.when().evaluateTree(Map.of("customer", Map.of("years", 7))
   header field's text, an input `Expr` or a `TableOutput`; a `String` cell is
   read as the table's CSV writes it (`"> 5"`, `"-"`, `"'VIP'"` for the string),
   an `Expr` cell is an input's condition or an output's value, `null` and
-  `Optional.empty()` are empty, and anything else is a constant. The core
+  `Optional.empty()` are empty, and anything else is a constant (an enum
+  constant is its name as a string, `'HIGH'`, never text). The core
   reads the grid one row at a time; its errors point at `/header/<c>` or
   `/rows/<r>/<c>` (also for a NaN, which Java rejects). A table gives
   `hitPolicy()`, `aggregate()`, `logic()`, `isStrict()`, `inputs()`,
@@ -233,7 +234,8 @@ which `import io.github.cleanrules.*` would bring into scope, hiding the root
 layer converts Scala values and delegates. Every Scala object keeps the Java
 one in `asJava`, and each type has `fromJava` for the other way. Do not
 wildcard-import both packages: `Rule`, `RuleSet`, `Decision`, `Expr`... are in
-both, so import the Java enums and exceptions you need by name.
+both, so import the Java enums (`HitPolicy`, `TablePolicy`, `Format`...),
+`Limits` and the exceptions you need by name.
 
 ```scala
 import io.github.cleanrules.{HitPolicy, Truth}
@@ -327,9 +329,11 @@ and `action` (the very function). `RuleSet(rules*)`, or `RuleSet(rules,
 hitPolicy, aggregate, logic, strict)` with named arguments, gives `rules`,
 `size`, `get(name)` (`Option`), `apply(name)` (`RuleNotFoundException`),
 `contains`, `hitPolicy`, `aggregate`, `logic`, `strict`, `fieldPaths`,
-`evaluate`, `evaluateMany`, `readDecision`, `bind`, `run` and `summary`.
-`ruleFromText(text[, actions])` reads a rule of the rule syntax. Rules, rule
-sets and decisions compare by identity, that of their Java objects.
+`evaluate`, `evaluateMany`, `readDecision` (with `limits`), `bind`, `run` and
+`summary`.
+`ruleFromText(text[, actions, limits])` reads a rule of the rule syntax
+(*Documents and decision tables*, below). Rules, rule sets and decisions
+compare by identity, that of their Java objects.
 
 **Decisions.** `fired`, `results` and `selected` (`RuleResult`, a case class
 of `rule`, `fired`, `truth` and `output`), `outputs`, `output` and
@@ -390,23 +394,82 @@ the cause of the `ActionException`. Extensions give the context as `Option`s:
 `error.ruleOption`, `pathOption`, `pointerOption`, `lineOption`,
 `columnOption`, `rowOption`, and an `ActionException`'s `scalaDecision`.
 
-**Documents and decision tables** go through the Java API for now (a Scala
-`loads`/`dumps`/`DecisionTable` is task G.2b), with `fromJava` back to Scala;
-`bind` takes Scala actions:
+**Documents and decision tables** have Scala versions of the Java binding's
+`Documents` and `DecisionTable`, which they delegate to: the core reads,
+checks, compiles and writes every one.
 
 ```scala
-import io.github.cleanrules.{DecisionTable, Documents, Format}
+import io.github.cleanrules.{Format, Limits, TablePolicy}
+import io.github.cleanrules.scaladsl.*
+import java.nio.file.Path
 
-val rules = Documents.loads(yaml, Format.YAML) match
-  case loaded: io.github.cleanrules.RuleSet => RuleSet.fromJava(loaded).bind(Map("notify_sales" -> notify))
+val rules = load(Path.of("discounts.yaml"), actions = Map("notify_sales" -> notify)) match
+  case rules: RuleSet => rules
   case other => sys.error(s"not a rule set: $other")
-val yamlAgain = Documents.dumps(rules.asJava, Format.YAML)
-val table = DecisionTable.of(
-  java.util.List.of("RULE", "customer.years", "THEN discount"),
-  java.util.List.of(java.util.List.of("vip", "> 5", java.math.BigDecimal("0.15"))),
+val yaml = dumps(rules, Format.YAML)
+val vip = ruleFromText("RULE vip IF customer.years > 5 THEN discount = 0.15", limits = Limits.defaults().withMaxTextSize(4096))
+
+val table = DecisionTable(
+  Seq("RULE", F.customer.years, "order.total", TableOutput("risk", "high", "low")),
+  Seq(
+    Seq("new", F.customer.years < 1, "> 1000", "'high'"),
+    Seq("default", None, None, "'low'"),
+  ),
+  hitPolicy = TablePolicy.PRIORITY,
 )
-RuleSet.fromJava(table.ruleSet()).evaluate(order)
+table.evaluate(order).output            // Some(VectorMap(risk -> low))
 ```
+
+- **Documents**: `loads(text[, format, actions, limits])` (a `String`, or
+  UTF-8 bytes; JSON by default) and `load(path[, format, actions, limits])`
+  read a condition, rule, rule set or decision table document as a
+  `DocumentContent`, the union `Expr | Rule | RuleSet | DecisionTable` of the
+  Scala types, which a `match` takes apart (and checks for exhaustiveness). A
+  file's format is its extension's unless `format = Some(...)` gives it, and a
+  file beyond the size limit of its format is not read (`limit_exceeded`).
+  `actions` binds the rules read to Scala functions (`ActionContext => Unit`)
+  by name, as `bind` does; empty, the default, leaves named actions unbound.
+  `limits` are Java's `Limits` (`Limits.defaults()` by default, changed with
+  `withMaxSize`, `withMaxDepth`...). `dumps(value[, format, omitActions])`
+  (JSON by default) and `dump(value, path[, format, omitActions])` write one in
+  canonical form: a rule whose action is code without a name is an
+  `UnsupportedException` at `/rule/do` or `/ruleset/rules/<i>/do` unless
+  `omitActions`. `ruleFromText(text[, actions, limits])` reads one rule
+  (fuzzytool's verb; `rule_1` without a `RULE` line); code without a name is a
+  step, `ruleFromText(text).withAction(code)`, which keeps the name the text
+  gives. Every argument after the first is optional and best named; the
+  readers take them in one order, `format`, `actions`, `limits`.
+- **Decision tables**: `DecisionTable(header, rows, hitPolicy, aggregate,
+  logic, strict, limits)`, with every argument after `header` named and
+  optional. Header items (`DecisionTable.HeaderItem`) are a CSV header field's
+  text, an input `Expr` or a `TableOutput(name, values*)` (its values are
+  Scala constants). Rows are any Scala collections of cells
+  (`DecisionTable.Cell`): a `String` is read as the table's CSV writes it
+  (`"> 5"`, `"-"`, `"'VIP'"` for the string), an `Expr` is an input's
+  condition or an output's value, `None` is empty and `Some(x)` is `x`, and any
+  other Scala constant is a constant: an enum case without parameters or a
+  case object is its name as a string (`Level.High` is `'High'`, as in
+  `F.x === Level.High` and `TableOutput("t", Level.High)`), never text. The core reads the grid one row at a time, and
+  its errors point at `/header/<c>` or `/rows/<r>/<c>`, also those this layer
+  finds (an enum case with parameters). A table gives `hitPolicy`
+  (`TablePolicy`), `aggregate` (`Option`), `logic`, `strict`, `inputs`,
+  `outputs` (`TableOutput`s with Scala values, which equal the ones given:
+  `1 == 1L`), `rows` (`TableRow(name, priority, description, inputs,
+  outputs)`, a case class built only by the engine, with `Option`s and cells as
+  `Option[Expr]`), `ruleSet` (the Scala `RuleSet`), `evaluate`, `evaluateMany`
+  (with case classes and other Scala data, and `limits`), `summary` and
+  `toJson`; tables compare by identity.
+
+Each Scala object keeps the Java one in `asJava`, and `fromJava` goes the other
+way (`DocumentContent.fromJava`, `DecisionTable.fromJava`, `TableOutput.fromJava`,
+`TableRow.fromJava`; `DocumentContent.asJava(content)` for a value of the
+union), so Scala and Java code can share documents and tables:
+`io.github.cleanrules.Documents.dumps(rules.asJava)` writes what
+`dumps(rules)` writes.
+
+[`docs/examples/RiskTable.scala`](../../docs/examples/RiskTable.scala) is
+`RiskTable.java` in Scala; the Scala tests compile and run it with
+`docs/examples/risk.csv`.
 
 [`docs/examples/DiscountRules.scala`](../../docs/examples/DiscountRules.scala)
 is `DiscountRules.java` in Scala; the Scala tests compile and run it.

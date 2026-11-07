@@ -7,6 +7,7 @@ import io.github.cleanrules.{
   GroupKind,
   HitPolicy,
   HitPolicyException,
+  Limits,
   MissingFieldException,
   NoteKind,
   RuleDefinitionException,
@@ -136,6 +137,13 @@ class DecisionsSuite extends munit.FunSuite:
     assertEquals(again.fired, decision.fired)
     assert(decision.write(Format.YAML).contains("hit_policy:"))
     assertEquals(rules.readDecision(decision.write(Format.YAML), Format.YAML).fired, decision.fired)
+    // Within limits: a decision's result trees deeper than maxDepth are not read.
+    val recorded = decision.toJson
+    assertEquals(rules.readDecision(recorded, limits = Limits.defaults()).fired, decision.fired)
+    val deep = intercept[FormatException](rules.readDecision(recorded, limits = Limits.defaults().withMaxDepth(1)))
+    assertEquals(deep.code(), "limit_exceeded")
+    val big = intercept[FormatException](rules.readDecision(recorded, Format.JSON, Limits.defaults().withMaxSize(10)))
+    assertEquals(big.code(), "limit_exceeded")
     intercept[FormatException](RuleSet(loyal).readDecision(decision.toJson))
     // A batch.
     val many = rules.evaluateMany(Seq(order(7, "1500"), order(3, "10"), order(0, "0")))
@@ -290,21 +298,6 @@ class DecisionsSuite extends munit.FunSuite:
       case other => fail(s"unexpected payloads $other")
     // Equal summaries of the same rules.
     assertEquals(rules.summary.rules, summary.rules)
-
-  test("documents and decision tables through the Java API"):
-    import io.github.cleanrules.{DecisionTable, Documents}
-    val calls = scala.collection.mutable.ArrayBuffer[String]()
-    val yaml = Documents.dumps(rules.asJava, Format.YAML)
-    val loaded = Documents.loads(yaml, Format.YAML) match
-      case read: io.github.cleanrules.RuleSet => RuleSet.fromJava(read).bind(Map("notify_sales" -> (ctx => calls += ctx.rule.name)))
-      case other => fail(s"unexpected document $other")
-    assertEquals(loaded.run(order(7, "1500")).fired, Seq("vip", "loyal"))
-    assertEquals(calls.toSeq, Seq("vip"))
-    val table = DecisionTable.of(
-      java.util.List.of("RULE", "customer.years", "THEN discount"),
-      java.util.List.of(java.util.List.of("vip", "> 5", java.math.BigDecimal("0.15"))),
-    )
-    assertEquals(RuleSet.fromJava(table.ruleSet()).evaluate(order(7, "1")).output, Some(VectorMap("discount" -> BigDecimal("0.15"))))
 
   test("rules from text"):
     val parsed = ruleFromText("RULE vip IF customer.years > 5 THEN discount = 0.15")

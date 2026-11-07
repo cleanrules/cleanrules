@@ -41,8 +41,9 @@ import java.util.function.Function;
  * {@link Expr} cell is an input's condition, which tests its column
  * ({@code field("age").lt(18)} under {@code age}), or an output's value;
  * {@code null} and {@code Optional.empty()} are empty cells; any other cell is
- * a constant (under an input {@code x}, the test {@code x = value}; under an
- * output, the value). Rows may be shorter than the header.
+ * a constant, an enum constant its name as a string (under an input {@code x},
+ * the test {@code x = value}; under an output, the value). Rows may be shorter
+ * than the header.
  *
  * <p>Or read one with {@link Documents#load(java.nio.file.Path)} or
  * {@link Documents#loads(String, Format)} (CSV, JSON or YAML), and write it
@@ -346,6 +347,12 @@ public final class DecisionTable implements DocumentContent {
                 Object cell = cells.get(c);
                 while (cell instanceof Optional<?> optional) {
                     cell = optional.orElse(null);
+                }
+                // An enum constant is a constant, its name (spec/data-model.md),
+                // and only strings are text (spec/tables.md, Grids): the string
+                // literal of its name, which needs no escaping.
+                if (cell instanceof Enum<?> constant) {
+                    cell = "'" + constant.name() + "'";
                 }
                 if (cell instanceof Expr node) {
                     values.add(null);
