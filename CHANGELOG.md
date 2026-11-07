@@ -552,6 +552,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `BigDecimal`, `BigInt`, Scala 3 enums and case objects (their names), and
   Java lists and maps holding Scala values. Errors are the Java binding's exceptions. Example
   `docs/examples/DiscountRules.scala`, run by a test.
+- Java conformance runner (task G.3a, `bindings/jvm`, `ConformanceTest`):
+  every vector, text, YAML and table reads included, through JSON on the
+  native layer (`json:<id>`, decisions also through its readers) and through
+  Java data on the idiomatic API (`native:<id>`: conditions, rules and rule
+  sets built in code and checked against the core's reading of the same JSON;
+  inputs as `Long`, `Integer`, `Short`, `BigInteger`, `Double`, `BigDecimal`,
+  `LocalDate`, `LocalDateTime`, `Instant`, `OffsetDateTime`, `ZonedDateTime`,
+  lists and `LinkedHashMap`; results compared as the values given back and as
+  their `toJson()`, and the same data through the native layer compared
+  exactly), with a lossless JSON reader and comparer of its own. It runs in
+  `./gradlew test` and `check` (about 3 seconds), so CI runs it on Linux,
+  macOS and Windows; grids have no JSON route, and every skip is counted and
+  listed in `java/build/reports/conformance/conformance.txt`. It replaces the
+  smoke pass of G.1a.
+- Java: `RuleSet.readDecision(text, format, limits)` in the idiomatic API, as
+  the native layer, Python and JavaScript have it (found by the conformance
+  runner: `format/decisions/tree-too-deep` could not run through the
+  idiomatic API).
 - C ABI, for what rules, documents, tables and result trees hold (task
   G.1d): `cr_ruleset_rule`, `cr_rule_name`, `cr_rule_description`,
   `cr_rule_action`, `cr_rule_priority`, `cr_rule_when`, `cr_rule_payload_len`,

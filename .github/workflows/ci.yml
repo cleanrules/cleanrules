@@ -383,10 +383,11 @@ jobs:
       - name: Check the Gradle wrapper jar
         run: bash scripts/check-wrapper.sh
       # Builds the C ABI with cargo, compiles with -Xlint:all -Werror, runs
-      # the JUnit tests on it (with --illegal-native-access=deny) and the
-      # javadoc with -Xdoclint:all -Werror; and, in the same build, the Scala
-      # 3 layer (subproject scala): compiled with -Werror, its MUnit tests
-      # and its Scaladoc.
+      # the JUnit tests on it (with --illegal-native-access=deny), among them
+      # the full conformance runner (every vector, through JSON and Java data,
+      # task G.3a), and the javadoc with -Xdoclint:all -Werror; and, in the
+      # same build, the Scala 3 layer (subproject scala): compiled with
+      # -Werror, its MUnit tests and its Scaladoc.
       - run: ./gradlew check --no-daemon
 
   conformance:

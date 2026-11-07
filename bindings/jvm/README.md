@@ -91,7 +91,7 @@ rules.bind(Map.of("notify_sales", context -> System.out.println(context.output()
   `Optional`), `rule(name)` (a `RuleNotFoundException` from the core, with the
   names there are), `contains(name)`, `hitPolicy()`, `aggregate()`, `logic()`,
   `isStrict()`, `fieldPaths()`, `evaluate(data[, limits])`,
-  `evaluateMany(rows[, limits])`, `readDecision(text[, format])`,
+  `evaluateMany(rows[, limits])`, `readDecision(text[, format[, limits]])`,
   `bind(actions)`, `run(data[, limits])` and `summary()`.
 - **Decisions** (`Decision`): `ruleSet()`, `hitPolicy()`, `results()` and
   `selected()` (`RuleResult`: `rule()`, `fired()`, `truth()`, `output()`),
@@ -474,6 +474,31 @@ use JUnit 5. Scala 3.3 LTS compiles with `-release 25 -feature -Wunused:all
 use MUnit (on JUnit 4). `-Pcleanrules.library.path=<file>` tests
 a library you built yourself, without cargo; cargo's `CARGO_TARGET_DIR` is
 honoured.
+
+**Conformance.** `./gradlew test` (and so `check`) runs every conformance
+vector of [`conformance/vectors`](../../conformance/README.md) twice, in a few
+seconds, so there is no separate task; to run it alone:
+
+```bash
+./gradlew test --tests '*ConformanceTest'
+cat java/build/reports/conformance/conformance.txt   # counts per route, skips with their reasons, time
+```
+
+`json:<id>` goes through the native layer with JSON text (`Document`,
+`RuleSet.read`, `readDecision`, `evaluateJson`, `evaluateManyJson`,
+`explain`, `summary`, `Node.evaluateTreeJson`, and the decision's readers);
+`native:<id>` goes through the idiomatic API with Java data: conditions,
+rules and rule sets built in code and checked against the core's reading of
+the vector, inputs as `Long`, `Integer`, `Short`, `BigInteger`, `Double`,
+`BigDecimal`, `LocalDate`, `LocalDateTime`, `Instant`, `OffsetDateTime`,
+`ZonedDateTime`, lists and `LinkedHashMap`s, results compared as the values
+given back (`Decision`, `Explanation`, `Summary`, `ResultTree`) and as their
+`toJson()`, and the same Java data through the native layer, compared
+exactly. `read` vectors go through `Documents.loads`/`dumps`,
+`ruleFromText`, `DecisionTable` and `RuleSet.readDecision`. Grids are Java
+data, so the 28 `table_grid` vectors have no JSON route; the report lists
+them. The runner compares with a lossless JSON reader of its own
+(`java/src/test/.../TestJson.java`), never with the library's equality.
 
 `./gradlew jar` builds the library of the platform it runs on with
 `cargo build --release -p cleanrules-ffi --target <its triple>` (on musl

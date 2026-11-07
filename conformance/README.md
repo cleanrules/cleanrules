@@ -117,6 +117,24 @@ output, never stopping at the first one.
   and read back with `loads` and `readDecision`. Grids are native data, so
   `table_grid` vectors have no JSON run; skips and inexact native inputs are counted and listed. It compares
   with a lossless JSON reader of its own (`bindings/js/test/support/json.js`).
+- **Java**: `cd bindings/jvm && ./gradlew test` (alone:
+  `--tests '*ConformanceTest'`) runs every vector through the native layer
+  (`io.github.cleanrules.ffi`) with JSON text (`json:<id>`; decisions also
+  through its readers) and through the idiomatic API with Java data
+  (`native:<id>`): conditions, rules and rule sets are built in code and
+  checked against the core's reading of the same JSON, inputs are Java values
+  (`Long`, `Integer`, `Short` or `BigInteger` in turn, `Double`, `BigDecimal`,
+  `LocalDate`, `LocalDateTime`, `Instant`, `OffsetDateTime` or `ZonedDateTime`
+  in turn for `Z`, `ZonedDateTime` in a zone, lists, `LinkedHashMap`), results
+  are compared as the values given back to Java (`spec/data-model.md`, which
+  gives a decimal infinity back as a `Double` infinity and a datetime in a
+  zone Java does not know at its offset) and as their `toJson()`, and the same
+  Java data also goes through the native layer, whose JSON is compared
+  exactly. `read` vectors go through `Documents.loads`, `dumps`,
+  `ruleFromText`, `DecisionTable` and `RuleSet.readDecision`. Grids are Java
+  data, so `table_grid` vectors have no JSON run; skips are counted and listed
+  in `java/build/reports/conformance/conformance.txt`. It compares with a
+  lossless JSON reader of its own (`bindings/jvm/java/src/test/java/io/github/cleanrules/tests/TestJson.java`).
 - **Each binding** runs every vector twice: once through its JSON entry points,
   and once converting `input` into the language's native data (with the
   conversions of `spec/data-model.md`: floats as floats, with `cr.float` in

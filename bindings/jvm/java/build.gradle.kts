@@ -281,6 +281,11 @@ tasks.test {
     inputs.dir(repository.resolve("conformance/vectors")).withPropertyName("vectors")
     systemProperty("cleanrules.library.path", library.get())
     systemProperty("cleanrules.conformance.vectors", repository.resolve("conformance/vectors").path)
+    // The conformance runner's report: the counts per route, the skips with
+    // their reasons, the time. An output, so that a cached run restores it.
+    val conformanceReport = layout.buildDirectory.file("reports/conformance/conformance.txt")
+    outputs.file(conformanceReport).withPropertyName("conformanceReport")
+    systemProperty("cleanrules.conformance.report", conformanceReport.get().asFile.path)
     systemProperty("cleanrules.examples", repository.resolve("docs/examples").path)
     // The compiled module, for the test that runs the example on the module path.
     systemProperty("cleanrules.module", sourceSets.main.get().output.classesDirs.asPath)
@@ -288,6 +293,10 @@ tasks.test {
     // The binding calls restricted methods (the FFM linker): allowed for it,
     // and any other illegal native access fails.
     jvmArgs("--enable-native-access=ALL-UNNAMED", "--illegal-native-access=deny")
+    // Java's default thread stack on Linux and Windows (macOS gives 2 MiB), so
+    // every platform checks that the core fits in it (spec/json-format.md,
+    // *Errors and limits*).
+    jvmArgs("-Xss1m")
     testLogging {
         events("failed", "skipped")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL

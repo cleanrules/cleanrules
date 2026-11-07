@@ -79,6 +79,8 @@ tasks.test {
     systemProperty("cleanrules.examples", repository.resolve("docs/examples").path)
     inputs.dir(repository.resolve("docs/examples")).withPropertyName("examples")
     jvmArgs("--enable-native-access=ALL-UNNAMED", "--illegal-native-access=deny")
+    // As the Java tests: Java's default thread stack on Linux and Windows.
+    jvmArgs("-Xss1m")
     testLogging {
         events("failed", "skipped")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL

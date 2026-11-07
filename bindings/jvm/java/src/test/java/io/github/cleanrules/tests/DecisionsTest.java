@@ -22,6 +22,7 @@ import io.github.cleanrules.Format;
 import io.github.cleanrules.FormatException;
 import io.github.cleanrules.HitPolicy;
 import io.github.cleanrules.HitPolicyException;
+import io.github.cleanrules.Limits;
 import io.github.cleanrules.MissingFieldException;
 import io.github.cleanrules.Note;
 import io.github.cleanrules.Requirement;
@@ -103,6 +104,17 @@ class DecisionsTest {
         assertEquals(decision.toJson(), again.toJson());
         assertTrue(decision.write(Format.YAML).contains("hit_policy:"), decision.write(Format.YAML));
         assertThrows(FormatException.class, () -> RuleSet.of(rules.rule("loyal")).readDecision(decision.toJson()));
+        // Within limits (found by the conformance runner: the idiomatic API had
+        // no limits there, so format/decisions/tree-too-deep could not run).
+        assertEquals(decision.toJson(), rules.readDecision(decision.toJson(), Format.JSON, null).toJson());
+        String yaml = decision.write(Format.YAML);
+        assertEquals(decision.toJson(), rules.readDecision(yaml, Format.YAML, Limits.defaults()).toJson());
+        FormatException deep = assertThrows(FormatException.class,
+                () -> rules.readDecision(decision.toJson(), Format.JSON, Limits.defaults().withMaxDepth(1)));
+        assertEquals("limit_exceeded", deep.code());
+        FormatException large = assertThrows(FormatException.class,
+                () -> rules.readDecision(decision.toJson(), Format.JSON, Limits.defaults().withMaxSize(10)));
+        assertEquals("limit_exceeded", large.code());
 
         // A batch.
         List<Decision> many = rules.evaluateMany(List.of(order(7, "1500"), order(3, "10"), order(0, "0")));

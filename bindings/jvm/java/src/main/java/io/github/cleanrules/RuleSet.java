@@ -437,7 +437,23 @@ public final class RuleSet implements Iterable<Rule>, DocumentContent {
      * @throws FormatException if the document is invalid or does not belong to this rule set
      */
     public Decision readDecision(String text, Format format) {
-        return new Decision(this, nativeRuleSet.readDecision(text, format));
+        return readDecision(text, format, null);
+    }
+
+    /**
+     * Read a decision this rule set made, recorded as JSON or YAML, within
+     * limits: the document's size and nesting, and the depth of its result
+     * trees.
+     *
+     * @param text the decision document
+     * @param format JSON or YAML
+     * @param limits the limits, or null for the defaults
+     * @return the decision
+     * @throws FormatException if the document is invalid, beyond the limits
+     *     ({@code limit_exceeded}), or does not belong to this rule set
+     */
+    public Decision readDecision(String text, Format format, Limits limits) {
+        return new Decision(this, nativeRuleSet.readDecision(text, format, limits));
     }
 
     // ---- Actions.
