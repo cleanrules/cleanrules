@@ -1,15 +1,16 @@
 //! Rules, rule sets and decisions in JSON (`spec/json-format.md`, *Rules*, *Rule
 //! sets*, *Decisions*).
 
-use crate::ast::Kind;
+use crate::ast::{Kind, Node};
 use crate::error::{Error, ErrorCode, Result};
-use crate::format::condition::{Raw, build, shape, write_node};
+use crate::format::condition::{Raw, build, shape, write_node_in};
 use crate::format::result::write_result;
 use crate::format::value::{ValueContext, read_value, write_value};
 use crate::json::{Json, Limits, pointer_token};
 use crate::logic::LogicName;
 use crate::rules::{Aggregate, Aggregated, Config, Decision, HitPolicy, Rule, RuleSet};
 use crate::value::{Map, Value};
+use crate::walk::Walk;
 
 pub(crate) fn format_error(pointer: &str, message: impl Into<String>) -> Error {
     Error::new(ErrorCode::FormatError, message).at_pointer(pointer)
@@ -385,15 +386,20 @@ pub(crate) fn build_ruleset(raw: RawRuleSet) -> Result<RuleSet> {
 /// Write a rule, omitting optional keys at their default.
 #[must_use]
 pub fn write_rule(rule: &Rule) -> Json {
+    write_rule_in(&mut Walk::default(), rule)
+}
+
+/// [`write_rule`], with the stacks of `walk` for its nodes.
+fn write_rule_in<'n>(walk: &mut Walk<&'n Node, Json>, rule: &'n Rule) -> Json {
     let mut members = vec![
         ("name".to_owned(), Json::String(rule.name().into())),
-        ("when".to_owned(), write_node(rule.when())),
+        ("when".to_owned(), write_node_in(walk, rule.when())),
     ];
     if !rule.then().is_empty() {
         let then = rule
             .then()
             .iter()
-            .map(|(k, v)| (k.clone(), write_node(v)))
+            .map(|(k, v)| (k.clone(), write_node_in(walk, v)))
             .collect();
         members.push(("then".into(), Json::Object(then)));
     }
@@ -450,7 +456,15 @@ pub fn write_ruleset(ruleset: &RuleSet) -> Json {
     }
     members.push((
         "rules".into(),
-        Json::Array(ruleset.rules().iter().map(write_rule).collect()),
+        Json::Array({
+            // The same stacks for the nodes of every rule.
+            let mut walk = Walk::default();
+            ruleset
+                .rules()
+                .iter()
+                .map(|rule| write_rule_in(&mut walk, rule))
+                .collect()
+        }),
     ));
     Json::Object(members)
 }

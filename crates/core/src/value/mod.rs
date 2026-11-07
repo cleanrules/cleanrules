@@ -13,11 +13,13 @@ pub use decimal::{Decimal, DecimalError, MAX_DIGITS};
 use jiff::civil::{Date, DateTime};
 pub use number::Number;
 
+use crate::walk::post_order;
+
 /// A value of the data model.
 ///
 /// Floats are never NaN: build them with [`Value::float`], which turns NaN into
 /// null, as the spec requires of data.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum Value {
     /// Nothing, with the reason it is null.
     Null(NullCause),
@@ -195,6 +197,40 @@ pub struct Opaque {
     pub token: u64,
 }
 
+/// Lists and maps are copied with an explicit stack: data nests as deep as the
+/// reader's limits allow, deeper than a small thread's stack would take
+/// recursively (`spec/json-format.md`, *Errors and limits*).
+impl Clone for Value {
+    fn clone(&self) -> Self {
+        if !matches!(self, Value::List(_) | Value::Map(_)) {
+            return self.clone_scalar();
+        }
+        let copied: Result<Value, std::convert::Infallible> = post_order(
+            self,
+            |value, done| Ok(value.item(done)),
+            |value, items| {
+                Ok(match value {
+                    Value::List(_) => Value::List(items.collect()),
+                    Value::Map(map) => Value::Map(Map {
+                        entries: map
+                            .entries
+                            .iter()
+                            .map(|(k, _)| k.clone())
+                            .zip(items)
+                            .collect(),
+                        record: map.record,
+                    }),
+                    scalar => scalar.clone_scalar(),
+                })
+            },
+        );
+        match copied {
+            Ok(value) => value,
+            Err(never) => match never {},
+        }
+    }
+}
+
 impl Value {
     /// A float value, or null when `value` is NaN.
     #[must_use]
@@ -261,18 +297,64 @@ impl Value {
     /// by identity.
     #[must_use]
     pub fn any_equal(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Value::Null(_), Value::Null(_)) => true,
-            (Value::List(a), Value::List(b)) => {
-                a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.any_equal(y))
+        // Pairs still to compare, with an explicit stack (see `Clone`), which
+        // two values without items never need.
+        let mut pending = Vec::new();
+        let mut next = Some((self, other));
+        while let Some((a, b)) = next.take().or_else(|| pending.pop()) {
+            let equal = match (a, b) {
+                (Value::Null(_), Value::Null(_)) => true,
+                (Value::List(a), Value::List(b)) => {
+                    pending.extend(a.iter().zip(b));
+                    a.len() == b.len()
+                }
+                (Value::Map(a), Value::Map(b)) => {
+                    a.len() == b.len()
+                        && a.iter().all(|(k, x)| {
+                            b.get(k).is_some_and(|y| {
+                                pending.push((x, y));
+                                true
+                            })
+                        })
+                }
+                (Value::Opaque(a), Value::Opaque(b)) => a.token == b.token,
+                _ => a.compare(b) == Some(Ordering::Equal),
+            };
+            if !equal {
+                return false;
             }
-            (Value::Map(a), Value::Map(b)) => {
-                a.len() == b.len()
-                    && a.iter()
-                        .all(|(k, x)| b.get(k).is_some_and(|y| x.any_equal(y)))
-            }
-            (Value::Opaque(a), Value::Opaque(b)) => a.token == b.token,
-            _ => self.compare(other) == Some(Ordering::Equal),
+        }
+        true
+    }
+
+    /// The `index`-th item of a list, or the value of a map's `index`-th entry:
+    /// the step of the walks over nested data.
+    pub(crate) fn item(&self, index: usize) -> Option<&Value> {
+        match self {
+            Value::List(items) => items.get(index),
+            Value::Map(map) => map.entries.get(index).map(|(_, v)| v),
+            _ => None,
+        }
+    }
+
+    /// A copy of a value without items; an empty copy of a list or map.
+    fn clone_scalar(&self) -> Self {
+        match self {
+            Value::Null(cause) => Value::Null(cause.clone()),
+            Value::Bool(b) => Value::Bool(*b),
+            Value::Int(i) => Value::Int(*i),
+            Value::Float(f) => Value::Float(*f),
+            Value::Decimal(d) => Value::Decimal(*d),
+            Value::String(s) => Value::String(s.clone()),
+            Value::Date(d) => Value::Date(*d),
+            Value::NaiveDateTime(dt) => Value::NaiveDateTime(*dt),
+            Value::AwareDateTime(a) => Value::AwareDateTime(a.clone()),
+            Value::List(_) => Value::List(Vec::new()),
+            Value::Map(map) => Value::Map(Map {
+                entries: Vec::new(),
+                record: map.record,
+            }),
+            Value::Opaque(o) => Value::Opaque(o.clone()),
         }
     }
 }

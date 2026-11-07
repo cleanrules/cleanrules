@@ -16,7 +16,7 @@ use cleanrules::json::{Json, JsonNumber, Limits, to_string};
 use cleanrules::logic::LogicName;
 use cleanrules::rules::Aggregate;
 use cleanrules::table::{Cell, DecisionTable, TableConfig, TablePolicy};
-use common::{get, int, limits_of, same, text, vectors};
+use common::{get, int, limits_of, on_small_stack, same, text, vectors};
 
 const FILES: [&str; 10] = [
     "format/documents.json",
@@ -267,23 +267,27 @@ fn check(vector: &Json) -> Option<String> {
 
 #[test]
 fn read_vectors() {
-    let (mut run, mut failures) = (0, Vec::new());
-    for file in FILES {
-        let all = vectors(file);
-        let Json::Array(list) = &all else { panic!() };
-        for vector in list {
-            run += 1;
-            if let Some(problem) = check(vector) {
-                failures.push(format!("{}: {problem}", text(get(vector, "id")).unwrap()));
+    // On a small stack, as a binding's thread may be (`spec/json-format.md`,
+    // *Errors and limits*).
+    on_small_stack(|| {
+        let (mut run, mut failures) = (0, Vec::new());
+        for file in FILES {
+            let all = vectors(file);
+            let Json::Array(list) = &all else { panic!() };
+            for vector in list {
+                run += 1;
+                if let Some(problem) = check(vector) {
+                    failures.push(format!("{}: {problem}", text(get(vector, "id")).unwrap()));
+                }
             }
         }
-    }
-    println!("{run} read vectors run");
-    assert!(run >= 187, "only {run} read vectors");
-    assert!(
-        failures.is_empty(),
-        "{} of {run} failed:\n{}",
-        failures.len(),
-        failures.join("\n")
-    );
+        println!("{run} read vectors run");
+        assert!(run >= 187, "only {run} read vectors");
+        assert!(
+            failures.is_empty(),
+            "{} of {run} failed:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+    });
 }

@@ -297,27 +297,31 @@ fn requirement(
     fired: bool,
     out: &mut Vec<String>,
 ) {
-    match requirement {
-        Requirement::Cause(cause) => out.push(format!("{indent}- {cause}")),
-        Requirement::Group(kind, items) => {
-            let kind = match kind {
-                GroupKind::All => "all",
-                GroupKind::Any => "any",
-            };
-            let inner = if top {
-                let (lead, verb) = if fired {
-                    ("because", "of these hold:")
-                } else {
-                    ("would fire if", "of these changed:")
+    // Lines in pre-order, with an explicit stack: a requirement is as deep as
+    // its condition. Each entry is a requirement, its indent and whether it
+    // is the top one.
+    let mut pending = vec![(requirement, indent.to_owned(), top)];
+    while let Some((requirement, indent, top)) = pending.pop() {
+        match requirement {
+            Requirement::Cause(cause) => out.push(format!("{indent}- {cause}")),
+            Requirement::Group(kind, items) => {
+                let kind = match kind {
+                    GroupKind::All => "all",
+                    GroupKind::Any => "any",
                 };
-                out.push(format!("{indent}{lead} {kind} {verb}"));
-                indent.to_owned()
-            } else {
-                out.push(format!("{indent}- {kind} of:"));
-                format!("{indent}  ")
-            };
-            for item in items {
-                self::requirement(item, &inner, false, fired, out);
+                let inner = if top {
+                    let (lead, verb) = if fired {
+                        ("because", "of these hold:")
+                    } else {
+                        ("would fire if", "of these changed:")
+                    };
+                    out.push(format!("{indent}{lead} {kind} {verb}"));
+                    indent
+                } else {
+                    out.push(format!("{indent}- {kind} of:"));
+                    format!("{indent}  ")
+                };
+                pending.extend(items.iter().rev().map(|item| (item, inner.clone(), false)));
             }
         }
     }

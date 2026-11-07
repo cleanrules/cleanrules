@@ -16,7 +16,7 @@ use cleanrules_ffi::{
     CR_FORMAT_CSV, CR_FORMAT_JSON, CR_FORMAT_TEXT, CR_FORMAT_YAML, CR_LIMIT_MAX_DEPTH,
     CR_LIMIT_MAX_NESTING, CR_LIMIT_MAX_SIZE, CR_LIMIT_MAX_TABLE_SIZE,
 };
-use common::{Failure, Limits_, json};
+use common::{Failure, Limits_, json, on_small_stack};
 
 fn files() -> Vec<PathBuf> {
     let mut files = Vec::new();
@@ -342,24 +342,28 @@ fn run(vector: &Json) -> Result<(), String> {
 
 #[test]
 fn the_vectors_pass_through_the_c_abi() {
-    let (mut ran, mut failures) = (0, Vec::new());
-    for file in files() {
-        let document = json(&fs::read_to_string(&file).unwrap());
-        let Some(Json::Array(vectors)) = get(&document, "vectors") else {
-            panic!()
-        };
-        for vector in vectors {
-            ran += 1;
-            if let Err(problem) = run(vector) {
-                failures.push(format!("{}: {problem}", string(get(vector, "id")).unwrap()));
+    // On a small stack, as a binding's thread may be (`spec/json-format.md`,
+    // *Errors and limits*).
+    on_small_stack(|| {
+        let (mut ran, mut failures) = (0, Vec::new());
+        for file in files() {
+            let document = json(&fs::read_to_string(&file).unwrap());
+            let Some(Json::Array(vectors)) = get(&document, "vectors") else {
+                panic!()
+            };
+            for vector in vectors {
+                ran += 1;
+                if let Err(problem) = run(vector) {
+                    failures.push(format!("{}: {problem}", string(get(vector, "id")).unwrap()));
+                }
             }
         }
-    }
-    assert!(
-        failures.is_empty(),
-        "{} of {ran} failed:\n{}",
-        failures.len(),
-        failures.join("\n")
-    );
-    assert!(ran >= 2508, "only {ran} vectors ran");
+        assert!(
+            failures.is_empty(),
+            "{} of {ran} failed:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+        assert!(ran >= 2508, "only {ran} vectors ran");
+    });
 }

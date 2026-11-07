@@ -6,6 +6,7 @@ use crate::format::explain::{Out, reason, truth};
 use crate::json::{Json, JsonNumber};
 use crate::logic::Truth;
 use crate::value::Value;
+use crate::walk::post_order;
 
 /// A field path as JSON: strings and integers.
 #[must_use]
@@ -55,8 +56,22 @@ pub fn write_truth(truth: Truth) -> Json {
 }
 
 /// A result and its children, in the structure of `spec/json-format.md`,
-/// *Result trees*.
+/// *Result trees*. Written with an explicit stack (`crate::walk`): a result
+/// tree is as deep as its condition.
 fn result<O: Out>(result: &Evaluated<'_, Truth>) -> O {
+    let written: Result<O, std::convert::Infallible> = post_order(
+        result,
+        |result, done| Ok(result.children.get(done)),
+        |result, children| Ok(one(result, children)),
+    );
+    match written {
+        Ok(out) => out,
+        Err(never) => match never {},
+    }
+}
+
+/// A result, given its children written in order.
+fn one<O: Out>(result: &Evaluated<'_, Truth>, children: impl ExactSizeIterator<Item = O>) -> O {
     let mut members = vec![("op", O::text(result.node.tag()))];
     if let crate::ast::Expr::Field(path) = result.node.expr() {
         members.push(("path", O::path(path)));
@@ -68,11 +83,8 @@ fn result<O: Out>(result: &Evaluated<'_, Truth>) -> O {
     if let Some(found) = &result.reason {
         members.push(("reason", reason(found)));
     }
-    if !result.children.is_empty() {
-        members.push((
-            "children",
-            O::list(result.children.iter().map(self::result).collect()),
-        ));
+    if children.len() > 0 {
+        members.push(("children", O::list(children.collect())));
     }
     O::object(members)
 }

@@ -17,6 +17,7 @@ use crate::json::{Json, pointer_token, same};
 use crate::logic::{Kleene, Logic, Truth};
 use crate::rules::{Aggregated, Decision, HitPolicy, RuleResult, RuleSet};
 use crate::value::{Group, Value};
+use crate::walk::post_order;
 
 fn format_error(pointer: &str, message: impl Into<String>) -> Error {
     Error::new(ErrorCode::FormatError, message).at_pointer(pointer)
@@ -94,23 +95,28 @@ fn same_value(a: &Value, b: &Value) -> bool {
 /// values or values (by [`same_value`]) and reasons (without `detail`, which is
 /// never compared), whatever the order of their keys or the form of their values.
 fn same_tree(a: &Tree, b: &Tree) -> bool {
-    let outcomes = match (&a.outcome, &b.outcome) {
-        (Outcome::Truth(x), Outcome::Truth(y)) => x == y,
-        (Outcome::Value(x), Outcome::Value(y)) => same_value(x, y),
-        _ => false,
-    };
-    a.op == b.op
-        && a.path == b.path
-        && outcomes
-        && same(
-            &reason_json(a.reason.as_ref()),
-            &reason_json(b.reason.as_ref()),
-        )
-        && a.children.len() == b.children.len()
-        && a.children
-            .iter()
-            .zip(&b.children)
-            .all(|(x, y)| same_tree(x, y))
+    // Pairs still to compare, with an explicit stack (`crate::walk`).
+    let mut pending = vec![(a, b)];
+    while let Some((a, b)) = pending.pop() {
+        let outcomes = match (&a.outcome, &b.outcome) {
+            (Outcome::Truth(x), Outcome::Truth(y)) => x == y,
+            (Outcome::Value(x), Outcome::Value(y)) => same_value(x, y),
+            _ => false,
+        };
+        let equal = a.op == b.op
+            && a.path == b.path
+            && outcomes
+            && same(
+                &reason_json(a.reason.as_ref()),
+                &reason_json(b.reason.as_ref()),
+            )
+            && a.children.len() == b.children.len();
+        if !equal {
+            return false;
+        }
+        pending.extend(a.children.iter().zip(&b.children));
+    }
+    true
 }
 
 fn read_path(json: &Json, pointer: &str) -> Result<Vec<Segment>> {
@@ -233,7 +239,44 @@ fn read_reason(json: &Json, pointer: &str) -> Result<Reason> {
     })
 }
 
+/// Read a result tree's shape: depth first in pre-order, each result's keys
+/// before its children, then its unknown keys; with an explicit stack
+/// (`crate::walk`), so the call stack does not grow with the depth.
 fn read_tree(json: &Json, pointer: &str, depth: usize, max_depth: usize) -> Result<Tree> {
+    post_order(
+        open_tree(json, pointer.to_owned(), depth, max_depth)?,
+        |opened, done| {
+            let Some(child) = opened.items.get(done) else {
+                return Ok(None);
+            };
+            let pointer = format!("{}/{done}", at(&opened.tree.pointer, "children"));
+            open_tree(child, pointer, opened.depth + 1, max_depth).map(Some)
+        },
+        |opened, children| {
+            unknown_keys(
+                opened.members,
+                &["op", "path", "truth", "value", "reason", "children"],
+                &opened.tree.pointer,
+            )?;
+            Ok(Tree {
+                children: children.collect(),
+                ..opened.tree
+            })
+        },
+    )
+}
+
+/// A result being read: its object, its depth, its own keys read (in a tree
+/// without children yet) and its children to read.
+struct OpenTree<'j> {
+    members: &'j [(String, Json)],
+    depth: usize,
+    tree: Tree,
+    items: &'j [Json],
+}
+
+/// Enter a result: its depth, its own keys, and that `children` is an array.
+fn open_tree(json: &Json, pointer: String, depth: usize, max_depth: usize) -> Result<OpenTree<'_>> {
     if depth > max_depth {
         return Err(Error::new(
             ErrorCode::LimitExceeded,
@@ -242,29 +285,34 @@ fn read_tree(json: &Json, pointer: &str, depth: usize, max_depth: usize) -> Resu
         .at_pointer(pointer));
     }
     let Json::Object(members) = json else {
-        return Err(format_error(pointer, "a result is an object"));
+        return Err(format_error(&pointer, "a result is an object"));
     };
     let op = match get(members, "op") {
         Some(Json::String(op)) if TAGS.contains(&op.as_str()) => op.clone(),
         Some(Json::String(op)) => {
             return Err(format_error(
-                &at(pointer, "op"),
+                &at(&pointer, "op"),
                 format!("unknown op {op:?}"),
             ));
         }
-        _ => return Err(format_error(&at(pointer, "op"), "a result needs an \"op\"")),
+        _ => {
+            return Err(format_error(
+                &at(&pointer, "op"),
+                "a result needs an \"op\"",
+            ));
+        }
     };
     let path = match (get(members, "path"), op == "field") {
-        (Some(path), true) => Some(read_path(path, &at(pointer, "path"))?),
+        (Some(path), true) => Some(read_path(path, &at(&pointer, "path"))?),
         (None, true) => {
             return Err(format_error(
-                &at(pointer, "path"),
+                &at(&pointer, "path"),
                 "a field result needs its path",
             ));
         }
         (Some(_), false) => {
             return Err(format_error(
-                &at(pointer, "path"),
+                &at(&pointer, "path"),
                 "only a field result has a path",
             ));
         }
@@ -276,58 +324,47 @@ fn read_tree(json: &Json, pointer: &str, depth: usize, max_depth: usize) -> Resu
         (Some(Json::Null), None) => Outcome::Truth(Truth::Unknown),
         (Some(_), None) => {
             return Err(format_error(
-                &at(pointer, "truth"),
+                &at(&pointer, "truth"),
                 "a truth value is true, false or null",
             ));
         }
         (None, Some(value)) => Outcome::Value(read_value(
             value,
-            &at(pointer, "value"),
+            &at(&pointer, "value"),
             ValueContext::Recorded,
         )?),
         _ => {
             return Err(format_error(
-                pointer,
+                &pointer,
                 "a result has either \"truth\" or \"value\"",
             ));
         }
     };
     let reason = get(members, "reason")
-        .map(|r| read_reason(r, &at(pointer, "reason")))
+        .map(|r| read_reason(r, &at(&pointer, "reason")))
         .transpose()?;
-    let children = match get(members, "children") {
-        None => Vec::new(),
-        Some(Json::Array(items)) => items
-            .iter()
-            .enumerate()
-            .map(|(i, child)| {
-                read_tree(
-                    child,
-                    &format!("{}/{i}", at(pointer, "children")),
-                    depth + 1,
-                    max_depth,
-                )
-            })
-            .collect::<Result<_>>()?,
+    let items: &[Json] = match get(members, "children") {
+        None => &[],
+        Some(Json::Array(items)) => items,
         Some(_) => {
             return Err(format_error(
-                &at(pointer, "children"),
+                &at(&pointer, "children"),
                 "\"children\" is an array",
             ));
         }
     };
-    unknown_keys(
+    Ok(OpenTree {
         members,
-        &["op", "path", "truth", "value", "reason", "children"],
-        pointer,
-    )?;
-    Ok(Tree {
-        pointer: pointer.to_owned(),
-        op,
-        path,
-        outcome,
-        reason,
-        children,
+        depth,
+        tree: Tree {
+            pointer,
+            op,
+            path,
+            outcome,
+            reason,
+            children: Vec::new(),
+        },
+        items,
     })
 }
 
@@ -382,8 +419,58 @@ fn expected_children<'a>(node: &Cow<'a, Node>, truth: bool) -> Result<Vec<(Cow<'
     })
 }
 
-/// Check 3: the tree matches its node, node by node; build the result.
+/// Check 3: the tree matches its node, node by node; build the result. Depth
+/// first, each result checked before its children, with an explicit stack
+/// (`crate::walk`).
 fn match_tree<'a>(tree: &Tree, node: Cow<'a, Node>, truth: bool) -> Result<Evaluated<'a, Truth>> {
+    post_order(
+        open_match(tree, node, truth)?,
+        |matching, done| {
+            let (Some(child_tree), Some((child_node, child_truth))) =
+                (matching.tree.children.get(done), matching.expected.next())
+            else {
+                return Ok(None);
+            };
+            open_match(child_tree, child_node, child_truth).map(Some)
+        },
+        |matching, children| {
+            let Matching { tree, node, .. } = matching;
+            if matches!(node.expr(), Expr::Between { .. })
+                // Both halves were matched, so each has its operand first.
+                && let (Some(first), Some(second)) = (
+                    tree.children[0].children.first(),
+                    tree.children[1].children.first(),
+                )
+                && !same_tree(first, second)
+            {
+                return Err(mismatch(
+                    &second.pointer,
+                    "both halves of a between hold the same operand",
+                ));
+            }
+            Ok(Evaluated {
+                node,
+                outcome: tree.outcome.clone(),
+                reason: tree.reason.clone(),
+                children: children.collect(),
+            })
+        },
+    )
+}
+
+/// A result being matched with its node, and the children it should have.
+struct Matching<'t, 'a> {
+    tree: &'t Tree,
+    node: Cow<'a, Node>,
+    expected: std::vec::IntoIter<(Cow<'a, Node>, bool)>,
+}
+
+/// Check a result against its node, before its children.
+fn open_match<'t, 'a>(
+    tree: &'t Tree,
+    node: Cow<'a, Node>,
+    truth: bool,
+) -> Result<Matching<'t, 'a>> {
     if tree.op != node.tag() {
         return Err(mismatch(
             &at(&tree.pointer, "op"),
@@ -421,28 +508,10 @@ fn match_tree<'a>(tree: &Tree, node: Cow<'a, Node>, truth: bool) -> Result<Evalu
             format!("expected {} children", expected.len()),
         ));
     }
-    let mut children = Vec::with_capacity(expected.len());
-    for (child_tree, (child_node, child_truth)) in tree.children.iter().zip(expected) {
-        children.push(match_tree(child_tree, child_node, child_truth)?);
-    }
-    if matches!(node.expr(), Expr::Between { .. })
-        // Both halves were matched above, so each has its operand first.
-        && let (Some(first), Some(second)) = (
-            tree.children[0].children.first(),
-            tree.children[1].children.first(),
-        )
-        && !same_tree(first, second)
-    {
-        return Err(mismatch(
-            &second.pointer,
-            "both halves of a between hold the same operand",
-        ));
-    }
-    Ok(Evaluated {
+    Ok(Matching {
+        tree,
         node,
-        outcome: tree.outcome.clone(),
-        reason: tree.reason.clone(),
-        children,
+        expected: expected.into_iter(),
     })
 }
 
@@ -456,11 +525,19 @@ fn reason_json(reason: Option<&Reason>) -> Json {
     })
 }
 
-/// Check 5: every result is what evaluation gives from its children's.
+/// Check 5: every result is what evaluation gives from its children's:
+/// children first (depth-first post-order), with an explicit stack
+/// (`crate::walk`).
 fn check_recomputed(result: &Evaluated<'_, Truth>, tree: &Tree) -> Result<()> {
-    for (child, child_tree) in result.children.iter().zip(&tree.children) {
-        check_recomputed(child, child_tree)?;
-    }
+    post_order(
+        (result, tree),
+        |&mut (result, tree), done| Ok(result.children.get(done).zip(tree.children.get(done))),
+        |(result, tree), _| check_one(result, tree),
+    )
+}
+
+/// Check 5 for one result, its children already checked.
+fn check_one(result: &Evaluated<'_, Truth>, tree: &Tree) -> Result<()> {
     let (outcome, reason) = recompute(&Kleene, result)?;
     match (&outcome, &result.outcome) {
         (Outcome::Truth(a), Outcome::Truth(b)) if a != b => {

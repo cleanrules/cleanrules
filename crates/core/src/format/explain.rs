@@ -12,30 +12,25 @@ use crate::json::{Json, to_string};
 use crate::logic::Truth;
 use crate::rules::Decision;
 use crate::value::{Map, NullCause, Value};
+use crate::walk::post_order;
 
 fn string(text: &str) -> Json {
     Json::String(text.to_owned())
 }
 
-/// The JSON Pointer of every result of the decision's condition trees, by address.
+/// The JSON Pointer of every result of the decision's condition trees, by
+/// address, in depth-first pre-order (with an explicit stack: a result tree is
+/// as deep as its condition).
 fn pointers<'d>(decision: &'d Decision<'_>) -> Vec<(*const Evaluated<'d, Truth>, String)> {
-    fn walk<'d>(
-        result: &'d Evaluated<'_, Truth>,
-        pointer: &str,
-        out: &mut Vec<(*const Evaluated<'d, Truth>, String)>,
-    ) {
-        out.push((std::ptr::from_ref(result).cast(), pointer.to_owned()));
-        for (i, child) in result.children.iter().enumerate() {
-            walk(child, &format!("{pointer}/children/{i}"), out);
-        }
-    }
     let mut out = Vec::new();
     for (i, result) in decision.results().iter().enumerate() {
-        walk(
-            &result.when,
-            &format!("/decision/results/{i}/when"),
-            &mut out,
-        );
+        let mut pending = vec![(&result.when, format!("/decision/results/{i}/when"))];
+        while let Some((result, pointer)) = pending.pop() {
+            for (i, child) in result.children.iter().enumerate().rev() {
+                pending.push((child, format!("{pointer}/children/{i}")));
+            }
+            out.push((std::ptr::from_ref(result).cast(), pointer));
+        }
     }
     out
 }
@@ -222,24 +217,32 @@ fn write_requirement<O: Out>(
     requirement: &Requirement<'_, '_>,
     pointers: &[(*const Evaluated<'_, Truth>, String)],
 ) -> O {
-    match requirement {
-        Requirement::Cause(cause) => write_cause(cause, pointers),
-        Requirement::Group(kind, items) => {
-            let key = if *kind == GroupKind::All {
-                "all"
-            } else {
-                "any"
-            };
-            O::object(vec![(
-                key,
-                O::list(
-                    items
-                        .iter()
-                        .map(|i| write_requirement(i, pointers))
-                        .collect(),
-                ),
-            )])
-        }
+    // A requirement is as deep as its condition: written with an explicit stack.
+    let written: Result<O, std::convert::Infallible> = post_order(
+        requirement,
+        |requirement, done| {
+            Ok(match requirement {
+                Requirement::Group(_, items) => items.get(done),
+                Requirement::Cause(_) => None,
+            })
+        },
+        |requirement, items| {
+            Ok(match requirement {
+                Requirement::Cause(cause) => write_cause(cause, pointers),
+                Requirement::Group(kind, _) => {
+                    let key = if *kind == GroupKind::All {
+                        "all"
+                    } else {
+                        "any"
+                    };
+                    O::object(vec![(key, O::list(items.collect()))])
+                }
+            })
+        },
+    );
+    match written {
+        Ok(out) => out,
+        Err(never) => match never {},
     }
 }
 

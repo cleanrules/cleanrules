@@ -12,6 +12,7 @@
 //! in this form with `Display`.
 
 use std::fmt::{self, Write as _};
+use std::vec::Drain;
 
 use crate::ast::{ArithOp, Closed, CompareOp, Expr, Node, StringOp};
 use crate::error::{Error, ErrorCode, Result, Segment};
@@ -20,6 +21,7 @@ use crate::json::{Json, JsonNumber, Limits};
 use crate::logic::LogicName;
 use crate::rules::{Aggregate, Config, HitPolicy, Rule, RuleSet};
 use crate::value::{NullCause, Value};
+use crate::walk::post_order;
 
 // --- Tokens -----------------------------------------------------------------------------
 
@@ -364,34 +366,169 @@ impl Syn {
         }
     }
 
-    /// The core node, children first, each error located where its node starts.
+    /// The core node, children first, each error located where its node
+    /// starts: depth-first post-order, with an explicit stack (`crate::walk`).
     fn build(self) -> Result<Node> {
+        post_order(
+            self.split(),
+            |(_, children), _| Ok(children.next().map(Syn::split)),
+            |(head, _), nodes| head.build(nodes),
+        )
+    }
+
+    /// The node's own data and its children, in order.
+    fn split(self) -> (Head, std::vec::IntoIter<Syn>) {
+        let (line, column) = (self.line, self.column);
+        let (own, children) = match self.shape {
+            Shape::Field(path) => (Own::Field(path), vec![]),
+            Shape::Const(value) => (Own::Const(value), vec![]),
+            Shape::Compare(op, a, b) => (Own::Compare(op), vec![*a, *b]),
+            Shape::And(items) => (Own::And, items),
+            Shape::Or(items) => (Own::Or, items),
+            Shape::Not(a) => (Own::Not, vec![*a]),
+            Shape::In(a, values) => (Own::In(values), vec![*a]),
+            Shape::Between(a, low, high, closed) => (Own::Between(closed), vec![*a, *low, *high]),
+            Shape::IsNull(a) => (Own::IsNull, vec![*a]),
+            Shape::Matches(a, pattern) => (Own::Matches(pattern), vec![*a]),
+            Shape::StringTest(op, a, text) => (Own::StringTest(op, text), vec![*a]),
+            Shape::Arith(op, a, b) => (Own::Arith(op), vec![*a, *b]),
+            Shape::Abs(a) => (Own::Abs, vec![*a]),
+            Shape::Neg(a) => (Own::Neg, vec![*a]),
+            Shape::Built(node) => (Own::Built(node), vec![]),
+        };
+        (Head { own, line, column }, children.into_iter())
+    }
+}
+
+/// A node as written without its children: what [`Syn::build`] builds once
+/// they are built.
+struct Head {
+    own: Own,
+    line: u64,
+    column: u64,
+}
+
+enum Own {
+    Field(Vec<Segment>),
+    Const(Value),
+    Compare(CompareOp),
+    And,
+    Or,
+    Not,
+    In(Vec<Value>),
+    Between(Closed),
+    IsNull,
+    Matches(String),
+    StringTest(StringOp, String),
+    Arith(ArithOp),
+    Abs,
+    Neg,
+    Built(Node),
+}
+
+impl Head {
+    fn build(self, mut nodes: Drain<'_, Node>) -> Result<Node> {
         let (line, column) = (self.line, self.column);
         let at = |error| locate_at(error, line, column);
-        match self.shape {
-            Shape::Field(path) => Node::field(path).map_err(at),
-            Shape::Const(value) => Node::constant(value).map_err(at),
-            Shape::Compare(op, a, b) => Node::compare(op, a.build()?, b.build()?).map_err(at),
-            Shape::And(items) => {
-                Node::and(items.into_iter().map(Syn::build).collect::<Result<_>>()?).map_err(at)
+        // `split` gave as many children as the node has: one is never missing.
+        let mut next = || {
+            nodes
+                .next()
+                .ok_or_else(|| Error::new(ErrorCode::ExpressionError, "a node lacks an operand"))
+        };
+        match self.own {
+            Own::Field(path) => Node::field(path).map_err(at),
+            Own::Const(value) => Node::constant(value).map_err(at),
+            Own::Compare(op) => {
+                let (a, b) = (next()?, next()?);
+                Node::compare(op, a, b).map_err(at)
             }
-            Shape::Or(items) => {
-                Node::or(items.into_iter().map(Syn::build).collect::<Result<_>>()?).map_err(at)
+            Own::And => Node::and(nodes.collect()).map_err(at),
+            Own::Or => Node::or(nodes.collect()).map_err(at),
+            Own::Not => Node::not(next()?).map_err(at),
+            Own::In(values) => Node::is_in(next()?, values).map_err(at),
+            Own::Between(closed) => {
+                let (a, low, high) = (next()?, next()?, next()?);
+                Node::between(a, low, high, closed).map_err(at)
             }
-            Shape::Not(a) => Node::not(a.build()?).map_err(at),
-            Shape::In(a, values) => Node::is_in(a.build()?, values).map_err(at),
-            Shape::Between(a, low, high, closed) => {
-                Node::between(a.build()?, low.build()?, high.build()?, closed).map_err(at)
+            Own::IsNull => Node::is_null(next()?).map_err(at),
+            Own::Matches(pattern) => Node::matches(next()?, &pattern).map_err(at),
+            Own::StringTest(op, text) => Node::string_test(op, next()?, text).map_err(at),
+            Own::Arith(op) => {
+                let (a, b) = (next()?, next()?);
+                Node::arith(op, a, b).map_err(at)
             }
-            Shape::IsNull(a) => Node::is_null(a.build()?).map_err(at),
-            Shape::Matches(a, pattern) => Node::matches(a.build()?, &pattern).map_err(at),
-            Shape::StringTest(op, a, text) => Node::string_test(op, a.build()?, text).map_err(at),
-            Shape::Arith(op, a, b) => Node::arith(op, a.build()?, b.build()?).map_err(at),
-            Shape::Abs(a) => Node::abs(a.build()?).map_err(at),
-            Shape::Neg(a) => Node::neg(a.build()?).map_err(at),
-            Shape::Built(node) => Ok(node),
+            Own::Abs => Node::abs(next()?).map_err(at),
+            Own::Neg => Node::neg(next()?).map_err(at),
+            Own::Built(node) => Ok(node),
         }
     }
+}
+
+/// A grammar rule waiting for an operand: the rest of what a recursive reader
+/// would do once the operand is read (see [`Parser::expr`]).
+enum Waiting {
+    /// An expression of level `min`: its operators, after a left side.
+    Expr { min: u8, has_predicate: bool },
+    /// `NOT`, at its token.
+    Not(Token),
+    /// A unary minus, at its token.
+    Neg(Token),
+    /// An opening parenthesis, at its token.
+    Paren(Token),
+    /// `ABS(`, at its token.
+    Abs(Token),
+    /// `left op`, for the right operand.
+    Arith(ArithOp, Syn),
+    /// `left op`, for the right side.
+    Compare(CompareOp, Syn),
+    /// `left OR …` or `left AND …`, for the next item.
+    Chain {
+        level: u8,
+        items: Vec<Syn>,
+        line: u64,
+        column: u64,
+    },
+    /// `left [NOT] IN (…`, for the constant that starts at `token`.
+    In {
+        left: Syn,
+        negated: bool,
+        values: Vec<Value>,
+        token: Token,
+    },
+    /// `left [NOT] BETWEEN`, for the low bound.
+    BetweenLow { left: Syn, negated: bool },
+    /// `left [NOT] BETWEEN low AND`, for the high bound.
+    BetweenHigh { left: Syn, negated: bool, low: Syn },
+}
+
+/// The next step of [`Parser::expr`].
+enum Step {
+    /// Start an expression of this level.
+    Start(u8),
+    /// An expression is read: give it to the rule waiting for it.
+    Read(Syn),
+}
+
+/// What starts an expression: read, or a rule waiting for an operand of a level.
+enum Prefixed {
+    Read(Syn),
+    Operand(Waiting, u8),
+}
+
+/// After an expression's left side: the expression ends with it, a new left side
+/// is read, or a rule waits for an operand of a level (with whether the
+/// expression has had its predicate).
+enum Infixed {
+    Done(Syn),
+    Read(Syn, bool),
+    Operand(Waiting, bool, u8),
+}
+
+/// A rule given its operand: complete, or waiting for another.
+enum Resumed {
+    Read(Syn),
+    Operand(Waiting, u8),
 }
 
 // --- Parser --------------------------------------------------------------------------------
@@ -401,8 +538,9 @@ struct Parser<'a> {
     /// The next token and the one after it.
     current: Token,
     following: Token,
-    /// How deep the grammar has recursed: once per `expr`, which bounds the
-    /// stack before the depth check bounds the tree.
+    /// How deep the grammar nests: once per expression, bounded by
+    /// `max_recursion` (`spec/text.md`, *Errors and limits*) before the depth
+    /// check bounds the tree.
     recursion: usize,
     max_recursion: usize,
     max_depth: usize,
@@ -422,7 +560,12 @@ fn describe(kind: &Kind) -> String {
 
 /// The nodes on the longest path down from `node`, itself included.
 fn depth(node: &Node) -> usize {
-    1 + node.children().into_iter().map(depth).max().unwrap_or(0)
+    let height: Result<usize, std::convert::Infallible> = post_order(
+        node,
+        |node, done| Ok(node.child(done)),
+        |_, heights| Ok(1 + heights.max().unwrap_or(0)),
+    );
+    height.unwrap_or_else(|never| match never {})
 }
 
 /// `NOT node` when `negated`, located where `node` starts.
@@ -569,51 +712,223 @@ impl<'a> Parser<'a> {
     }
 
     /// An expression whose operators bind at least as tightly as `min`
-    /// (precedence climbing: two frames per level of nesting). The work that
-    /// does not recurse is kept out of line, so that the frames stay small.
+    /// (precedence climbing). The grammar nests as deep as the recursion bound
+    /// allows (514 by default), so it runs on an explicit stack of the rules
+    /// waiting for an operand, rather than on the call stack: each step reads
+    /// the tokens and makes the checks a recursive reader would, in the same
+    /// order.
     fn expr(&mut self, min: u8) -> Result<Syn> {
-        self.enter()?;
-        let first = self.prefix(min)?;
-        let mut left = self.bounded(first)?;
-        let mut has_predicate = false;
-        while let Some(level) = self.infix_level() {
-            if level < min {
-                break;
-            }
-            left = match level {
-                OR | AND => self.chain(left, level)?,
-                PREDICATE => {
-                    if has_predicate {
-                        if self.comparison().is_some() {
-                            return Err(self.unexpected("one comparison at most").with_hint(
-                                "write a range as x BETWEEN low AND high, or join comparisons with AND",
-                            ));
+        let mut waiting: Vec<Waiting> = Vec::new();
+        // Either an expression of some level to start, or one just read.
+        let mut step = Step::Start(min);
+        loop {
+            let read = match step {
+                Step::Start(min) => {
+                    self.enter()?;
+                    waiting.push(Waiting::Expr {
+                        min,
+                        has_predicate: false,
+                    });
+                    match self.prefix(min)? {
+                        Prefixed::Read(syn) => syn,
+                        Prefixed::Operand(rule, level) => {
+                            waiting.push(rule);
+                            step = Step::Start(level);
+                            continue;
                         }
-                        break;
                     }
-                    has_predicate = true;
-                    self.predicate(left)?
                 }
-                _ => {
-                    let op = match self.next().kind {
-                        Kind::Symbol("+") => ArithOp::Add,
-                        Kind::Symbol("-") => ArithOp::Sub,
-                        Kind::Symbol("*") => ArithOp::Mul,
-                        _ => ArithOp::Div,
-                    };
-                    let right = self.expr(level + 1)?;
-                    let (line, column) = (left.line, left.column);
-                    Syn::new(
-                        Shape::Arith(op, Box::new(left), Box::new(right)),
+                Step::Read(syn) => syn,
+            };
+            let Some(rule) = waiting.pop() else {
+                return Ok(read);
+            };
+            step = match rule {
+                Waiting::Expr { min, has_predicate } => {
+                    match self.infix(read, min, has_predicate)? {
+                        Infixed::Done(left) => {
+                            self.recursion -= 1;
+                            Step::Read(left)
+                        }
+                        Infixed::Read(left, has_predicate) => {
+                            waiting.push(Waiting::Expr { min, has_predicate });
+                            Step::Read(left)
+                        }
+                        Infixed::Operand(rule, has_predicate, level) => {
+                            waiting.push(Waiting::Expr { min, has_predicate });
+                            waiting.push(rule);
+                            Step::Start(level)
+                        }
+                    }
+                }
+                rule => match self.resume(rule, read)? {
+                    Resumed::Read(syn) => Step::Read(syn),
+                    Resumed::Operand(rule, level) => {
+                        waiting.push(rule);
+                        Step::Start(level)
+                    }
+                },
+            };
+        }
+    }
+
+    /// An expression's operators after its left side `left`: the expression
+    /// ends, an operator makes a new left side, or one needs its right operand.
+    /// `left` is checked against the depth limit first, as each node is made.
+    #[inline(never)]
+    fn infix(&mut self, left: Syn, min: u8, has_predicate: bool) -> Result<Infixed> {
+        let left = self.bounded(left)?;
+        let Some(level) = self.infix_level().filter(|&level| level >= min) else {
+            return Ok(Infixed::Done(left));
+        };
+        Ok(match level {
+            OR | AND => {
+                // `left OR …` or `left AND …`, flattened.
+                self.next();
+                let (line, column) = (left.line, left.column);
+                let chain = Waiting::Chain {
+                    level,
+                    items: vec![left],
+                    line,
+                    column,
+                };
+                Infixed::Operand(chain, has_predicate, level + 1)
+            }
+            PREDICATE => {
+                if has_predicate {
+                    if self.comparison().is_some() {
+                        return Err(self.unexpected("one comparison at most").with_hint(
+                            "write a range as x BETWEEN low AND high, or join comparisons with AND",
+                        ));
+                    }
+                    return Ok(Infixed::Done(left));
+                }
+                match self.predicate(left)? {
+                    Resumed::Read(syn) => Infixed::Read(syn, true),
+                    Resumed::Operand(rule, level) => Infixed::Operand(rule, true, level),
+                }
+            }
+            _ => {
+                let op = match self.next().kind {
+                    Kind::Symbol("+") => ArithOp::Add,
+                    Kind::Symbol("-") => ArithOp::Sub,
+                    Kind::Symbol("*") => ArithOp::Mul,
+                    _ => ArithOp::Div,
+                };
+                Infixed::Operand(Waiting::Arith(op, left), has_predicate, level + 1)
+            }
+        })
+    }
+
+    /// A rule that was waiting for an operand, given it: it is complete, or it
+    /// needs another operand.
+    // One arm per waiting rule reads best as a single dispatch.
+    #[allow(clippy::too_many_lines)]
+    #[inline(never)]
+    fn resume(&mut self, rule: Waiting, read: Syn) -> Result<Resumed> {
+        let made = |shape, token: &Token| Syn::new(shape, token.line, token.column);
+        Ok(Resumed::Read(match rule {
+            Waiting::Not(token) => made(Shape::Not(Box::new(read)), &token),
+            Waiting::Neg(token) => made(Shape::Neg(Box::new(read)), &token),
+            Waiting::Paren(token) => {
+                self.expect_symbol(")")?;
+                // A parenthesized node starts at its parenthesis.
+                read.relocated(token.line, token.column)
+            }
+            Waiting::Abs(token) => {
+                self.expect_symbol(")")?;
+                made(Shape::Abs(Box::new(read)), &token)
+            }
+            Waiting::Arith(op, left) => {
+                let (line, column) = (left.line, left.column);
+                Syn::new(
+                    Shape::Arith(op, Box::new(left), Box::new(read)),
+                    line,
+                    column,
+                )
+            }
+            Waiting::Compare(op, left) => {
+                let (line, column) = (left.line, left.column);
+                Syn::new(
+                    Shape::Compare(op, Box::new(left), Box::new(read)),
+                    line,
+                    column,
+                )
+            }
+            Waiting::Chain {
+                level,
+                mut items,
+                line,
+                column,
+            } => {
+                items.push(read);
+                if self.infix_level() == Some(level) {
+                    self.next();
+                    let chain = Waiting::Chain {
+                        level,
+                        items,
                         line,
                         column,
-                    )
+                    };
+                    return Ok(Resumed::Operand(chain, level + 1));
                 }
-            };
-            left = self.bounded(left)?;
-        }
-        self.recursion -= 1;
-        Ok(left)
+                let shape = if level == OR {
+                    Shape::Or(items)
+                } else {
+                    Shape::And(items)
+                };
+                Syn::new(shape, line, column)
+            }
+            Waiting::In {
+                left,
+                negated,
+                mut values,
+                token,
+            } => {
+                let Shape::Const(value) = read.shape else {
+                    return Err(syntax(token.line, token.column, "IN lists constants only")
+                        .with_hint("compare with fields one by one, joined with OR"));
+                };
+                values.push(value);
+                if self.accept_symbol(",") {
+                    let token = self.peek().clone();
+                    let rule = Waiting::In {
+                        left,
+                        negated,
+                        values,
+                        token,
+                    };
+                    return Ok(Resumed::Operand(rule, UNARY));
+                }
+                self.expect_symbol(")")?;
+                let (line, column) = (left.line, left.column);
+                negate(
+                    negated,
+                    Syn::new(Shape::In(Box::new(left), values), line, column),
+                )
+            }
+            Waiting::BetweenLow { left, negated } => {
+                self.expect_keyword("AND")?;
+                let rule = Waiting::BetweenHigh {
+                    left,
+                    negated,
+                    low: read,
+                };
+                return Ok(Resumed::Operand(rule, SUM));
+            }
+            Waiting::BetweenHigh { left, negated, low } => {
+                let closed = if self.accept_keyword("CLOSED") {
+                    self.closed()?
+                } else {
+                    Closed::Both
+                };
+                let (line, column) = (left.line, left.column);
+                let shape = Shape::Between(Box::new(left), Box::new(low), Box::new(read), closed);
+                negate(negated, Syn::new(shape, line, column))
+            }
+            // Handled by `expr`.
+            Waiting::Expr { .. } => read,
+        }))
     }
 
     /// The level of the operator at the next token, if it is one.
@@ -636,31 +951,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// `left OR …` or `left AND …`, flattened.
-    #[inline(never)]
-    fn chain(&mut self, left: Syn, level: u8) -> Result<Syn> {
-        let (line, column) = (left.line, left.column);
-        let mut items = vec![left];
-        while self.infix_level() == Some(level) {
-            self.next();
-            items.push(self.expr(level + 1)?);
-        }
-        let shape = if level == OR {
-            Shape::Or(items)
-        } else {
-            Shape::And(items)
-        };
-        Ok(Syn::new(shape, line, column))
-    }
-
     /// What starts an expression: `NOT`, a minus, a parenthesis, `ABS` or a
-    /// primary.
-    fn prefix(&mut self, min: u8) -> Result<Syn> {
+    /// primary; all but a primary or a negative number wait for an operand.
+    #[inline(never)]
+    fn prefix(&mut self, min: u8) -> Result<Prefixed> {
         let token = self.peek().clone();
-        let located = |shape| Syn::new(shape, token.line, token.column);
         if min <= NOT && (self.accept_keyword("NOT") || self.accept_symbol("~")) {
-            let operand = self.expr(NOT)?;
-            return Ok(located(Shape::Not(Box::new(operand))));
+            return Ok(Prefixed::Operand(Waiting::Not(token), NOT));
         }
         if self.accept_symbol("-") {
             // A minus directly before a number is a negative constant.
@@ -668,24 +965,18 @@ impl<'a> Parser<'a> {
             if matches!(next.kind, Kind::Number(_))
                 && (next.line, next.column) == (token.line, token.column + 1)
             {
-                return self.negative_number(&token);
+                return self.negative_number(&token).map(Prefixed::Read);
             }
-            let operand = self.expr(UNARY)?;
-            return Ok(located(Shape::Neg(Box::new(operand))));
+            return Ok(Prefixed::Operand(Waiting::Neg(token), UNARY));
         }
         if self.accept_symbol("(") {
-            let inner = self.expr(OR)?;
-            self.expect_symbol(")")?;
-            // A parenthesized node starts at its parenthesis.
-            return Ok(inner.relocated(token.line, token.column));
+            return Ok(Prefixed::Operand(Waiting::Paren(token), OR));
         }
         if self.accept_keyword("ABS") {
             self.expect_symbol("(")?;
-            let operand = self.expr(SUM)?;
-            self.expect_symbol(")")?;
-            return Ok(located(Shape::Abs(Box::new(operand))));
+            return Ok(Prefixed::Operand(Waiting::Abs(token), SUM));
         }
-        self.primary()
+        self.primary().map(Prefixed::Read)
     }
 
     /// The negative constant after its minus.
@@ -700,27 +991,20 @@ impl<'a> Parser<'a> {
     /// A predicate after its operand: a comparison, `IS [NOT] NULL` or a
     /// predicate keyword, possibly after `NOT`.
     #[inline(never)]
-    fn predicate(&mut self, left: Syn) -> Result<Syn> {
+    fn predicate(&mut self, left: Syn) -> Result<Resumed> {
         if let Some(op) = self.comparison() {
             self.next();
-            let right = self.expr(SUM)?;
-            let (line, column) = (left.line, left.column);
-            return Ok(Syn::new(
-                Shape::Compare(op, Box::new(left), Box::new(right)),
-                line,
-                column,
-            ));
+            return Ok(Resumed::Operand(Waiting::Compare(op, left), SUM));
         }
         if self.accept_keyword("IS") {
             let negated = self.accept_keyword("NOT");
             self.expect_keyword("NULL")?;
             let (line, column) = (left.line, left.column);
             let node = Syn::new(Shape::IsNull(Box::new(left)), line, column);
-            return Ok(negate(negated, node));
+            return Ok(Resumed::Read(negate(negated, node)));
         }
         let negated = self.accept_keyword("NOT");
-        let node = self.test(left)?;
-        Ok(negate(negated, node))
+        self.test(left, negated)
     }
 
     fn comparison(&self) -> Option<CompareOp> {
@@ -735,29 +1019,39 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// A predicate after `left`, read to its end.
+    fn whole_predicate(&mut self, left: Syn) -> Result<Syn> {
+        let mut resumed = self.predicate(left)?;
+        loop {
+            match resumed {
+                Resumed::Read(syn) => return Ok(syn),
+                Resumed::Operand(rule, level) => {
+                    let operand = self.expr(level)?;
+                    resumed = self.resume(rule, operand)?;
+                }
+            }
+        }
+    }
+
     /// The predicate that a keyword starts after `left`.
-    fn test(&mut self, left: Syn) -> Result<Syn> {
+    fn test(&mut self, left: Syn, negated: bool) -> Result<Resumed> {
+        if self.accept_keyword("IN") {
+            self.expect_symbol("(")?;
+            let token = self.peek().clone();
+            let rule = Waiting::In {
+                left,
+                negated,
+                values: Vec::new(),
+                token,
+            };
+            return Ok(Resumed::Operand(rule, UNARY));
+        }
+        if self.accept_keyword("BETWEEN") {
+            return Ok(Resumed::Operand(Waiting::BetweenLow { left, negated }, SUM));
+        }
         let (line, column) = (left.line, left.column);
         let left = Box::new(left);
-        let shape = if self.accept_keyword("IN") {
-            self.expect_symbol("(")?;
-            let mut values = vec![self.constant()?];
-            while self.accept_symbol(",") {
-                values.push(self.constant()?);
-            }
-            self.expect_symbol(")")?;
-            Shape::In(left, values)
-        } else if self.accept_keyword("BETWEEN") {
-            let low = self.expr(SUM)?;
-            self.expect_keyword("AND")?;
-            let high = self.expr(SUM)?;
-            let closed = if self.accept_keyword("CLOSED") {
-                self.closed()?
-            } else {
-                Closed::Both
-            };
-            Shape::Between(left, Box::new(low), Box::new(high), closed)
-        } else if self.accept_keyword("MATCHES") {
+        let shape = if self.accept_keyword("MATCHES") {
             Shape::Matches(left, self.string()?)
         } else if self.accept_keyword("STARTS") {
             self.expect_keyword("WITH")?;
@@ -769,7 +1063,10 @@ impl<'a> Parser<'a> {
             self.expect_keyword("CONTAINS")?;
             Shape::StringTest(StringOp::Contains, left, self.string()?)
         };
-        Ok(Syn::new(shape, line, column))
+        Ok(Resumed::Read(negate(
+            negated,
+            Syn::new(shape, line, column),
+        )))
     }
 
     fn closed(&mut self) -> Result<Closed> {
@@ -1185,7 +1482,7 @@ impl<'a> Parser<'a> {
         let start = self.peek().clone();
         let left = Syn::built(subject.clone(), start.line, start.column);
         let syn = if self.infix_level() == Some(PREDICATE) {
-            self.predicate(left)?
+            self.whole_predicate(left)?
         } else {
             let value = self.expr(SUM)?;
             Syn::new(
@@ -1539,16 +1836,6 @@ pub(crate) fn styled(value: &Value, single: bool) -> String {
     }
 }
 
-fn child(node: &Node, min: u8, single: bool, out: &mut String) {
-    if level(node) < min {
-        out.push('(');
-        write_node(node, single, out);
-        out.push(')');
-    } else {
-        write_node(node, single, out);
-    }
-}
-
 fn is_number_constant(node: &Node) -> bool {
     matches!(
         node.expr(),
@@ -1556,14 +1843,51 @@ fn is_number_constant(node: &Node) -> bool {
     )
 }
 
+/// A piece of a node's text: literal text, a node, or a child node, in
+/// parentheses when it binds more loosely than `min`.
+enum Piece<'n> {
+    Text(&'static str),
+    Owned(String),
+    Node(&'n Node),
+    Child(&'n Node, u8),
+}
+
+/// Write a node's text, from its pieces in order, with an explicit stack: a
+/// condition nests as deep as the reader's limits allow.
+fn write_node(node: &Node, single: bool, out: &mut String) {
+    write_piece(Piece::Node(node), single, out);
+}
+
+/// A child node's text: in parentheses when it binds more loosely than `min`.
+fn child(node: &Node, min: u8, single: bool, out: &mut String) {
+    write_piece(Piece::Child(node, min), single, out);
+}
+
+fn write_piece(piece: Piece<'_>, single: bool, out: &mut String) {
+    let mut pending = vec![piece];
+    while let Some(piece) = pending.pop() {
+        match piece {
+            Piece::Text(text) => out.push_str(text),
+            Piece::Owned(text) => out.push_str(&text),
+            Piece::Child(node, min) if level(node) < min => {
+                pending.extend([Piece::Text(")"), Piece::Node(node), Piece::Text("(")]);
+            }
+            Piece::Child(node, _) | Piece::Node(node) => {
+                pending.extend(pieces(node, single).into_iter().rev());
+            }
+        }
+    }
+}
+
+/// A node's text, in pieces.
 // One arm per node reads best as a single dispatch.
 #[allow(clippy::too_many_lines)]
-fn write_node(node: &Node, single: bool, out: &mut String) {
+fn pieces(node: &Node, single: bool) -> Vec<Piece<'_>> {
+    use Piece::{Child, Owned, Text};
     match node.expr() {
-        Expr::Field(segments) => out.push_str(&path(segments)),
-        Expr::Const(value) => out.push_str(&styled(value, single)),
+        Expr::Field(segments) => vec![Owned(path(segments))],
+        Expr::Const(value) => vec![Owned(styled(value, single))],
         Expr::Compare { op, left, right } => {
-            child(left, 5, single, out);
             let symbol = match op {
                 CompareOp::Eq => " = ",
                 CompareOp::Ne => " != ",
@@ -1572,8 +1896,7 @@ fn write_node(node: &Node, single: bool, out: &mut String) {
                 CompareOp::Gt => " > ",
                 CompareOp::Ge => " >= ",
             };
-            out.push_str(symbol);
-            child(right, 5, single, out);
+            vec![Child(left, 5), Text(symbol), Child(right, 5)]
         }
         Expr::And(items) | Expr::Or(items) => {
             let (separator, min) = if matches!(node.expr(), Expr::And(_)) {
@@ -1581,23 +1904,24 @@ fn write_node(node: &Node, single: bool, out: &mut String) {
             } else {
                 (" OR ", 2)
             };
+            let mut pieces = Vec::with_capacity(2 * items.len());
             for (i, item) in items.iter().enumerate() {
                 if i > 0 {
-                    out.push_str(separator);
+                    pieces.push(Text(separator));
                 }
-                child(item, min, single, out);
+                pieces.push(Child(item, min));
             }
+            pieces
         }
-        Expr::Not(operand) => {
-            out.push_str("NOT ");
-            child(operand, 3, single, out);
-        }
+        Expr::Not(operand) => vec![Text("NOT "), Child(operand, 3)],
         Expr::In { operand, values } => {
-            child(operand, 5, single, out);
-            out.push_str(" IN (");
             let items: Vec<String> = values.iter().map(|v| styled(v, single)).collect();
-            out.push_str(&items.join(", "));
-            out.push(')');
+            vec![
+                Child(operand, 5),
+                Text(" IN ("),
+                Owned(items.join(", ")),
+                Text(")"),
+            ]
         }
         Expr::Between {
             operand,
@@ -1605,34 +1929,34 @@ fn write_node(node: &Node, single: bool, out: &mut String) {
             high,
             closed,
         } => {
-            child(operand, 5, single, out);
-            out.push_str(" BETWEEN ");
-            child(low, 5, single, out);
-            out.push_str(" AND ");
-            child(high, 5, single, out);
+            let mut pieces = vec![
+                Child(operand, 5),
+                Text(" BETWEEN "),
+                Child(low, 5),
+                Text(" AND "),
+                Child(high, 5),
+            ];
             if *closed != Closed::Both {
-                out.push_str(" CLOSED ");
-                out.push_str(&closed.as_str().to_ascii_uppercase());
+                pieces.push(Text(" CLOSED "));
+                pieces.push(Owned(closed.as_str().to_ascii_uppercase()));
             }
+            pieces
         }
-        Expr::IsNull(operand) => {
-            child(operand, 5, single, out);
-            out.push_str(" IS NULL");
-        }
-        Expr::Matches { operand, pattern } => {
-            child(operand, 5, single, out);
-            out.push_str(" MATCHES ");
-            out.push_str(&string_text(pattern.source(), single));
-        }
-        Expr::StringTest { op, operand, text } => {
-            child(operand, 5, single, out);
-            out.push_str(match op {
+        Expr::IsNull(operand) => vec![Child(operand, 5), Text(" IS NULL")],
+        Expr::Matches { operand, pattern } => vec![
+            Child(operand, 5),
+            Text(" MATCHES "),
+            Owned(string_text(pattern.source(), single)),
+        ],
+        Expr::StringTest { op, operand, text } => vec![
+            Child(operand, 5),
+            Text(match op {
                 StringOp::StartsWith => " STARTS WITH ",
                 StringOp::EndsWith => " ENDS WITH ",
                 StringOp::Contains => " CONTAINS ",
-            });
-            out.push_str(&string_text(text, single));
-        }
+            }),
+            Owned(string_text(text, single)),
+        ],
         Expr::Arith { op, left, right } => {
             let (symbol, own) = match op {
                 ArithOp::Add => (" + ", 5),
@@ -1640,26 +1964,14 @@ fn write_node(node: &Node, single: bool, out: &mut String) {
                 ArithOp::Mul => (" * ", 6),
                 ArithOp::Div => (" / ", 6),
             };
-            child(left, own, single, out);
-            out.push_str(symbol);
-            child(right, own + 1, single, out);
+            vec![Child(left, own), Text(symbol), Child(right, own + 1)]
         }
-        Expr::Abs(operand) => {
-            out.push_str("ABS(");
-            child(operand, 5, single, out);
-            out.push(')');
+        Expr::Abs(operand) => vec![Text("ABS("), Child(operand, 5), Text(")")],
+        // `-5` would read back as the constant -5.
+        Expr::Neg(operand) if is_number_constant(operand) => {
+            vec![Text("-("), Piece::Node(operand), Text(")")]
         }
-        Expr::Neg(operand) => {
-            out.push('-');
-            if is_number_constant(operand) {
-                // `-5` would read back as the constant -5.
-                out.push('(');
-                write_node(operand, single, out);
-                out.push(')');
-            } else {
-                child(operand, 7, single, out);
-            }
-        }
+        Expr::Neg(operand) => vec![Text("-"), Child(operand, 7)],
     }
 }
 
@@ -1790,25 +2102,28 @@ fn rule_text(rule: &Rule) -> Result<String> {
 /// A field key with a control character, which a name between backticks
 /// cannot hold.
 pub(crate) fn check_keys(node: &Node) -> Result<()> {
-    if let Expr::Field(segments) = node.expr() {
-        for segment in segments {
-            if let Segment::Key(key) = segment
-                && key.chars().any(|c| c < ' ')
-            {
-                return Err(Error::new(
-                    ErrorCode::Unsupported,
-                    format!(
-                        "the field key {key:?} has a control character, which text cannot hold"
-                    ),
-                )
-                .with_hint("write it as JSON or YAML")
-                .unsupported("text", "names cannot hold control characters"));
+    // In pre-order, with an explicit stack.
+    let mut pending = vec![node];
+    while let Some(node) = pending.pop() {
+        if let Expr::Field(segments) = node.expr() {
+            for segment in segments {
+                if let Segment::Key(key) = segment
+                    && key.chars().any(|c| c < ' ')
+                {
+                    return Err(Error::new(
+                        ErrorCode::Unsupported,
+                        format!(
+                            "the field key {key:?} has a control character, which text cannot hold"
+                        ),
+                    )
+                    .with_hint("write it as JSON or YAML")
+                    .unsupported("text", "names cannot hold control characters"));
+                }
             }
         }
+        pending.extend(node.children().into_iter().rev());
     }
-    node.children()
-        .iter()
-        .try_for_each(|child| check_keys(child))
+    Ok(())
 }
 
 /// A document's canonical text (`spec/text.md`, *Printing*), without a final
@@ -1959,12 +2274,20 @@ mod tests {
         assert_eq!((e.context().line, e.context().column), (Some(3), Some(1)));
     }
 
+    /// The stack every operation at the default limits fits in
+    /// (`tests/stack.rs`).
+    const STACK: usize = if cfg!(debug_assertions) {
+        512 << 10
+    } else {
+        128 << 10
+    };
+
     #[test]
     fn deep_texts_stop_before_the_stack_does() {
-        // At the default limits the worst texts need under 640 KiB of stack in
-        // release builds; debug builds have frames several times larger.
+        // The grammar runs on an explicit stack: however deep the text, the
+        // reader needs no more call stack than for a shallow one.
         let worst = std::thread::Builder::new()
-            .stack_size(8 << 20)
+            .stack_size(STACK)
             .spawn(|| {
                 let n = 100_000;
                 [
@@ -1990,7 +2313,7 @@ mod tests {
         // A left-deep chain is read without recursion: the depth check stops
         // it, so it needs no more stack than any other text.
         let chains = std::thread::Builder::new()
-            .stack_size(2 << 20)
+            .stack_size(STACK)
             .spawn(|| {
                 let terms = "+x".repeat(1_000_000);
                 [

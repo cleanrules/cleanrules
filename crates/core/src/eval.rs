@@ -12,6 +12,7 @@ use crate::ast::{ArithOp, Closed, CompareOp, Expr, Kind, Node, StringOp};
 use crate::error::{Error, ErrorCode, Result, Segment};
 use crate::logic::Logic;
 use crate::value::{Group, NullCause, Number, Value};
+use crate::walk::{Walk, post_order};
 
 /// Why a truth value is unknown or a value is null.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -91,7 +92,7 @@ pub enum Outcome<T> {
 
 /// The result of evaluating one node, with the results of its children
 /// (`spec/json-format.md`, *Result trees*).
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Evaluated<'a, T> {
     /// The node evaluated; owned for the synthetic halves of a `between`.
     pub node: Cow<'a, Node>,
@@ -101,6 +102,29 @@ pub struct Evaluated<'a, T> {
     pub reason: Option<Reason>,
     /// The children's results.
     pub children: Vec<Evaluated<'a, T>>,
+}
+
+/// Copied with an explicit stack (`crate::walk`): a result tree is as deep as
+/// its condition.
+impl<T: Clone> Clone for Evaluated<'_, T> {
+    fn clone(&self) -> Self {
+        let copied: std::result::Result<Self, std::convert::Infallible> = post_order(
+            self,
+            |result, done| Ok(result.children.get(done)),
+            |result, children| {
+                Ok(Evaluated {
+                    node: result.node.clone(),
+                    outcome: result.outcome.clone(),
+                    reason: result.reason.clone(),
+                    children: children.collect(),
+                })
+            },
+        );
+        match copied {
+            Ok(result) => result,
+            Err(never) => match never {},
+        }
+    }
 }
 
 impl<T: Copy> Evaluated<'_, T> {
@@ -155,6 +179,18 @@ pub fn evaluate_tree<'a, L: Logic>(
     logic: &L,
     options: Options<'_>,
 ) -> Result<Evaluated<'a, L::Truth>> {
+    evaluate_tree_in(&mut Trees::default(), node, input, logic, options)
+}
+
+/// [`evaluate_tree`], with the walk's stacks of `trees`: a rule set evaluates
+/// every tree of a decision with the same ones.
+pub(crate) fn evaluate_tree_in<'a, L: Logic>(
+    trees: &mut Trees<'a, L::Truth>,
+    node: &'a Node,
+    input: &Value,
+    logic: &L,
+    options: Options<'_>,
+) -> Result<Evaluated<'a, L::Truth>> {
     if node.kind() == Kind::Value || node.is_null_constant() {
         return Err(Error::new(
             ErrorCode::ExpressionError,
@@ -167,7 +203,7 @@ pub fn evaluate_tree<'a, L: Logic>(
         logic,
         options,
     }
-    .condition(Cow::Borrowed(node))
+    .run(trees, node, Mode::Condition)
 }
 
 /// Evaluate a value node (or a field) on `input`.
@@ -176,6 +212,17 @@ pub fn evaluate_tree<'a, L: Logic>(
 ///
 /// `expression_error` for a condition; in strict mode, as [`evaluate_tree`].
 pub fn evaluate_value_tree<'a, L: Logic>(
+    node: &'a Node,
+    input: &Value,
+    logic: &L,
+    options: Options<'_>,
+) -> Result<Evaluated<'a, L::Truth>> {
+    evaluate_value_tree_in(&mut Trees::default(), node, input, logic, options)
+}
+
+/// [`evaluate_value_tree`], with the walk's stacks of `trees`.
+pub(crate) fn evaluate_value_tree_in<'a, L: Logic>(
+    trees: &mut Trees<'a, L::Truth>,
     node: &'a Node,
     input: &Value,
     logic: &L,
@@ -192,11 +239,8 @@ pub fn evaluate_value_tree<'a, L: Logic>(
         logic,
         options,
     }
-    .value(Cow::Borrowed(node))
+    .run(trees, node, Mode::Value)
 }
-
-/// Two results, such as a comparison's left and right.
-type Pair<'a, T> = (Evaluated<'a, T>, Evaluated<'a, T>);
 
 struct Evaluator<'i, 'o, L> {
     input: &'i Value,
@@ -263,31 +307,79 @@ impl<L: Logic> Evaluator<'_, '_, L> {
         Ok((self.logic.unknown(), Some(reason)))
     }
 
-    // --- Conditions --------------------------------------------------------------------
+    // --- The walk ------------------------------------------------------------------------
 
-    /// Evaluate a condition; an evaluation error names the innermost node that
-    /// failed (`spec/errors.md`, `node`).
-    fn condition<'a>(&self, node: Cow<'a, Node>) -> Result<Evaluated<'a, L::Truth>> {
-        match node {
-            Cow::Borrowed(node) => self
-                .condition_of(Cow::Borrowed(node))
-                .map_err(|error| failed_at(error, node)),
-            // A synthetic node (the halves of `between`): the error names the
-            // user's node above it.
-            Cow::Owned(node) => self.condition_of(Cow::Owned(node)),
-        }
+    /// Evaluate `node` and its subtree, children before their parent and in
+    /// order (depth-first post-order), with an explicit stack: a tree as deep as
+    /// any limit allows needs no more call stack than a leaf. An evaluation
+    /// error names the innermost user node that failed (`spec/errors.md`,
+    /// `node`).
+    fn run<'a>(
+        &self,
+        trees: &mut Trees<'a, L::Truth>,
+        node: &'a Node,
+        mode: Mode,
+    ) -> Result<Evaluated<'a, L::Truth>> {
+        trees.run(
+            Step { node, mode },
+            |step, done| Self::next(*step, done).map_err(|error| failed_at(error, step.node)),
+            |step, children| {
+                let node = Cow::Borrowed(step.node);
+                let children = children.collect();
+                match step.mode {
+                    Mode::Condition => self.finish_condition(node, children),
+                    Mode::Value => self.finish_value(node, children),
+                }
+                .map_err(|error| failed_at(error, step.node))
+            },
+        )
     }
 
-    fn condition_of<'a>(&self, node: Cow<'a, Node>) -> Result<Evaluated<'a, L::Truth>> {
+    /// The next child of `step` to evaluate once `done` are, or `None` when they
+    /// all are; an error for a node in a position it cannot take.
+    fn next(step: Step<'_>, done: usize) -> Result<Option<Step<'_>>> {
+        let node = step.node;
+        let mode = match (step.mode, node.expr()) {
+            (Mode::Condition, Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_)) => {
+                return Err(Error::new(
+                    ErrorCode::ExpressionError,
+                    format!("'{}' is not a condition", node.tag()),
+                ));
+            }
+            // A field or a constant used as a condition: its value, then its truth.
+            (Mode::Condition, Expr::Field(_) | Expr::Const(_)) => {
+                return Ok((done == 0).then_some(Step {
+                    node,
+                    mode: Mode::Value,
+                }));
+            }
+            (Mode::Condition, Expr::And(_) | Expr::Or(_) | Expr::Not(_)) => Mode::Condition,
+            (Mode::Condition, _)
+            | (Mode::Value, Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_)) => Mode::Value,
+            (Mode::Value, Expr::Field(_) | Expr::Const(_)) => return Ok(None),
+            (Mode::Value, _) => {
+                return Err(Error::new(
+                    ErrorCode::ExpressionError,
+                    format!("a {} is not a value", node.tag()),
+                ));
+            }
+        };
+        Ok(node.child(done).map(|child| Step { node: child, mode }))
+    }
+
+    // --- Conditions --------------------------------------------------------------------
+
+    /// A condition's result from its children's.
+    fn finish_condition<'a>(
+        &self,
+        node: Cow<'a, Node>,
+        mut children: Vec<Evaluated<'a, L::Truth>>,
+    ) -> Result<Evaluated<'a, L::Truth>> {
         let n: &Node = &node;
         match n.expr() {
             Expr::And(_) | Expr::Or(_) => {
-                let is_and = matches!(n.expr(), Expr::And(_));
-                let children = (0..n.children().len())
-                    .map(|i| self.condition(child(&node, i)))
-                    .collect::<Result<Vec<_>>>()?;
                 let truths: Vec<L::Truth> = children.iter().filter_map(Evaluated::truth).collect();
-                let truth = if is_and {
+                let truth = if matches!(n.expr(), Expr::And(_)) {
                     self.logic.all(&truths)
                 } else {
                     self.logic.any(&truths)
@@ -295,54 +387,58 @@ impl<L: Logic> Evaluator<'_, '_, L> {
                 Ok(self.combined(node, truth, children))
             }
             Expr::Not(_) => {
-                let operand = self.condition(child(&node, 0))?;
+                let operand = only(&children)?;
                 let truth = self
                     .logic
                     .not(operand.truth().unwrap_or_else(|| self.logic.unknown()));
-                Ok(self.combined(node, truth, vec![operand]))
+                Ok(self.combined(node, truth, children))
             }
-            Expr::Field(_) | Expr::Const(_) => self.value_as_condition(node),
+            Expr::Field(_) | Expr::Const(_) => {
+                let (Some(result), None) = (children.pop(), children.first()) else {
+                    return Err(lacks_child());
+                };
+                self.value_as_condition(node, result)
+            }
             Expr::Compare { op, .. } => {
-                let op = *op;
-                let (left, right) = self.two_values(&node)?;
-                let (truth, reason) = self.compare_values(&node, op, &left, &right)?;
+                let (left, right) = pair(&children)?;
+                let (truth, reason) = self.compare_values(n, *op, left, right)?;
                 Ok(Evaluated {
                     node,
                     outcome: Outcome::Truth(truth),
                     reason,
-                    children: vec![left, right],
+                    children,
                 })
             }
             Expr::In { values, .. } => {
-                let operand = self.sub_value(&node, 0)?;
-                let (truth, reason) = self.member(&node, &operand, values)?;
+                let operand = only(&children)?;
+                let (truth, reason) = self.member(n, operand, values)?;
                 Ok(Evaluated {
                     node,
                     outcome: Outcome::Truth(truth),
                     reason,
-                    children: vec![operand],
+                    children,
                 })
             }
-            Expr::Between { .. } => self.between(node),
+            Expr::Between { .. } => self.between(node, children),
             Expr::IsNull(_) => {
-                let operand = self.sub_value(&node, 0)?;
+                let operand = only(&children)?;
                 let is_null = operand.value().is_none_or(Value::is_null);
                 let truth = self.logic.truth(is_null);
                 Ok(Evaluated {
                     node,
                     outcome: Outcome::Truth(truth),
                     reason: None,
-                    children: vec![operand],
+                    children,
                 })
             }
             Expr::Matches { .. } | Expr::StringTest { .. } => {
-                let operand = self.sub_value(&node, 0)?;
-                let (truth, reason) = self.string_test(&node, &operand)?;
+                let operand = only(&children)?;
+                let (truth, reason) = self.string_test(n, operand)?;
                 Ok(Evaluated {
                     node,
                     outcome: Outcome::Truth(truth),
                     reason,
-                    children: vec![operand],
+                    children,
                 })
             }
             Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_) => Err(Error::new(
@@ -350,17 +446,6 @@ impl<L: Logic> Evaluator<'_, '_, L> {
                 format!("'{}' is not a condition", n.tag()),
             )),
         }
-    }
-
-    /// The `index`-th child of `node`, evaluated as a value.
-    fn sub_value<'a>(&self, node: &Cow<'a, Node>, index: usize) -> Result<Evaluated<'a, L::Truth>> {
-        self.value(child(node, index))
-    }
-
-    fn two_values<'a>(&self, node: &Cow<'a, Node>) -> Result<Pair<'a, L::Truth>> {
-        let left = self.sub_value(node, 0)?;
-        let right = self.sub_value(node, 1)?;
-        Ok((left, right))
     }
 
     /// A connective's result: unknown takes the first unknown child's reason.
@@ -386,8 +471,12 @@ impl<L: Logic> Evaluator<'_, '_, L> {
         }
     }
 
-    fn value_as_condition<'a>(&self, node: Cow<'a, Node>) -> Result<Evaluated<'a, L::Truth>> {
-        let result = self.value(node.clone())?;
+    /// A field or constant used as a condition, from `result`, its value.
+    fn value_as_condition<'a>(
+        &self,
+        node: Cow<'a, Node>,
+        result: Evaluated<'a, L::Truth>,
+    ) -> Result<Evaluated<'a, L::Truth>> {
         let value = result
             .value()
             .cloned()
@@ -484,7 +573,11 @@ impl<L: Logic> Evaluator<'_, '_, L> {
         Ok((self.logic.truth(found), None))
     }
 
-    fn between<'a>(&self, node: Cow<'a, Node>) -> Result<Evaluated<'a, L::Truth>> {
+    fn between<'a>(
+        &self,
+        node: Cow<'a, Node>,
+        children: Vec<Evaluated<'a, L::Truth>>,
+    ) -> Result<Evaluated<'a, L::Truth>> {
         let Expr::Between {
             operand,
             low,
@@ -506,9 +599,15 @@ impl<L: Logic> Evaluator<'_, '_, L> {
         };
         // The halves are synthetic comparisons, kept so explanations can say which
         // bound failed; the operand is evaluated once and shared.
-        let operand_result = self.sub_value(&node, 0)?;
-        let low_result = self.sub_value(&node, 1)?;
-        let high_result = self.sub_value(&node, 2)?;
+        let mut children = children.into_iter();
+        let (Some(operand_result), Some(low_result), Some(high_result), None) = (
+            children.next(),
+            children.next(),
+            children.next(),
+            children.next(),
+        ) else {
+            return Err(lacks_child());
+        };
         let low_half_node = Node::compare(low_op, (**operand).clone(), (**low).clone())?;
         let high_half_node = Node::compare(high_op, (**operand).clone(), (**high).clone())?;
         let (low_truth, low_reason) =
@@ -570,21 +669,14 @@ impl<L: Logic> Evaluator<'_, '_, L> {
 
     // --- Values ----------------------------------------------------------------------------
 
-    /// Evaluate a value; an evaluation error names the innermost node that
-    /// failed.
-    fn value<'a>(&self, node: Cow<'a, Node>) -> Result<Evaluated<'a, L::Truth>> {
-        match node {
-            Cow::Borrowed(node) => self
-                .value_of(Cow::Borrowed(node))
-                .map_err(|error| failed_at(error, node)),
-            // A synthetic node (the halves of `between`): the error names the
-            // user's node above it.
-            Cow::Owned(node) => self.value_of(Cow::Owned(node)),
-        }
-    }
-
-    fn value_of<'a>(&self, node: Cow<'a, Node>) -> Result<Evaluated<'a, L::Truth>> {
-        match node.expr() {
+    /// A value's result from its children's.
+    fn finish_value<'a>(
+        &self,
+        node: Cow<'a, Node>,
+        children: Vec<Evaluated<'a, L::Truth>>,
+    ) -> Result<Evaluated<'a, L::Truth>> {
+        let n: &Node = &node;
+        match n.expr() {
             Expr::Field(path) => {
                 let (value, reason) = self.read(path)?;
                 Ok(Self::leaf(node, Outcome::Value(value), reason))
@@ -597,29 +689,28 @@ impl<L: Logic> Evaluator<'_, '_, L> {
                 Ok(Self::leaf(node, Outcome::Value(value), reason))
             }
             Expr::Arith { op, .. } => {
-                let op = *op;
-                let (left, right) = self.two_values(&node)?;
-                let (value, reason) = self.arith(&node, op, &left, &right)?;
+                let (left, right) = pair(&children)?;
+                let (value, reason) = self.arith(n, *op, left, right)?;
                 Ok(Evaluated {
                     node,
                     outcome: Outcome::Value(value),
                     reason,
-                    children: vec![left, right],
+                    children,
                 })
             }
             Expr::Abs(_) | Expr::Neg(_) => {
-                let operand = self.sub_value(&node, 0)?;
-                let (value, reason) = self.unary(&node, &operand)?;
+                let operand = only(&children)?;
+                let (value, reason) = self.unary(n, operand)?;
                 Ok(Evaluated {
                     node,
                     outcome: Outcome::Value(value),
                     reason,
-                    children: vec![operand],
+                    children,
                 })
             }
             _ => Err(Error::new(
                 ErrorCode::ExpressionError,
-                format!("a {} is not a value", node.tag()),
+                format!("a {} is not a value", n.tag()),
             )),
         }
     }
@@ -912,12 +1003,44 @@ fn float_result(value: f64, paths: impl Fn() -> Vec<Vec<Segment>>) -> (Value, Op
     }
 }
 
-/// The `index`-th child of a node: borrowed for a borrowed node, cloned for the
-/// owned halves of a `between`. Callers pass an index below the child count.
-fn child<'a>(node: &Cow<'a, Node>, index: usize) -> Cow<'a, Node> {
-    match node {
-        Cow::Borrowed(n) => Cow::Borrowed(n.children()[index]),
-        Cow::Owned(n) => Cow::Owned(n.children()[index].clone()),
+/// Whether a node is evaluated for its truth value or for its value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Mode {
+    Condition,
+    Value,
+}
+
+/// A node waiting in the evaluator's walk: the walk starts from a borrowed
+/// node and meets only its descendants, so every node it evaluates is the
+/// user's, and an evaluation error names it.
+#[derive(Clone, Copy)]
+pub(crate) struct Step<'a> {
+    node: &'a Node,
+    mode: Mode,
+}
+
+/// The stacks of the evaluator's walks, kept from one tree to the next.
+pub(crate) type Trees<'a, T> = Walk<Step<'a>, Evaluated<'a, T>>;
+
+/// A result without the children its node has: the walk gives every node its
+/// children, so this is never met.
+fn lacks_child() -> Error {
+    Error::new(ErrorCode::ExpressionError, "a result lacks a child")
+}
+
+/// The one child result of a node with one child.
+fn only<T>(children: &[T]) -> Result<&T> {
+    match children {
+        [only] => Ok(only),
+        _ => Err(lacks_child()),
+    }
+}
+
+/// The two child results of a node with two children.
+fn pair<T>(children: &[T]) -> Result<(&T, &T)> {
+    match children {
+        [left, right] => Ok((left, right)),
+        _ => Err(lacks_child()),
     }
 }
 

@@ -5,17 +5,22 @@
 //! built in post-order with the construction rules of `spec/ast.md`
 //! (`expression_error`).
 
+use std::vec::Drain;
+
 use crate::ast::{ArithOp, Closed, CompareOp, Expr, Node, StringOp};
 use crate::error::{Error, ErrorCode, Result, Segment};
 use crate::format::value::{ValueContext, read_value, write_value};
 use crate::json::{Json, JsonNumber, Limits, pointer_token};
 use crate::value::Value;
+use crate::walk::{Walk, post_order};
 
-/// A node whose shape is valid, not yet built.
+/// A node whose shape is valid, not yet built: its own data, and its child
+/// nodes in the order of [`Node::children`].
 #[derive(Debug)]
 pub(crate) struct Raw {
     pointer: String,
     shape: Shape,
+    children: Vec<Raw>,
 }
 
 /// A path segment before construction: an index may still be negative.
@@ -25,22 +30,23 @@ enum RawSegment {
     Index(i64),
 }
 
+/// A node's own data; its child nodes are in [`Raw::children`].
 #[derive(Debug)]
 enum Shape {
     Field(Vec<RawSegment>),
     Const(Value),
-    Compare(CompareOp, Box<Raw>, Box<Raw>),
-    And(Vec<Raw>),
-    Or(Vec<Raw>),
-    Not(Box<Raw>),
-    In(Box<Raw>, Vec<Value>),
-    Between(Box<Raw>, Box<Raw>, Box<Raw>, Closed),
-    IsNull(Box<Raw>),
-    Matches(Box<Raw>, String),
-    StringTest(StringOp, Box<Raw>, String),
-    Arith(ArithOp, Box<Raw>, Box<Raw>),
-    Abs(Box<Raw>),
-    Neg(Box<Raw>),
+    Compare(CompareOp),
+    And,
+    Or,
+    Not,
+    In(Vec<Value>),
+    Between(Closed),
+    IsNull,
+    Matches(String),
+    StringTest(StringOp, String),
+    Arith(ArithOp),
+    Abs,
+    Neg,
 }
 
 fn format_error(pointer: &str, message: impl Into<String>) -> Error {
@@ -53,7 +59,7 @@ fn child(pointer: &str, key: &str) -> String {
 
 /// The members of a node object, with the keys already read.
 struct Object<'a> {
-    pointer: &'a str,
+    pointer: String,
     members: &'a [(String, Json)],
     known: Vec<&'static str>,
 }
@@ -67,7 +73,7 @@ impl<'a> Object<'a> {
             .map(|(_, v)| v)
             .ok_or_else(|| {
                 format_error(
-                    &child(self.pointer, key),
+                    &child(&self.pointer, key),
                     format!("the key {key:?} is missing"),
                 )
             })
@@ -82,33 +88,87 @@ impl<'a> Object<'a> {
         match self.required(key)? {
             Json::String(s) => Ok(s),
             _ => Err(format_error(
-                &child(self.pointer, key),
+                &child(&self.pointer, key),
                 format!("{key:?} must be a string"),
             )),
         }
     }
 
-    /// After the known keys: an unknown key is an error, in text order.
-    fn finish(self) -> Result<()> {
+    /// After the known keys: an unknown key is an error, in text order;
+    /// else the object's pointer.
+    fn finish(self) -> Result<String> {
         match self
             .members
             .iter()
             .find(|(k, _)| !self.known.contains(&k.as_str()))
         {
             Some((key, _)) => Err(format_error(
-                &child(self.pointer, key),
+                &child(&self.pointer, key),
                 format!("unknown key {key:?}"),
             )
             .with_hint("it may come from a newer version of cleanrules")),
-            None => Ok(()),
+            None => Ok(self.pointer),
         }
     }
 }
 
-/// Check the shape of a node at `pointer`, `depth` nodes deep.
-// One arm per row of the node table reads best as a single dispatch.
-#[allow(clippy::too_many_lines)]
+/// A node whose shape is being checked: its object, its depth, its own data
+/// read so far, and where its child nodes are.
+struct Checking<'j> {
+    object: Object<'j>,
+    depth: usize,
+    shape: Shape,
+    children: Children<'j>,
+}
+
+/// Where a node's child nodes are: under keys, read in this order, or the items
+/// of `operands`, with that array's pointer.
+enum Children<'j> {
+    Keys(&'static [&'static str]),
+    Items(&'j [Json], String),
+}
+
+/// Check the shape of a node at `pointer`, `depth` nodes deep: depth first in
+/// pre-order, each node's keys in the order of its table, its child nodes
+/// where their keys come, then its unknown keys (`spec/json-format.md`,
+/// *Errors and limits*). The walk keeps its state on the heap (`crate::walk`),
+/// so the call stack does not grow with the depth.
 pub(crate) fn shape(json: &Json, pointer: &str, depth: usize, limits: &Limits) -> Result<Raw> {
+    post_order(
+        open(json, pointer.to_owned(), depth, limits)?,
+        |checking, done| {
+            let (json, at) = match &checking.children {
+                Children::Keys(keys) => {
+                    let Some(&key) = keys.get(done) else {
+                        return Ok(None);
+                    };
+                    let at = child(&checking.object.pointer, key);
+                    (checking.object.required(key)?, at)
+                }
+                &Children::Items(items, ref at) => match items.get(done) {
+                    Some(item) => (item, format!("{at}/{done}")),
+                    None => return Ok(None),
+                },
+            };
+            open(json, at, checking.depth + 1, limits).map(Some)
+        },
+        close,
+    )
+}
+
+/// The key of a node's one child node.
+const OPERAND: &[&str] = &["operand"];
+/// The keys of a node's two sides.
+const SIDES: &[&str] = &["left", "right"];
+
+/// Enter a node: its depth, that it is an object, its `op`, and the keys that
+/// come before its child nodes.
+fn open<'j>(
+    json: &'j Json,
+    pointer: String,
+    depth: usize,
+    limits: &Limits,
+) -> Result<Checking<'j>> {
     if depth > limits.max_depth {
         return Err(Error::new(
             ErrorCode::LimitExceeded,
@@ -121,7 +181,7 @@ pub(crate) fn shape(json: &Json, pointer: &str, depth: usize, limits: &Limits) -
     }
     let Json::Object(members) = json else {
         return Err(format_error(
-            pointer,
+            &pointer,
             "a node must be an object with an \"op\"",
         ));
     };
@@ -131,48 +191,80 @@ pub(crate) fn shape(json: &Json, pointer: &str, depth: usize, limits: &Limits) -
         known: Vec::new(),
     };
     let op = object.string("op")?;
-    let node = |object: &mut Object<'_>, key: &'static str| -> Result<Box<Raw>> {
-        let json = object.required(key)?;
-        Ok(Box::new(shape(
-            json,
-            &child(pointer, key),
-            depth + 1,
-            limits,
-        )?))
-    };
-    let shape = match op {
-        "field" => Shape::Field(read_path(
-            object.required("path")?,
-            &child(pointer, "path"),
-        )?),
-        "const" => Shape::Const(read_value(
-            object.required("value")?,
-            &child(pointer, "value"),
-            ValueContext::Constant,
-        )?),
+    let (shape, children) = match op {
+        "field" => {
+            let path = object.required("path")?;
+            let at = child(&object.pointer, "path");
+            (Shape::Field(read_path(path, &at)?), Children::Keys(&[]))
+        }
+        "const" => {
+            let value = object.required("value")?;
+            let at = child(&object.pointer, "value");
+            (
+                Shape::Const(read_value(value, &at, ValueContext::Constant)?),
+                Children::Keys(&[]),
+            )
+        }
         "and" | "or" => {
-            let at = child(pointer, "operands");
+            let at = child(&object.pointer, "operands");
             let Json::Array(items) = object.required("operands")? else {
                 return Err(format_error(&at, "\"operands\" must be an array of nodes"));
             };
-            let mut operands = Vec::with_capacity(items.len());
-            for (i, item) in items.iter().enumerate() {
-                operands.push(shape(item, &format!("{at}/{i}"), depth + 1, limits)?);
-            }
-            if op == "and" {
-                Shape::And(operands)
+            let shape = if op == "and" { Shape::And } else { Shape::Or };
+            (shape, Children::Items(items, at))
+        }
+        "not" => (Shape::Not, Children::Keys(OPERAND)),
+        "in" => (Shape::In(Vec::new()), Children::Keys(OPERAND)),
+        "between" => (
+            Shape::Between(Closed::Both),
+            Children::Keys(&["operand", "low", "high"]),
+        ),
+        "is_null" => (Shape::IsNull, Children::Keys(OPERAND)),
+        "matches" => (Shape::Matches(String::new()), Children::Keys(OPERAND)),
+        "abs" => (Shape::Abs, Children::Keys(OPERAND)),
+        "neg" => (Shape::Neg, Children::Keys(OPERAND)),
+        tag => {
+            if let Some(op) = CompareOp::from_tag(tag) {
+                (Shape::Compare(op), Children::Keys(SIDES))
+            } else if let Some(op) = ArithOp::from_tag(tag) {
+                (Shape::Arith(op), Children::Keys(SIDES))
+            } else if let Some(op) = StringOp::from_tag(tag) {
+                (
+                    Shape::StringTest(op, String::new()),
+                    Children::Keys(OPERAND),
+                )
             } else {
-                Shape::Or(operands)
+                return Err(format_error(
+                    &child(&object.pointer, "op"),
+                    format!("unknown op {tag:?}"),
+                )
+                .with_hint("it may come from a newer version of cleanrules"));
             }
         }
-        "not" => Shape::Not(node(&mut object, "operand")?),
-        "in" => {
-            let operand = node(&mut object, "operand")?;
-            let at = child(pointer, "values");
+    };
+    Ok(Checking {
+        object,
+        depth,
+        shape,
+        children,
+    })
+}
+
+/// Leave a node, its child nodes checked: the keys that come after them, then
+/// its unknown keys.
+fn close(checking: Checking<'_>, children: Drain<'_, Raw>) -> Result<Raw> {
+    let Checking {
+        mut object,
+        mut shape,
+        ..
+    } = checking;
+    match &mut shape {
+        Shape::In(values) => {
+            let at = child(&object.pointer, "values");
             let Json::Array(items) = object.required("values")? else {
                 return Err(format_error(&at, "\"values\" must be an array of values"));
             };
-            let mut values = Vec::with_capacity(items.len());
+            values.reserve_exact(items.len());
             for (i, item) in items.iter().enumerate() {
                 values.push(read_value(
                     item,
@@ -180,58 +272,32 @@ pub(crate) fn shape(json: &Json, pointer: &str, depth: usize, limits: &Limits) -
                     ValueContext::Constant,
                 )?);
             }
-            Shape::In(operand, values)
         }
-        "between" => {
-            let operand = node(&mut object, "operand")?;
-            let low = node(&mut object, "low")?;
-            let high = node(&mut object, "high")?;
-            let closed = match object.optional("closed") {
+        Shape::Between(closed) => {
+            *closed = match object.optional("closed") {
                 None => Closed::Both,
                 Some(Json::String(name)) => Closed::from_name(name).ok_or_else(|| {
                     format_error(
-                        &child(pointer, "closed"),
+                        &child(&object.pointer, "closed"),
                         r#""closed" is "both", "left", "right" or "none""#,
                     )
                 })?,
                 Some(_) => {
                     return Err(format_error(
-                        &child(pointer, "closed"),
+                        &child(&object.pointer, "closed"),
                         "\"closed\" must be a string",
                     ));
                 }
             };
-            Shape::Between(operand, low, high, closed)
         }
-        "is_null" => Shape::IsNull(node(&mut object, "operand")?),
-        "matches" => {
-            let operand = node(&mut object, "operand")?;
-            Shape::Matches(operand, object.string("pattern")?.to_owned())
-        }
-        "abs" => Shape::Abs(node(&mut object, "operand")?),
-        "neg" => Shape::Neg(node(&mut object, "operand")?),
-        tag => {
-            if let Some(op) = CompareOp::from_tag(tag) {
-                let left = node(&mut object, "left")?;
-                Shape::Compare(op, left, node(&mut object, "right")?)
-            } else if let Some(op) = ArithOp::from_tag(tag) {
-                let left = node(&mut object, "left")?;
-                Shape::Arith(op, left, node(&mut object, "right")?)
-            } else if let Some(op) = StringOp::from_tag(tag) {
-                let operand = node(&mut object, "operand")?;
-                Shape::StringTest(op, operand, object.string("text")?.to_owned())
-            } else {
-                return Err(
-                    format_error(&child(pointer, "op"), format!("unknown op {tag:?}"))
-                        .with_hint("it may come from a newer version of cleanrules"),
-                );
-            }
-        }
-    };
-    object.finish()?;
+        Shape::Matches(pattern) => object.string("pattern")?.clone_into(pattern),
+        Shape::StringTest(_, text) => object.string("text")?.clone_into(text),
+        _ => {}
+    }
     Ok(Raw {
-        pointer: pointer.to_owned(),
+        pointer: object.finish()?,
         shape,
+        children: children.collect(),
     })
 }
 
@@ -267,12 +333,26 @@ fn read_path(json: &Json, pointer: &str) -> Result<Vec<RawSegment>> {
 }
 
 /// Build the node, children first, adding the node's pointer to construction
-/// errors.
+/// errors: depth-first post-order, with an explicit stack (`crate::walk`).
 pub(crate) fn build(raw: Raw) -> Result<Node> {
-    let pointer = raw.pointer;
-    let at = |error: Error| error.at_pointer(pointer.clone());
-    let b = |raw: Box<Raw>| build(*raw);
-    match raw.shape {
+    let building = |raw: Raw| (raw.pointer, raw.shape, raw.children.into_iter());
+    post_order(
+        building(raw),
+        |(_, _, children), _| Ok(children.next().map(building)),
+        |(pointer, shape, _), nodes| construct(&pointer, shape, nodes),
+    )
+}
+
+/// A node from its own data and its child nodes, built.
+fn construct(pointer: &str, shape: Shape, mut nodes: Drain<'_, Node>) -> Result<Node> {
+    let at = |error: Error| error.at_pointer(pointer);
+    // `shape` read as many child nodes as its node has: one is never missing.
+    let mut next = || {
+        nodes
+            .next()
+            .ok_or_else(|| Error::new(ErrorCode::ExpressionError, "a node lacks an operand"))
+    };
+    match shape {
         Shape::Field(path) => {
             let mut segments = Vec::with_capacity(path.len());
             for segment in path {
@@ -291,48 +371,58 @@ pub(crate) fn build(raw: Raw) -> Result<Node> {
             Node::field(segments).map_err(at)
         }
         Shape::Const(value) => Node::constant(value).map_err(at),
-        Shape::Compare(op, left, right) => {
-            let (left, right) = (b(left)?, b(right)?);
+        Shape::Compare(op) => {
+            let (left, right) = (next()?, next()?);
             Node::compare(op, left, right).map_err(at)
         }
-        Shape::And(operands) => {
-            let operands = build_all(operands)?;
-            Node::and(operands).map_err(at)
-        }
-        Shape::Or(operands) => {
-            let operands = build_all(operands)?;
-            Node::or(operands).map_err(at)
-        }
-        Shape::Not(operand) => Node::not(b(operand)?).map_err(at),
-        Shape::In(operand, values) => Node::is_in(b(operand)?, values).map_err(at),
-        Shape::Between(operand, low, high, closed) => {
-            let (operand, low, high) = (b(operand)?, b(low)?, b(high)?);
+        Shape::And => Node::and(nodes.collect()).map_err(at),
+        Shape::Or => Node::or(nodes.collect()).map_err(at),
+        Shape::Not => Node::not(next()?).map_err(at),
+        Shape::In(values) => Node::is_in(next()?, values).map_err(at),
+        Shape::Between(closed) => {
+            let (operand, low, high) = (next()?, next()?, next()?);
             Node::between(operand, low, high, closed).map_err(at)
         }
-        Shape::IsNull(operand) => Node::is_null(b(operand)?).map_err(at),
-        Shape::Matches(operand, pattern) => Node::matches(b(operand)?, &pattern).map_err(at),
-        Shape::StringTest(op, operand, text) => {
-            Node::string_test(op, b(operand)?, text).map_err(at)
-        }
-        Shape::Arith(op, left, right) => {
-            let (left, right) = (b(left)?, b(right)?);
+        Shape::IsNull => Node::is_null(next()?).map_err(at),
+        Shape::Matches(pattern) => Node::matches(next()?, &pattern).map_err(at),
+        Shape::StringTest(op, text) => Node::string_test(op, next()?, text).map_err(at),
+        Shape::Arith(op) => {
+            let (left, right) = (next()?, next()?);
             Node::arith(op, left, right).map_err(at)
         }
-        Shape::Abs(operand) => Node::abs(b(operand)?).map_err(at),
-        Shape::Neg(operand) => Node::neg(b(operand)?).map_err(at),
+        Shape::Abs => Node::abs(next()?).map_err(at),
+        Shape::Neg => Node::neg(next()?).map_err(at),
     }
 }
 
-fn build_all(raws: Vec<Raw>) -> Result<Vec<Node>> {
-    raws.into_iter().map(build).collect()
-}
-
 /// Write a node in canonical form: keys in table order, `op` first, `closed`
-/// always written.
+/// always written. Written with an explicit stack (`crate::walk`), so the
+/// call stack does not grow with the node's depth.
 #[must_use]
 pub fn write_node(node: &Node) -> Json {
+    write_node_in(&mut Walk::default(), node)
+}
+
+/// [`write_node`], with the walk's stacks of `walk`: a rule set writes every
+/// node of its rules with the same ones.
+pub(crate) fn write_node_in<'n>(walk: &mut Walk<&'n Node, Json>, node: &'n Node) -> Json {
+    let written: std::result::Result<Json, std::convert::Infallible> = walk.run(
+        node,
+        |node, done| Ok(node.child(done)),
+        |node, children| Ok(write_one(node, children)),
+    );
+    match written {
+        Ok(json) => json,
+        Err(never) => match never {},
+    }
+}
+
+/// A node, given its children written in order.
+fn write_one(node: &Node, mut children: impl Iterator<Item = Json>) -> Json {
     let mut members: Vec<(String, Json)> = vec![("op".into(), Json::String(node.tag().into()))];
     let mut put = |key: &str, json: Json| members.push((key.to_owned(), json));
+    // The walk gives every child: a missing one cannot happen.
+    let mut child = || children.next().unwrap_or(Json::Null);
     match node.expr() {
         Expr::Field(path) => put(
             "path",
@@ -346,43 +436,38 @@ pub fn write_node(node: &Node) -> Json {
             ),
         ),
         Expr::Const(value) => put("value", write_value(value)),
-        Expr::Compare { left, right, .. } | Expr::Arith { left, right, .. } => {
-            put("left", write_node(left));
-            put("right", write_node(right));
+        Expr::Compare { .. } | Expr::Arith { .. } => {
+            put("left", child());
+            put("right", child());
         }
         Expr::And(operands) | Expr::Or(operands) => {
             put(
                 "operands",
-                Json::Array(operands.iter().map(write_node).collect()),
+                Json::Array((0..operands.len()).map(|_| child()).collect()),
             );
         }
-        Expr::Not(operand) | Expr::IsNull(operand) | Expr::Abs(operand) | Expr::Neg(operand) => {
-            put("operand", write_node(operand));
+        Expr::Not(_) | Expr::IsNull(_) | Expr::Abs(_) | Expr::Neg(_) => {
+            put("operand", child());
         }
-        Expr::In { operand, values } => {
-            put("operand", write_node(operand));
+        Expr::In { values, .. } => {
+            put("operand", child());
             put(
                 "values",
                 Json::Array(values.iter().map(write_value).collect()),
             );
         }
-        Expr::Between {
-            operand,
-            low,
-            high,
-            closed,
-        } => {
-            put("operand", write_node(operand));
-            put("low", write_node(low));
-            put("high", write_node(high));
+        Expr::Between { closed, .. } => {
+            put("operand", child());
+            put("low", child());
+            put("high", child());
             put("closed", Json::String(closed.as_str().into()));
         }
-        Expr::Matches { operand, pattern } => {
-            put("operand", write_node(operand));
+        Expr::Matches { pattern, .. } => {
+            put("operand", child());
             put("pattern", Json::String(pattern.source().into()));
         }
-        Expr::StringTest { operand, text, .. } => {
-            put("operand", write_node(operand));
+        Expr::StringTest { text, .. } => {
+            put("operand", child());
             put("text", Json::String(text.clone()));
         }
     }

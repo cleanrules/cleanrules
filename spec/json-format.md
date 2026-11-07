@@ -850,3 +850,15 @@ nest deeper, and a decision can be larger than its rule set, so writers do not
 enforce these limits, and callers that read large decisions raise them. The
 caller can raise the limits, but never disable them. A reader must not overflow its stack on any
 input within its limits.
+
+The core walks conditions, result trees, explanations and data with explicit
+stacks on the heap, not with recursion, so its call stack does not grow with
+the depth: at the default limits, every operation (reading, writing in every
+format, evaluating, explaining, summarising, copying and comparing) needs at
+most **128 KiB** of stack in a release build and **512 KiB** in a debug build,
+less than the threads of the hosts the bindings serve have (a JVM thread has
+1 MiB on Linux and Windows). Freeing is the exception: it takes stack in
+proportion to the nesting, most for lists and maps (about 64 bytes a level in
+a release build, 240 in a debug build), so a caller that raises `max_nesting`
+or `max_depth` far beyond its default gives the threads that use the core a
+larger stack.

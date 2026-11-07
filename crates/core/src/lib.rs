@@ -20,6 +20,7 @@ pub mod rules;
 pub mod table;
 pub mod text;
 pub mod value;
+mod walk;
 #[cfg(feature = "yaml")]
 pub mod yaml;
 

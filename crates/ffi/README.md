@@ -73,6 +73,13 @@ The whole program, with explanations and errors, is
 - **Limits.** `CR_LIMIT_MAX_SIZE` sets the size limit of every format at once
   and reads JSON's; `CR_LIMIT_MAX_YAML_SIZE` and `CR_LIMIT_MAX_TEXT_SIZE` (the
   rule syntax and CSV) set one each.
+- **Stack.** At the default limits every call needs at most 128 KiB of stack
+  in a release build of the library (512 KiB in a debug build), less than a
+  JVM thread has (1 MiB on Linux and Windows). Freeing values or
+  conditions nested far deeper than the default `CR_LIMIT_MAX_NESTING` or
+  `CR_LIMIT_MAX_DEPTH` takes more, about 64 bytes a level of data in a release
+  build: give such threads a larger stack
+  ([`spec/json-format.md`](../../spec/json-format.md#errors-and-limits)).
 - **Rule sets.** `cr_ruleset_read` accepts a rule set, a decision table, which
   it compiles, or one rule, which becomes a rule set of one with the default
   settings (`spec/json-format.md`, *Documents*).

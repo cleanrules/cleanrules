@@ -1,6 +1,7 @@
 //! Values in JSON (`spec/json-format.md`, *Values*): bare JSON where it is
 //! unambiguous, and typed values (`{"$decimal": "0.10"}`) elsewhere.
 
+use std::borrow::Cow;
 use std::fmt::Write as _;
 
 use jiff::Timestamp;
@@ -13,6 +14,7 @@ use crate::value::{
     AwareDateTime, Decimal, DecimalError, Map, NullCause, Opaque, Value, Zone, check_date,
     check_naive,
 };
+use crate::walk::post_order;
 
 /// Where a value is read, which decides what is allowed and what an out-of-range
 /// number becomes.
@@ -42,26 +44,98 @@ fn format_error(pointer: &str, message: impl Into<String>) -> Error {
 /// `format_error`, pointing to the offending value or key, when the JSON is not a
 /// value allowed in `context`.
 pub fn read_value(json: &Json, pointer: &str, context: ValueContext) -> Result<Value> {
-    match json {
-        Json::Null => Ok(Value::Null(NullCause::Null)),
-        Json::Bool(b) => Ok(Value::Bool(*b)),
-        Json::String(s) => Ok(Value::String(s.clone())),
-        Json::Number(n) => read_number(n, pointer, context),
+    if !matches!(json, Json::Array(_) | Json::Object(_)) {
+        return read_scalar(json, pointer, context);
+    }
+    // Lists and maps nest as deep as the JSON nesting limit allows: they are read
+    // with an explicit stack (`crate::walk`), children in order after their
+    // container's own checks, as a recursive reader would.
+    post_order(
+        open_value(json, Cow::Borrowed(pointer), context)?,
+        |reading, done| {
+            let (at, item) = match &reading.items {
+                Items::None(_) => return Ok(None),
+                Items::List(items) => match items.get(done) {
+                    Some(item) => (format!("{}/{done}", reading.pointer), item),
+                    None => return Ok(None),
+                },
+                Items::Map(members) => match members.get(done) {
+                    Some((key, item)) => {
+                        (format!("{}/{}", reading.pointer, pointer_token(key)), item)
+                    }
+                    None => return Ok(None),
+                },
+            };
+            open_value(item, Cow::Owned(at), context).map(Some)
+        },
+        |reading, values| {
+            Ok(match reading.items {
+                Items::None(value) => value,
+                Items::List(_) => Value::List(values.collect()),
+                Items::Map(members) => {
+                    let mut map = Map::new();
+                    for ((key, _), value) in members.iter().zip(values) {
+                        map.insert(key.clone(), value);
+                    }
+                    Value::Map(map)
+                }
+            })
+        },
+    )
+}
+
+/// A value being read: its pointer (for a `$map`, that of its entries) and its
+/// items still to read.
+struct Reading<'a> {
+    pointer: Cow<'a, str>,
+    items: Items<'a>,
+}
+
+enum Items<'j> {
+    /// A value without items, already read.
+    None(Value),
+    List(&'j [Json]),
+    Map(&'j [(String, Json)]),
+}
+
+/// Check a value as a reader entering it would, and read it if it has no items.
+fn open_value<'a>(
+    json: &'a Json,
+    pointer: Cow<'a, str>,
+    context: ValueContext,
+) -> Result<Reading<'a>> {
+    let items = match json {
         Json::Array(items) => {
             if context == ValueContext::Constant {
                 return Err(format_error(
-                    pointer,
+                    &pointer,
                     "a constant must be a scalar, not a list",
                 ));
             }
-            let mut list = Vec::with_capacity(items.len());
-            for (i, item) in items.iter().enumerate() {
-                list.push(read_value(item, &format!("{pointer}/{i}"), context)?);
-            }
-            Ok(Value::List(list))
+            Items::List(items)
         }
-        Json::Object(members) => read_object(members, pointer, context),
-    }
+        Json::Object(members) => match read_object(members, &pointer, context)? {
+            Object::Value(value) => Items::None(value),
+            Object::Map(members, at) => {
+                return Ok(Reading {
+                    pointer: at.map_or(pointer, Cow::Owned),
+                    items: Items::Map(members),
+                });
+            }
+        },
+        scalar => Items::None(read_scalar(scalar, &pointer, context)?),
+    };
+    Ok(Reading { pointer, items })
+}
+
+/// A value that is neither a list nor an object.
+fn read_scalar(json: &Json, pointer: &str, context: ValueContext) -> Result<Value> {
+    Ok(match json {
+        Json::Bool(b) => Value::Bool(*b),
+        Json::String(s) => Value::String(s.clone()),
+        Json::Number(n) => return read_number(n, pointer, context),
+        _ => Value::Null(NullCause::Null),
+    })
 }
 
 fn read_number(n: &JsonNumber, pointer: &str, context: ValueContext) -> Result<Value> {
@@ -92,7 +166,18 @@ fn read_float_literal(n: &JsonNumber, pointer: &str) -> Result<Value> {
     Ok(Value::Float(f))
 }
 
-fn read_object(members: &[(String, Json)], pointer: &str, context: ValueContext) -> Result<Value> {
+/// An object read: a typed value, or a map's entries to read, at the object's
+/// pointer or, for a `$map`, at this one.
+enum Object<'j> {
+    Value(Value),
+    Map(&'j [(String, Json)], Option<String>),
+}
+
+fn read_object<'j>(
+    members: &'j [(String, Json)],
+    pointer: &str,
+    context: ValueContext,
+) -> Result<Object<'j>> {
     let Some(typed) = members.iter().position(|(k, _)| k.starts_with('$')) else {
         if context == ValueContext::Constant {
             return Err(format_error(
@@ -100,7 +185,7 @@ fn read_object(members: &[(String, Json)], pointer: &str, context: ValueContext)
                 "a constant must be a scalar, not a map",
             ));
         }
-        return read_map(members, pointer, context);
+        return Ok(Object::Map(members, None));
     };
     let (tag, inner) = &members[typed];
     let at = format!("{pointer}/{}", pointer_token(tag));
@@ -116,7 +201,19 @@ fn read_object(members: &[(String, Json)], pointer: &str, context: ValueContext)
             format!("a typed value has the single key {tag}; {extra:?} is extra"),
         ));
     }
-    match tag.as_str() {
+    if tag == "$map" {
+        let Json::Object(entries) = inner else {
+            return Err(format_error(&at, "$map takes an object"));
+        };
+        if context == ValueContext::Constant {
+            return Err(format_error(
+                pointer,
+                "a constant must be a scalar, not a map",
+            ));
+        }
+        return Ok(Object::Map(entries, Some(at)));
+    }
+    let value = match tag.as_str() {
         "$int" => read_typed_int(inner, &at, context),
         "$float" => match inner {
             Json::Number(n) => read_float_literal(n, &at),
@@ -153,18 +250,6 @@ fn read_object(members: &[(String, Json)], pointer: &str, context: ValueContext)
             };
             parse_datetime(text).map_err(|why| format_error(&at, format!("{text:?}: {why}")))
         }
-        "$map" => {
-            let Json::Object(entries) = inner else {
-                return Err(format_error(&at, "$map takes an object"));
-            };
-            if context == ValueContext::Constant {
-                return Err(format_error(
-                    pointer,
-                    "a constant must be a scalar, not a map",
-                ));
-            }
-            read_map(entries, &at, context)
-        }
         // "$opaque"
         _ => match (inner, context) {
             (Json::String(name), ValueContext::Recorded) if !name.is_empty() => {
@@ -178,7 +263,8 @@ fn read_object(members: &[(String, Json)], pointer: &str, context: ValueContext)
                 "an opaque value appears only in decisions and explanations",
             )),
         },
-    }
+    };
+    value.map(Object::Value)
 }
 
 fn read_typed_int(inner: &Json, at: &str, context: ValueContext) -> Result<Value> {
@@ -210,15 +296,6 @@ fn read_typed_int(inner: &Json, at: &str, context: ValueContext) -> Result<Value
         )),
         None => Ok(Value::Null(NullCause::IntOverflow)),
     }
-}
-
-fn read_map(members: &[(String, Json)], pointer: &str, context: ValueContext) -> Result<Value> {
-    let mut map = Map::new();
-    for (key, item) in members {
-        let at = format!("{pointer}/{}", pointer_token(key));
-        map.insert(key.clone(), read_value(item, &at, context)?);
-    }
-    Ok(Value::Map(map))
 }
 
 /// Read `YYYY-MM-DD`, years 0001 to 9999.
@@ -367,6 +444,38 @@ fn parse_offset(text: &str) -> Option<(Offset, &str)> {
 /// Write a value in canonical form.
 #[must_use]
 pub fn write_value(value: &Value) -> Json {
+    if !matches!(value, Value::List(_) | Value::Map(_)) {
+        return write_scalar(value);
+    }
+    // Lists and maps nest as deep as the reader's limits allow: written with an
+    // explicit stack (`crate::walk`).
+    let written: std::result::Result<Json, std::convert::Infallible> = post_order(
+        value,
+        |value, done| Ok(value.item(done)),
+        |value, items| {
+            Ok(match value {
+                Value::List(_) => Json::Array(items.collect()),
+                Value::Map(map) => {
+                    let members: Vec<(String, Json)> =
+                        map.iter().map(|(k, _)| k.to_owned()).zip(items).collect();
+                    if map.iter().any(|(k, _)| k.starts_with('$')) {
+                        typed("$map", Json::Object(members))
+                    } else {
+                        Json::Object(members)
+                    }
+                }
+                scalar => write_scalar(scalar),
+            })
+        },
+    );
+    match written {
+        Ok(json) => json,
+        Err(never) => match never {},
+    }
+}
+
+/// A value without items in canonical form (a list or map as if empty).
+fn write_scalar(value: &Value) -> Json {
     match value {
         Value::Null(_) => Json::Null,
         Value::Bool(b) => Json::Bool(*b),
@@ -385,18 +494,8 @@ pub fn write_value(value: &Value) -> Json {
         Value::Date(d) => typed("$date", Json::String(date_text(*d))),
         Value::NaiveDateTime(dt) => typed("$datetime", Json::String(naive_text(*dt))),
         Value::AwareDateTime(a) => typed("$datetime", Json::String(aware_text(a))),
-        Value::List(items) => Json::Array(items.iter().map(write_value).collect()),
-        Value::Map(map) => {
-            let members: Vec<(String, Json)> = map
-                .iter()
-                .map(|(k, v)| (k.to_owned(), write_value(v)))
-                .collect();
-            if map.iter().any(|(k, _)| k.starts_with('$')) {
-                typed("$map", Json::Object(members))
-            } else {
-                Json::Object(members)
-            }
-        }
+        Value::List(_) => Json::Array(Vec::new()),
+        Value::Map(_) => Json::Object(Vec::new()),
         Value::Opaque(o) => typed("$opaque", Json::String(o.type_name.clone())),
     }
 }

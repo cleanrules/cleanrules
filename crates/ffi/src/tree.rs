@@ -29,9 +29,12 @@ pub struct cr_tree {
 
 /// Each result's node, in pre-order.
 fn nodes(evaluated: &Evaluated<'_, Truth>, out: &mut Vec<Node>) {
-    out.push(evaluated.node.as_ref().clone());
-    for child in &evaluated.children {
-        nodes(child, out);
+    // In depth-first pre-order, with an explicit stack: a result tree is as
+    // deep as its condition.
+    let mut pending = vec![evaluated];
+    while let Some(evaluated) = pending.pop() {
+        out.push(evaluated.node.as_ref().clone());
+        pending.extend(evaluated.children.iter().rev());
     }
 }
 

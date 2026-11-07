@@ -889,6 +889,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already did (task D.5).
 ### Fixed
 
+- A condition, result tree or data value at the default limits no longer
+  overflows a small thread stack: the core read, evaluated, explained and wrote
+  them recursively, so a condition 256 nodes deep needed about 2 MiB of stack
+  to be read and 4 MiB to be evaluated in a debug build (1 MiB in a release
+  build), and the deepest rule text 3.9 MiB (640 KiB), which crashed the JVM
+  test runner on Linux and Windows, where a Java thread has 1 MiB. Every walk
+  over conditions, result trees, explanations, texts and data now keeps its
+  state on the heap; at the default limits every operation needs at most
+  128 KiB of stack in a release build and 512 KiB in a debug build
+  (`spec/json-format.md`, *Errors and limits*), and the conformance vectors
+  run on threads of that size in the core and through the C ABI.
 - Java binding (found in task G.1c): on a Java runtime with no native linker
   for the platform (`Linker.nativeLinker()` throws), loading the library was
   an `ExceptionInInitializerError` that hid why; it is now an

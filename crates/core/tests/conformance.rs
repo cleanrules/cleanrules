@@ -21,7 +21,7 @@ use cleanrules::format::{
 use cleanrules::format::{read_decision_document, write_explanation, write_summary};
 use cleanrules::json::{Json, Limits, parse, to_string};
 use cleanrules::logic::Kleene;
-use common::{get, same, text, vector_files};
+use common::{get, on_small_stack, same, text, vector_files};
 
 /// Remove `detail` from reasons, which is never compared.
 fn strip_detail(json: &Json) -> Json {
@@ -283,44 +283,48 @@ fn run(vector: &Json) -> Result<(), String> {
 
 #[test]
 fn conformance_vectors() {
-    let mut passed = 0;
-    let mut pending: BTreeMap<String, usize> = BTreeMap::new();
-    let mut failures = Vec::new();
-    for path in vector_files() {
-        let file = parse(&fs::read_to_string(&path).unwrap(), &Limits::default()).unwrap();
-        let Some(Json::Array(vectors)) = get(&file, "vectors") else {
-            continue;
-        };
-        for vector in vectors {
-            let kind = text(get(get(vector, "given").unwrap(), "kind")).unwrap();
-            if !matches!(
-                kind,
-                "condition" | "value" | "evaluate" | "explain" | "summary"
-            ) {
-                *pending.entry(kind.to_owned()).or_default() += 1;
+    // On a small stack, as a binding's thread may be (`spec/json-format.md`,
+    // *Errors and limits*).
+    on_small_stack(|| {
+        let mut passed = 0;
+        let mut pending: BTreeMap<String, usize> = BTreeMap::new();
+        let mut failures = Vec::new();
+        for path in vector_files() {
+            let file = parse(&fs::read_to_string(&path).unwrap(), &Limits::default()).unwrap();
+            let Some(Json::Array(vectors)) = get(&file, "vectors") else {
                 continue;
-            }
-            match run(vector) {
-                Ok(()) => passed += 1,
-                Err(problem) => {
-                    failures.push(format!("{}: {problem}", text(get(vector, "id")).unwrap()));
+            };
+            for vector in vectors {
+                let kind = text(get(get(vector, "given").unwrap(), "kind")).unwrap();
+                if !matches!(
+                    kind,
+                    "condition" | "value" | "evaluate" | "explain" | "summary"
+                ) {
+                    *pending.entry(kind.to_owned()).or_default() += 1;
+                    continue;
+                }
+                match run(vector) {
+                    Ok(()) => passed += 1,
+                    Err(problem) => {
+                        failures.push(format!("{}: {problem}", text(get(vector, "id")).unwrap()));
+                    }
                 }
             }
         }
-    }
-    println!(
-        "{passed} passed, {} failed; pending kinds: {pending:?}",
-        failures.len()
-    );
-    let shown: Vec<&String> = failures.iter().take(15).collect();
-    assert!(
-        failures.is_empty(),
-        "{} failed, first ones:\n{}",
-        failures.len(),
-        shown
-            .iter()
-            .map(|s| s.as_str())
-            .collect::<Vec<_>>()
-            .join("\n")
-    );
+        println!(
+            "{passed} passed, {} failed; pending kinds: {pending:?}",
+            failures.len()
+        );
+        let shown: Vec<&String> = failures.iter().take(15).collect();
+        assert!(
+            failures.is_empty(),
+            "{} failed, first ones:\n{}",
+            failures.len(),
+            shown
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+    });
 }

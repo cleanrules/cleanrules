@@ -564,38 +564,74 @@ fn lone_surrogate(line: u64, column: u64) -> Error {
 #[must_use]
 pub fn to_string(value: &Json) -> String {
     let mut out = String::new();
-    write_value(&mut out, value);
-    out
+    // The open arrays and objects, each with its items still to write and
+    // whether it has written one: an explicit stack, so that no value within
+    // the limits overflows the call stack.
+    let mut open: Vec<Open<'_>> = Vec::new();
+    let mut value = value;
+    loop {
+        match value {
+            Json::Array(items) => {
+                out.push('[');
+                open.push(Open::Array(items.iter(), true));
+            }
+            Json::Object(members) => {
+                out.push('{');
+                open.push(Open::Object(members.iter(), true));
+            }
+            scalar => write_scalar(&mut out, scalar),
+        }
+        // The next item of the innermost open collection, closing those done.
+        loop {
+            let Some(top) = open.last_mut() else {
+                return out;
+            };
+            let (next, first, close) = match top {
+                Open::Array(items, first) => {
+                    let next = items.next();
+                    if next.is_some() && !*first {
+                        out.push(',');
+                    }
+                    (next, first, ']')
+                }
+                Open::Object(members, first) => {
+                    let next = members.next().map(|(key, item)| {
+                        if !*first {
+                            out.push(',');
+                        }
+                        write_string(&mut out, key);
+                        out.push(':');
+                        item
+                    });
+                    (next, first, '}')
+                }
+            };
+            if let Some(item) = next {
+                *first = false;
+                value = item;
+                break;
+            }
+            out.push(close);
+            open.pop();
+        }
+    }
 }
 
-fn write_value(out: &mut String, value: &Json) {
+/// An array or object being written: its items still to write, and whether
+/// none has been written yet.
+enum Open<'a> {
+    Array(std::slice::Iter<'a, Json>, bool),
+    Object(std::slice::Iter<'a, (String, Json)>, bool),
+}
+
+fn write_scalar(out: &mut String, value: &Json) {
     match value {
         Json::Null => out.push_str("null"),
         Json::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
         Json::Number(n) => out.push_str(n.text()),
         Json::String(s) => write_string(out, s),
-        Json::Array(items) => {
-            out.push('[');
-            for (i, item) in items.iter().enumerate() {
-                if i > 0 {
-                    out.push(',');
-                }
-                write_value(out, item);
-            }
-            out.push(']');
-        }
-        Json::Object(members) => {
-            out.push('{');
-            for (i, (key, item)) in members.iter().enumerate() {
-                if i > 0 {
-                    out.push(',');
-                }
-                write_string(out, key);
-                out.push(':');
-                write_value(out, item);
-            }
-            out.push('}');
-        }
+        // Collections are written by `to_string`.
+        Json::Array(_) | Json::Object(_) => {}
     }
 }
 
@@ -625,23 +661,41 @@ fn write_string(out: &mut String, text: &str) {
 /// float zero.
 #[must_use]
 pub fn same(a: &Json, b: &Json) -> bool {
-    match (a, b) {
-        (Json::Number(x), Json::Number(y)) => {
-            x.is_integer_literal() == y.is_integer_literal()
-                && if x.is_integer_literal() {
-                    x.as_i128().is_some() && x.as_i128() == y.as_i128()
-                } else {
-                    x.as_f64().to_bits() == y.as_f64().to_bits()
-                }
+    // Pairs still to compare, with an explicit stack (see `to_string`), which
+    // two values without items never need.
+    let mut pending = Vec::new();
+    let mut next = Some((a, b));
+    while let Some((a, b)) = next.take().or_else(|| pending.pop()) {
+        let equal = match (a, b) {
+            (Json::Number(x), Json::Number(y)) => {
+                x.is_integer_literal() == y.is_integer_literal()
+                    && if x.is_integer_literal() {
+                        x.as_i128().is_some() && x.as_i128() == y.as_i128()
+                    } else {
+                        x.as_f64().to_bits() == y.as_f64().to_bits()
+                    }
+            }
+            (Json::Array(x), Json::Array(y)) => {
+                pending.extend(x.iter().zip(y));
+                x.len() == y.len()
+            }
+            (Json::Object(x), Json::Object(y)) => {
+                x.len() == y.len()
+                    && x.iter().zip(y).all(|((k, p), (l, q))| {
+                        pending.push((p, q));
+                        k == l
+                    })
+            }
+            (Json::Null, Json::Null) => true,
+            (Json::Bool(x), Json::Bool(y)) => x == y,
+            (Json::String(x), Json::String(y)) => x == y,
+            _ => false,
+        };
+        if !equal {
+            return false;
         }
-        (Json::Array(x), Json::Array(y)) => {
-            x.len() == y.len() && x.iter().zip(y).all(|(p, q)| same(p, q))
-        }
-        (Json::Object(x), Json::Object(y)) => {
-            x.len() == y.len() && x.iter().zip(y).all(|((k, p), (l, q))| k == l && same(p, q))
-        }
-        _ => a == b,
     }
+    true
 }
 
 /// Escape a key for a JSON Pointer: `~` becomes `~0` and `/` becomes `~1`.

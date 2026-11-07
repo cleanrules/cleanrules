@@ -8,6 +8,28 @@ use std::path::{Path, PathBuf};
 
 use cleanrules::json::{Json, Limits, parse};
 
+/// The most stack any operation at the default limits needs
+/// (`spec/json-format.md`, *Errors and limits*): 512 KiB in debug builds and
+/// 128 KiB in release builds, less than a JVM or Node worker thread has.
+pub const STACK: usize = if cfg!(debug_assertions) {
+    512 << 10
+} else {
+    128 << 10
+};
+
+/// Run `f` on a thread with [`STACK`] bytes of stack, as a binding's thread
+/// may be; a panic in `f` is the caller's.
+pub fn on_small_stack<T: Send>(f: impl FnOnce() -> T + Send) -> T {
+    std::thread::scope(|scope| {
+        std::thread::Builder::new()
+            .stack_size(STACK)
+            .spawn_scoped(scope, f)
+            .unwrap()
+            .join()
+            .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+    })
+}
+
 /// The conformance vectors directory.
 pub fn vectors_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance/vectors")

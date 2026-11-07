@@ -27,12 +27,15 @@
 //! # Ok::<(), cleanrules::Error>(())
 //! ```
 
+use std::convert::Infallible;
+
 use crate::ast::{CompareOp, Expr, Node};
 use crate::error::Segment;
 use crate::eval::{Evaluated, Outcome, Reason};
 use crate::logic::Truth;
 use crate::rules::{Decision, HitPolicy, Rule, RuleResult, RuleSet};
 use crate::value::{Number, Value};
+use crate::walk::{Walk, post_order};
 
 /// How a rule ended up (`spec/explain.md`, *Rule status*).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -220,6 +223,7 @@ pub fn explain<'d, 'a>(decision: &'d Decision<'a>) -> Explanation<'d, 'a> {
     let selected: Vec<&str> = decision.selected().map(|r| r.rule.name()).collect();
     let winner = decision.selected().next();
     let policy = decision.ruleset().hit_policy();
+    let mut walks = Walks::default();
     let rules = decision
         .results()
         .iter()
@@ -234,10 +238,11 @@ pub fn explain<'d, 'a>(decision: &'d Decision<'a>) -> Explanation<'d, 'a> {
             } else {
                 Status::NotFired
             };
-            let mut requirement = simplify(requirement(&result.when, false));
+            let built = requirement(&mut walks.requirements, &result.when, false);
+            let mut requirement = simplify(built);
             let mut achievable = None;
             if matches!(status, Status::NotFired | Status::Unknown) {
-                let (kept, ok) = keep_options_that_fire(&result.when, requirement);
+                let (kept, ok) = keep_options_that_fire(&mut walks, &result.when, requirement);
                 requirement = kept;
                 achievable = Some(ok);
             }
@@ -273,6 +278,17 @@ fn note(policy: HitPolicy, result: &RuleResult<'_>, winner: &RuleResult<'_>) -> 
     }
 }
 
+/// The stacks of an explanation's walks, kept from one rule to the next.
+#[derive(Default)]
+struct Walks<'d, 'a> {
+    requirements: Walk<Opened<'d, 'a>, Requirement<'d, 'a>>,
+    replays: Vec<Replaying<'d, 'a>>,
+}
+
+/// A connective being replayed: its result, its next child, and the truth of
+/// the children before it, combined.
+type Replaying<'d, 'a> = (&'d Evaluated<'a, Truth>, usize, Truth);
+
 // --- Requirements ----------------------------------------------------------------------
 
 fn kleene_not(t: Truth) -> Truth {
@@ -288,13 +304,66 @@ fn truth_of(result: &Evaluated<'_, Truth>) -> Truth {
 }
 
 /// Build the requirement of a result (`spec/explain.md`, *Building the
-/// requirement*).
-fn requirement<'d, 'a>(result: &'d Evaluated<'a, Truth>, negated: bool) -> Requirement<'d, 'a> {
+/// requirement*). Built with an explicit stack (`crate::walk`), as are the other
+/// walks over result trees and requirements below: both are as deep as the
+/// condition.
+fn requirement<'d, 'a>(
+    walk: &mut Walk<Opened<'d, 'a>, Requirement<'d, 'a>>,
+    result: &'d Evaluated<'a, Truth>,
+    negated: bool,
+) -> Requirement<'d, 'a> {
+    let built: Result<Requirement<'d, 'a>, Infallible> = walk.run(
+        open_requirement(result, negated),
+        |opened, done| {
+            Ok(opened
+                .chosen
+                .get(done)
+                .map(|child| open_requirement(child, opened.negated)))
+        },
+        |opened, items| {
+            Ok(match opened.kind {
+                Some(kind) => Requirement::Group(kind, items.collect()),
+                None => Requirement::Cause(cause(opened.result, opened.negated)),
+            })
+        },
+    );
+    match built {
+        Ok(requirement) => requirement,
+        Err(never) => match never {},
+    }
+}
+
+/// A requirement being built: a cause (no kind), or a group of the
+/// requirements of the chosen children.
+struct Opened<'d, 'a> {
+    result: &'d Evaluated<'a, Truth>,
+    negated: bool,
+    kind: Option<GroupKind>,
+    chosen: Vec<&'d Evaluated<'a, Truth>>,
+}
+
+/// What a result's requirement is made of: a negation is its operand's,
+/// negated; a connective or `between` a group of some children; anything else
+/// a cause.
+fn open_requirement<'d, 'a>(
+    mut result: &'d Evaluated<'a, Truth>,
+    mut negated: bool,
+) -> Opened<'d, 'a> {
+    while let (Expr::Not(_), Some(operand)) = (result.node.expr(), result.children.first()) {
+        result = operand;
+        negated = !negated;
+    }
     let is_and = matches!(result.node.expr(), Expr::And(_) | Expr::Between { .. });
-    match result.node.expr() {
-        Expr::Not(_) => return requirement(&result.children[0], !negated),
-        Expr::And(_) | Expr::Or(_) | Expr::Between { .. } => {}
-        _ => return Requirement::Cause(cause(result, negated)),
+    if !matches!(
+        result.node.expr(),
+        Expr::And(_) | Expr::Or(_) | Expr::Between { .. }
+    ) {
+        return Opened {
+            result,
+            negated,
+            kind: None,
+            chosen: Vec::new(),
+        };
     }
     let effective = |r: &Evaluated<'_, Truth>| {
         if negated {
@@ -330,28 +399,91 @@ fn requirement<'d, 'a>(result: &'d Evaluated<'a, Truth>, negated: bool) -> Requi
         ),
         (false, Truth::False) => (GroupKind::Any, children.collect()),
     };
-    Requirement::Group(
-        kind,
-        chosen
-            .into_iter()
-            .map(|c| requirement(c, negated))
-            .collect(),
-    )
+    Opened {
+        result,
+        negated,
+        kind: Some(kind),
+        chosen,
+    }
 }
 
 /// Two requirements are the same: causes on structurally identical nodes with
 /// the same `negated`, or groups of the same kind with the same set of items.
 fn same(a: &Requirement<'_, '_>, b: &Requirement<'_, '_>) -> bool {
     match (a, b) {
-        (Requirement::Cause(x), Requirement::Cause(y)) => {
-            x.negated == y.negated && *x.result.node == *y.result.node
-        }
-        (Requirement::Group(ka, ia), Requirement::Group(kb, ib)) => {
-            ka == kb
-                && ia.iter().all(|x| ib.iter().any(|y| same(x, y)))
-                && ib.iter().all(|y| ia.iter().any(|x| same(x, y)))
+        (Requirement::Cause(x), Requirement::Cause(y)) => same_cause(x, y),
+        (Requirement::Group(ka, ia), Requirement::Group(kb, ib)) if ka == kb => {
+            let causes = |items: &[Requirement<'_, '_>]| {
+                items.iter().all(|i| matches!(i, Requirement::Cause(_)))
+            };
+            if causes(ia) && causes(ib) {
+                // Groups of causes, by the definition.
+                ia.iter().all(|x| ib.iter().any(|y| same(x, y)))
+                    && ib.iter().all(|y| ia.iter().any(|x| same(x, y)))
+            } else {
+                // Sameness is an equivalence, so two groups are the same when
+                // their items fall in the same classes: classify both, bottom
+                // up, without recursion.
+                let mut classes = Classes::default();
+                classes.of(a) == classes.of(b)
+            }
         }
         _ => false,
+    }
+}
+
+fn same_cause(x: &Cause<'_, '_>, y: &Cause<'_, '_>) -> bool {
+    x.negated == y.negated && *x.result.node == *y.result.node
+}
+
+/// The classes of the same requirements met so far: a cause, or a group's kind
+/// and the classes of its items, sorted and without repeats.
+#[derive(Default)]
+struct Classes<'r, 'd, 'a> {
+    classes: Vec<Class<'r, 'd, 'a>>,
+}
+
+enum Class<'r, 'd, 'a> {
+    Cause(&'r Cause<'d, 'a>),
+    Group(GroupKind, Vec<usize>),
+}
+
+impl<'r, 'd, 'a> Classes<'r, 'd, 'a> {
+    /// The class of a requirement, adding it when it is new.
+    fn of(&mut self, requirement: &'r Requirement<'d, 'a>) -> usize {
+        let found: Result<usize, Infallible> = post_order(
+            requirement,
+            |requirement, done| {
+                Ok(match requirement {
+                    Requirement::Group(_, items) => items.get(done),
+                    Requirement::Cause(_) => None,
+                })
+            },
+            |requirement, items| {
+                let class = match requirement {
+                    Requirement::Cause(cause) => Class::Cause(cause),
+                    Requirement::Group(kind, _) => {
+                        let mut items: Vec<usize> = items.collect();
+                        items.sort_unstable();
+                        items.dedup();
+                        Class::Group(*kind, items)
+                    }
+                };
+                let known = self.classes.iter().position(|c| match (c, &class) {
+                    (Class::Cause(x), Class::Cause(y)) => same_cause(x, y),
+                    (Class::Group(kx, x), Class::Group(ky, y)) => kx == ky && x == y,
+                    _ => false,
+                });
+                Ok(known.unwrap_or_else(|| {
+                    self.classes.push(class);
+                    self.classes.len() - 1
+                }))
+            },
+        );
+        match found {
+            Ok(class) => class,
+            Err(never) => match never {},
+        }
     }
 }
 
@@ -361,8 +493,40 @@ fn simplify<'d, 'a>(requirement: Requirement<'d, 'a>) -> Requirement<'d, 'a> {
     let Requirement::Group(kind, items) = requirement else {
         return requirement;
     };
+    // The group being simplified (its kind, its items still to simplify, and
+    // those simplified), and the groups around it: an explicit stack, as a
+    // requirement is as deep as its condition. A cause is simplified as it is.
+    let mut current = (kind, items.into_iter(), Vec::new());
+    let mut around = Vec::new();
+    loop {
+        match current.1.next() {
+            Some(Requirement::Group(kind, items)) => {
+                around.push(std::mem::replace(
+                    &mut current,
+                    (kind, items.into_iter(), Vec::new()),
+                ));
+            }
+            Some(cause) => current.2.push(cause),
+            None => {
+                let (kind, _, simplified) = current;
+                let merged = merge(kind, simplified);
+                match around.pop() {
+                    Some(mut outer) => {
+                        outer.2.push(merged);
+                        current = outer;
+                    }
+                    None => return merged,
+                }
+            }
+        }
+    }
+}
+
+/// A group of `kind` from its items, already simplified: flattened, merged,
+/// absorbed and unwrapped.
+fn merge<'d, 'a>(kind: GroupKind, items: Vec<Requirement<'d, 'a>>) -> Requirement<'d, 'a> {
     let mut flat = Vec::new();
-    for item in items.into_iter().map(simplify) {
+    for item in items {
         match item {
             Requirement::Group(k, inner) if k == kind => flat.extend(inner),
             other => flat.push(other),
@@ -403,13 +567,25 @@ const MAX_OPTIONS: usize = 64;
 fn options<'r, 'd, 'a>(
     requirement: &'r Requirement<'d, 'a>,
 ) -> Option<Vec<Vec<&'r Cause<'d, 'a>>>> {
-    match requirement {
-        Requirement::Cause(cause) => Some(vec![vec![cause]]),
-        Requirement::Group(kind, items) => {
-            let parts: Vec<Vec<Vec<&Cause<'d, 'a>>>> =
-                items.iter().map(options).collect::<Option<_>>()?;
+    /// More than [`MAX_OPTIONS`] at some step.
+    struct TooMany;
+    post_order(
+        requirement,
+        |requirement, done| {
+            Ok(match requirement {
+                Requirement::Group(_, items) => items.get(done),
+                Requirement::Cause(_) => None,
+            })
+        },
+        |requirement: &'r Requirement<'d, 'a>, parts| {
+            let Requirement::Group(kind, _) = requirement else {
+                let Requirement::Cause(cause) = requirement else {
+                    return Err(TooMany);
+                };
+                return Ok(vec![vec![cause]]);
+            };
             let combined = if *kind == GroupKind::Any {
-                parts.into_iter().flatten().collect::<Vec<_>>()
+                parts.flatten().collect::<Vec<_>>()
             } else {
                 let mut combined: Vec<Vec<&Cause<'d, 'a>>> = vec![Vec::new()];
                 for part in parts {
@@ -421,41 +597,81 @@ fn options<'r, 'd, 'a>(
                         })
                         .collect();
                     if combined.len() > MAX_OPTIONS {
-                        return None;
+                        return Err(TooMany);
                     }
                 }
                 combined
             };
-            (combined.len() <= MAX_OPTIONS).then_some(combined)
-        }
-    }
+            if combined.len() <= MAX_OPTIONS {
+                Ok(combined)
+            } else {
+                Err(TooMany)
+            }
+        },
+    )
+    .ok()
 }
 
 /// Recombine the tree with some leaves forced (`spec/explain.md`, *Keeping only
 /// the changes that work*).
-fn replay(result: &Evaluated<'_, Truth>, forced: &[(&Node, Truth)]) -> Truth {
-    match result.node.expr() {
-        Expr::Not(_) => kleene_not(replay(&result.children[0], forced)),
-        Expr::And(_) | Expr::Between { .. } => result
-            .children
-            .iter()
-            .map(|c| replay(c, forced))
-            .min()
-            .unwrap_or(Truth::True),
-        Expr::Or(_) => result
-            .children
-            .iter()
-            .map(|c| replay(c, forced))
-            .max()
-            .unwrap_or(Truth::False),
-        _ => forced
-            .iter()
-            .find(|(node, _)| **node == *result.node)
-            .map_or_else(|| truth_of(result), |(_, truth)| *truth),
+fn replay<'d, 'a>(
+    frames: &mut Vec<Replaying<'d, 'a>>,
+    result: &'d Evaluated<'a, Truth>,
+    forced: &[(&Node, Truth)],
+) -> Truth {
+    // The connectives entered, innermost last: a result tree is as deep as its
+    // condition. Anything else is a leaf, forced or as it was.
+    frames.clear();
+    let mut current = result;
+    loop {
+        let mut truth = match (current.node.expr(), current.children.first()) {
+            (Expr::Not(_) | Expr::And(_) | Expr::Or(_) | Expr::Between { .. }, Some(first)) => {
+                // `min` and `max` start from their identities (`False < Unknown < True`).
+                let identity = if matches!(current.node.expr(), Expr::Or(_)) {
+                    Truth::False
+                } else {
+                    Truth::True
+                };
+                frames.push((current, 1, identity));
+                current = first;
+                continue;
+            }
+            (Expr::Not(_), None) => kleene_not(Truth::Unknown),
+            (Expr::And(_) | Expr::Between { .. }, None) => Truth::True,
+            (Expr::Or(_), None) => Truth::False,
+            _ => forced
+                .iter()
+                .find(|(node, _)| **node == *current.node)
+                .map_or_else(|| truth_of(current), |(_, truth)| *truth),
+        };
+        // Combine it into the connectives above, as far as they are complete.
+        loop {
+            let Some((connective, next, combined)) = frames.last_mut() else {
+                return truth;
+            };
+            let connective: &'d Evaluated<'a, Truth> = connective;
+            let value = match connective.node.expr() {
+                Expr::Not(_) => kleene_not(truth),
+                Expr::Or(_) => (*combined).max(truth),
+                _ => (*combined).min(truth),
+            };
+            if let Some(child) = connective.children.get(*next) {
+                *next += 1;
+                *combined = value;
+                current = child;
+                break;
+            }
+            truth = value;
+            frames.pop();
+        }
     }
 }
 
-fn fires_with(tree: &Evaluated<'_, Truth>, option: &[&Cause<'_, '_>]) -> bool {
+fn fires_with<'d, 'a>(
+    frames: &mut Vec<Replaying<'d, 'a>>,
+    tree: &'d Evaluated<'a, Truth>,
+    option: &[&Cause<'_, '_>],
+) -> bool {
     let mut forced: Vec<(&Node, Truth)> = Vec::new();
     for cause in option {
         let needed = if cause.negated {
@@ -469,11 +685,12 @@ fn fires_with(tree: &Evaluated<'_, Truth>, option: &[&Cause<'_, '_>]) -> bool {
             None => forced.push((&cause.result.node, needed)),
         }
     }
-    replay(tree, &forced) == Truth::True
+    replay(frames, tree, &forced) == Truth::True
 }
 
 fn keep_options_that_fire<'d, 'a>(
-    tree: &Evaluated<'a, Truth>,
+    walks: &mut Walks<'d, 'a>,
+    tree: &'d Evaluated<'a, Truth>,
     requirement: Requirement<'d, 'a>,
 ) -> (Requirement<'d, 'a>, bool) {
     let Some(all) = options(&requirement) else {
@@ -481,7 +698,7 @@ fn keep_options_that_fire<'d, 'a>(
     };
     let valid: Vec<Vec<Cause<'d, 'a>>> = all
         .iter()
-        .filter(|option| fires_with(tree, option))
+        .filter(|option| fires_with(&mut walks.replays, tree, option))
         .map(|option| option.iter().map(|&c| c.clone()).collect())
         .collect();
     if valid.len() == all.len() {

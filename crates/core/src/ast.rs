@@ -7,6 +7,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::error::{Error, ErrorCode, Result, Segment};
 use crate::value::{Group, NullCause, Value};
+use crate::walk::post_order;
 
 /// Where a node may appear (`spec/ast.md`, *Node kinds*).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -271,9 +272,25 @@ pub enum Expr {
 }
 
 /// A node of a condition tree, valid by construction.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Node {
     expr: Expr,
+}
+
+/// Copied with an explicit stack (`crate::walk`): a tree as deep as the
+/// reader's limits allow needs no more call stack than a leaf.
+impl Clone for Node {
+    fn clone(&self) -> Self {
+        let copied: std::result::Result<Node, std::convert::Infallible> = post_order(
+            self,
+            |node, done| Ok(node.child(done)),
+            |node, children| Ok(node.with_children(children)),
+        );
+        match copied {
+            Ok(node) => node,
+            Err(never) => match never {},
+        }
+    }
 }
 
 fn invalid(message: impl Into<String>) -> Error {
@@ -590,6 +607,108 @@ impl Node {
         })
     }
 
+    /// The `index`-th direct child, in the order of [`Node::children`], without
+    /// collecting them: the step of the core's iterative walks.
+    pub(crate) fn child(&self, index: usize) -> Option<&Node> {
+        let child: &Node = match (&self.expr, index) {
+            (Expr::And(operands) | Expr::Or(operands), _) => return operands.get(index),
+            (
+                Expr::Compare { left, .. }
+                | Expr::Arith { left, .. }
+                | Expr::Not(left)
+                | Expr::IsNull(left)
+                | Expr::Abs(left)
+                | Expr::Neg(left)
+                | Expr::In { operand: left, .. }
+                | Expr::Matches { operand: left, .. }
+                | Expr::StringTest { operand: left, .. }
+                | Expr::Between { operand: left, .. },
+                0,
+            ) => left,
+            (
+                Expr::Compare { right, .. }
+                | Expr::Arith { right, .. }
+                | Expr::Between { low: right, .. },
+                1,
+            )
+            | (Expr::Between { high: right, .. }, 2) => right,
+            _ => return None,
+        };
+        Some(child)
+    }
+
+    /// A copy of this node with `children`, copies of its own, in order, in
+    /// their place (the step of [`Clone`]). A child missing from `children` is
+    /// copied from this node's.
+    fn with_children(&self, mut children: impl Iterator<Item = Node>) -> Node {
+        let mut take = |own: &Node| Box::new(children.next().unwrap_or_else(|| own.clone()));
+        let expr = match &self.expr {
+            Expr::Field(path) => Expr::Field(path.clone()),
+            Expr::Const(value) => Expr::Const(value.clone()),
+            Expr::Compare { op, left, right } => Expr::Compare {
+                op: *op,
+                left: take(left),
+                right: take(right),
+            },
+            Expr::And(operands) => Expr::And(operands.iter().map(|o| *take(o)).collect()),
+            Expr::Or(operands) => Expr::Or(operands.iter().map(|o| *take(o)).collect()),
+            Expr::Not(operand) => Expr::Not(take(operand)),
+            Expr::In { operand, values } => Expr::In {
+                operand: take(operand),
+                values: values.clone(),
+            },
+            Expr::Between {
+                operand,
+                low,
+                high,
+                closed,
+            } => Expr::Between {
+                operand: take(operand),
+                low: take(low),
+                high: take(high),
+                closed: *closed,
+            },
+            Expr::IsNull(operand) => Expr::IsNull(take(operand)),
+            Expr::Matches { operand, pattern } => Expr::Matches {
+                operand: take(operand),
+                pattern: pattern.clone(),
+            },
+            Expr::StringTest { op, operand, text } => Expr::StringTest {
+                op: *op,
+                operand: take(operand),
+                text: text.clone(),
+            },
+            Expr::Arith { op, left, right } => Expr::Arith {
+                op: *op,
+                left: take(left),
+                right: take(right),
+            },
+            Expr::Abs(operand) => Expr::Abs(take(operand)),
+            Expr::Neg(operand) => Expr::Neg(take(operand)),
+        };
+        Node { expr }
+    }
+
+    /// Whether two nodes are the same apart from their children: tag and own
+    /// data (the step of structural identity).
+    fn same_own(&self, other: &Node) -> bool {
+        match (&self.expr, &other.expr) {
+            (Expr::Field(a), Expr::Field(b)) => a == b,
+            (Expr::Const(a), Expr::Const(b)) => same_constant(a, b),
+            (Expr::In { values: va, .. }, Expr::In { values: vb, .. }) => {
+                va.len() == vb.len() && va.iter().zip(vb).all(|(x, y)| same_constant(x, y))
+            }
+            (Expr::Between { closed: a, .. }, Expr::Between { closed: b, .. }) => a == b,
+            (Expr::Matches { pattern: a, .. }, Expr::Matches { pattern: b, .. }) => {
+                a.source == b.source
+            }
+            (Expr::StringTest { text: a, .. }, Expr::StringTest { text: b, .. }) => {
+                self.tag() == other.tag() && a == b
+            }
+            _ => self.tag() == other.tag(),
+        }
+    }
+
     /// The direct child nodes, in field order.
     #[must_use]
     pub fn children(&self) -> Vec<&Node> {
@@ -764,46 +883,67 @@ fn hash_constant<H: Hasher>(value: &Value, state: &mut H) {
 }
 
 /// Structural identity: same shape, tags and constants (`spec/ast.md`).
+/// Compared with an explicit stack (`crate::walk`).
 impl PartialEq for Node {
     fn eq(&self, other: &Self) -> bool {
-        match (&self.expr, &other.expr) {
-            (Expr::Field(a), Expr::Field(b)) => a == b,
-            (Expr::Const(a), Expr::Const(b)) => same_constant(a, b),
-            (Expr::In { values: va, .. }, Expr::In { values: vb, .. }) => {
-                va.len() == vb.len()
-                    && va.iter().zip(vb).all(|(x, y)| same_constant(x, y))
-                    && self.children() == other.children()
+        // Pairs whose children are still to compare: leaves are compared in
+        // place, so comparing a node of leaves allocates nothing.
+        let mut pending: Vec<(&Node, &Node)> = Vec::new();
+        let (mut left, mut right) = (self, other);
+        loop {
+            if !left.same_own(right) {
+                return false;
             }
-            (Expr::Between { closed: a, .. }, Expr::Between { closed: b, .. }) => {
-                a == b && self.children() == other.children()
+            let mut index = 0;
+            loop {
+                match (left.child(index), right.child(index)) {
+                    (Some(l), Some(r)) if l.child(0).is_none() && r.child(0).is_none() => {
+                        if !l.same_own(r) {
+                            return false;
+                        }
+                    }
+                    (Some(l), Some(r)) => pending.push((l, r)),
+                    (None, None) => break,
+                    _ => return false,
+                }
+                index += 1;
             }
-            (Expr::Matches { pattern: a, .. }, Expr::Matches { pattern: b, .. }) => {
-                a.source == b.source && self.children() == other.children()
+            match pending.pop() {
+                Some(pair) => (left, right) = pair,
+                None => return true,
             }
-            (Expr::StringTest { text: a, .. }, Expr::StringTest { text: b, .. }) => {
-                self.tag() == other.tag() && a == b && self.children() == other.children()
-            }
-            _ => self.tag() == other.tag() && self.children() == other.children(),
         }
     }
 }
 
 impl Eq for Node {}
 
+/// Each node's tag and own data, in depth-first pre-order, with an explicit
+/// stack.
 impl Hash for Node {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.tag().hash(state);
-        match &self.expr {
-            Expr::Field(path) => path.hash(state),
-            Expr::Const(value) => hash_constant(value, state),
-            Expr::In { values, .. } => values.iter().for_each(|v| hash_constant(v, state)),
-            Expr::Between { closed, .. } => closed.hash(state),
-            Expr::Matches { pattern, .. } => pattern.source.hash(state),
-            Expr::StringTest { text, .. } => text.hash(state),
-            _ => {}
-        }
-        for child in self.children() {
-            child.hash(state);
+        let mut pending = Vec::new();
+        let mut next = Some(self);
+        while let Some(node) = next.take().or_else(|| pending.pop()) {
+            node.tag().hash(state);
+            match &node.expr {
+                Expr::Field(path) => path.hash(state),
+                Expr::Const(value) => hash_constant(value, state),
+                Expr::In { values, .. } => values.iter().for_each(|v| hash_constant(v, state)),
+                Expr::Between { closed, .. } => closed.hash(state),
+                Expr::Matches { pattern, .. } => pattern.source.hash(state),
+                Expr::StringTest { text, .. } => text.hash(state),
+                _ => {}
+            }
+            // The first child next, the others after it, in order.
+            next = node.child(0);
+            let start = pending.len();
+            let mut index = 1;
+            while let Some(child) = node.child(index) {
+                pending.push(child);
+                index += 1;
+            }
+            pending[start..].reverse();
         }
     }
 }

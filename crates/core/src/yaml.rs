@@ -357,35 +357,59 @@ fn key_text(key: &str) -> String {
     }
 }
 
+/// Write a value at `indent`, in pre-order with an explicit stack of the open
+/// collections (each with the position of its next item and its indent), so
+/// that the call stack does not grow with the nesting.
 fn write_value(value: &Json, indent: usize, out: &mut String) {
-    match value {
-        Json::Object(members) if !members.is_empty() => {
-            for (i, (key, item)) in members.iter().enumerate() {
-                if i > 0 {
-                    out.push('\n');
-                    out.push_str(&" ".repeat(indent));
-                }
-                write_member(key, item, indent, out);
+    let mut open: Vec<(&Json, usize, usize)> = Vec::new();
+    let mut next = Some((value, indent));
+    loop {
+        if let Some((value, indent)) = next.take() {
+            match value {
+                Json::Object(members) if !members.is_empty() => open.push((value, 0, indent)),
+                Json::Array(items) if !items.is_empty() => open.push((value, 0, indent)),
+                other => out.push_str(&scalar(other).unwrap_or_default()),
             }
         }
-        Json::Array(items) if !items.is_empty() => {
-            for (i, item) in items.iter().enumerate() {
-                if i > 0 {
-                    out.push('\n');
-                    out.push_str(&" ".repeat(indent));
-                }
-                out.push_str("- ");
-                match scalar(item) {
-                    Some(text) => out.push_str(&text),
-                    None => write_value(item, indent + 2, out),
-                }
-            }
+        let Some((collection, position, indent)) = open.last_mut() else {
+            return;
+        };
+        let (indent, i) = (*indent, *position);
+        let item = match collection {
+            Json::Object(members) => members.get(i).map(|(key, item)| (Some(key), item)),
+            Json::Array(items) => items.get(i).map(|item| (None, item)),
+            _ => None,
+        };
+        let Some((key, item)) = item else {
+            open.pop();
+            continue;
+        };
+        *position += 1;
+        if i > 0 {
+            out.push('\n');
+            out.push_str(&" ".repeat(indent));
         }
-        other => out.push_str(&scalar(other).unwrap_or_default()),
+        let nested = if let Some(key) = key {
+            write_member(key, item, indent, out)
+        } else {
+            out.push_str("- ");
+            match scalar(item) {
+                Some(text) => {
+                    out.push_str(&text);
+                    false
+                }
+                None => true,
+            }
+        };
+        if nested {
+            next = Some((item, indent + 2));
+        }
     }
 }
 
-fn write_member(key: &str, item: &Json, indent: usize, out: &mut String) {
+/// A member's key and, for a scalar, its value; whether the value is a
+/// collection, to write next on its own lines.
+fn write_member(key: &str, item: &Json, indent: usize, out: &mut String) -> bool {
     let key = key_text(key);
     if key.chars().count() > MAX_IMPLICIT_KEY {
         // An explicit key: `? key`, then `: value` on the next line.
@@ -400,10 +424,11 @@ fn write_member(key: &str, item: &Json, indent: usize, out: &mut String) {
     if let Some(text) = scalar(item) {
         out.push(' ');
         out.push_str(&text);
+        false
     } else {
         out.push('\n');
         out.push_str(&" ".repeat(indent + 2));
-        write_value(item, indent + 2, out);
+        true
     }
 }
 

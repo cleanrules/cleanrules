@@ -2,7 +2,7 @@
 
 use crate::ast::{Kind, Node};
 use crate::error::{Error, ErrorCode, Result};
-use crate::eval::{Evaluated, Options, evaluate_tree, evaluate_value_tree};
+use crate::eval::{Evaluated, Options, Trees, evaluate_tree_in, evaluate_value_tree_in};
 use crate::logic::{Kleene, Logic, LogicName, Truth};
 use crate::value::{Map, NullCause, Number, Value};
 
@@ -43,22 +43,39 @@ fn check_payload_value(rule: &str, key: &str, value: &Node) -> Result<()> {
     Ok(())
 }
 
-/// Where, in metadata at `at`, the first value that is not data is, said in words.
+/// Where, in metadata at `at`, the first value that is not data is, said in words:
+/// the first in depth-first pre-order, found with an explicit stack (metadata
+/// nests as deep as the reader's limits allow).
 fn not_data(value: &Value, at: &str) -> Option<String> {
-    match value {
-        Value::Null(cause) if *cause != NullCause::Null => {
-            Some(format!("{at} is out of range or unreadable"))
+    let mut pending = vec![(value, at.to_owned())];
+    while let Some((value, at)) = pending.pop() {
+        match value {
+            Value::Null(cause) if *cause != NullCause::Null => {
+                return Some(format!("{at} is out of range or unreadable"));
+            }
+            Value::Opaque(opaque) => {
+                return Some(format!("{at} is not a data value: a {}", opaque.type_name));
+            }
+            Value::List(items) => pending.extend(
+                items
+                    .iter()
+                    .enumerate()
+                    .rev()
+                    .map(|(i, item)| (item, format!("{at}[{i}]"))),
+            ),
+            Value::Map(map) => {
+                let entries: Vec<_> = map.iter().collect();
+                pending.extend(
+                    entries
+                        .into_iter()
+                        .rev()
+                        .map(|(key, item)| (item, format!("{at}[{key:?}]"))),
+                );
+            }
+            _ => {}
         }
-        Value::Opaque(opaque) => Some(format!("{at} is not a data value: a {}", opaque.type_name)),
-        Value::List(items) => items
-            .iter()
-            .enumerate()
-            .find_map(|(i, item)| not_data(item, &format!("{at}[{i}]"))),
-        Value::Map(map) => map
-            .iter()
-            .find_map(|(key, item)| not_data(item, &format!("{at}[{key:?}]"))),
-        _ => None,
     }
+    None
 }
 
 impl Rule {
@@ -617,13 +634,15 @@ impl RuleSet {
     }
 
     fn decide<'a>(&'a self, input: &Value, logic: Kleene) -> Result<Decision<'a>> {
+        // The stacks of the evaluator's walks, for every tree of the decision.
+        let mut trees = Trees::default();
         let mut results = Vec::with_capacity(self.rules.len());
         for rule in &self.rules {
             let options = Options {
                 strict: self.strict,
                 rule: Some(&rule.name),
             };
-            let when = evaluate_tree(&rule.when, input, &logic, options)?;
+            let when = evaluate_tree_in(&mut trees, &rule.when, input, &logic, options)?;
             let fired = when.truth().is_some_and(|t| logic.fires(t));
             results.push(RuleResult {
                 rule,
@@ -635,13 +654,13 @@ impl RuleSet {
         let fired: Vec<usize> = (0..results.len()).filter(|&i| results[i].fired).collect();
         if self.hit_policy == HitPolicy::Any {
             for &i in &fired {
-                results[i].then = Some(self.payload(&self.rules[i], input, logic)?);
+                results[i].then = Some(self.payload(&mut trees, &self.rules[i], input, logic)?);
             }
         }
         let selected = self.select(&fired)?;
         for &i in &selected {
             if results[i].then.is_none() {
-                results[i].then = Some(self.payload(&self.rules[i], input, logic)?);
+                results[i].then = Some(self.payload(&mut trees, &self.rules[i], input, logic)?);
             }
         }
         if self.hit_policy == HitPolicy::Any && !Self::outputs_agree(&results, &fired) {
@@ -692,6 +711,7 @@ impl RuleSet {
 
     fn payload<'a>(
         &self,
+        trees: &mut Trees<'a, Truth>,
         rule: &'a Rule,
         input: &Value,
         logic: Kleene,
@@ -705,7 +725,7 @@ impl RuleSet {
             .map(|(key, node)| {
                 Ok((
                     key.clone(),
-                    evaluate_value_tree(node, input, &logic, options)?,
+                    evaluate_value_tree_in(trees, node, input, &logic, options)?,
                 ))
             })
             .collect()
