@@ -26,8 +26,9 @@ import scala.language.dynamics
  *
  * Beware: `a == b` and `a.eq(b)` are Scala's, and give a `Boolean`: `==` is
  * the structural identity of `spec/ast.md` (as `equals` in Java) and `eq` the
- * identity of the objects. `F.a == 1` is `false`, not a condition: build
- * equality with `===` and `=!=`.
+ * identity of the objects. `F.a == 1` does not compile (Scala 3's strict
+ * equality rejects comparing a node with a number), and `F.a == Const(1)` is
+ * `false`, not a condition: build equality with `===` and `=!=`.
  *
  * The core builds every node and applies the construction rules, so a node
  * that breaks one (a condition compared, an invalid pattern) is an

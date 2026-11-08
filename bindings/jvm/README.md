@@ -284,7 +284,8 @@ an error):
 **Beware of `==` and `eq`:** they are Scala's and give a `Boolean`, never a
 condition. `a == b` is the structural identity of `spec/ast.md` (as `equals`
 in Java, so nodes work in sets and maps) and `a.eq(b)` the identity of the
-objects: `F.a == 1` is `false`. Build equality with `===` and `=!=`.
+objects: `F.a == 1` does not compile (Scala 3 rejects comparing a node with a
+number), and `F.a == Const(1)` is `false`. Build equality with `===` and `=!=`.
 
 Constants are typed (`Constant`: booleans, numbers, `BigDecimal` and
 `BigInt`, strings, `java.time` dates and datetimes, Java enums, Scala 3 enum
