@@ -1,6 +1,6 @@
 package io.github.cleanrules.scaladsl
 
-import io.github.cleanrules.{Closed, Conditions, ExpressionException}
+import io.github.cleanrules.{Closed, Conditions, ExpressionException, Limits}
 import io.github.cleanrules.scaladsl.internal.{FromJava, ToJava}
 import scala.jdk.CollectionConverters.*
 import scala.language.dynamics
@@ -130,9 +130,21 @@ sealed abstract class Expr private[scaladsl] (val asJava: io.github.cleanrules.E
   def evaluateTree(data: Any, logic: String = "boolean", strict: Boolean = false): ResultTree =
     ResultTree.fromJava(asJava.evaluateTree(ToJava.convert(data), logic, strict))
 
+  /**
+   * Evaluate this condition like `evaluateTree`, reading at most
+   * `limits.maxValues` values of `data` (`spec/data-model.md`, *Reading
+   * native data*, *Limits*).
+   */
+  def evaluateTree(data: Any, logic: String, strict: Boolean, limits: Limits): ResultTree =
+    ResultTree.fromJava(asJava.evaluateTree(ToJava.convert(data), logic, strict, limits))
+
   /** Evaluate this value node on `data` and give its result tree. */
   def evaluateValueTree(data: Any, strict: Boolean = false): ResultTree =
     ResultTree.fromJava(asJava.evaluateValueTree(ToJava.convert(data), strict))
+
+  /** Evaluate this value node like `evaluateValueTree`, reading at most `limits.maxValues` values of `data`. */
+  def evaluateValueTree(data: Any, strict: Boolean, limits: Limits): ResultTree =
+    ResultTree.fromJava(asJava.evaluateValueTree(ToJava.convert(data), strict, limits))
 
   // ---- Introspection (the rest is on `asJava`).
 

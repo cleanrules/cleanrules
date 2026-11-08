@@ -68,7 +68,7 @@ pub unsafe extern "C" fn cr_node_read(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_node_read", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Write a node in JSON or YAML (the node itself), or in the rule syntax.
@@ -109,7 +109,7 @@ pub unsafe extern "C" fn cr_node_write(
         unsafe { give_text(out, len, text) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_node_write", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The logic a node is evaluated under, by name; `boolean` for `NULL`.
@@ -148,7 +148,6 @@ pub(crate) unsafe fn logic(name: *const c_char, len: usize) -> Outcome<Kleene> {
 /// As the exported functions below.
 #[allow(clippy::too_many_arguments)]
 unsafe fn evaluate(
-    name: &str,
     node: *const cr_node,
     input: *const cr_value,
     logic: Option<(*const c_char, usize)>,
@@ -177,7 +176,7 @@ unsafe fn evaluate(
         unsafe { give_text(out, len, to_string(&write_result(&tree))) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call(name, error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Evaluate a node as a condition on an input (`spec/ast.md`, *Evaluating one
@@ -208,7 +207,6 @@ pub unsafe extern "C" fn cr_node_evaluate_tree(
     // SAFETY: the caller's promises are `evaluate`'s.
     unsafe {
         evaluate(
-            "cr_node_evaluate_tree",
             node,
             input,
             Some((logic, logic_len)),
@@ -240,18 +238,7 @@ pub unsafe extern "C" fn cr_node_evaluate_value_tree(
     error: *mut *mut cr_error,
 ) -> cr_status {
     // SAFETY: the caller's promises are `evaluate`'s.
-    unsafe {
-        evaluate(
-            "cr_node_evaluate_value_tree",
-            node,
-            input,
-            None,
-            strict,
-            out,
-            len,
-            error,
-        )
-    }
+    unsafe { evaluate(node, input, None, strict, out, len, error) }
 }
 
 /// The paths of the input that the node reads, in preorder and each once, as
@@ -281,7 +268,7 @@ pub unsafe extern "C" fn cr_node_field_paths(
         unsafe { give_new_value(out, paths) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_node_field_paths", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Free a node. `NULL` is ignored.

@@ -6,7 +6,8 @@
 
 use cleanrules::jiff::civil::{Date, DateTime, Time};
 use cleanrules::jiff::tz::{Offset, TimeZone};
-use cleanrules::value::{AwareDateTime, DecimalError, Zone};
+use cleanrules::json::Limits;
+use cleanrules::value::{AwareDateTime, DecimalError, ValueCount, Zone};
 use cleanrules::{Decimal, Map, NullCause, Value};
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
@@ -16,6 +17,7 @@ use pyo3::types::{
 };
 
 use crate::errors;
+use crate::read::Stop;
 
 /// Why a Python value has no value of the model.
 pub(crate) enum Problem {
@@ -413,20 +415,26 @@ fn naive<'py>(
 pub(crate) const MAX_DEPTH: usize = 256;
 
 /// Rule metadata as a value: data values only, converted with the rules of
-/// constants (`spec/json-format.md`: no NaN, nothing opaque).
+/// constants (`spec/json-format.md`: no NaN, nothing opaque), at most the
+/// default `max_values` values (`spec/data-model.md`, *Reading native data*,
+/// *Limits*).
 ///
 /// # Errors
 ///
-/// A message naming the key path of the first value that is not data.
-pub(crate) fn metadata(value: &Bound<'_, PyAny>) -> PyResult<Result<Value, String>> {
-    metadata_at(value, "metadata", &mut Vec::new())
+/// A message naming the key path of the first value that is not data;
+/// `Stop::Limit` beyond `max_values`.
+pub(crate) fn metadata(value: &Bound<'_, PyAny>) -> Result<Result<Value, String>, Stop> {
+    let mut count = ValueCount::new(Limits::default().max_values);
+    metadata_at(value, "metadata", &mut Vec::new(), &mut count)
 }
 
 fn metadata_at(
     value: &Bound<'_, PyAny>,
     at: &str,
     open: &mut Vec<usize>,
-) -> PyResult<Result<Value, String>> {
+    count: &mut ValueCount,
+) -> Result<Result<Value, String>, Stop> {
+    count.add(1)?;
     let is_dict = value.cast::<PyDict>().is_ok();
     let is_sequence = value.cast::<PyList>().is_ok() || value.cast::<PyTuple>().is_ok();
     if is_dict || is_sequence {
@@ -446,7 +454,7 @@ fn metadata_at(
                 let Ok(key) = key.extract::<String>() else {
                     return Ok(Err(format!("{at} has a key that is not a string: {key}")));
                 };
-                match metadata_at(&item, &format!("{at}[{key:?}]"), open)? {
+                match metadata_at(&item, &format!("{at}[{key:?}]"), open, count)? {
                     Ok(item) => map.insert(key, item),
                     Err(problem) => return Ok(Err(problem)),
                 }
@@ -455,7 +463,7 @@ fn metadata_at(
         } else {
             let mut items = Vec::new();
             for (index, item) in value.try_iter()?.enumerate() {
-                match metadata_at(&item?, &format!("{at}[{index}]"), open)? {
+                match metadata_at(&item?, &format!("{at}[{index}]"), open, count)? {
                     Ok(item) => items.push(item),
                     Err(problem) => return Ok(Err(problem)),
                 }

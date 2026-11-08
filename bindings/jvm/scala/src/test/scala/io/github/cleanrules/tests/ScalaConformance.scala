@@ -729,9 +729,11 @@ final class ScalaConformance extends Conformance:
     val built = checkBuilt(ruleset, setup)
     if built.nonEmpty then break(built)
     val failing = expect.containsKey("error")
+    // `max_values`, through Java's Limits.
+    val limits = Option(Conformance.limitsOf(setup)).getOrElse(Limits.defaults())
     if setup.containsKey("inputs") then
       val rows = arr(setup.get("inputs")).map(data)
-      val outcome = attempt(ruleset.evaluateMany(if turn(2) == 0 then rows else rows.toList))
+      val outcome = attempt(ruleset.evaluateMany(if turn(2) == 0 then rows else rows.toList, limits))
       if outcome.error() != null || failing then break(compare(outcome, expect, "decisions", Exact))
       val decisions = arr(need(expect, "decisions"))
       val made = outcome.result().asInstanceOf[Seq[Decision]]
@@ -744,7 +746,7 @@ final class ScalaConformance extends Conformance:
           if all.nonEmpty then break(s"decision $i: $all")
       break("")
     val input = inputOf(setup)
-    val outcome = attempt(ruleset.evaluate(input))
+    val outcome = attempt(ruleset.evaluate(input, limits))
     if outcome.error() != null || failing then break(compare(outcome, expect, "decision", Exact))
     closing(outcome.result().asInstanceOf[Decision]): decision =>
       val expected = obj(need(expect, "decision"))

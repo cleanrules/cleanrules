@@ -565,6 +565,18 @@ export interface RuleSetOptions {
   strict?: boolean
 }
 
+/**
+ * How native data is evaluated: `limits.maxValues` is the most values read
+ * from one input (1,000,000 by default; `spec/data-model.md`, *Reading native
+ * data*, *Limits*). An input beyond it is refused in every mode with a
+ * `FormatError` (`limit_exceeded`, `context.name` `'max_values'`, and
+ * `context.row` in a batch). The other limits apply to documents and JSON
+ * inputs.
+ */
+export interface EvaluateOptions {
+  limits?: Limits | null
+}
+
 /** How a recorded decision is read. */
 export interface ReadDecisionOptions {
   format?: 'json' | 'yaml' | null
@@ -598,16 +610,18 @@ export declare class RuleSet implements Iterable<Rule> {
   /**
    * Evaluate the rule set on native data (`spec/data-model.md`, *JavaScript
    * and TypeScript*), read along `fieldPaths()` only. In strict mode, an
-   * `EvaluationError` for a missing field or a type mismatch.
+   * `EvaluationError` for a missing field or a type mismatch, and a
+   * `FormatError` (`limit_exceeded`) for an input beyond `limits.maxValues`.
    */
-  evaluate(data: unknown): Decision
-  evaluateMany(rows: Iterable<unknown>): Decision[]
+  evaluate(data: unknown, options?: EvaluateOptions | null): Decision
+  /** Evaluate each input in order; `limits.maxValues` applies to each one. */
+  evaluateMany(rows: Iterable<unknown>, options?: EvaluateOptions | null): Decision[]
   /** A decision this rule set made, recorded as JSON or YAML. */
   readDecision(text: string | Uint8Array, options?: ReadDecisionOptions | null): Decision
   /** This rule set with its named actions resolved in `actions`. */
   bind(actions: Readonly<Record<string, Action>> | ReadonlyMap<string, Action>): RuleSet
   /** Evaluate, then call the selected rules' actions in rule order. */
-  run(data: unknown): Decision
+  run(data: unknown, options?: EvaluateOptions | null): Decision
   summary(): Summary
   /**
    * The rule set document of the JSON format (`{ version, ruleset }`), as an
@@ -866,11 +880,15 @@ export interface EvaluateTreeOptions {
   logic?: string | null
   /** Throw an `EvaluationError` instead of giving unknown. */
   strict?: boolean | null
+  /** `maxValues`, the most values read from the data (`EvaluateOptions`). */
+  limits?: Limits | null
 }
 
 export interface EvaluateValueTreeOptions {
   /** Throw an `EvaluationError` instead of giving null. */
   strict?: boolean | null
+  /** `maxValues`, the most values read from the data (`EvaluateOptions`). */
+  limits?: Limits | null
 }
 
 /**
@@ -977,8 +995,8 @@ export declare class DecisionTable {
   readonly rows: readonly TableRow[]
   /** The rule set the table compiles into: one rule per row. */
   readonly ruleset: RuleSet
-  evaluate(data: unknown): Decision
-  evaluateMany(rows: Iterable<unknown>): Decision[]
+  evaluate(data: unknown, options?: EvaluateOptions | null): Decision
+  evaluateMany(rows: Iterable<unknown>, options?: EvaluateOptions | null): Decision[]
   summary(): Summary
   /**
    * The decision table document of the JSON format, as an object for

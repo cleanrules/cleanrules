@@ -57,7 +57,6 @@ impl cr_tree {
 /// `cr_value`; `out` is `NULL` or points to a writable `cr_tree *`; `error` is
 /// `NULL` or points to a writable `cr_error *` set to `NULL`.
 unsafe fn evaluate(
-    name: &str,
     node: *const cr_node,
     input: *const cr_value,
     out: *mut *mut cr_tree,
@@ -77,7 +76,7 @@ unsafe fn evaluate(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call(name, error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Evaluate a node as a condition on an input, as `cr_node_evaluate_tree`
@@ -108,7 +107,7 @@ pub unsafe extern "C" fn cr_tree_new_condition(
         Ok(cr_tree::of(&evaluate_tree(node, input, &logic, options)?))
     };
     // SAFETY: the caller's promises are `evaluate`'s.
-    unsafe { evaluate("cr_tree_new_condition", node, input, out, error, tree) }
+    unsafe { evaluate(node, input, out, error, tree) }
 }
 
 /// Evaluate a node as a value on an input, as `cr_node_evaluate_value_tree`
@@ -135,7 +134,7 @@ pub unsafe extern "C" fn cr_tree_new_value(
         )?))
     };
     // SAFETY: the caller's promises are `evaluate`'s.
-    unsafe { evaluate("cr_tree_new_value", node, input, out, error, tree) }
+    unsafe { evaluate(node, input, out, error, tree) }
 }
 
 /// The result tree of the condition of the rule at position `rule` in a
@@ -164,7 +163,7 @@ pub unsafe extern "C" fn cr_decision_rule_tree(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_decision_rule_tree", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The tree as a new value, freed with `cr_value_free`, in the structure of
@@ -192,7 +191,7 @@ pub unsafe extern "C" fn cr_tree_value(
         unsafe { give_new_value(out, value) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_tree_value", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The number of results in the tree, its root and every descendant; 0 for
@@ -235,7 +234,7 @@ pub unsafe extern "C" fn cr_tree_node(
         })
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_tree_node", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// Free a result tree. `NULL` is ignored.

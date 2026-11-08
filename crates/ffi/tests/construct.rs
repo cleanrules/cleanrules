@@ -323,7 +323,7 @@ fn constructors_report_the_core_errors() {
             .err()
             .unwrap();
     assert_eq!(failure.status, CR_INVALID_ARGUMENT);
-    assert!(message(&failure).starts_with("cr_node_new_compare: unknown comparison \"near\""));
+    assert!(message(&failure).starts_with("unknown comparison \"near\""));
     for (call, op) in [("arith", "pow"), ("string", "has"), ("closed", "half")] {
         let (p, n) = arg(op.as_bytes());
         // SAFETY: live nodes; the names outlive the calls.

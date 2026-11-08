@@ -102,6 +102,7 @@ impl JsonNumber {
 /// The reader's limits (`spec/json-format.md`, *Errors and limits*). Callers may
 /// raise them, never disable them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Limits {
     /// The largest document, in bytes of UTF-8.
     pub max_size: usize,
@@ -119,6 +120,12 @@ pub struct Limits {
     /// the nodes of each cell's condition or value, with the copy of its
     /// column that an input cell holds (`spec/tables.md`, *Limits*).
     pub max_table_size: usize,
+    /// The most values a binding reads from the native data of one input, or
+    /// converts for a native constant (`spec/data-model.md`, *Reading native
+    /// data*, *Limits*): not checked by the core's readers, which never meet
+    /// native data, but carried with the other limits for the bindings that do
+    /// ([`crate::value::ValueCount`]).
+    pub max_values: usize,
 }
 
 impl Limits {
@@ -144,6 +151,7 @@ impl Default for Limits {
             max_yaml_size: 1024 * 1024,
             max_text_size: 4 * 1024 * 1024,
             max_table_size: 2 * 1024 * 1024,
+            max_values: 1_000_000,
         }
     }
 }

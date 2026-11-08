@@ -259,8 +259,27 @@ public abstract sealed class Expr implements DocumentContent permits Field, Cons
      * @throws EvaluationException in strict mode, for a missing field or a type mismatch
      */
     public ResultTree evaluateTree(Object data, String logic, boolean strict) {
+        return evaluateTree(data, logic, strict, null);
+    }
+
+    /**
+     * Evaluate this condition on {@code data} like
+     * {@link #evaluateTree(Object, String, boolean)}, reading at most the
+     * limits' {@link Limits#maxValues()} values of it.
+     *
+     * @param data the input
+     * @param logic the logic, by name ({@code boolean})
+     * @param strict whether a missing field or a type mismatch is an error instead of unknown
+     * @param limits the limits, or null for the defaults
+     * @return the result tree
+     * @throws ExpressionException if this is a value node
+     * @throws RegistryException for an unknown logic
+     * @throws EvaluationException in strict mode, for a missing field or a type mismatch
+     * @throws FormatException with the code {@code limit_exceeded} for an input beyond {@code maxValues}
+     */
+    public ResultTree evaluateTree(Object data, String logic, boolean strict, Limits limits) {
         byte[] name = Text.name(Objects.requireNonNull(logic, "logic"));
-        return tree(data, (node, input, out, scope) -> Native.treeNewCondition(
+        return tree(data, limits, (node, input, out, scope) -> Native.treeNewCondition(
                 node,
                 input,
                 // An empty name is not NULL: the core refuses it.
@@ -292,7 +311,24 @@ public abstract sealed class Expr implements DocumentContent permits Field, Cons
      * @throws EvaluationException in strict mode, for a missing field or a type mismatch
      */
     public ResultTree evaluateValueTree(Object data, boolean strict) {
-        return tree(data, (node, input, out, scope) -> Native.treeNewValue(node, input, strict, out, scope.error()));
+        return evaluateValueTree(data, strict, null);
+    }
+
+    /**
+     * Evaluate this value node on {@code data}, strict or not, reading at most
+     * the limits' {@link Limits#maxValues()} values of it.
+     *
+     * @param data the input
+     * @param strict whether a missing field or a type mismatch is an error instead of null
+     * @param limits the limits, or null for the defaults
+     * @return the result tree
+     * @throws ExpressionException if this is a condition
+     * @throws EvaluationException in strict mode, for a missing field or a type mismatch
+     * @throws FormatException with the code {@code limit_exceeded} for an input beyond {@code maxValues}
+     */
+    public ResultTree evaluateValueTree(Object data, boolean strict, Limits limits) {
+        return tree(
+                data, limits, (node, input, out, scope) -> Native.treeNewValue(node, input, strict, out, scope.error()));
     }
 
     @FunctionalInterface
@@ -300,7 +336,7 @@ public abstract sealed class Expr implements DocumentContent permits Field, Cons
         int call(MemorySegment node, MemorySegment input, MemorySegment out, Scope scope);
     }
 
-    private ResultTree tree(Object data, TreeCall call) {
+    private ResultTree tree(Object data, Limits limits, TreeCall call) {
         PathTree read = paths;
         if (read == null) {
             read = PathTree.of(fieldPaths());
@@ -309,7 +345,7 @@ public abstract sealed class Expr implements DocumentContent permits Field, Cons
         PathTree along = read;
         return with(pointer -> {
             try (Scope scope = new Scope();
-                    DataReader reader = new DataReader()) {
+                    DataReader reader = DataReader.within(limits)) {
                 MemorySegment input = reader.read(data, along);
                 scope.onClose(() -> Native.valueFree(input));
                 MemorySegment out = scope.pointer();

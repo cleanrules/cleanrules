@@ -162,8 +162,27 @@ public final class Node implements AutoCloseable {
      * @throws EvaluationException in strict mode, as for a rule set
      */
     public String evaluateTree(Object data, String logic, boolean strict) {
+        return evaluateTree(data, logic, strict, null);
+    }
+
+    /**
+     * Evaluate the node as a condition on Java data, under a logic, strict or
+     * not, reading at most the limits' {@code maxValues} values of it.
+     *
+     * @param data the input
+     * @param logic the logic's name, such as {@code boolean}
+     * @param strict whether a missing field or a type mismatch is an error
+     * @param limits the limits, or null for the defaults
+     * @return the result tree's JSON text
+     * @throws RegistryException for an unknown logic
+     * @throws ExpressionException if the node is a value, not a condition
+     * @throws EvaluationException in strict mode, as for a rule set
+     * @throws io.github.cleanrules.FormatException with the code {@code limit_exceeded} for an input beyond {@code maxValues}
+     */
+    public String evaluateTree(Object data, String logic, boolean strict, Limits limits) {
         Objects.requireNonNull(logic, "logic");
-        return evaluateNative(data, (pointer, input, scope) -> condition(pointer, input, logic, strict, scope));
+        return evaluateNative(
+                data, limits, (pointer, input, scope) -> condition(pointer, input, logic, strict, scope));
     }
 
     /**
@@ -214,7 +233,21 @@ public final class Node implements AutoCloseable {
      * @throws CleanRulesException if the node is a condition, or the evaluation fails
      */
     public String evaluateValueTree(Object data, boolean strict) {
-        return evaluateNative(data, (pointer, input, scope) -> value(pointer, input, strict, scope));
+        return evaluateValueTree(data, strict, null);
+    }
+
+    /**
+     * Evaluate the node as a value on Java data, strict or not, reading at most
+     * the limits' {@code maxValues} values of it.
+     *
+     * @param data the input
+     * @param strict whether a missing field or a type mismatch is an error
+     * @param limits the limits, or null for the defaults
+     * @return the result tree's JSON text
+     * @throws CleanRulesException if the node is a condition, or the evaluation fails
+     */
+    public String evaluateValueTree(Object data, boolean strict, Limits limits) {
+        return evaluateNative(data, limits, (pointer, input, scope) -> value(pointer, input, strict, scope));
     }
 
     /**
@@ -264,10 +297,10 @@ public final class Node implements AutoCloseable {
         return Scope.takeText(out, len);
     }
 
-    private String evaluateNative(Object data, Tree tree) {
+    private String evaluateNative(Object data, Limits limits, Tree tree) {
         return with(pointer -> {
             try (Scope scope = new Scope();
-                    DataReader reader = new DataReader()) {
+                    DataReader reader = DataReader.within(limits)) {
                 MemorySegment input = reader.read(data, tree());
                 scope.onClose(() -> Native.valueFree(input));
                 scope.causes = reader.causes;

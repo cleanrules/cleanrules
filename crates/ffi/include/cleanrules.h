@@ -139,7 +139,8 @@ typedef int32_t cr_value_type;
 #define CR_OK 0
 
 // The caller broke the ABI's rules: a `NULL` where a pointer is required, or
-// an unknown format or limit. The message names the function.
+// an unknown format or limit. The message says which argument and how to fix
+// it; it never names the function, so bindings show it as it is.
 #define CR_INVALID_ARGUMENT -1
 
 // A bug in cleanrules, caught at the boundary: please report it.
@@ -242,6 +243,13 @@ typedef int32_t cr_value_type;
 
 // The largest text in the rule syntax or CSV, in bytes.
 #define CR_LIMIT_MAX_TEXT_SIZE 6
+
+// The most values a binding reads from the native data of one input, or
+// converts for a native constant (`spec/data-model.md`, *Reading native
+// data*, *Limits*): carried for the bindings built on this ABI, which count
+// what they read and refuse more with `cr_error_new_max_values`. The ABI
+// does not count the values a program builds with `cr_value_new_*`.
+#define CR_LIMIT_MAX_VALUES 7
 
 // A null, with its reason.
 #define CR_VALUE_NULL 1
@@ -838,6 +846,26 @@ cr_status cr_error_new_action(const char *rule,
                               const struct cr_value *executed,
                               struct cr_error **out,
                               struct cr_error **error);
+
+// A new `limit_exceeded` for native data beyond `max_values`
+// (`spec/data-model.md`, *Reading native data*, *Limits*), made by the core
+// for the bindings that read native data on this ABI and count what they
+// convert: its context has `name` = `max_values`, the `row` of a batch when
+// `row` is 0 or more, and the `rule` whose metadata or payload constant it is
+// when `rule` is not `NULL`. It is given through `out`, owned by the caller
+// and freed with `cr_error_free`; the call's own failures go to `error`.
+//
+// # Safety
+//
+// `rule` is `NULL` or points to `rule_len` readable bytes; `out` is `NULL` or
+// points to a writable `cr_error *`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_error_new_max_values(size_t max_values,
+                                  int64_t row,
+                                  const char *rule,
+                                  size_t rule_len,
+                                  struct cr_error **out,
+                                  struct cr_error **error);
 
 // The parent of an error code in the hierarchy of `spec/errors.md`
 // (`CR_FORMAT_ERROR` for `CR_LIMIT_EXCEEDED`); `CR_OK` for a code

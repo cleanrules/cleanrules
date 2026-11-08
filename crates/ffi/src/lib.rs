@@ -55,7 +55,8 @@ pub type cr_status = i32;
 /// Success.
 pub const CR_OK: cr_status = 0;
 /// The caller broke the ABI's rules: a `NULL` where a pointer is required, or
-/// an unknown format or limit. The message names the function.
+/// an unknown format or limit. The message says which argument and how to fix
+/// it; it never names the function, so bindings show it as it is.
 pub const CR_INVALID_ARGUMENT: cr_status = -1;
 /// A bug in cleanrules, caught at the boundary: please report it.
 pub const CR_INTERNAL_ERROR: cr_status = -2;

@@ -271,6 +271,12 @@ value it comes from changes, moves or is destroyed; `clone()` makes it a
 `value`. Read from a temporary, they are owned instead, so
 `auto label = decision.output()["label"].as_string();` is a `std::string`.
 
+`limits` carries `limit::max_values` (1,000,000 by default) with the other
+limits, for the bindings that read native data, count what they convert and
+refuse an input beyond it with `limit_exceeded` (`spec/data-model.md`,
+*Reading native data*, *Limits*). A value you build here is not counted,
+since you build every part of it.
+
 ## Decisions
 
 `decision.fired(i)`, `truth(i)`, `selected()`, `rule_name(i)`,

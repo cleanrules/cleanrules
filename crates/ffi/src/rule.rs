@@ -50,7 +50,6 @@ unsafe fn text<'a>(text: *const c_char, len: usize, what: &str) -> Outcome<&'a s
 /// writable `cr_rule *`; `error` is `NULL` or points to a writable
 /// `cr_error *` set to `NULL`.
 unsafe fn step(
-    name: &str,
     rule: *const cr_rule,
     out: *mut *mut cr_rule,
     error: *mut *mut cr_error,
@@ -66,7 +65,7 @@ unsafe fn step(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call(name, error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A rule with a name and a condition, and nothing else: priority 0, no
@@ -100,7 +99,7 @@ pub unsafe extern "C" fn cr_rule_new(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_rule_new", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The rule with `key` in its payload, given `value` (copied): a new key goes
@@ -130,7 +129,7 @@ pub unsafe extern "C" fn cr_rule_with_payload(
         Ok(rule.clone().with_payload_entry(key, value)?)
     };
     // SAFETY: the caller's promises are `step`'s.
-    unsafe { step("cr_rule_with_payload", rule, out, error, make) }
+    unsafe { step(rule, out, error, make) }
 }
 
 /// The rule with a priority, for the `priority` hit policy.
@@ -149,7 +148,7 @@ pub unsafe extern "C" fn cr_rule_with_priority(
 ) -> cr_status {
     let make = |rule: &Rule| Ok(rule.clone().priority(priority));
     // SAFETY: the caller's promises are `step`'s.
-    unsafe { step("cr_rule_with_priority", rule, out, error, make) }
+    unsafe { step(rule, out, error, make) }
 }
 
 /// The rule with these tags instead of its own: `tags` is a list of strings,
@@ -191,7 +190,7 @@ pub unsafe extern "C" fn cr_rule_with_tags(
         Ok(rule.clone().tags(names))
     };
     // SAFETY: the caller's promises are `step`'s.
-    unsafe { step("cr_rule_with_tags", rule, out, error, make) }
+    unsafe { step(rule, out, error, make) }
 }
 
 /// The rule with a description.
@@ -215,7 +214,7 @@ pub unsafe extern "C" fn cr_rule_with_description(
         Ok(rule.clone().description(description))
     };
     // SAFETY: the caller's promises are `step`'s.
-    unsafe { step("cr_rule_with_description", rule, out, error, make) }
+    unsafe { step(rule, out, error, make) }
 }
 
 /// The rule with this metadata instead of its own: `metadata` is a map of
@@ -252,7 +251,7 @@ pub unsafe extern "C" fn cr_rule_with_metadata(
         Ok(rule.clone().try_metadata(plain)?)
     };
     // SAFETY: the caller's promises are `step`'s.
-    unsafe { step("cr_rule_with_metadata", rule, out, error, make) }
+    unsafe { step(rule, out, error, make) }
 }
 
 /// The rule naming its action, which a program resolves in its registry
@@ -278,7 +277,7 @@ pub unsafe extern "C" fn cr_rule_with_action(
         Ok(rule.clone().action_name(name)?)
     };
     // SAFETY: the caller's promises are `step`'s.
-    unsafe { step("cr_rule_with_action", rule, out, error, make) }
+    unsafe { step(rule, out, error, make) }
 }
 
 /// The rule's tags as the core keeps them, sorted and without repeats: a new
@@ -307,7 +306,7 @@ pub unsafe extern "C" fn cr_rule_tags(
         unsafe { give_new_value(out, Value::List(tags)) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_rule_tags", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The rule's metadata as the core keeps it: a new map, freed with
@@ -332,7 +331,7 @@ pub unsafe extern "C" fn cr_rule_metadata(
         unsafe { give_new_value(out, metadata) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_rule_metadata", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// One rule written in the rule syntax (`spec/text.md`), as fuzzytool's
@@ -368,7 +367,7 @@ pub unsafe extern "C" fn cr_rule_from_text(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_rule_from_text", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Lend a text of a rule: `pick` chooses it, `None` for a text the rule
@@ -380,7 +379,6 @@ pub unsafe extern "C" fn cr_rule_from_text(
 /// to a writable `const char *` and `size_t`; `error` is `NULL` or points to a
 /// writable `cr_error *` set to `NULL`.
 unsafe fn lend(
-    name: &str,
     rule: *const cr_rule,
     text: *mut *const c_char,
     len: *mut usize,
@@ -398,7 +396,7 @@ unsafe fn lend(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call(name, error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The rule's name, borrowed from the rule and not NUL-terminated.
@@ -416,11 +414,7 @@ pub unsafe extern "C" fn cr_rule_name(
     error: *mut *mut cr_error,
 ) -> cr_status {
     // SAFETY: the caller's promises are `lend`'s.
-    unsafe {
-        lend("cr_rule_name", rule, name, len, error, |r| {
-            Ok(Some(r.name()))
-        })
-    }
+    unsafe { lend(rule, name, len, error, |r| Ok(Some(r.name()))) }
 }
 
 /// The rule's description, borrowed from the rule and not NUL-terminated;
@@ -437,11 +431,7 @@ pub unsafe extern "C" fn cr_rule_description(
     error: *mut *mut cr_error,
 ) -> cr_status {
     // SAFETY: the caller's promises are `lend`'s.
-    unsafe {
-        lend("cr_rule_description", rule, text, len, error, |r| {
-            Ok(r.get_description())
-        })
-    }
+    unsafe { lend(rule, text, len, error, |r| Ok(r.get_description())) }
 }
 
 /// The name of the rule's action (`spec/rules.md`, *Actions*), borrowed from
@@ -459,11 +449,7 @@ pub unsafe extern "C" fn cr_rule_action(
     error: *mut *mut cr_error,
 ) -> cr_status {
     // SAFETY: the caller's promises are `lend`'s.
-    unsafe {
-        lend("cr_rule_action", rule, name, len, error, |r| {
-            Ok(r.get_action_name())
-        })
-    }
+    unsafe { lend(rule, name, len, error, |r| Ok(r.get_action_name())) }
 }
 
 /// The rule's priority; 0 for `NULL`.
@@ -493,7 +479,7 @@ pub unsafe extern "C" fn cr_rule_when(
     // SAFETY: `rule` is NULL or live (# Safety).
     let make = || Ok(unsafe { handle(rule, "rule") }?.rule.when().clone());
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_rule_when", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// The number of entries in the rule's payload; 0 for `NULL`.
@@ -539,7 +525,7 @@ pub unsafe extern "C" fn cr_rule_payload_key(
 ) -> cr_status {
     // SAFETY: the caller's promises are `lend`'s.
     unsafe {
-        lend("cr_rule_payload_key", rule, key, len, error, |r| {
+        lend(rule, key, len, error, |r| {
             Ok(Some(entry(r, index)?.0.as_str()))
         })
     }
@@ -566,7 +552,7 @@ pub unsafe extern "C" fn cr_rule_payload_value(
         Ok(entry(rule, index)?.1.clone())
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_rule_payload_value", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// Free a rule. `NULL` is ignored. Rule sets made with it keep their own copy.

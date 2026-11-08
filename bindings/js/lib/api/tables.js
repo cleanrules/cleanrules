@@ -193,14 +193,14 @@ function tables(native, expressions, rules, build) {
       return this.#ruleset
     }
 
-    /** Evaluate one input with the compiled rule set (`RuleSet.evaluate`). */
-    evaluate(data) {
-      return this.ruleset.evaluate(data)
+    /** Evaluate one input with the compiled rule set (`RuleSet.evaluate`, with its options). */
+    evaluate(data, evaluateOptions) {
+      return this.ruleset.evaluate(data, evaluateOptions)
     }
 
-    /** Evaluate a batch with the compiled rule set (`RuleSet.evaluateMany`). */
-    evaluateMany(rows) {
-      return this.ruleset.evaluateMany(rows)
+    /** Evaluate a batch with the compiled rule set (`RuleSet.evaluateMany`, with its options). */
+    evaluateMany(rows, evaluateOptions) {
+      return this.ruleset.evaluateMany(rows, evaluateOptions)
     }
 
     /** The summary of the compiled rule set (`RuleSet.summary`). */

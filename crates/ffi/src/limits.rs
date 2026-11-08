@@ -23,6 +23,12 @@ pub const CR_LIMIT_MAX_TABLE_SIZE: cr_limit = 4;
 pub const CR_LIMIT_MAX_YAML_SIZE: cr_limit = 5;
 /// The largest text in the rule syntax or CSV, in bytes.
 pub const CR_LIMIT_MAX_TEXT_SIZE: cr_limit = 6;
+/// The most values a binding reads from the native data of one input, or
+/// converts for a native constant (`spec/data-model.md`, *Reading native
+/// data*, *Limits*): carried for the bindings built on this ABI, which count
+/// what they read and refuse more with `cr_error_new_max_values`. The ABI
+/// does not count the values a program builds with `cr_value_new_*`.
+pub const CR_LIMIT_MAX_VALUES: cr_limit = 7;
 
 /// Limits for reading documents and inputs. Functions that take a
 /// `const cr_limits *` use the defaults for `NULL`. Unlike the other handles,
@@ -40,12 +46,12 @@ pub extern "C" fn cr_limits_new() -> *mut cr_limits {
 }
 
 fn which(limit: cr_limit) -> Outcome<cr_limit> {
-    if (CR_LIMIT_MAX_SIZE..=CR_LIMIT_MAX_TEXT_SIZE).contains(&limit) {
+    if (CR_LIMIT_MAX_SIZE..=CR_LIMIT_MAX_VALUES).contains(&limit) {
         Ok(limit)
     } else {
         Err(Failure::Invalid(
             format!("limit {limit} is not a CR_LIMIT_* constant"),
-            "use CR_LIMIT_MAX_SIZE (1) to CR_LIMIT_MAX_TEXT_SIZE (6)",
+            "use CR_LIMIT_MAX_SIZE (1) to CR_LIMIT_MAX_VALUES (7)",
         ))
     }
 }
@@ -73,12 +79,13 @@ pub unsafe extern "C" fn cr_limits_set(
             CR_LIMIT_MAX_DEPTH => l.max_depth = value,
             CR_LIMIT_MAX_TABLE_SIZE => l.max_table_size = value,
             CR_LIMIT_MAX_YAML_SIZE => l.max_yaml_size = value,
-            _ => l.max_text_size = value,
+            CR_LIMIT_MAX_TEXT_SIZE => l.max_text_size = value,
+            _ => l.max_values = value,
         }
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_limits_set", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Read one limit (`CR_LIMIT_*`) into `value`.
@@ -104,13 +111,14 @@ pub unsafe extern "C" fn cr_limits_get(
             CR_LIMIT_MAX_DEPTH => l.max_depth,
             CR_LIMIT_MAX_TABLE_SIZE => l.max_table_size,
             CR_LIMIT_MAX_YAML_SIZE => l.max_yaml_size,
-            _ => l.max_text_size,
+            CR_LIMIT_MAX_TEXT_SIZE => l.max_text_size,
+            _ => l.max_values,
         };
         // SAFETY: `value` is NULL or writable (# Safety).
         unsafe { write_out(value, read, "value") }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_limits_get", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Free limits. `NULL` is ignored.

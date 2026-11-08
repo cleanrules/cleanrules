@@ -1,6 +1,6 @@
 package io.github.cleanrules.scaladsl.tests
 
-import io.github.cleanrules.{EvaluationException, Truth}
+import io.github.cleanrules.{EvaluationException, FormatException, Limits, Truth}
 import io.github.cleanrules.scaladsl.*
 import java.time.LocalDate
 import scala.collection.immutable.{ListMap, SortedMap, TreeMap, VectorMap}
@@ -221,3 +221,29 @@ class DataSuite extends munit.FunSuite:
     assert(seen.asInstanceOf[AnyRef] eq customer)
     val decisions = rules.evaluateMany(Seq(customer, Map("years" -> 0), Customer("B", 3, Address("X", None))))
     assertEquals(decisions.map(_.fired), Seq(Seq("r"), Nil, Seq("r")))
+
+  test("max_values: Scala data beyond the limit is refused in every mode (spec/data-model.md, Limits)"):
+    def beyond(call: => Any): FormatException =
+      val error = intercept[FormatException](call)
+      assertEquals(error.code, "limit_exceeded")
+      assertEquals(error.name.orElseThrow, "max_values")
+      error
+    // A vector holding the same vector twice, 30 times over: 2^30 references.
+    val diamond = (0 until 30).foldLeft[Any](1)((inner, _) => Vector(inner, inner))
+    val rules = RuleSet(Rule("r", F.d.isNull), Rule("s", F.x === 1))
+    beyond(rules.evaluate(Map("d" -> diamond, "x" -> 1)))
+    beyond(RuleSet(Seq(Rule("r", F.d.isNull)), strict = true).evaluate(Map("d" -> diamond)))
+    beyond((F.d === 1).evaluateTree(Map("d" -> diamond)))
+    // Java's Limits, here too: 3 levels are 15 values, plus `x`.
+    val small = Map("d" -> (0 until 3).foldLeft[Any](1)((inner, _) => Vector(inner, inner)), "x" -> 1)
+    assertEquals(rules.evaluate(small, Limits.defaults().withMaxValues(16)).results.map(_.truth), Seq(Truth.FALSE, Truth.TRUE))
+    beyond(rules.evaluate(small, Limits.defaults().withMaxValues(15)))
+    // A case class is a map of its fields: only those read count.
+    assertEquals(
+      RuleSet(Rule("r", F.a.city === "Madrid")).evaluate(Map("a" -> Address("Madrid", None)), Limits.defaults().withMaxValues(1)).fired,
+      Seq("r"),
+    )
+    beyond((F.d === 1).evaluateTree(small, "boolean", false, Limits.defaults().withMaxValues(3)))
+    beyond((F.d).evaluateValueTree(small, false, Limits.defaults().withMaxValues(3)))
+    val rows = Seq(Map("x" -> 1), Map("x" -> Vector(1, 1, 1)))
+    assertEquals(beyond(rules.evaluateMany(rows, Limits.defaults().withMaxValues(2))).row.getAsInt, 1)

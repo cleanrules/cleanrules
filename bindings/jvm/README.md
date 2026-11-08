@@ -92,7 +92,10 @@ rules.bind(Map.of("notify_sales", context -> System.out.println(context.output()
   names there are), `contains(name)`, `hitPolicy()`, `aggregate()`, `logic()`,
   `isStrict()`, `fieldPaths()`, `evaluate(data[, limits])`,
   `evaluateMany(rows[, limits])`, `readDecision(text[, format[, limits]])`,
-  `bind(actions)`, `run(data[, limits])` and `summary()`.
+  `bind(actions)`, `run(data[, limits])` and `summary()`. `evaluate`,
+  `evaluateMany` and `run` read at most `limits.maxValues()` values of each
+  input (1,000,000 by default), and refuse one beyond it with a
+  `FormatException` (`limit_exceeded`; *Data*).
 - **Decisions** (`Decision`): `ruleSet()`, `hitPolicy()`, `results()` and
   `selected()` (`RuleResult`: `rule()`, `fired()`, `truth()`, `output()`),
   `fired()` (names), `outputs()`, `output()` and `aggregated()` (`Optional`
@@ -146,6 +149,7 @@ Java's names differ:
 | `DecisionTable.builder().header(...).row(...).build()` | `new DecisionTable(header, rows, { ... })` | `DecisionTable(header, rows, hitPolicy = ...)` |
 | `table.ruleSet()` | `table.ruleset` | `table.ruleSet` |
 | `expr.evaluateTree(data)` | `evaluateTree(expr, data)` | `expr.evaluateTree(data)` |
+| `ruleSet.evaluate(data, Limits.defaults().withMaxValues(n))` | `ruleset.evaluate(data, { limits: { maxValues: n } })` | `ruleSet.evaluate(data, Limits.defaults().withMaxValues(n))` |
 | `RuleSet.builder()...build()`, `RuleSet.of(...)` | `new RuleSet([...], { ... })` | `RuleSet(rules, hitPolicy = ...)`, `RuleSet(rules*)` |
 | `ruleSet.isStrict()` | `ruleSet.strict` | `ruleSet.strict` |
 | `decision.output()` (an `Optional`) | `decision.output` (or `null`) | `decision.output` (an `Option`) |
@@ -211,8 +215,9 @@ ResultTree tree = vip.when().evaluateTree(Map.of("customer", Map.of("years", 7))
   `outputs()`, `rows()` (each `TableRow`: `name()`, `priority()`,
   `description()`, `inputs()` and `outputs()` as `Optional<Expr>`s),
   `ruleSet()`, `evaluate`, `evaluateMany`, `summary()` and `toJson()`.
-- **Result trees** (`ResultTree`): `expr.evaluateTree(data[, logic, strict])`
-  and `expr.evaluateValueTree(data[, strict])` evaluate one node, and
+- **Result trees** (`ResultTree`): `expr.evaluateTree(data[, logic, strict[,
+  limits]])` and `expr.evaluateValueTree(data[, strict[, limits]])` evaluate
+  one node (`limits` for `maxValues`, *Data*), and
   `ActionContext.tree()` gives the tree of the rule's condition in an action;
   each result has `node()`, `truth()` (an `Optional`, empty for a value),
   `value()`, `reason()`, `children()` and `toJson()` (the core's JSON result
@@ -298,8 +303,11 @@ a constant where no node is involved. An enum case with parameters is not a
 constant (an `ExpressionException` that names it). `toString` is the core's
 text, `toJson` the JSON node, `fieldPaths` the paths read, and
 `evaluateTree(data[, logic, strict])` and `evaluateValueTree(data[, strict])`
-give a `ResultTree`; the rest is on `asJava` (`tag()`, `kind()`,
-`children()`...).
+give a `ResultTree`; `evaluateTree(data, logic, strict, limits)` and
+`evaluateValueTree(data, strict, limits)` take Java's `Limits` too, an
+overload without defaults (Scala allows defaults on one overload only, so
+`logic` and `strict` are given there); the rest is on `asJava` (`tag()`,
+`kind()`, `children()`...).
 
 **Field paths.** `F.customer.age`, `F.items(0).price`, `F("customer", "age")`
 and `F.customer("age")` (`F` and `Field` are `Dynamic`: `selectDynamic` and
@@ -799,7 +807,7 @@ a 64-bit platform.
 | `Document` (`ffi`) | a document in JSON, YAML, the rule syntax or CSV: `read(text, format[, limits])` (a `String`, or UTF-8 bytes), `kind()`, `write([format])` |
 | `RuleSet` (`ffi`) | `read(text, format[, limits])`, `fromDocument(document)`, `write([format])`, `summary([format])` (text by default), `size()`, `ruleName(i)`, `ruleNames()`, `hitPolicy()`, `logic()`, `aggregate()`, `isStrict()`, `fieldPaths()`, `evaluate(data[, limits])`, `evaluateJson(json[, limits])` (a `String` or bytes), `evaluateMany(inputs[, limits])` (any `Iterable`), `evaluateManyJson(json[, limits])`, `readDecision(text[, format[, limits]])`, `checkActions(names)`, `run(data, actions[, limits])` |
 | `Decision` (`ffi`) | `size()`, `ruleName(i)`, `firedAt(i)`, `truth(i)`, `selected()`, `output()`, `outputs()`, `ruleOutput(i)`, `outputJson()`, `outputsJson()`, `write([format])` (JSON by default), `explain([format])` (text by default) |
-| `Node` (`ffi`) | one condition or value: `read(text, format[, limits])`, `write([format])`, `fieldPaths()`, `evaluateTree(data[, logic, strict])`, `evaluateValueTree(data[, strict])` and their `...Json` forms, which give the result tree as JSON |
+| `Node` (`ffi`) | one condition or value: `read(text, format[, limits])`, `write([format])`, `fieldPaths()`, `evaluateTree(data[, logic, strict[, limits]])`, `evaluateValueTree(data[, strict[, limits]])` and their `...Json` forms, which give the result tree as JSON |
 | `Limits` | immutable limits: `Limits.defaults().withMaxSize(n)`, `withMaxNesting`, `withMaxDepth`, `withMaxTableSize`, `withMaxYamlSize`, `withMaxTextSize` |
 | `Action`, `ActionCall` (`ffi`) | an action (`call -> ...`, which may throw) and its call: `ruleName()`, `position()`, `truth()`, `output()`, `data()`, `decision()` |
 | `Format`, `Truth`, `DocumentKind`, `HitPolicy`, `Aggregate` | enums; all but `Format` have `jsonName()` and `fromJsonName(name)` |
@@ -849,6 +857,19 @@ read where its package is open to the binding, which it always is on the class
 path, or else through a public supertype that declares it. A getter that
 throws an error of the virtual machine (`StackOverflowError`,
 `OutOfMemoryError`) is never a read error: the error goes on as it is.
+
+The values read from one input are bounded by `Limits.maxValues()`, 1,000,000
+by default (`Limits.defaults().withMaxValues(n)` changes it; the methods that
+take `Limits` apply it). Each value placed where a path ends or stops counts,
+with everything inside it, an object referenced from several places each
+time, and a list along the paths counts its size, so data shared as a
+"diamond" or a `Collections.nCopies(Integer.MAX_VALUE, x)` cannot exhaust
+memory. An input beyond the limit is refused, not evaluated, in every mode: a
+`FormatException` with the code `limit_exceeded`, `name()` `max_values` and,
+in a batch, `row()` (`spec/data-model.md`, *Reading native data*, *Limits*).
+Constants and rule metadata are converted under the default limit too
+(`Rule.metadata` names the rule). Scala data goes through the same reader,
+with Java's `Limits`.
 
 ## Values given back
 

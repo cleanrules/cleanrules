@@ -123,7 +123,8 @@ def same(actual: Any, expected: Any) -> bool:
     return type(actual) is type(expected) and actual == expected
 
 
-COMPARED = ("rule", "path", "types", "rules", "row")
+# `name` for `limit_exceeded` beyond `max_values`, which evaluation raises.
+COMPARED = ("rule", "path", "types", "rules", "row", "name")
 
 
 def error_dict(error: CleanRulesError, fields: tuple[str, ...]) -> dict[str, Any]:
@@ -475,11 +476,15 @@ def run_native(vector: dict[str, Any]) -> None:
 
         expect_result(tree, expect, "result")
     elif kind == "evaluate":
+        wanted = given.get("limits", {}).get("max_values")
+        max_values = None if wanted is None else int(wanted)
         if "inputs" in given:
             expect_result(
                 lambda: [
                     d.to_dict()["decision"]
-                    for d in build_ruleset(given["ruleset"]).evaluate_many(native(given["inputs"]))
+                    for d in build_ruleset(given["ruleset"]).evaluate_many(
+                        native(given["inputs"]), max_values=max_values
+                    )
                 ],
                 expect,
                 "decisions",
@@ -488,7 +493,7 @@ def run_native(vector: dict[str, Any]) -> None:
             expect_result(
                 lambda: (
                     build_ruleset(given["ruleset"])
-                    .evaluate(native(given["input"]))
+                    .evaluate(native(given["input"]), max_values=max_values)
                     .to_dict()["decision"]
                 ),
                 expect,
@@ -513,6 +518,11 @@ def collect() -> list[Any]:
     params: list[Any] = []
     for path in sorted(VECTORS.rglob("*.json")):
         for vector in load(path.read_text(encoding="utf-8"))["vectors"]:
+            given = vector["given"]
+            if given["kind"] == "evaluate" and "limits" in given:
+                # `max_values` bounds native data only: no JSON run.
+                params.append(pytest.param(vector, "native", id=f"native:{vector['id']}"))
+                continue
             params.append(pytest.param(vector, "json", id=f"json:{vector['id']}"))
             if vector["given"]["kind"] != "read":
                 params.append(pytest.param(vector, "native", id=f"native:{vector['id']}"))

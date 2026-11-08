@@ -51,11 +51,15 @@ A vector file is a JSON document:
 | `read` | `text` (a JSON text, for lexical cases), `yaml` (a YAML text, `json-format.md`, *YAML*) or `document`; `ruleset` when reading a decision; optional `limits` (`max_size` in bytes, `max_nesting`, `max_depth`) | the document reader | `document`: the canonical form that is read back, or `error` |
 | `condition` | `condition` (a condition node), `input` (a data value), optional `logic` and `strict` | `evaluate_tree` (`spec/ast.md`, *Evaluating one node*) | `result`: its result tree, or `error` |
 | `value` | `value` (a value node), `input`, optional `strict` | `evaluate_value_tree` | `result`: its result tree, or `error` |
-| `evaluate` | `ruleset` (a rule set document's content), and `input` or `inputs` (a batch) | `evaluate`, or its batch form | `decision`, or `decisions` for a batch, or `error` |
+| `evaluate` | `ruleset` (a rule set document's content), and `input` or `inputs` (a batch); optional `limits` (`max_values`, `spec/data-model.md`, *Reading native data*, *Limits*) | `evaluate`, or its batch form | `decision`, or `decisions` for a batch, or `error` |
 | `explain` | `ruleset`, `input` | `evaluate`, then `explain` | `decision` (which `at` pointers refer to) and `explanation`, optionally `text` (the exact text of `explain()`), or `error` |
 | `summary` | `ruleset` | `summary` | `summary`, and optionally `text` |
 
-Optional flags such as `strict` are omitted when false. An `error` holds the
+Optional flags such as `strict` are omitted when false. An `evaluate` vector
+with `limits` checks `max_values`, which bounds what is read from native data
+only: runners run it with the language's native data (`native:<id>`) and skip
+it in their JSON runs, and the core, C ABI and C++ runners, which have no
+native data, skip it and count the skips. An `error` holds the
 error's `code` and the compared context fields that apply, such as
 `{"code": "missing_field", "rule": "vip", "path": ["customer", "age"]}`;
 runners compare errors as `spec/errors.md` (*Comparing errors*) says.

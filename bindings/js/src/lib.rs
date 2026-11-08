@@ -38,10 +38,10 @@ mod wasm;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use napi::build::{
-    NativeRule, NodeList, RuleList, action_error_data, decision_data, explanation_data, node_arith,
-    node_between, node_children, node_compare, node_connective, node_constant, node_details,
-    node_field, node_is_in, node_matches, node_same_as, node_string_test, node_unary, rule_details,
-    rule_new, rule_set_new, summary_with,
+    NativeRule, NodeList, RuleList, action_error_data, decision_data, explanation_data,
+    max_values_error_data, node_arith, node_between, node_children, node_compare, node_connective,
+    node_constant, node_details, node_field, node_is_in, node_matches, node_same_as,
+    node_string_test, node_unary, rule_details, rule_new, rule_set_new, summary_with,
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use napi::classes::{
@@ -61,10 +61,10 @@ pub use napi::{FORMAT_VERSION, decimal_problem, version};
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm::build::{
-    NativeRule, NodeList, RuleList, action_error_data, decision_data, explanation_data, node_arith,
-    node_between, node_children, node_compare, node_connective, node_constant, node_details,
-    node_field, node_is_in, node_matches, node_same_as, node_string_test, node_unary, rule_details,
-    rule_new, rule_set_new, summary_with,
+    NativeRule, NodeList, RuleList, action_error_data, decision_data, explanation_data,
+    max_values_error_data, node_arith, node_between, node_children, node_compare, node_connective,
+    node_constant, node_details, node_field, node_is_in, node_matches, node_same_as,
+    node_string_test, node_unary, rule_details, rule_new, rule_set_new, summary_with,
 };
 #[cfg(target_arch = "wasm32")]
 pub use wasm::classes::{Decision, Document, Node, RuleSet};

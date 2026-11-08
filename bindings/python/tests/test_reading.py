@@ -3,10 +3,21 @@
 import collections
 import dataclasses
 import datetime as dt
+import threading
+import time
 from typing import Any, NamedTuple
 
 import pytest
-from cleanrules import EvaluationError, F, Rule, RuleSet, Truth
+from cleanrules import (
+    EvaluationError,
+    F,
+    FormatError,
+    Rule,
+    RuleSet,
+    Truth,
+    evaluate_tree,
+    evaluate_value_tree,
+)
 
 
 def truth(condition: Any, data: object, **options: Any) -> Truth:
@@ -361,3 +372,137 @@ def test_a_read_error_in_the_middle_of_a_path_is_not_a_null() -> None:
         RuleSet([Rule("r", F.c.profile.age > 18)], strict=True).evaluate(data)
     assert info.value.path == ("c", "profile", "age")
     assert isinstance(info.value.__cause__, ValueError)
+
+
+# ---- max_values (`spec/data-model.md`, *Reading native data*, *Limits*).
+
+
+def diamond(depth: int) -> object:
+    """A list holding the same list twice, `depth` times over: 2**depth references."""
+    node: object = 1
+    for _ in range(depth):
+        node = [node, node]
+    return node
+
+
+def on_small_stack(call: Any) -> Any:
+    """Run `call` on a thread with 512 KiB of stack, as a host thread may have."""
+    result: list[Any] = []
+    failure: list[BaseException] = []
+
+    def run() -> None:
+        try:
+            result.append(call())
+        except BaseException as error:  # re-raised below
+            failure.append(error)
+
+    old = threading.stack_size(512 * 1024)
+    try:
+        thread = threading.Thread(target=run)
+        thread.start()
+        thread.join()
+    finally:
+        threading.stack_size(old)
+    if failure:
+        raise failure[0]
+    return result[0]
+
+
+def beyond(call: Any) -> FormatError:
+    """The `limit_exceeded` that `call` raises for data beyond `max_values`."""
+    with pytest.raises(FormatError) as raised:
+        call()
+    error = raised.value
+    assert error.code == "limit_exceeded"
+    assert error.name == "max_values"
+    assert "max_values" in str(error)
+    assert error.hint is not None
+    return error
+
+
+def test_a_diamond_of_depth_30_is_refused_within_max_values() -> None:
+    rules = RuleSet([Rule("r", F.d.is_null()), Rule("s", F.x == 1)])
+    data = {"d": diamond(30), "x": 1}
+    started = time.monotonic()
+    # Refused in every mode: an input beyond a limit is never evaluated.
+    error = beyond(lambda: on_small_stack(lambda: rules.evaluate(data)))
+    # A million values, not a thousand million.
+    assert time.monotonic() - started < 30
+    assert error.rule is None and error.path is None and error.row is None
+    strict = RuleSet([Rule("r", F.d.is_null())], strict=True)
+    beyond(lambda: strict.evaluate(data))
+
+
+def test_max_values_counts_exactly() -> None:
+    # diamond(3): 8 ints and 7 lists, plus the int at `x`: 16 values.
+    rules = RuleSet([Rule("r", F.d.is_null()), Rule("s", F.x == 1)])
+    data = {"d": diamond(3), "x": 1}
+    assert [r.truth for r in rules.evaluate(data, max_values=16).results] == [
+        Truth.FALSE,
+        Truth.TRUE,
+    ]
+    beyond(lambda: rules.evaluate(data, max_values=15))
+    # A shared object counts each time it is converted.
+    shared = diamond(3)
+    both = RuleSet([Rule("a", F.a.is_null()), Rule("b", F.b.is_null())])
+    assert both.evaluate({"a": shared, "b": shared}, max_values=30).results[1].truth == Truth.FALSE
+    beyond(lambda: both.evaluate({"a": shared, "b": shared}, max_values=29))
+    # A list along the paths counts its length, and what is read at a position.
+    second = RuleSet([Rule("r", F.xs[1] == 20)])
+    assert second.evaluate({"xs": [10, 20, 30]}, max_values=4).results[0].truth == Truth.TRUE
+    beyond(lambda: second.evaluate({"xs": [10, 20, 30]}, max_values=3))
+    # A record counts each of its positions.
+    record = RuleSet([Rule("r", F.p.x == 1)])
+    assert record.evaluate({"p": Point(1, 2)}, max_values=3).results[0].truth == Truth.TRUE
+    beyond(lambda: record.evaluate({"p": Point(1, 2)}, max_values=2))
+    # A read error from a getter is a value placed in the tree.
+    failing = RuleSet([Rule("r", F.f.broken > 1)])
+    assert failing.evaluate({"f": Failing()}, max_values=1).results[0].truth == Truth.UNKNOWN
+    beyond(lambda: failing.evaluate({"f": Failing()}, max_values=0))
+    # The default allows a million values: 2**19 - 1 of them, not 2**20 - 1.
+    one = RuleSet([Rule("r", F.d.is_null())])
+    assert one.evaluate({"d": diamond(18)}).results[0].truth == Truth.FALSE
+    beyond(lambda: one.evaluate({"d": diamond(19)}))
+
+
+def test_a_huge_declared_length_fails_fast() -> None:
+    huge = range(10**12)
+    # Along the paths, before the list is allocated.
+    beyond(lambda: RuleSet([Rule("r", F.r[0] == 0)]).evaluate({"r": huge}))
+    # Where a path ends, before its elements are converted.
+    beyond(lambda: RuleSet([Rule("r", F.r.is_null())]).evaluate({"r": huge}))
+
+
+def test_a_batch_reports_the_row_beyond_the_limit() -> None:
+    rules = RuleSet([Rule("s", F.x == 1)])
+    error = beyond(
+        lambda: rules.evaluate_many([{"x": 1}, {"x": [1, 1, 1]}, {"x": 1}], max_values=2)
+    )
+    assert error.row == 1
+    assert [
+        d.results[0].truth for d in rules.evaluate_many([{"x": 1}, {"x": [1]}], max_values=2)
+    ] == [
+        Truth.TRUE,
+        Truth.UNKNOWN,
+    ]
+    # Read before evaluating: the limit comes before an evaluation error.
+    strict = RuleSet([Rule("s", F.y == 1)], strict=True)
+    assert beyond(lambda: strict.evaluate_many([{}, {"y": [1, 1, 1]}], max_values=2)).row == 1
+
+
+def test_max_values_applies_to_runs_tables_trees_and_metadata() -> None:
+    ran: list[str] = []
+    rules = RuleSet([Rule("r", F.x.is_null(), do=lambda _: ran.append("r"))])
+    beyond(lambda: rules.run({"x": diamond(30)}))
+    # diamond(2): 4 ints and 3 lists.
+    rules.run({"x": diamond(2)}, max_values=7)
+    assert ran == []  # a list is not null
+    beyond(lambda: rules.run({"x": diamond(2)}, max_values=6))
+    beyond(lambda: evaluate_tree(F.x == 1, {"x": diamond(30)}))
+    beyond(lambda: evaluate_tree(F.x == 1, {"x": diamond(2)}, max_values=6))
+    assert evaluate_tree(F.x == 1, {"x": diamond(2)}, max_values=7).reason is not None
+    beyond(lambda: evaluate_value_tree(F.x, {"x": diamond(2)}, max_values=6))
+    # Metadata is converted with the default limit, naming the rule.
+    error = beyond(lambda: Rule("big", F.x == 1, metadata={"m": diamond(20)}))
+    assert error.rule == "big"
+    assert Rule("small", F.x == 1, metadata={"m": diamond(3)}).metadata["m"] is not None

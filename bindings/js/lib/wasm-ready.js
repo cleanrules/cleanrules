@@ -19,6 +19,7 @@ const INTERNAL = [
   'documentTable',
   'explanationData',
   'fileSizeCheck',
+  'maxValuesErrorData',
   'gridNew',
   'nodeArith',
   'nodeBetween',

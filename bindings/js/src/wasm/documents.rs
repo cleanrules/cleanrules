@@ -409,7 +409,7 @@ pub fn node_tree(
     if data.is_undefined() {
         return Err(undefined_input());
     }
-    let native = read(data, node.paths())?;
+    let native = read(data, node.paths(), options.limits.max_values, None)?;
     node.core
         .tree_data(&kind, &native.read.value, &options)
         .map(NativeTree::from)

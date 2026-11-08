@@ -257,9 +257,11 @@ public final class Rule implements DocumentContent {
      * @param metadata the metadata
      * @return the new rule
      * @throws RuleDefinitionException if a value is not data (an opaque object, an integer beyond 64 bits...)
+     * @throws FormatException with the code {@code limit_exceeded} for metadata of more
+     *     than the default {@code maxValues} values, naming this rule
      */
     public Rule metadata(Map<String, ?> metadata) {
-        MemorySegment map = Build.data(Objects.requireNonNull(metadata, "metadata"));
+        MemorySegment map = Build.data(Objects.requireNonNull(metadata, "metadata"), name());
         try {
             MemorySegment made = next((rule, out, error, scope) -> Native.ruleWithMetadata(rule, map, out, error));
             return copy(made, then, priority, description, actionName, action);

@@ -149,7 +149,8 @@ payloads (`F.x == 2**70` in Python). There, a result that would be null with
 reason `int_overflow`, `decimal_overflow` or `read_error`, or opaque, is an
 `ExpressionError` instead. A NaN constant and a datetime finer than a
 microsecond are rejected too (`ast.md`, *Construction rules*). A native null is
-the null constant.
+the null constant. A constant converted from more than `max_values` values is
+a `limit_exceeded` (*Reading native data*, *Limits*).
 
 ### Fuzzy degrees
 
@@ -162,7 +163,8 @@ if it ever must, that will be a new kind of value.
 ## Reading native data
 
 *Not checked by vectors: each binding's own tests and its native conformance
-run check it.*
+run check it. The vectors of `max_values` (*Limits*) are run with native data
+only.*
 
 The core reads a path through a value as `ast.md` (*Reading data*) says. Values
 built directly (in Rust, through the C ABI, or from JSON) are read that way.
@@ -198,6 +200,56 @@ mean the same object (*Equality*). C has no native object to wrap, so the
 builder makes no opaque value on its own: a date or datetime outside years 1 to
 9999, or an offset beyond ±18 hours, is an invalid argument, and the program
 chooses what to build instead.
+
+### Limits
+
+Native data can share objects: the same list, map or object referenced from
+several places. A value of the core shares nothing, so each reference is
+converted (or copied) again, and data shared as a "diamond", the same object
+referenced twice at each of *n* levels, would give a value of 2*ⁿ* parts and
+exhaust memory; a list can also declare a length far beyond what it holds. So
+every binding that reads native data counts what it reads against the limit
+**`max_values`** (`json-format.md`, *Errors and limits*), **1,000,000** by
+default:
+
+- **What counts.** One value for each value the binding places in the sparse
+  tree other than the maps and lists it walks through: what it converts at the
+  end of a path, and what it finds where a path stops early (a scalar, a null,
+  an opaque value, a null with reason `read_error` from a getter that raised),
+  each with everything inside it. A list or map counts one, and each of its
+  elements and entry values counts as a value of its own. A list along the
+  paths counts one value for each position of its **declared length**, since
+  the core holds a value for every one of them (the unread positions are
+  nulls), and so does a record, for each of its entries; what is read at a
+  position then counts as above. Maps and objects along the paths, map keys
+  and missing values do not count.
+- **Per input.** The count covers all the paths of one input (one row of a
+  batch). A shared object counts each time it is converted, at the same path
+  end or at another one, and a **copy counts every value it holds, as if
+  converted again**, so a binding that converts a shared object once and copies
+  it must keep each copy's size, and never copy past the limit. An opaque
+  object keeps a single token however often it is met.
+- **Beyond the limit.** A binding checks the count before it builds anything,
+  a list's declared length before it allocates the list, and stops reading the
+  input at once. The input is **refused, not evaluated**, as an input beyond
+  any other limit: in strict mode and outside it, the evaluation raises
+  `limit_exceeded` (a `FormatError`) with `name` `max_values` and, in a batch,
+  the `row` of the input, built by the core (`errors.md`). Native data is read
+  before it is evaluated, so this error comes before any error of the
+  evaluation, and in a batch the first input in order that is beyond the limit
+  is the one reported. Whether an input is beyond the limit depends only on
+  what it holds, not on the order in which a binding walks the paths.
+- **Constants.** A native constant in a condition or payload, and rule
+  metadata, are converted with the default `max_values` too (*Constants*):
+  beyond it, building the node or rule raises `limit_exceeded`, with the
+  `rule` when the binding knows it.
+
+The core gives the bindings the pieces, so the count, the wording and the
+error are the same in every language: the limit with the others, the count and
+the error (through the C ABI too: `CR_LIMIT_MAX_VALUES` and
+`cr_error_new_max_values`). The core does not count values built directly: a
+program that builds a value through the C ABI or in Rust builds every part of
+it itself.
 
 ### Safety
 

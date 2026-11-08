@@ -251,6 +251,19 @@
               "items": {
                 "$ref": "https://cleanrules.github.io/schemas/v1/value.schema.json#/$defs/value"
               }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "max_values": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "max_values"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [

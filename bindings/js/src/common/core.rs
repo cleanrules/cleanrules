@@ -205,6 +205,27 @@ pub(crate) fn action_error_json(
     to_string(&json)
 }
 
+/// The JSON form of the core's `limit_exceeded` for native data beyond
+/// `max_values`, with the `rule` whose metadata or constant it is and the
+/// `row` of a batch.
+pub(crate) fn max_values_error(
+    max_values: usize,
+    rule: Option<String>,
+    row: Option<usize>,
+) -> cleanrules::Error {
+    let mut error = cleanrules::value::too_many_values(max_values);
+    error.context_mut().rule = rule;
+    error.context_mut().row = row.and_then(|r| u64::try_from(r).ok());
+    error
+}
+
+/// [`max_values_error`] in its JSON form, for `fromNative`.
+pub(crate) fn max_values_error_json(max_values: usize, rule: Option<String>) -> String {
+    let mut json = cleanrules::format::write_error(&max_values_error(max_values, rule, None));
+    super::out::stringifiable(&mut json);
+    to_string(&json)
+}
+
 impl RulesCore {
     pub(crate) fn new(ruleset: RuleSet) -> Self {
         Self {

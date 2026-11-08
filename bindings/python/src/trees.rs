@@ -72,10 +72,16 @@ fn evaluate_node<'py>(
     data: &Bound<'py, PyAny>,
     strict: bool,
     value: bool,
+    max_values: Option<usize>,
 ) -> PyResult<(Bound<'py, PyDict>, String)> {
     let node = &node.get().node;
     let paths = Paths::new(node.field_paths());
-    let native = read(data, &paths)?;
+    let native = read(
+        data,
+        &paths,
+        crate::rules::max_values_or_default(max_values),
+        None,
+    )?;
     let options = Options { strict, rule: None };
     let tree = if value {
         evaluate_value_tree(node, &native.value, &Kleene, options)
@@ -92,17 +98,18 @@ fn evaluate_node<'py>(
 /// Evaluate a condition on `data`: its result tree as Python data, and in
 /// the JSON format.
 #[pyfunction]
-#[pyo3(name = "evaluate_tree")]
+#[pyo3(name = "evaluate_tree", signature = (node, data, logic, strict, max_values=None))]
 pub(crate) fn evaluate_condition<'py>(
     py: Python<'py>,
     node: &Bound<'py, PyNode>,
     data: &Bound<'py, PyAny>,
     logic: &str,
     strict: bool,
+    max_values: Option<usize>,
 ) -> PyResult<(Bound<'py, PyDict>, String)> {
     // Every logic of this build has its arm: a new one cannot be ignored silently.
     match LogicName::from_name(logic).or_raise(py)? {
-        LogicName::Boolean => evaluate_node(py, node, data, strict, false),
+        LogicName::Boolean => evaluate_node(py, node, data, strict, false, max_values),
         other => Err(errors::to_py(
             py,
             &Error::new(
@@ -120,12 +127,13 @@ pub(crate) fn evaluate_condition<'py>(
 /// Evaluate a value on `data`: its result tree as Python data, and in the
 /// JSON format.
 #[pyfunction]
-#[pyo3(name = "evaluate_value_tree")]
+#[pyo3(name = "evaluate_value_tree", signature = (node, data, strict, max_values=None))]
 pub(crate) fn evaluate_value<'py>(
     py: Python<'py>,
     node: &Bound<'py, PyNode>,
     data: &Bound<'py, PyAny>,
     strict: bool,
+    max_values: Option<usize>,
 ) -> PyResult<(Bound<'py, PyDict>, String)> {
-    evaluate_node(py, node, data, strict, true)
+    evaluate_node(py, node, data, strict, true, max_values)
 }

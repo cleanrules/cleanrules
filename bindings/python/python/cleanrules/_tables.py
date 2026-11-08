@@ -323,13 +323,19 @@ class DecisionTable:
             return ruleset
         return self._ruleset
 
-    def evaluate(self, data: object) -> Decision:
-        """Evaluate one input with the compiled rule set (`RuleSet.evaluate`)."""
-        return self.ruleset.evaluate(data)
+    def evaluate(self, data: object, *, max_values: int | None = None) -> Decision:
+        """Evaluate one input with the compiled rule set (`RuleSet.evaluate`).
 
-    def evaluate_many(self, rows: Iterable[object]) -> list[Decision]:
+        Raises:
+            FormatError: For an input beyond `max_values` (`limit_exceeded`).
+        """
+        return self.ruleset.evaluate(data, max_values=max_values)
+
+    def evaluate_many(
+        self, rows: Iterable[object], *, max_values: int | None = None
+    ) -> list[Decision]:
         """Evaluate a batch with the compiled rule set (`RuleSet.evaluate_many`)."""
-        return self.ruleset.evaluate_many(rows)
+        return self.ruleset.evaluate_many(rows, max_values=max_values)
 
     def summary(self) -> Summary:
         """The summary of the compiled rule set (`RuleSet.summary`)."""

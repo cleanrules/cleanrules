@@ -10,7 +10,9 @@ use wasm_bindgen::prelude::*;
 use super::classes::{Decision, Node, RuleSet};
 use super::{OrFail, fail, raw, raw_list};
 use crate::common::build::{self, RuleArgs};
-use crate::common::core::{ActionFailure, NodeCore, RulesCore, action_error_json};
+use crate::common::core::{
+    ActionFailure, NodeCore, RulesCore, action_error_json, max_values_error_json,
+};
 use crate::common::strings;
 
 fn node(core: cleanrules::ast::Node) -> Node {
@@ -359,4 +361,12 @@ pub fn action_error_data(
         .filter_map(|name| name.as_string())
         .collect();
     action_error_json(rule, action.as_deref(), &failure, executed)
+}
+
+/// As in the napi-rs build.
+#[wasm_bindgen(js_name = maxValuesErrorData)]
+#[must_use]
+pub fn max_values_error_data(max_values: f64, rule: Option<String>) -> String {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // A limit the reader used.
+    max_values_error_json(max_values as usize, rule)
 }

@@ -345,13 +345,21 @@ fn the_vectors_pass_through_the_c_abi() {
     // On a small stack, as a binding's thread may be (`spec/json-format.md`,
     // *Errors and limits*).
     on_small_stack(|| {
-        let (mut ran, mut failures) = (0, Vec::new());
+        let (mut ran, mut skipped, mut failures) = (0, 0, Vec::new());
         for file in files() {
             let document = json(&fs::read_to_string(&file).unwrap());
             let Some(Json::Array(vectors)) = get(&document, "vectors") else {
                 panic!()
             };
             for vector in vectors {
+                // `max_values` bounds native data: a C program builds its
+                // values itself, so only the bindings' native runs check these.
+                let given = get(vector, "given").unwrap();
+                if get(given, "limits").is_some() && string(get(given, "kind")) == Some("evaluate")
+                {
+                    skipped += 1;
+                    continue;
+                }
                 ran += 1;
                 if let Err(problem) = run(vector) {
                     failures.push(format!("{}: {problem}", string(get(vector, "id")).unwrap()));
@@ -365,5 +373,6 @@ fn the_vectors_pass_through_the_c_abi() {
             failures.join("\n")
         );
         assert!(ran >= 2508, "only {ran} vectors ran");
+        assert!(skipped >= 14, "{skipped} native-only vectors skipped");
     });
 }

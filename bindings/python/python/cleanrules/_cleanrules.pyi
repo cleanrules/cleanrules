@@ -74,8 +74,10 @@ def rule(
 class RuleSet:
     """A rule set of the core, immutable."""
 
-    def evaluate(self, data: object) -> Decision: ...
-    def evaluate_many(self, data: list[object]) -> list[Decision]: ...
+    def evaluate(self, data: object, max_values: int | None = None) -> Decision: ...
+    def evaluate_many(
+        self, data: list[object], max_values: int | None = None
+    ) -> list[Decision]: ...
     def read_decision(
         self,
         text: bytes,
@@ -107,9 +109,11 @@ class Decision:
     def explanation_texts(self) -> tuple[str, list[tuple[str, list[str]]]]: ...
 
 def evaluate_tree(
-    node: Node, data: object, logic: str, strict: bool
+    node: Node, data: object, logic: str, strict: bool, max_values: int | None = None
 ) -> tuple[dict[str, Any], str]: ...
-def evaluate_value_tree(node: Node, data: object, strict: bool) -> tuple[dict[str, Any], str]: ...
+def evaluate_value_tree(
+    node: Node, data: object, strict: bool, max_values: int | None = None
+) -> tuple[dict[str, Any], str]: ...
 def _read_document(
     text: str,
     max_size: int | None = None,

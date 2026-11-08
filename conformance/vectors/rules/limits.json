@@ -1,0 +1,977 @@
+{
+  "version": 1,
+  "area": "rules",
+  "vectors": [
+    {
+      "id": "rules/limits/lists-at-the-limit",
+      "spec": [
+        "data-model.md#limits",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a list converted where a path ends counts itself and each element, nested lists included: 5 values within a limit of 5",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "is_null",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "a": [
+            1,
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        "limits": {
+          "max_values": 5
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": false,
+              "when": {
+                "op": "is_null",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ],
+                    "value": [
+                      1,
+                      [
+                        2,
+                        3
+                      ]
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": []
+        }
+      }
+    },
+    {
+      "id": "rules/limits/lists-one-over",
+      "spec": [
+        "data-model.md#limits",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "the same 5 values beyond a limit of 4 refuse the input, in non-strict mode too",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "is_null",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "a": [
+            1,
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        "limits": {
+          "max_values": 4
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "name": "max_values"
+        }
+      }
+    },
+    {
+      "id": "rules/limits/maps-at-the-limit",
+      "spec": [
+        "data-model.md#limits",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a map converted where a path ends counts itself and each entry value: 6 values within a limit of 6",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "is_null",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "a": {
+            "b": [
+              1,
+              2
+            ],
+            "c": {
+              "d": 3
+            }
+          }
+        },
+        "limits": {
+          "max_values": 6
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": false,
+              "when": {
+                "op": "is_null",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ],
+                    "value": {
+                      "b": [
+                        1,
+                        2
+                      ],
+                      "c": {
+                        "d": 3
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": []
+        }
+      }
+    },
+    {
+      "id": "rules/limits/maps-one-over",
+      "spec": [
+        "data-model.md#limits",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "the same 6 values beyond a limit of 5 refuse the input",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "is_null",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "a": {
+            "b": [
+              1,
+              2
+            ],
+            "c": {
+              "d": 3
+            }
+          }
+        },
+        "limits": {
+          "max_values": 5
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "name": "max_values"
+        }
+      }
+    },
+    {
+      "id": "rules/limits/prefix-path-at-the-limit",
+      "spec": [
+        "data-model.md#limits",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a path that is a prefix of another converts its value whole once: 4 values within a limit of 4",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "is_null",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "s",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a",
+                    "b",
+                    0
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "a": {
+            "b": [
+              1,
+              2
+            ]
+          }
+        },
+        "limits": {
+          "max_values": 4
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": false,
+              "when": {
+                "op": "is_null",
+                "truth": false,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a"
+                    ],
+                    "value": {
+                      "b": [
+                        1,
+                        2
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "s",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a",
+                      "b",
+                      0
+                    ],
+                    "value": 1
+                  },
+                  {
+                    "op": "const",
+                    "value": 0
+                  }
+                ]
+              },
+              "then": {}
+            }
+          ],
+          "selected": [
+            "s"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/limits/prefix-path-one-over",
+      "spec": [
+        "data-model.md#limits",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "the same 4 values beyond a limit of 3 refuse the input",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "is_null",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "s",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a",
+                    "b",
+                    0
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "a": {
+            "b": [
+              1,
+              2
+            ]
+          }
+        },
+        "limits": {
+          "max_values": 3
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "name": "max_values"
+        }
+      }
+    },
+    {
+      "id": "rules/limits/list-along-a-path-at-the-limit",
+      "spec": [
+        "data-model.md#limits",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a list a path goes through counts each position of its length, and the value read at a position: 4 values within a limit of 4",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "xs",
+                    1
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 20
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "xs": [
+            10,
+            20,
+            30
+          ]
+        },
+        "limits": {
+          "max_values": 4
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": true,
+              "when": {
+                "op": "eq",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "xs",
+                      1
+                    ],
+                    "value": 20
+                  },
+                  {
+                    "op": "const",
+                    "value": 20
+                  }
+                ]
+              },
+              "then": {}
+            }
+          ],
+          "selected": [
+            "r"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/limits/list-along-a-path-one-over",
+      "spec": [
+        "data-model.md#limits",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "the same 4 values beyond a limit of 3 refuse the input",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "xs",
+                    1
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 20
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "xs": [
+            10,
+            20,
+            30
+          ]
+        },
+        "limits": {
+          "max_values": 3
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "name": "max_values"
+        }
+      }
+    },
+    {
+      "id": "rules/limits/map-along-a-path",
+      "spec": [
+        "data-model.md#limits",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a map a path goes through counts nothing, nor do its entries no path reads: 1 value within a limit of 1",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "m",
+                    "k"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "m": {
+            "k": 1,
+            "big": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ]
+          }
+        },
+        "limits": {
+          "max_values": 1
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": true,
+              "when": {
+                "op": "eq",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "m",
+                      "k"
+                    ],
+                    "value": 1
+                  },
+                  {
+                    "op": "const",
+                    "value": 1
+                  }
+                ]
+              },
+              "then": {}
+            }
+          ],
+          "selected": [
+            "r"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules/limits/value-where-a-path-stops",
+      "spec": [
+        "data-model.md#limits",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a scalar where a path cannot go further counts one; a missing field counts nothing",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a",
+                    "b"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "a": 5
+        },
+        "limits": {
+          "max_values": 1
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r",
+              "fired": false,
+              "when": {
+                "op": "gt",
+                "truth": null,
+                "reason": {
+                  "code": "missing_field",
+                  "paths": [
+                    [
+                      "a",
+                      "b"
+                    ]
+                  ]
+                },
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "a",
+                      "b"
+                    ],
+                    "value": null,
+                    "reason": {
+                      "code": "missing_field",
+                      "paths": [
+                        [
+                          "a",
+                          "b"
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "op": "const",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": []
+        }
+      }
+    },
+    {
+      "id": "rules/limits/value-where-a-path-stops-one-over",
+      "spec": [
+        "data-model.md#limits",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "the scalar where the path stops is beyond a limit of 0",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "a",
+                    "b"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "a": 5
+        },
+        "limits": {
+          "max_values": 0
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "name": "max_values"
+        }
+      }
+    },
+    {
+      "id": "rules/limits/strict-one-over",
+      "spec": [
+        "data-model.md#limits",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "in strict mode an input beyond the limit is refused with the same error",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "is_null",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                }
+              }
+            }
+          ],
+          "strict": true
+        },
+        "input": {
+          "a": [
+            1,
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        "limits": {
+          "max_values": 4
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "name": "max_values"
+        }
+      }
+    },
+    {
+      "id": "rules/limits/batch-row",
+      "spec": [
+        "data-model.md#limits",
+        "json-format.md#errors-and-limits",
+        "errors.md#which-error-comes-first"
+      ],
+      "description": "in a batch the limit applies to each input on its own, and the first input beyond it gives its row",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "is_null",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "inputs": [
+          {
+            "a": 1
+          },
+          {
+            "a": [
+              1,
+              2,
+              3
+            ]
+          },
+          {
+            "a": 1
+          }
+        ],
+        "limits": {
+          "max_values": 2
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "name": "max_values",
+          "row": 1
+        }
+      }
+    },
+    {
+      "id": "rules/limits/batch-within",
+      "spec": [
+        "data-model.md#limits",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a batch whose inputs are each within the limit is evaluated",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "is_null",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "inputs": [
+          {
+            "a": [
+              1
+            ]
+          },
+          {
+            "a": 1
+          }
+        ],
+        "limits": {
+          "max_values": 2
+        }
+      },
+      "expect": {
+        "decisions": [
+          {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "r",
+                "fired": false,
+                "when": {
+                  "op": "is_null",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "a"
+                      ],
+                      "value": [
+                        1
+                      ]
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": []
+          },
+          {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "r",
+                "fired": false,
+                "when": {
+                  "op": "is_null",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "a"
+                      ],
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": []
+          }
+        ]
+      }
+    }
+  ]
+}

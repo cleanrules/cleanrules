@@ -1,6 +1,7 @@
 package io.github.cleanrules.tests;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -180,7 +181,9 @@ class ErrorsTest {
         try (RuleSet rules = Fixtures.discounts()) {
             IllegalArgumentException empty =
                     assertThrows(IllegalArgumentException.class, () -> rules.checkActions(List.of("")));
-            assertTrue(empty.getMessage().contains("cr_actions_add"), empty.getMessage());
+            // The C ABI's messages never name its functions.
+            assertTrue(empty.getMessage().startsWith("the name is empty"), empty.getMessage());
+            assertFalse(empty.getMessage().contains("cr_"), empty.getMessage());
             assertThrows(NullPointerException.class, () -> rules.evaluateJson((String) null));
         }
         assertThrows(IllegalArgumentException.class, () -> Limits.defaults().withMaxDepth(-1));

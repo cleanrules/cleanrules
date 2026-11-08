@@ -134,7 +134,8 @@ public final class Scope implements AutoCloseable {
             limits.maxDepth(),
             limits.maxTableSize(),
             limits.maxYamlSize(),
-            limits.maxTextSize()
+            limits.maxTextSize(),
+            limits.maxValues()
         };
         // The size first: it sets the YAML and text limits too.
         for (int i = 0; i < values.length; i++) {

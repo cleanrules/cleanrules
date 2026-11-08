@@ -17,6 +17,15 @@
 // arrays and typed arrays only. A key that is absent or holds `undefined` is
 // missing. A getter that throws gives a null with reason `read_error`.
 //
+// What is read is counted against `max_values` (spec/data-model.md, *Reading
+// native data*, *Limits*): each value placed in the tree other than the maps
+// and lists walked through, with everything inside it, and each position of a
+// list walked through (its declared length, checked before anything is
+// built); an object met through several references counts each time. Beyond
+// the limit, reading stops at once and the input is refused: `read` gives no
+// encoding, and the native layer throws the core's `limit_exceeded`.
+// Constants and metadata are converted under the default limit too.
+//
 // The reader also encodes constants and rule metadata (`encodeData`), with
 // the same rules, and keeps the objects of the opaque values it meets, by
 // token, so that a decision can give back the very objects (`capture`).
@@ -25,6 +34,18 @@ import { MARKER } from './values.js'
 
 /** How deep containers are converted: the format's node depth. */
 const MAX_DEPTH = 256
+/** The core's default `max_values`, for a caller that gives none. */
+const MAX_VALUES = 1_000_000
+/** Thrown through the reader's own frames to stop reading an input beyond `max_values`. */
+const BEYOND = Object.freeze({ beyond: 'max_values' })
+
+/** Makes the core's `limit_exceeded` for `(maxValues, rule)`; set by `install`. */
+let limitError = null
+
+/** Use `make(maxValues, rule)` for the error of a constant beyond `max_values`. */
+function useLimitError(make) {
+  limitError = make
+}
 /** How many prototypes a lookup walks (a Proxy can make the chain endless). */
 const MAX_PROTOTYPES = 64
 const I64_MIN = -(2n ** 63n)
@@ -420,15 +441,31 @@ class Reader {
    * @param {boolean} data Whether this reads a constant or metadata, where a
    *   NaN is an error (the form `["NaN"]`), not a null.
    */
-  constructor(data = false) {
+  constructor(data = false, maxValues = Infinity) {
     /** What a NaN reads as. */
     this.nan = data ? ['NaN'] : null
+    /** How many more values may be converted (`max_values`). */
+    this.left = maxValues
     /** Values thrown while reading, by index. */
     this.errors = []
     /** The token of each opaque value, in the order they are met. */
     this.tokens = new Map()
     /** The containers being converted, for cycles. */
     this.open = new Set()
+  }
+
+  /** Count `n` values about to be placed; stop reading beyond the limit. */
+  tick(n = 1) {
+    if (n > this.left) {
+      throw BEYOND
+    }
+    this.left -= n
+  }
+
+  /** A null with reason `read_error` placed in the tree: it counts as a value. */
+  placed(thrown) {
+    this.tick()
+    return this.raised(thrown)
   }
 
   raised(thrown) {
@@ -459,7 +496,7 @@ class Reader {
     try {
       shape = shapeOf(value)
     } catch (thrown) {
-      return this.raised(thrown)
+      return this.placed(thrown)
     }
     switch (shape[0]) {
       case MAP:
@@ -471,7 +508,7 @@ class Reader {
           try {
             found = lookup(value, key)
           } catch (thrown) {
-            entries.push([key, this.raised(thrown)])
+            entries.push([key, this.placed(thrown)])
             continue
           }
           if (found !== MISSING) {
@@ -482,6 +519,8 @@ class Reader {
       }
       case LIST: {
         const length = shape[1]
+        // The core holds a value for each position of the declared length.
+        this.tick(length)
         const entries = []
         for (const [index, sub] of node.indices) {
           if (index >= length) {
@@ -491,10 +530,16 @@ class Reader {
           try {
             found = element(value, index)
           } catch (thrown) {
-            entries.push([index, this.raised(thrown)])
+            entries.push([index, this.placed(thrown)])
             continue
           }
-          entries.push([index, found === HOLE ? ['M'] : this.walk(found, sub)])
+          if (found === HOLE) {
+            // A hole read is a null placed at its position.
+            this.tick()
+            entries.push([index, ['M']])
+          } else {
+            entries.push([index, this.walk(found, sub)])
+          }
         }
         return ['L', length, entries]
       }
@@ -505,6 +550,7 @@ class Reader {
 
   /** The whole value, where a path ends; `known` is its shape, if computed. */
   convert(value, known) {
+    this.tick()
     switch (typeof value) {
       case 'boolean':
         return value
@@ -561,16 +607,27 @@ class Reader {
 
   container(value, shape) {
     if (shape[0] === LIST) {
+      // Each element counts as it is converted: a declared length beyond what
+      // is left is refused before anything is read.
+      if (shape[1] > this.left) {
+        throw BEYOND
+      }
       const items = []
       for (let index = 0; index < shape[1]; index += 1) {
         let found
         try {
           found = element(value, index)
         } catch (thrown) {
+          this.tick()
           items.push(this.raised(thrown))
           continue
         }
-        items.push(found === HOLE ? ['M'] : this.convert(found))
+        if (found === HOLE) {
+          this.tick()
+          items.push(['M'])
+        } else {
+          items.push(this.convert(found))
+        }
       }
       return ['l', items]
     }
@@ -596,6 +653,7 @@ class Reader {
       try {
         found = objectLookup(value, key)
       } catch (thrown) {
+        this.tick()
         entries.push([key, this.raised(thrown)])
         continue
       }
@@ -725,18 +783,23 @@ let captured = null
 let depth = 0
 
 /**
- * Read `data` along the paths of `owner` (a `RuleSet` or a `Node`):
- * `[encoding, thrown]`.
+ * Read `data` along the paths of `owner` (a `RuleSet` or a `Node`), at most
+ * `maxValues` values of it: `[encoding, thrown]`, or `[null, null]` for an
+ * input beyond the limit, which the native layer refuses.
  */
-function read(data, owner) {
+function read(data, owner, maxValues = MAX_VALUES) {
   if (data === undefined) {
     throw new TypeError('the input is undefined; pass the data to evaluate (null for none)')
   }
-  const reader = new Reader()
+  const reader = new Reader(false, maxValues)
   depth += 1
   let encoded
   try {
     encoded = reader.walk(data, treeOf(owner))
+  } catch (thrown) {
+    if (thrown !== BEYOND) throw thrown
+    // Refused: no encoding, and nothing of the input is kept.
+    return [null, null]
   } finally {
     depth -= 1
   }
@@ -767,12 +830,19 @@ function capture(call) {
 
 /**
  * A constant or metadata in the reader's encoding (not yet a string), read
- * whole with the rules of native data, and the values thrown while reading:
- * `[form, thrown]`. A NaN is the form `["NaN"]`, which the caller rejects.
+ * whole with the rules of native data under the default `max_values`, and the
+ * values thrown while reading: `[form, thrown]`. A NaN is the form `["NaN"]`,
+ * which the caller rejects. Beyond the limit, throws the core's
+ * `limit_exceeded`, with `rule` when it is given.
  */
-function encodeData(value) {
-  const reader = new Reader(true)
-  return [reader.convert(value), reader.errors]
+function encodeData(value, rule = null) {
+  const reader = new Reader(true, MAX_VALUES)
+  try {
+    return [reader.convert(value), reader.errors]
+  } catch (thrown) {
+    if (thrown !== BEYOND) throw thrown
+    throw limitError(MAX_VALUES, rule)
+  }
 }
 
 /**
@@ -805,4 +875,4 @@ function notData(form, root) {
   }
 }
 
-export { capture, describe, encodeData, notData, read, registerOpaque, typeName, useTypes }
+export { capture, describe, encodeData, notData, read, registerOpaque, typeName, useLimitError, useTypes }

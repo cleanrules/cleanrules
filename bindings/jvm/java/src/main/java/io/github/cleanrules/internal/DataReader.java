@@ -43,6 +43,15 @@ import java.util.TreeMap;
  * {@link EvaluationException} ({@link Errors.Causes}). Objects with no
  * equivalent are opaque, with a token by identity, so that an output gives back
  * the very object.
+ *
+ * <p>What is read is counted against {@code max_values}
+ * ({@code spec/data-model.md}, <i>Reading native data</i>, <i>Limits</i>):
+ * each value placed in the tree other than the maps and lists walked through,
+ * with everything inside it, and each position of a list walked through (its
+ * declared length, checked before the list is allocated); an object met
+ * through several references counts each time. Beyond the limit, reading
+ * stops at once and the input is refused with the core's
+ * {@code limit_exceeded} ({@code cr_error_new_max_values}).
  */
 public final class DataReader implements AutoCloseable {
     /** How deep containers are converted whole: the format's default node depth. */
@@ -66,13 +75,73 @@ public final class DataReader implements AutoCloseable {
     private final IdentityHashMap<Object, Boolean> open = new IdentityHashMap<>();
     private final ArrayList<Object> at = new ArrayList<>();
     private int row = -1;
+    /** The most values converted for one input. */
+    private final long maxValues;
+    /** How many more values the current input may convert. */
+    private long left;
+    /** The rule whose metadata or constant this reads, for the error; or null. */
+    private final String rule;
+
+    /** Thrown through the reader's own frames to stop reading an input beyond the limit. */
+    private static final class Beyond extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        Beyond() {
+            super("beyond max_values", null, false, false);
+        }
+    }
+
+    private static final Beyond BEYOND = new Beyond();
+
+    /** A reader under the default {@code maxValues}: for constants and metadata. */
+    public DataReader() {
+        this(null);
+    }
+
+    /** A reader of the metadata or a constant of {@code rule}, under the default {@code maxValues}. */
+    public DataReader(String rule) {
+        this(io.github.cleanrules.Limits.defaults().maxValues(), rule);
+    }
+
+    /** A reader within {@code limits}' {@code maxValues}, or the default's for null. */
+    public static DataReader within(io.github.cleanrules.Limits limits) {
+        return new DataReader((limits == null ? io.github.cleanrules.Limits.defaults() : limits).maxValues(), null);
+    }
+
+    private DataReader(long maxValues, String rule) {
+        this.maxValues = maxValues;
+        this.rule = rule;
+    }
 
     /** The objects of the opaque values, by token, and the reads that threw. */
     public final Errors.Causes causes = new Errors.Causes(new ArrayList<>());
 
-    /** Read {@code data} along {@code tree}: an owned value. */
+    /**
+     * Read {@code data} along {@code tree}: an owned value.
+     *
+     * @throws io.github.cleanrules.FormatException with the code
+     *     {@code limit_exceeded} beyond {@code maxValues}, with the row of a batch
+     */
     public MemorySegment read(Object data, PathTree tree) {
-        return walk(data, tree);
+        left = maxValues;
+        try {
+            return walk(data, tree);
+        } catch (Beyond beyond) {
+            throw tooMany();
+        }
+    }
+
+    /** The core's {@code limit_exceeded} for this input, with its row and rule. */
+    private RuntimeException tooMany() {
+        MemorySegment name = MemorySegment.NULL;
+        long length = 0;
+        if (rule != null) {
+            byte[] bytes = rule.getBytes(StandardCharsets.UTF_8);
+            name = scope.scratch(bytes);
+            length = bytes.length;
+        }
+        scope.check(Native.errorNewMaxValues(maxValues, row, name, length, out, scope.error()));
+        return Errors.of(Native.CR_LIMIT_EXCEEDED, taken(), null);
     }
 
     /** Read each input of {@code inputs} along {@code tree}: an owned list. */
@@ -83,7 +152,7 @@ public final class DataReader implements AutoCloseable {
         try {
             for (int index = 0; index < rows.size(); index++) {
                 row = index;
-                set(list, index, walk(rows.get(index), tree));
+                set(list, index, read(rows.get(index), tree));
             }
         } catch (RuntimeException | Error thrown) {
             Native.valueFree(list);
@@ -120,8 +189,10 @@ public final class DataReader implements AutoCloseable {
         try {
             length = shape == Shape.ARRAY ? Array.getLength(value) : ((List<?>) value).size();
         } catch (RuntimeException thrown) {
-            return readError(thrown);
+            return placedError(thrown);
         }
+        // The core holds a value for each position: counted before allocating.
+        tick(length);
         MemorySegment list = list(length);
         try {
             for (Map.Entry<Integer, PathTree> step : node.indices.entrySet()) {
@@ -135,7 +206,7 @@ public final class DataReader implements AutoCloseable {
                     try {
                         item = shape == Shape.ARRAY ? Array.get(value, index) : ((List<?>) value).get(index);
                     } catch (RuntimeException thrown) {
-                        set(list, index, readError(thrown));
+                        set(list, index, placedError(thrown));
                         continue;
                     }
                     set(list, index, walk(item, step.getValue()));
@@ -164,7 +235,7 @@ public final class DataReader implements AutoCloseable {
                         }
                         item = value.get(key);
                     } catch (RuntimeException thrown) {
-                        insert(map, key, readError(thrown));
+                        insert(map, key, placedError(thrown));
                         continue;
                     }
                     insert(map, key, walk(item, step.getValue()));
@@ -205,7 +276,7 @@ public final class DataReader implements AutoCloseable {
                     } catch (VirtualMachineError fatal) {
                         throw fatal;
                     } catch (Throwable thrown) {
-                        insert(map, step.getKey(), readError(thrown));
+                        insert(map, step.getKey(), placedError(thrown));
                         continue;
                     }
                     insert(map, step.getKey(), walk(item, step.getValue()));
@@ -311,8 +382,35 @@ public final class DataReader implements AutoCloseable {
         }
     };
 
+    /** Count one value placed in the tree; stop reading beyond the limit. */
+    private void tick() {
+        tick(1);
+    }
+
+    /** Count {@code n} values about to be placed; stop reading beyond the limit. */
+    private void tick(long n) {
+        if (n > left) {
+            throw BEYOND;
+        }
+        left -= n;
+    }
+
+    /** A read error placed in the tree, which counts as a value. */
+    private MemorySegment placedError(Throwable thrown) {
+        tick();
+        return readError(thrown);
+    }
+
+    /** Refuse a list or map of {@code size} entries that cannot fit, before copying it. */
+    private void fits(long size) {
+        if (size > left) {
+            throw BEYOND;
+        }
+    }
+
     /** The whole of {@code value}, where a path ends. */
     private MemorySegment convert(Object value) {
+        tick();
         value = unwrap(value);
         if (value == null) {
             return Native.valueNewNull();
@@ -339,6 +437,15 @@ public final class DataReader implements AutoCloseable {
 
     private MemorySegment wholeList(List<?> value) {
         List<Object> items;
+        int size;
+        try {
+            size = value.size();
+        } catch (RuntimeException thrown) {
+            return readError(thrown);
+        }
+        // Each element counts as it is converted: a size beyond what is left
+        // is refused before the list is copied.
+        fits(size);
         try {
             items = new ArrayList<>(value);
         } catch (RuntimeException thrown) {
@@ -358,6 +465,7 @@ public final class DataReader implements AutoCloseable {
 
     private MemorySegment wholeArray(Object value) {
         int length = Array.getLength(value);
+        fits(length);
         MemorySegment list = list(length);
         try {
             for (int i = 0; i < length; i++) {
@@ -408,6 +516,7 @@ public final class DataReader implements AutoCloseable {
                 } catch (VirtualMachineError fatal) {
                     throw fatal;
                 } catch (Throwable thrown) {
+                    tick();
                     insert(map, entry.getKey(), readError(thrown));
                     continue;
                 }

@@ -188,7 +188,7 @@ pub unsafe extern "C" fn cr_actions_add(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_actions_add", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Free an action registry. `NULL` is ignored. The data it holds stays the
@@ -242,7 +242,7 @@ pub unsafe extern "C" fn cr_ruleset_check_actions(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_check_actions", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Evaluate the rule set on an input, then call the actions of the selected
@@ -306,7 +306,7 @@ pub unsafe extern "C" fn cr_ruleset_run(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_run", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Call the actions of the selected rules; the error of the first that fails.
@@ -428,7 +428,7 @@ pub unsafe extern "C" fn cr_ruleset_evaluate_many(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_evaluate_many", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A failure of the input at `row` of a batch.

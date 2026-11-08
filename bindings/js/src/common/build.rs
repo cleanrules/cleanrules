@@ -24,9 +24,10 @@ fn internal(what: &str, name: &str) -> Problem {
     Problem::Internal(format!("unknown {what} {name:?}"))
 }
 
-/// A value in the reader's encoding (`lib/read.js`, `encodeData`).
+/// A value in the reader's encoding (`lib/read.js`, `encodeData`), which the
+/// reader made under the default `max_values`.
 pub(crate) fn data(wire: &str) -> Outcome<Value> {
-    decode(wire)
+    decode(wire, cleanrules::json::Limits::default().max_values)
         .map(|read| read.value)
         .map_err(|problem| Problem::Internal(format!("the data encoding is wrong ({problem})")))
 }

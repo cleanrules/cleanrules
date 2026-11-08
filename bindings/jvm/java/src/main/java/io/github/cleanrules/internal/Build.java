@@ -26,9 +26,22 @@ public final class Build {
 
     private static final PathTree WHOLE = PathTree.of(List.of(List.of()));
 
-    /** An owned value of {@code value}, read whole as data. */
+    /**
+     * An owned value of {@code value}, read whole as data under the default
+     * {@code maxValues} ({@code spec/data-model.md}, <i>Reading native
+     * data</i>, <i>Limits</i>).
+     */
     public static MemorySegment data(Object value) {
-        try (DataReader reader = new DataReader()) {
+        return data(value, null);
+    }
+
+    /**
+     * An owned value of {@code value}, the metadata or a constant of
+     * {@code rule}: beyond the default {@code maxValues}, a
+     * {@code limit_exceeded} that names the rule.
+     */
+    public static MemorySegment data(Object value, String rule) {
+        try (DataReader reader = new DataReader(rule)) {
             return reader.read(value, WHOLE);
         }
     }

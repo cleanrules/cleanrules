@@ -32,6 +32,7 @@ const NATIVE = Symbol('cleanrules.native')
 
 const RULE_OPTIONS = ['priority', 'tags', 'description', 'metadata', 'do']
 const RULESET_OPTIONS = ['hitPolicy', 'aggregate', 'logic', 'strict']
+const EVALUATE_OPTIONS = ['limits']
 
 const EMPTY = Object.freeze({})
 const I64_MIN = -(2n ** 63n)
@@ -96,9 +97,12 @@ function rules(native, expressions, trees, build) {
         return [key, constant(value)]
       } catch (error) {
         if (!(error instanceof CleanRulesError)) throw error
+        // The same code, and the limit's name for a constant beyond `max_values`.
+        const context = error.context.name === undefined ? { rule } : { rule, name: error.context.name }
         throw new error.constructor(`then[${JSON.stringify(key)}]: ${error.message}`, {
+          code: error.code,
           hint: error.hint,
-          context: { rule },
+          context,
           cause: error,
         })
       }
@@ -115,7 +119,7 @@ function rules(native, expressions, trees, build) {
     if (entries.some(([key]) => typeof key !== 'string')) {
       throw definition('metadata keys must be strings', rule)
     }
-    const [form, thrown] = encodeData(metadata)
+    const [form, thrown] = encodeData(metadata, rule)
     const problem = notData(form, 'metadata')
     if (problem !== null) {
       const [bad, at] = problem
@@ -417,17 +421,28 @@ function rules(native, expressions, trees, build) {
       return Object.freeze(natives.get(this).fieldPaths().map((path) => Object.freeze(path)))
     }
 
-    /** Evaluate the rule set on one input (`spec/data-model.md`, *JavaScript and TypeScript*). */
-    evaluate(data) {
-      const [decision, objects] = capture(() => natives.get(this).evaluate(data))
+    /**
+     * Evaluate the rule set on one input (`spec/data-model.md`, *JavaScript and
+     * TypeScript*). `{ limits: { maxValues } }` bounds the values read from it
+     * (1,000,000 by default; *Reading native data*, *Limits*): an input
+     * beyond it is refused, in every mode, with a `FormatError` whose code is
+     * `limit_exceeded`.
+     */
+    evaluate(data, evaluateOptions) {
+      const { limits } = options(evaluateOptions, EVALUATE_OPTIONS, '{ limits: { maxValues: 10000 } }')
+      const [decision, objects] = capture(() => natives.get(this).evaluate(data, limits))
       return new Decision(PRIVATE, this, decision, objects[0] ?? [])
     }
 
-    /** Evaluate each input of a batch, in order; an error's `row` is the input's position. */
-    evaluateMany(rows) {
+    /**
+     * Evaluate each input of a batch, in order; an error's `row` is the
+     * input's position. `limits.maxValues` applies to each input on its own.
+     */
+    evaluateMany(rows, evaluateOptions) {
+      const { limits } = options(evaluateOptions, EVALUATE_OPTIONS, '{ limits: { maxValues: 10000 } }')
       const iterable = rows !== null && typeof rows === 'object' && typeof rows[Symbol.iterator] === 'function'
       const batch = Array.isArray(rows) || !iterable || rows instanceof Map ? rows : [...rows]
-      const [decisions, objects] = capture(() => natives.get(this).evaluateMany(batch))
+      const [decisions, objects] = capture(() => natives.get(this).evaluateMany(batch, limits))
       return decisions.map((decision, i) => new Decision(PRIVATE, this, decision, objects[i] ?? []))
     }
 
@@ -462,14 +477,15 @@ function rules(native, expressions, trees, build) {
     }
 
     /**
-     * Evaluate like `evaluate`, then call the actions of the selected rules,
-     * in rule order, each with an `ActionContext`. Actions are synchronous.
+     * Evaluate like `evaluate` (with the same options), then call the actions
+     * of the selected rules, in rule order, each with an `ActionContext`.
+     * Actions are synchronous.
      */
-    run(data) {
+    run(data, evaluateOptions) {
       // Named actions must be bound: the core names the first that is not.
       const bound = this.#rules.filter((rule) => rule.actionName !== null && rule.do !== null).map((rule) => rule.actionName)
       natives.get(this).checkActions(bound)
-      const decision = this.evaluate(data)
+      const decision = this.evaluate(data, evaluateOptions)
       const executed = []
       for (const result of decision.selected) {
         const action = result.rule.do

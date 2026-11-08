@@ -678,6 +678,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/examples/discounts.go`. CI: job `go` on Linux, macOS and Windows
   (`gofmt`, `go vet`, `go test -count=1`, which a rebuilt Rust library needs,
   since Go caches test results by the link flags).
+- A limit on the values read from native data, `max_values` (1,000,000 by
+  default; `spec/data-model.md`, *Reading native data*, *Limits*): data whose
+  objects are shared, such as a "diamond" that references the same object
+  twice at each of 30 levels, was converted once per reference, and a list
+  could declare any length, so an input could exhaust memory. Every binding
+  that reads native data now counts what it reads for one input (each value
+  placed where a path ends or stops, with everything inside it, a shared
+  object each time; each position of a list or record the paths go through,
+  checked before it is allocated) and refuses an input beyond the limit, as
+  every other limit does, in strict mode and outside it: `limit_exceeded` (a
+  `FormatError`) with `name` `max_values` and, in a batch, the `row`, built by
+  the core. Native constants and rule metadata are converted under the
+  default limit too, the error naming the rule when it is known. Core:
+  `Limits::max_values`, `value::ValueCount` and `value::too_many_values`;
+  `Limits` and `NullCause` are now `#[non_exhaustive]`. C ABI:
+  `CR_LIMIT_MAX_VALUES` and `cr_error_new_max_values`. Python: `max_values=`
+  on `RuleSet.evaluate`, `evaluate_many` and `run`, `DecisionTable.evaluate`
+  and `evaluate_many`, `evaluate_tree` and `evaluate_value_tree`.
+  JavaScript: `limits.maxValues`, with `{ limits }` options on `evaluate`,
+  `evaluateMany`, `run` (also `DecisionTable`), `evaluateTree` and
+  `evaluateValueTree`, and a last `limits` argument on the native layer's
+  `evaluate`, `evaluateMany` and `run`. Java: `Limits.maxValues` and
+  `withMaxValues`, applied by every evaluation that takes `Limits`, and new
+  overloads `Expr.evaluateTree(data, logic, strict, limits)`,
+  `evaluateValueTree(data, strict, limits)` and the same on `ffi.Node`; Scala
+  through Java's `Limits`, with the same two tree overloads. C++:
+  `limit::max_values`. Conformance: 14 vectors in `rules/limits.json`, with
+  the new optional `limits` (`max_values`) of `evaluate` vectors, run with
+  native data only. Go follows with H.1c.
 - C ABI, for what rules, documents, tables and result trees hold (task
   G.1d): `cr_ruleset_rule`, `cr_rule_name`, `cr_rule_description`,
   `cr_rule_action`, `cr_rule_priority`, `cr_rule_when`, `cr_rule_payload_len`,
@@ -918,6 +947,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Specification: `max_values` in `spec/json-format.md` (*Errors and limits*)
+  and `spec/data-model.md` (*Reading native data*, *Limits*, and *Constants*);
+  `limit_exceeded` for native data and constants beyond it, with `name` and
+  `row`, and its place in *Which error comes first*, in `spec/errors.md`; and
+  `spec/ast.md`. Additive: the format version stays 1; the conformance
+  vectors gain `rules/limits.json` and an optional `limits` for `evaluate`
+  vectors (`conformance/README.md`, `vectors.schema.json`), which the runners
+  without native data (core, C ABI, C++) and the JSON routes skip.
 - Core: a value or the null constant read as a condition document (JSON, YAML
   or text) says "only a condition can be a document, not the value ..." (it
   was "'add' is not a condition"), with a hint; the code and the pointer or
@@ -1042,6 +1079,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already did (task D.5).
 ### Fixed
 
+- C ABI: the messages of argument errors (`CR_INVALID_ARGUMENT`, and core
+  errors about an argument, such as a key that is not UTF-8) began with the C
+  function's name (`cr_value_map_insert: key is not valid UTF-8`), in the
+  message and the JSON form, which every binding on the ABI showed (Go
+  stripped it). They now say only what is wrong and how to fix it.
 - Java: an enum constant given as a cell of a `DecisionTable` grid is now a
   constant, its name as a string (`'HIGH'`), as `spec/tables.md` (*Grids*)
   says of every value that is not a string; it was read as text, the field

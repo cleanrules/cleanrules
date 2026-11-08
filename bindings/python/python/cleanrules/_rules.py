@@ -136,7 +136,8 @@ class Rule:
         priority: Used by the `PRIORITY` hit policy; higher wins.
         tags: Labels for grouping and filtering.
         description: A human-readable description.
-        metadata: Free-form data (owner, ticket, version, ...).
+        metadata: Free-form data (owner, ticket, version, ...), of at most
+            1,000,000 values (`max_values`; a `FormatError` beyond it).
         do: An action: a callable that `RuleSet.run` calls with an
             `ActionContext` when the rule is selected (never `evaluate`), or
             the name of one, which `RuleSet.bind` (or `load` and `loads` with
@@ -500,12 +501,17 @@ class RuleSet(Sequence[Rule]):
         """Whether evaluation raises instead of returning unknown."""
         return self._strict
 
-    def evaluate(self, data: object) -> Decision:
+    def evaluate(self, data: object, *, max_values: int | None = None) -> Decision:
         """Evaluate the rule set on one input.
 
         Args:
             data: The input: dicts, lists and scalars (other objects arrive with a
                 later version of the binding).
+            max_values: The most values read from the input's native data
+                (1,000,000): an object referenced from several places counts
+                each time it is converted, and a list along the paths counts
+                its length. An input beyond it is refused, not evaluated
+                (`spec/data-model.md`, *Reading native data*, *Limits*).
 
         Returns:
             The `Decision`.
@@ -513,8 +519,10 @@ class RuleSet(Sequence[Rule]):
         Raises:
             EvaluationError: In strict mode, for a missing field or a type
                 mismatch; or a `HitPolicyError` when the policy cannot decide.
+            FormatError: For an input beyond `max_values`, in every mode, with
+                the code `limit_exceeded` and `name == "max_values"`.
         """
-        return Decision(self, self._native.evaluate(data))
+        return Decision(self, self._native.evaluate(data, max_values))
 
     def read_decision(
         self,
@@ -605,11 +613,12 @@ class RuleSet(Sequence[Rule]):
             strict=self._strict,
         )
 
-    def run(self, data: object) -> Decision:
+    def run(self, data: object, *, max_values: int | None = None) -> Decision:
         """Evaluate like `evaluate`, then run the actions of the selected rules.
 
         Actions run in rule order, each with an `ActionContext`. `evaluate` never
         runs them, so a decision can be computed any number of times.
+        `max_values` is as in `evaluate`.
 
         Returns:
             The `Decision`.
@@ -621,13 +630,14 @@ class RuleSet(Sequence[Rule]):
             RegistryError: If a rule names an action that is not bound
                 (`bind`); checked before evaluating, so nothing runs.
             EvaluationError: As `evaluate`.
+            FormatError: As `evaluate`, for an input beyond `max_values`.
         """
         from cleanrules._trees import _tree  # pyright: ignore[reportPrivateUsage]
 
         # Named actions must be bound: the core reports the first that is not.
         bound = [r.action_name for r in self._rules if r.action_name and r.do is not None]
         self._native.check_action_names(bound)
-        decision = self.evaluate(data)
+        decision = self.evaluate(data, max_values=max_values)
         executed: list[str] = []
         for result in decision.selected:
             action = result.rule.do
@@ -656,14 +666,21 @@ class RuleSet(Sequence[Rule]):
             executed.append(result.rule.name)
         return decision
 
-    def evaluate_many(self, rows: Iterable[object]) -> list[Decision]:
+    def evaluate_many(
+        self, rows: Iterable[object], *, max_values: int | None = None
+    ) -> list[Decision]:
         """Evaluate the rule set on each input of a batch, in order.
+
+        `max_values` applies to each input on its own, as in `evaluate`.
 
         Raises:
             EvaluationError: As `evaluate`; the error's `row` is the input's position.
+            FormatError: For the first input beyond `max_values`, with its `row`,
+                before anything is evaluated.
         """
         _check_rows(rows)
-        return [Decision(self, native) for native in self._native.evaluate_many(list(rows))]
+        natives = self._native.evaluate_many(list(rows), max_values)
+        return [Decision(self, native) for native in natives]
 
     def summary(self) -> Summary:
         """Describe the rule set without evaluating it: rules, fields read, outputs, tags."""

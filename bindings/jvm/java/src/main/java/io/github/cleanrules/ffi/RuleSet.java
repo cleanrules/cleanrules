@@ -334,7 +334,9 @@ public final class RuleSet implements AutoCloseable {
 
     /**
      * Evaluate the rule set on Java data within limits: lists and maps nested
-     * deeper than the limits' JSON nesting are a {@link FormatException}.
+     * deeper than the limits' JSON nesting, and data of more than
+     * {@link Limits#maxValues()} values, are a {@link FormatException}
+     * ({@code limit_exceeded}).
      *
      * @param data the input
      * @param limits the limits, or null for the defaults
@@ -344,7 +346,7 @@ public final class RuleSet implements AutoCloseable {
     public Decision evaluate(Object data, Limits limits) {
         return with(pointer -> {
             try (Scope scope = new Scope();
-                    DataReader reader = new DataReader()) {
+                    DataReader reader = DataReader.within(limits)) {
                 MemorySegment input = reader.read(data, tree());
                 scope.onClose(() -> Native.valueFree(input));
                 MemorySegment out = scope.pointer();
@@ -436,7 +438,7 @@ public final class RuleSet implements AutoCloseable {
         Objects.requireNonNull(inputs, "inputs");
         return with(pointer -> {
             try (Scope scope = new Scope();
-                    DataReader reader = new DataReader()) {
+                    DataReader reader = DataReader.within(limits)) {
                 MemorySegment list = reader.readMany(inputs, tree());
                 scope.onClose(() -> Native.valueFree(list));
                 return batch(pointer, list, scope.limits(limits), scope, reader.causes);
@@ -643,7 +645,7 @@ public final class RuleSet implements AutoCloseable {
         });
         return with(pointer -> {
             try (Scope scope = new Scope();
-                    DataReader reader = new DataReader()) {
+                    DataReader reader = DataReader.within(limits)) {
                 MemorySegment registry = Actions.registry(names, scope);
                 // Unknown names fail before anything is read.
                 scope.check(Native.rulesetCheckActions(pointer, registry, scope.error()));

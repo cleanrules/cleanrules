@@ -338,11 +338,9 @@ pub(crate) fn stringifiable(document: &mut Json) {
 
 /// `stringifiable` on the text of a document the core wrote.
 pub(crate) fn stringifiable_text(text: &str) -> String {
-    let limits = json::Limits {
-        max_size: text.len(),
-        max_nesting: usize::MAX,
-        ..json::Limits::default()
-    };
+    let mut limits = json::Limits::default();
+    limits.max_size = text.len();
+    limits.max_nesting = usize::MAX;
     // The core wrote the text, so it reads back; were it not to, it is
     // returned as it is.
     match json::parse(text, &limits) {

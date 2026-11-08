@@ -111,6 +111,11 @@ enum class limit : cr_limit {
     max_table_size = CR_LIMIT_MAX_TABLE_SIZE,
     max_yaml_size = CR_LIMIT_MAX_YAML_SIZE,
     max_text_size = CR_LIMIT_MAX_TEXT_SIZE,
+    // The most values a binding reads from one input's native data (spec/
+    // data-model.md, *Reading native data*, *Limits*), refused beyond it with
+    // `limit_exceeded`: carried for the bindings that read native data. The
+    // values you build here are not counted.
+    max_values = CR_LIMIT_MAX_VALUES,
 };
 
 // What a value is; `none` for an empty handle.

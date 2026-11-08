@@ -257,11 +257,11 @@ pub(crate) fn raw_limits(value: &JsValue) -> Result<RawLimits, JsValue> {
     if !matches!(kind, Raw::Other(OBJECT)) {
         return Ok(RawLimits::Wrong(kind.describe()));
     }
-    let mut values: [Raw; 6] = Default::default();
+    let mut values: [Raw; 7] = Default::default();
     for (slot, name) in values.iter_mut().zip(LIMIT_NAMES) {
         *slot = member(value, name)?;
     }
-    Ok(RawLimits::Given(values))
+    Ok(RawLimits::Given(Box::new(values)))
 }
 
 /// An options object, read once; `None` when it is left out.
@@ -298,9 +298,20 @@ pub(crate) fn object(members: &[(&str, JsValue)]) -> Result<Object, JsValue> {
     Ok(object)
 }
 
-/// The `read` hook: `[encoding, thrown]` for `data` along `owner`'s paths.
-pub(crate) fn call_read(data: &JsValue, owner: &JsValue) -> Result<Array, JsValue> {
-    let result = with_hooks(|hooks| hooks.read.call2(&JsValue::UNDEFINED, data, owner))?;
+/// The `read` hook: `[encoding, thrown]` for `data` along `owner`'s paths,
+/// reading at most `max_values` values.
+pub(crate) fn call_read(
+    data: &JsValue,
+    owner: &JsValue,
+    max_values: usize,
+) -> Result<Array, JsValue> {
+    #[allow(clippy::cast_precision_loss)] // Limits beyond 2^53 are no limit at all.
+    let max_values = JsValue::from_f64(max_values as f64);
+    let result = with_hooks(|hooks| {
+        hooks
+            .read
+            .call3(&JsValue::UNDEFINED, data, owner, &max_values)
+    })?;
     Ok(Array::from(&result))
 }
 

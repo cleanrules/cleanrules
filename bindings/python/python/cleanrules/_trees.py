@@ -75,7 +75,12 @@ def _node(node: object, what: str) -> Expr:
 
 
 def evaluate_tree(
-    condition: Expr, data: object, *, logic: str = "boolean", strict: bool = False
+    condition: Expr,
+    data: object,
+    *,
+    logic: str = "boolean",
+    strict: bool = False,
+    max_values: int | None = None,
 ) -> ResultTree:
     """Evaluate a condition on `data` and return its result tree.
 
@@ -84,10 +89,12 @@ def evaluate_tree(
         data: The input, read as `RuleSet.evaluate` reads it.
         logic: The logic, by name.
         strict: Raise an `EvaluationError` instead of returning unknown.
+        max_values: The most values read from `data`, as in `RuleSet.evaluate`.
 
     Raises:
         ExpressionError: If `condition` is a value node.
         EvaluationError: In strict mode, for a missing field or a type mismatch.
+        FormatError: For `data` beyond `max_values` (`limit_exceeded`).
 
     Example:
         >>> tree = evaluate_tree((F.age >= 18) & F.country.is_in(["ES"]), {"age": 20})
@@ -95,12 +102,16 @@ def evaluate_tree(
         (<Truth.UNKNOWN: 'unknown'>, 'missing_field')
     """
     node = _node(condition, "evaluate_tree")
-    tree, encoded = _native.evaluate_tree(node._node, data, logic, strict)  # pyright: ignore[reportPrivateUsage]
+    tree, encoded = _native.evaluate_tree(node._node, data, logic, strict, max_values)  # pyright: ignore[reportPrivateUsage]
     return _tree(tree, json.loads(encoded))
 
 
-def evaluate_value_tree(value: Expr, data: object, *, strict: bool = False) -> ResultTree:
+def evaluate_value_tree(
+    value: Expr, data: object, *, strict: bool = False, max_values: int | None = None
+) -> ResultTree:
     """Evaluate a value node on `data` and return its result tree.
+
+    `strict` and `max_values` are as in `evaluate_tree`.
 
     Example:
         >>> evaluate_value_tree(F.price * F.quantity, {"price": 2.5, "quantity": 4}).value
@@ -109,7 +120,8 @@ def evaluate_value_tree(value: Expr, data: object, *, strict: bool = False) -> R
     Raises:
         ExpressionError: If `value` is a condition.
         EvaluationError: In strict mode, for a missing field or a type mismatch.
+        FormatError: For `data` beyond `max_values` (`limit_exceeded`).
     """
     node = _node(value, "evaluate_value_tree")
-    tree, encoded = _native.evaluate_value_tree(node._node, data, strict)  # pyright: ignore[reportPrivateUsage]
+    tree, encoded = _native.evaluate_value_tree(node._node, data, strict, max_values)  # pyright: ignore[reportPrivateUsage]
     return _tree(tree, json.loads(encoded))

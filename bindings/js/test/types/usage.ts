@@ -321,6 +321,16 @@ const rows: readonly TableRow[] = table.rows
 const firstInput: Expr | null = rows[0]?.inputs[0] ?? null
 const tableSet: RootRuleSet = table.ruleset
 const tableOut: RootDecision = table.evaluate({ age: 20 })
+// max_values bounds what is read from native data.
+const bounded: RootDecision = rules.evaluate({ x: 1 }, { limits: { maxValues: 10_000 } })
+const boundedMany: RootDecision[] = rules.evaluateMany([{ x: 1 }], { limits: { maxValues: 10_000 } })
+const boundedRun: RootDecision = rules.run({ x: 1 }, { limits: { maxValues: 10_000 } })
+const boundedTable: RootDecision = table.evaluate({ age: 20 }, { limits: { maxValues: 10_000 } })
+const boundedTree: ResultTree = evaluateTree(F.x.eq(1), { x: 1 }, { limits: { maxValues: 10 } })
+const boundedValue: ResultTree = evaluateValueTree(F.x, { x: 1 }, { strict: true, limits: { maxValues: 10 } })
+const nativeBounded: Decision = ruleset.evaluate({}, { maxValues: 10 })
+// @ts-expect-error: limits go under `limits`.
+rules.evaluate({}, { maxValues: 10 })
 const outputs: readonly TableOutput[] = table.outputs
 const contextTree = (context: ActionContext): ResultTree => context.tree
 // @ts-expect-error: a table policy is a closed set.

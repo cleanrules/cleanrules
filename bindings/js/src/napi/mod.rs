@@ -110,11 +110,11 @@ pub(crate) fn raw_limits(value: &Unknown<'_>) -> Result<RawLimits> {
         return Ok(RawLimits::Wrong(kind.describe()));
     }
     let object = Object::from_unknown(*value)?;
-    let mut values: [Raw; 6] = Default::default();
+    let mut values: [Raw; 7] = Default::default();
     for (slot, name) in values.iter_mut().zip(LIMIT_NAMES) {
         *slot = member(&object, name)?;
     }
-    Ok(RawLimits::Given(values))
+    Ok(RawLimits::Given(Box::new(values)))
 }
 
 /// An options object, read once; `None` when it is left out.

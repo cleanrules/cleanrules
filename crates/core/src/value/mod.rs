@@ -13,6 +13,7 @@ pub use decimal::{Decimal, DecimalError, MAX_DIGITS};
 use jiff::civil::{Date, DateTime};
 pub use number::Number;
 
+use crate::error::{Error, ErrorCode};
 use crate::walk::post_order;
 
 /// A value of the data model.
@@ -49,6 +50,7 @@ pub enum Value {
 
 /// Why a value is null (`spec/data-model.md`, *Nulls with a reason*).
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum NullCause {
     /// A native null or a NaN.
     Null,
@@ -58,6 +60,87 @@ pub enum NullCause {
     DecimalOverflow,
     /// Reading the native value raised an error, described here.
     ReadError(String),
+}
+
+/// The error of native data beyond `max_values`: `limit_exceeded`, with the
+/// context `name` set to `max_values` (`spec/data-model.md`, *Reading native
+/// data*, *Limits*). Bindings add the `row` of a batch, or the `rule` whose
+/// metadata or payload constant it is.
+#[must_use]
+pub fn too_many_values(limit: usize) -> Error {
+    let mut error = Error::new(
+        ErrorCode::LimitExceeded,
+        format!("the native data holds more than {limit} values (max_values)"),
+    )
+    .with_hint(
+        "raise max_values, or pass data that shares fewer objects: an object referenced from \
+         several places counts once per reference",
+    );
+    error.context_mut().name = Some("max_values".to_owned());
+    error
+}
+
+/// Counts the values a binding reads from the native data of one input,
+/// against the limit `max_values` (`spec/data-model.md`, *Reading native
+/// data*, *Limits*): each value placed where a path ends or stops, with
+/// everything inside it, and each position of a list or record that the paths
+/// go through.
+///
+/// ```
+/// use cleanrules::value::ValueCount;
+///
+/// let mut count = ValueCount::new(3);
+/// assert!(count.add(2).is_ok());
+/// assert_eq!(count.remaining(), 1);
+/// let error = count.add(2).unwrap_err();
+/// assert_eq!(error.code().as_str(), "limit_exceeded");
+/// assert_eq!(count.count(), 2);
+/// ```
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ValueCount {
+    limit: usize,
+    count: usize,
+}
+
+impl ValueCount {
+    /// A count of none, against `limit` (`Limits::max_values`).
+    #[must_use]
+    pub fn new(limit: usize) -> Self {
+        Self { limit, count: 0 }
+    }
+
+    /// Count `n` more values. Check before building them, so that a list's
+    /// declared length is refused before it is allocated.
+    ///
+    /// # Errors
+    ///
+    /// [`too_many_values`] when the count would pass the limit; the count is
+    /// then left as it was.
+    pub fn add(&mut self, n: usize) -> Result<(), Error> {
+        if n > self.remaining() {
+            return Err(too_many_values(self.limit));
+        }
+        self.count += n;
+        Ok(())
+    }
+
+    /// The values counted so far.
+    #[must_use]
+    pub fn count(&self) -> usize {
+        self.count
+    }
+
+    /// How many more values fit.
+    #[must_use]
+    pub fn remaining(&self) -> usize {
+        self.limit - self.count
+    }
+
+    /// The limit.
+    #[must_use]
+    pub fn limit(&self) -> usize {
+        self.limit
+    }
 }
 
 /// The comparison group of a value (`spec/ast.md`, *Types*).

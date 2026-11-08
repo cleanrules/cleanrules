@@ -727,7 +727,7 @@ fn an_input_nested_too_deep_is_refused() {
 }
 
 #[test]
-fn argument_errors_name_the_function_and_the_argument() {
+fn argument_errors_name_the_argument_not_the_function() {
     let map = Value(cr_value_new_map());
     let mut error = ptr::null_mut();
     // SAFETY: an owned map and item; the key is not UTF-8 on purpose.
@@ -751,7 +751,7 @@ fn argument_errors_name_the_function_and_the_argument() {
     };
     let message = members.iter().find(|(k, _)| k == "message").unwrap();
     assert!(
-        matches!(&message.1, cleanrules::json::Json::String(m) if m.starts_with("cr_value_map_insert: key is not valid UTF-8")),
+        matches!(&message.1, cleanrules::json::Json::String(m) if m.starts_with("key is not valid UTF-8")),
         "{message:?}"
     );
 }
@@ -842,4 +842,121 @@ fn a_clone_keeps_what_json_loses() {
         panic!("a NULL value was cloned");
     };
     assert_eq!(refused.code(), "invalid_argument");
+}
+
+/// A native object graph whose lists share their elements, as a binding's
+/// data may be.
+enum Shared {
+    Int(i64),
+    List(Vec<std::sync::Arc<Shared>>),
+}
+
+/// A list holding `inner` twice, `depth` times over: 2^depth references.
+fn diamond(depth: usize) -> std::sync::Arc<Shared> {
+    (0..depth).fold(std::sync::Arc::new(Shared::Int(1)), |inner, _| {
+        std::sync::Arc::new(Shared::List(vec![std::sync::Arc::clone(&inner), inner]))
+    })
+}
+
+/// Convert `native` whole through the value builder, counting each value
+/// against `left` as a binding on this ABI does (`spec/data-model.md`,
+/// *Reading native data*, *Limits*), a list's length before it is allocated;
+/// `None` beyond the limit.
+fn convert(native: &Shared, left: &mut usize) -> Option<Value> {
+    *left = left.checked_sub(1)?;
+    match native {
+        Shared::Int(n) => Some(Value(cr_value_new_int(*n))),
+        Shared::List(items) => {
+            if items.len() > *left {
+                return None;
+            }
+            let list = Value(cr_value_new_list(items.len()));
+            for (i, item) in items.iter().enumerate() {
+                let item = std::mem::ManuallyDrop::new(convert(item, left)?);
+                common::ok(|e| {
+                    // SAFETY: live values; the item is moved into the list,
+                    // which frees it from now on.
+                    unsafe { cr_value_list_set(list.0, i, item.0, e) }
+                });
+            }
+            Some(list)
+        }
+    }
+}
+
+/// The error of an input beyond `max_values`, made by the core.
+fn beyond(max_values: usize, row: i64, rule: Option<&str>) -> common::Failure {
+    let (p, n) = rule.map_or((ptr::null(), 0), |r| arg(r.as_bytes()));
+    let mut out = ptr::null_mut();
+    common::ok(|e| {
+        // SAFETY: the rule's name outlives the call; `out` is writable.
+        unsafe { cr_error_new_max_values(max_values, row, p, n, &raw mut out, e) }
+    });
+    common::take(out)
+}
+
+#[test]
+fn a_binding_refuses_an_input_beyond_max_values_with_the_cores_error() {
+    // A small limit under Miri, which runs a million values slowly.
+    let max_values = if cfg!(miri) { 64 } else { 1_000_000 };
+    let limits = common::limits(&[(CR_LIMIT_MAX_VALUES, max_values)]);
+    let mut limit = 0;
+    // SAFETY: a live handle and a writable value.
+    let status = unsafe {
+        cr_limits_get(
+            limits.0,
+            CR_LIMIT_MAX_VALUES,
+            &raw mut limit,
+            ptr::null_mut(),
+        )
+    };
+    assert_eq!(status, CR_OK);
+    let data = diamond(30);
+    // On a binding's small stack: the reader stops within the limit.
+    let within = common::on_small_stack(|| {
+        let mut left = limit;
+        convert(&data, &mut left).is_some()
+    });
+    assert!(!within, "a diamond of depth 30 within {limit} values");
+    let failure = beyond(limit, -1, None);
+    assert_eq!(failure.status, CR_LIMIT_EXCEEDED);
+    assert_eq!(failure.code(), "limit_exceeded");
+    let json = cleanrules::json::to_string(&failure.json);
+    assert!(json.contains(r#""name":"max_values""#), "{json}");
+    assert!(
+        json.contains(&format!("more than {limit} values (max_values)")),
+        "{json}"
+    );
+    assert!(
+        !json.contains(r#""row""#) && !json.contains(r#""rule""#),
+        "{json}"
+    );
+    // In a batch, the row; for a constant, the rule.
+    let json = cleanrules::json::to_string(&beyond(5, 2, Some("vip")).json);
+    assert!(
+        json.contains(r#""rule":"vip""#) && json.contains(r#""row":2"#),
+        "{json}"
+    );
+    // SAFETY: the rule is not UTF-8 on purpose; `out` is writable.
+    let failure = unsafe {
+        let mut out = ptr::null_mut();
+        let mut error = ptr::null_mut();
+        let status =
+            cr_error_new_max_values(5, -1, c"\xff".as_ptr(), 1, &raw mut out, &raw mut error);
+        assert!(out.is_null());
+        assert_eq!(status, CR_FORMAT_ERROR);
+        common::take(error)
+    };
+    assert_eq!(failure.code(), "format_error");
+    // SAFETY: a NULL out-parameter is refused.
+    let status =
+        unsafe { cr_error_new_max_values(5, -1, ptr::null(), 0, ptr::null_mut(), ptr::null_mut()) };
+    assert_eq!(status, CR_INVALID_ARGUMENT);
+    // Within the limit, the same reader reads a smaller diamond: 7 values.
+    let mut left = 7;
+    let small = convert(&diamond(2), &mut left).unwrap();
+    assert_eq!(left, 0);
+    assert_eq!(value_to_json(small.0), "[[1,1],[1,1]]");
+    let mut left = 6;
+    assert!(convert(&diamond(2), &mut left).is_none());
 }

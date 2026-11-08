@@ -375,12 +375,15 @@ public final class RuleSet implements Iterable<Rule>, DocumentContent {
     }
 
     /**
-     * Evaluate the rule set on one input within limits.
+     * Evaluate the rule set on one input within limits: the Java data read is
+     * bounded by {@link Limits#maxValues()}.
      *
      * @param data the input
      * @param limits the limits, or null for the defaults
      * @return the decision
      * @throws CleanRulesException if the evaluation fails
+     * @throws FormatException with the code {@code limit_exceeded} for an input beyond
+     *     {@link Limits#maxValues()} (1,000,000 by default), in every mode
      */
     public Decision evaluate(Object data, Limits limits) {
         return new Decision(this, nativeRuleSet.evaluate(data, limits));
@@ -392,6 +395,8 @@ public final class RuleSet implements Iterable<Rule>, DocumentContent {
      * @param rows the inputs
      * @return the decisions, one per input
      * @throws EvaluationException as {@link #evaluate(Object)}, with the input's position as {@code row}
+     * @throws FormatException with the code {@code limit_exceeded} for the first input beyond
+     *     {@link Limits#maxValues()} (1,000,000 by default), with its {@code row}, before anything is evaluated
      */
     public List<Decision> evaluateMany(Iterable<?> rows) {
         return evaluateMany(rows, null);
@@ -404,6 +409,8 @@ public final class RuleSet implements Iterable<Rule>, DocumentContent {
      * @param limits the limits, or null for the defaults
      * @return the decisions, one per input
      * @throws CleanRulesException if an evaluation fails, with the input's position as {@code row}
+     * @throws FormatException with the code {@code limit_exceeded} for the first input beyond
+     *     {@link Limits#maxValues()} (1,000,000 by default), with its {@code row}, before anything is evaluated
      */
     public List<Decision> evaluateMany(Iterable<?> rows, Limits limits) {
         List<Decision> decisions = new ArrayList<>();
@@ -510,6 +517,8 @@ public final class RuleSet implements Iterable<Rule>, DocumentContent {
      * @return the decision
      * @throws RegistryException if a rule names an action that is not bound
      * @throws ActionException if an action throws
+     * @throws FormatException with the code {@code limit_exceeded} for an input beyond
+     *     {@link Limits#maxValues()} (1,000,000 by default), in every mode
      */
     public Decision run(Object data, Limits limits) {
         LinkedHashSet<String> bound = new LinkedHashSet<>();

@@ -47,7 +47,8 @@ function trees(native, expressions, build) {
    * Evaluate a condition (or a field or boolean constant used as one) on
    * `data`, read as `RuleSet.evaluate` reads it, and return its result tree.
    * `logic` is the logic's name; `strict` throws an `EvaluationError` instead
-   * of giving unknown.
+   * of giving unknown; `limits.maxValues` bounds the values read from `data`,
+   * as `RuleSet.evaluate` says.
    */
   function evaluateTree(condition, data, treeOptions) {
     const node = nodeArgument(condition, 'evaluateTree')
@@ -56,15 +57,15 @@ function trees(native, expressions, build) {
         hint: 'compare it, or evaluate it with evaluateValueTree',
       })
     }
-    const { logic, strict } = options(treeOptions, ['logic', 'strict'], '{ strict: true }')
-    return evaluate(node, data, { logic, strict }, false)
+    const { logic, strict, limits } = options(treeOptions, ['logic', 'strict', 'limits'], '{ strict: true }')
+    return evaluate(node, data, { logic, strict, limits }, false)
   }
 
-  /** Evaluate a value node on `data` and return its result tree. */
+  /** Evaluate a value node on `data` and return its result tree; options as `evaluateTree`'s, without `logic`. */
   function evaluateValueTree(value, data, treeOptions) {
     const node = nodeArgument(value, 'evaluateValueTree')
-    const { strict } = options(treeOptions, ['strict'], '{ strict: true }')
-    return evaluate(node, data, { strict }, true)
+    const { strict, limits } = options(treeOptions, ['strict', 'limits'], '{ strict: true }')
+    return evaluate(node, data, { strict, limits }, true)
   }
 
   return { evaluateTree, evaluateValueTree, resultTree }

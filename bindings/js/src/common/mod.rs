@@ -81,13 +81,14 @@ impl Raw {
 pub(crate) const OBJECT: &str = "an object";
 
 /// The names of the limits, in the order of [`RawOptions::limits`].
-pub(crate) const LIMIT_NAMES: [&str; 6] = [
+pub(crate) const LIMIT_NAMES: [&str; 7] = [
     "maxSize",
     "maxNesting",
     "maxDepth",
     "maxTableSize",
     "maxYamlSize",
     "maxTextSize",
+    "maxValues",
 ];
 
 /// An options object as JavaScript gives it: each known member, read once.
@@ -110,7 +111,7 @@ pub(crate) enum RawLimits {
     /// `undefined` or `null`: the core's defaults.
     Absent,
     /// An object: its members, named by [`LIMIT_NAMES`].
-    Given([Raw; 6]),
+    Given(Box<[Raw; 7]>),
     /// Anything else.
     Wrong(&'static str),
 }
@@ -190,7 +191,7 @@ pub(crate) fn limits(raw: &RawLimits) -> Outcome<Limits> {
         }
         RawLimits::Given(values) => values,
     };
-    let [size_, nesting, depth, table, yaml, text] = values;
+    let [size_, nesting, depth, table, yaml, text, values_] = &**values;
     if let Some(value) = size(LIMIT_NAMES[0], size_)? {
         out = out.with_max_size(value);
     }
@@ -209,6 +210,9 @@ pub(crate) fn limits(raw: &RawLimits) -> Outcome<Limits> {
     if let Some(value) = size(LIMIT_NAMES[5], text)? {
         out.max_text_size = value;
     }
+    if let Some(value) = size(LIMIT_NAMES[6], values_)? {
+        out.max_values = value;
+    }
     Ok(out)
 }
 
@@ -224,7 +228,8 @@ pub(crate) fn read_options(options: Option<&RawOptions>) -> Outcome<(DocumentFor
 }
 
 /// How one node is evaluated: the logic's name (boolean by default), whether
-/// strictly, and the limits for an input given as JSON.
+/// strictly, and the limits: `max_values` for native data, the others for an
+/// input given as JSON.
 pub(crate) struct TreeOptions {
     pub(crate) logic: Option<String>,
     pub(crate) strict: bool,

@@ -437,15 +437,17 @@ export declare class RuleSet {
   fieldPaths(): Array<Array<string | number>>
   /**
    * Evaluate native JavaScript data (`spec/data-model.md`, *JavaScript and
-   * TypeScript*), read along the rule set's paths only.
+   * TypeScript*), read along the rule set's paths only, at most
+   * `limits.maxValues` values of it.
    *
    * # Errors
    *
    * In strict mode, `EvaluationError` and its subclasses; a `read_error`
-   * has the value its getter threw as `cause`. A `TypeError` for an
-   * `undefined` input.
+   * has the value its getter threw as `cause`; `FormatError`
+   * (`limit_exceeded`) for an input beyond `maxValues`. A `TypeError` for
+   * an `undefined` input.
    */
-  evaluate(data: unknown): Decision
+  evaluate(data: unknown, limits?: Limits | null): Decision
   /**
    * Evaluate an input given as a JSON value (`spec/json-format.md`,
    * *Values*) under `limits`.
@@ -464,7 +466,7 @@ export declare class RuleSet {
    * error's `row`; `EvaluationError` when `rows` is not an array or an
    * input is `undefined` (with its `row`).
    */
-  evaluateMany(rows: unknown[]): Array<Decision>
+  evaluateMany(rows: unknown[], limits?: Limits | null): Array<Decision>
   /**
    * Evaluate a batch given as a JSON array of values, under `limits`.
    *
@@ -510,7 +512,7 @@ export declare class RuleSet {
    * not run); a `TypeError` if an action is not a function; and as
    * `evaluate`.
    */
-  run(data: unknown, actions: Record<string, (call: ActionCall) => void> | Map<string, (call: ActionCall) => void>): Decision
+  run(data: unknown, actions: Record<string, (call: ActionCall) => void> | Map<string, (call: ActionCall) => void>, limits?: Limits | null): Decision
 }
 
 /**
@@ -646,7 +648,19 @@ export interface Limits {
   maxYamlSize?: number
   /** The largest text in the rule syntax or CSV, in bytes. */
   maxTextSize?: number
+  /**
+   * The most values read from the native data of one input (1,000,000 by
+   * default; `spec/data-model.md`, *Reading native data*, *Limits*).
+   */
+  maxValues?: number
 }
+
+/**
+ * The JSON form of the core's `limit_exceeded` for a constant or metadata
+ * beyond `max_values`, with the `rule` when it is known
+ * (`spec/data-model.md`, *Reading native data*, *Limits*).
+ */
+export declare function maxValuesErrorData(maxValues: number, rule?: string | undefined | null): string
 
 /**
  * Arithmetic.
@@ -849,7 +863,10 @@ export interface TreeOptions {
   logic?: string
   /** Whether evaluation is strict; `false` by default. */
   strict?: boolean
-  /** The limits for an input given as JSON; ignored for native data. */
+  /**
+   * The limits: `maxValues` for native data, the others for an input given
+   * as JSON.
+   */
   limits?: Limits
 }
 
@@ -860,7 +877,10 @@ export type Truth = 'true' | 'false' | 'unknown'
 export interface ValueTreeOptions {
   /** Whether evaluation is strict; `false` by default. */
   strict?: boolean
-  /** The limits for an input given as JSON; ignored for native data. */
+  /**
+   * The limits: `maxValues` for native data, the others for an input given
+   * as JSON.
+   */
   limits?: Limits
 }
 

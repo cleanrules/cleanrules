@@ -534,12 +534,14 @@ public final class DecisionTable implements DocumentContent {
     }
 
     /**
-     * Evaluate one input within limits.
+     * Evaluate one input within limits, as {@link RuleSet#evaluate(Object, Limits)}.
      *
      * @param data the input
      * @param limits the limits, or null for the defaults
      * @return the decision
      * @throws CleanRulesException if the evaluation fails
+     * @throws FormatException with the code {@code limit_exceeded} for an input beyond
+     *     {@link Limits#maxValues()} (1,000,000 by default), in every mode
      */
     public Decision evaluate(Object data, Limits limits) {
         return ruleSet().evaluate(data, limits);
@@ -557,12 +559,14 @@ public final class DecisionTable implements DocumentContent {
     }
 
     /**
-     * Evaluate a batch within limits.
+     * Evaluate a batch within limits, as {@link RuleSet#evaluateMany(Iterable, Limits)}.
      *
      * @param rows the inputs
      * @param limits the limits, or null for the defaults
      * @return the decisions, one per input
      * @throws CleanRulesException if an evaluation fails, with the input's row
+     * @throws FormatException with the code {@code limit_exceeded} for the first input beyond
+     *     {@link Limits#maxValues()} (1,000,000 by default), with its {@code row}, before anything is evaluated
      */
     public List<Decision> evaluateMany(Iterable<?> rows, Limits limits) {
         return ruleSet().evaluateMany(rows, limits);

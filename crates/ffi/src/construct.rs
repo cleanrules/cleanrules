@@ -77,7 +77,6 @@ unsafe fn operand(node: *const cr_node, what: &str) -> Outcome<Node> {
 /// `out` is `NULL` or points to a writable `cr_node *`; `error` is `NULL` or
 /// points to a writable `cr_error *` set to `NULL`.
 pub(crate) unsafe fn build(
-    name: &str,
     out: *mut *mut cr_node,
     error: *mut *mut cr_error,
     make: impl FnOnce() -> Outcome<Node>,
@@ -91,7 +90,7 @@ pub(crate) unsafe fn build(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call(name, error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A field (`spec/ast.md`, `field`): `path` is a list of strings (keys, never
@@ -146,7 +145,7 @@ pub unsafe extern "C" fn cr_node_new_field(
         Ok(Node::field(segments)?)
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_node_new_field", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// A constant (`spec/ast.md`, `const`): a copy of `value`, which stays the
@@ -176,7 +175,7 @@ pub unsafe extern "C" fn cr_node_new_constant(
         Ok(Node::constant(value.clone())?)
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_node_new_constant", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// A comparison `left op right`, with `op` one of `eq`, `ne`, `lt`, `le`,
@@ -208,7 +207,7 @@ pub unsafe extern "C" fn cr_node_new_compare(
         Ok(Node::compare(op, left, right)?)
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_node_new_compare", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// The operands of `and` and `or`, copied.
@@ -255,7 +254,7 @@ pub unsafe extern "C" fn cr_node_new_and(
     // SAFETY: `operands` and `len` (# Safety).
     let make = || Ok(Node::and(unsafe { self::operands(operands, len) }?)?);
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_node_new_and", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// The disjunction of `len` conditions, at least two after flattening.
@@ -273,7 +272,7 @@ pub unsafe extern "C" fn cr_node_new_or(
     // SAFETY: `operands` and `len` (# Safety).
     let make = || Ok(Node::or(unsafe { self::operands(operands, len) }?)?);
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_node_new_or", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// A node of one operand: `not`, `is_null`, `abs` or `neg`.
@@ -282,7 +281,6 @@ pub unsafe extern "C" fn cr_node_new_or(
 ///
 /// `node` is `NULL` or a live `cr_node`; `out` and `error` as `build`.
 unsafe fn unary(
-    name: &str,
     node: *const cr_node,
     out: *mut *mut cr_node,
     error: *mut *mut cr_error,
@@ -291,7 +289,7 @@ unsafe fn unary(
     // SAFETY: `node` is NULL or live (# Safety).
     let make = || Ok(constructor(unsafe { operand(node, "operand") }?)?);
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build(name, out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// The negation of a condition.
@@ -308,7 +306,7 @@ pub unsafe extern "C" fn cr_node_new_not(
     error: *mut *mut cr_error,
 ) -> cr_status {
     // SAFETY: the caller's promises are `unary`'s.
-    unsafe { unary("cr_node_new_not", operand, out, error, Node::not) }
+    unsafe { unary(operand, out, error, Node::not) }
 }
 
 /// Whether a value is null: never unknown, and the only place for the null
@@ -324,7 +322,7 @@ pub unsafe extern "C" fn cr_node_new_is_null(
     error: *mut *mut cr_error,
 ) -> cr_status {
     // SAFETY: the caller's promises are `unary`'s.
-    unsafe { unary("cr_node_new_is_null", operand, out, error, Node::is_null) }
+    unsafe { unary(operand, out, error, Node::is_null) }
 }
 
 /// The absolute value of a number.
@@ -339,7 +337,7 @@ pub unsafe extern "C" fn cr_node_new_abs(
     error: *mut *mut cr_error,
 ) -> cr_status {
     // SAFETY: the caller's promises are `unary`'s.
-    unsafe { unary("cr_node_new_abs", operand, out, error, Node::abs) }
+    unsafe { unary(operand, out, error, Node::abs) }
 }
 
 /// The negation of a number.
@@ -354,7 +352,7 @@ pub unsafe extern "C" fn cr_node_new_neg(
     error: *mut *mut cr_error,
 ) -> cr_status {
     // SAFETY: the caller's promises are `unary`'s.
-    unsafe { unary("cr_node_new_neg", operand, out, error, Node::neg) }
+    unsafe { unary(operand, out, error, Node::neg) }
 }
 
 /// Membership in constants (`spec/ast.md`, `in`): `values` is a list, copied,
@@ -390,7 +388,7 @@ pub unsafe extern "C" fn cr_node_new_is_in(
         Ok(Node::is_in(operand, items.clone())?)
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_node_new_is_in", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// A range test `low <= operand <= high`; `closed` names the ends included:
@@ -433,7 +431,7 @@ pub unsafe extern "C" fn cr_node_new_between(
         Ok(Node::between(operand, low, high, closed)?)
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_node_new_between", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// A regular expression search, in the syntax of Rust's `regex` crate: no
@@ -463,7 +461,7 @@ pub unsafe extern "C" fn cr_node_new_matches(
         )?)
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_node_new_matches", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// A literal string test, `op` one of `starts_with`, `ends_with` and
@@ -497,7 +495,7 @@ pub unsafe extern "C" fn cr_node_new_string_test(
         Ok(Node::string_test(op, operand, text)?)
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_node_new_string_test", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// Arithmetic `left op right`, `op` one of `add`, `sub`, `mul` and `div`
@@ -525,7 +523,7 @@ pub unsafe extern "C" fn cr_node_new_arith(
         Ok(Node::arith(op, left, right)?)
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_node_new_arith", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 // ---- What a node says about itself.
@@ -638,7 +636,7 @@ pub unsafe extern "C" fn cr_node_child(
             })
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_node_child", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// Whether two nodes are structurally identical (`spec/ast.md`, *Structural
@@ -786,7 +784,7 @@ pub unsafe extern "C" fn cr_node_detail(
         unsafe { give_new_value(out, detail) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_node_detail", error, body) }
+    unsafe { call(error, body) }
 }
 
 #[cfg(test)]

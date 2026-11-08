@@ -1067,6 +1067,7 @@ std::vector<std::filesystem::path> vector_files(const std::filesystem::path &dir
 int main(int argc, char **argv) {
     const std::filesystem::path dir = argc > 1 ? argv[1] : CLEANRULES_VECTORS;
     std::size_t ran = 0;
+    std::size_t skipped = 0;
     std::size_t passed_json = 0;
     std::size_t ran_native = 0;
     std::size_t passed_native = 0;
@@ -1082,6 +1083,13 @@ int main(int argc, char **argv) {
             }
             for (const json::value &vector : need(document, "vectors").items) {
                 const std::string &id = need(vector, "id").text;
+                // `max_values` bounds native data: C++ builds its values
+                // itself, so only the bindings' native runs check these.
+                const json::value &given = need(vector, "given");
+                if (need(given, "kind").text == "evaluate" && given.get("limits") != nullptr) {
+                    ++skipped;
+                    continue;
+                }
                 ++ran;
                 if (std::string issue = run(vector, false); issue.empty()) {
                     ++passed_json;
@@ -1106,8 +1114,9 @@ int main(int argc, char **argv) {
     for (const std::string &failed : failures) {
         std::fprintf(stderr, "%s\n", failed.c_str());
     }
-    std::printf("conformance: %zu vectors; json %zu of %zu passed, native %zu of %zu passed\n",
-                ran, passed_json, ran, passed_native, ran_native);
+    std::printf("conformance: %zu vectors; json %zu of %zu passed, native %zu of %zu passed; %zu "
+                "native-only skipped\n",
+                ran, passed_json, ran, passed_native, ran_native, skipped);
     if (!failures.empty()) {
         std::fprintf(stderr, "conformance: %zu failures\n", failures.size());
         return EXIT_FAILURE;

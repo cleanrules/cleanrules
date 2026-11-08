@@ -63,7 +63,8 @@ The whole program, with explanations and errors, is
   an error code (`CR_FORMAT_ERROR`, `CR_MISSING_FIELD`, ...; the table of
   [`spec/errors.md`](../../spec/errors.md#numeric-codes)), `CR_INVALID_ARGUMENT`
   for a broken call (a `NULL` handle, an unknown format), whose message names
-  the function, or `CR_INTERNAL_ERROR` for a bug. Its last argument,
+  the argument (never the function, so bindings show messages as they are),
+  or `CR_INTERNAL_ERROR` for a bug. Its last argument,
   `cr_error **error`, may be `NULL`; otherwise `*error` must be `NULL` on entry,
   receives a `cr_error` on failure and is left alone on success. The error
   holds the message, the hint and the error's JSON form (`cr_error_json`, with
@@ -72,7 +73,13 @@ The whole program, with explanations and errors, is
   Out-parameters are `NULL` after a failure.
 - **Limits.** `CR_LIMIT_MAX_SIZE` sets the size limit of every format at once
   and reads JSON's; `CR_LIMIT_MAX_YAML_SIZE` and `CR_LIMIT_MAX_TEXT_SIZE` (the
-  rule syntax and CSV) set one each.
+  rule syntax and CSV) set one each. `CR_LIMIT_MAX_VALUES` (1,000,000 by
+  default) is for bindings that read native data on this ABI (Java, Go): they
+  count the values they read for one input and, beyond the limit, stop and
+  refuse the input with the core's error, `cr_error_new_max_values(limit, row,
+  rule, len, ...)` (`CR_LIMIT_EXCEEDED`, `name` `max_values`; `spec/data-model.md`,
+  *Reading native data*, *Limits*). The ABI does not count the values a
+  program builds itself.
 - **Stack.** At the default limits every call needs at most 128 KiB of stack
   in a release build of the library (512 KiB in a debug build), less than a
   JVM thread has (1 MiB on Linux and Windows). Freeing values or

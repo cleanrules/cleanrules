@@ -7,10 +7,15 @@
 //! or a module. A getter that raises gives a null with reason `read_error`,
 //! except `AttributeError`, which means missing; the exception is kept so that
 //! strict mode can chain it.
+//!
+//! What is read is counted against `max_values` (`spec/data-model.md`,
+//! *Reading native data*, *Limits*): beyond it, reading stops at once and the
+//! input is refused with the core's `limit_exceeded`.
 
 use std::collections::{HashMap, HashSet};
 
-use cleanrules::{Map, NullCause, Segment, Value};
+use cleanrules::value::{ValueCount, too_many_values};
+use cleanrules::{Error, Map, NullCause, Segment, Value};
 use pyo3::exceptions::{PyAttributeError, PyKeyError};
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
@@ -20,6 +25,7 @@ use pyo3::types::{
 };
 
 use crate::convert::{self, MAX_DEPTH, Problem};
+use crate::errors;
 
 /// The paths a rule set reads, as a tree of segments.
 #[derive(Clone, Debug, Default)]
@@ -134,23 +140,62 @@ static ISROUTINE: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 static FIELDS: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 static INTERNALS: PyOnceLock<Py<PyTuple>> = PyOnceLock::new();
 
-/// Read `data` along `paths`.
+/// Read `data` along `paths`, reading at most `max_values` values of it.
 ///
 /// # Errors
 ///
-/// Only failures of the binding itself; exceptions raised by the data become
-/// `read_error` nulls.
-pub(crate) fn read(data: &Bound<'_, PyAny>, paths: &Paths) -> PyResult<Native> {
-    let mut reader = Reader::default();
-    let value = reader.walk(data, paths, &mut Vec::new())?;
-    Ok(Native {
-        value,
-        objects: reader.objects,
-        errors: reader.errors,
-    })
+/// `limit_exceeded` from the core beyond `max_values`, with `row` when it is
+/// given (`spec/data-model.md`, *Reading native data*, *Limits*), and failures
+/// of the binding itself; exceptions raised by the data become `read_error`
+/// nulls.
+pub(crate) fn read(
+    data: &Bound<'_, PyAny>,
+    paths: &Paths,
+    max_values: usize,
+    row: Option<usize>,
+) -> PyResult<Native> {
+    let mut reader = Reader {
+        objects: Vec::new(),
+        tokens: HashMap::new(),
+        errors: Vec::new(),
+        open: HashSet::new(),
+        count: ValueCount::new(max_values),
+    };
+    match reader.walk(data, paths, &mut Vec::new()) {
+        Ok(value) => Ok(Native {
+            value,
+            objects: reader.objects,
+            errors: reader.errors,
+        }),
+        Err(Stop::Python(error)) => Err(error),
+        Err(Stop::Limit(mut error)) => {
+            error.context_mut().row = row.and_then(|r| u64::try_from(r).ok());
+            Err(errors::to_py(data.py(), &error))
+        }
+    }
 }
 
-#[derive(Default)]
+/// Why reading stopped: an error of the binding, or the input beyond
+/// `max_values`.
+pub(crate) enum Stop {
+    Python(PyErr),
+    Limit(Error),
+}
+
+impl From<PyErr> for Stop {
+    fn from(error: PyErr) -> Self {
+        Self::Python(error)
+    }
+}
+
+impl From<Error> for Stop {
+    fn from(error: Error) -> Self {
+        Self::Limit(error)
+    }
+}
+
+type Read<T = Value> = Result<T, Stop>;
+
 struct Reader {
     objects: Vec<Py<PyAny>>,
     /// The token of each object in `objects`, by identity. Tokens are handed out
@@ -159,6 +204,8 @@ struct Reader {
     errors: Vec<(Vec<Segment>, PyErr)>,
     /// The containers being converted, by identity, for cycles.
     open: HashSet<usize>,
+    /// The values read, against `max_values`.
+    count: ValueCount,
 }
 
 fn identity(value: &Bound<'_, PyAny>) -> usize {
@@ -166,15 +213,10 @@ fn identity(value: &Bound<'_, PyAny>) -> usize {
 }
 
 impl Reader {
-    fn walk(
-        &mut self,
-        value: &Bound<'_, PyAny>,
-        paths: &Paths,
-        at: &mut Vec<Segment>,
-    ) -> PyResult<Value> {
+    fn walk(&mut self, value: &Bound<'_, PyAny>, paths: &Paths, at: &mut Vec<Segment>) -> Read {
         let array = match convert::numpy_array_as_list(value) {
             Ok(array) => array,
-            Err(error) => return Ok(self.raised(value.py(), error, at)),
+            Err(error) => return self.placed_error(value.py(), error, at),
         };
         let value = array.as_ref().unwrap_or(value);
         if paths.end {
@@ -182,7 +224,7 @@ impl Reader {
         }
         let shape = match shape(value) {
             Ok(shape) => shape,
-            Err(error) => return Ok(self.raised(value.py(), error, at)),
+            Err(error) => return self.placed_error(value.py(), error, at),
         };
         Ok(match &shape {
             Shape::Scalar => self.convert(value, at)?,
@@ -198,6 +240,8 @@ impl Reader {
                 Value::Map(map)
             }
             Shape::Record { keys, .. } => {
+                // The core holds a value for each position, read or not.
+                self.count.add(keys.len())?;
                 let mut map = Map::record();
                 for (position, key) in keys.iter().enumerate() {
                     let by_key = paths.keys.iter().find(|(k, _)| k == key).map(|(_, p)| p);
@@ -225,7 +269,9 @@ impl Reader {
                 Value::Map(map)
             }
             Shape::Sequence(len) => {
-                // The list keeps its length; holes stand for elements no path reads.
+                // The list keeps its declared length, each position a value the
+                // core holds: counted before it is allocated.
+                self.count.add(*len)?;
                 let mut items = vec![Value::Null(NullCause::Null); *len];
                 for (index, sub) in &paths.indices {
                     let Some(i) = usize::try_from(*index).ok().filter(|i| i < len) else {
@@ -234,7 +280,7 @@ impl Reader {
                     at.push(Segment::Index(*index));
                     items[i] = match value.get_item(i) {
                         Ok(item) => self.walk(&item, sub, at)?,
-                        Err(error) => self.raised(value.py(), error, at),
+                        Err(error) => self.placed_error(value.py(), error, at)?,
                     };
                     at.pop();
                 }
@@ -251,12 +297,18 @@ impl Reader {
         key: &str,
         paths: &Paths,
         at: &[Segment],
-    ) -> PyResult<Option<Value>> {
+    ) -> Read<Option<Value>> {
         match lookup(value, shape, key) {
             Found::Value(item) => self.walk(&item, paths, &mut at.to_vec()).map(Some),
             Found::Missing => Ok(None),
-            Found::Raised(error) => Ok(Some(self.raised(value.py(), error, at))),
+            Found::Raised(error) => self.placed_error(value.py(), error, at).map(Some),
         }
+    }
+
+    /// A null with reason `read_error` placed in the tree: it counts as a value.
+    fn placed_error(&mut self, py: Python<'_>, error: PyErr, at: &[Segment]) -> Read {
+        self.count.add(1)?;
+        Ok(self.raised(py, error, at))
     }
 
     fn raised(&mut self, py: Python<'_>, error: PyErr, at: &[Segment]) -> Value {
@@ -278,8 +330,10 @@ impl Reader {
         Value::Opaque(cleanrules::value::Opaque { type_name, token })
     }
 
-    /// The whole value, where a path ends (`spec/data-model.md`, *Python*).
-    fn convert(&mut self, value: &Bound<'_, PyAny>, at: &mut Vec<Segment>) -> PyResult<Value> {
+    /// The whole value, where a path ends (`spec/data-model.md`, *Python*):
+    /// it counts one, and so does everything inside it.
+    fn convert(&mut self, value: &Bound<'_, PyAny>, at: &mut Vec<Segment>) -> Read {
+        self.count.add(1)?;
         let array = match convert::numpy_array_as_list(value) {
             Ok(array) => array,
             Err(error) => return Ok(self.raised(value.py(), error, at)),
@@ -290,7 +344,7 @@ impl Reader {
             Err(error) => return Ok(self.raised(value.py(), error, at)),
         };
         if matches!(shape, Shape::Scalar) {
-            return self.scalar(value);
+            return Ok(self.scalar(value)?);
         }
         let id = identity(value);
         if self.open.len() >= MAX_DEPTH || self.open.contains(&id) {
@@ -307,16 +361,21 @@ impl Reader {
         value: &Bound<'_, PyAny>,
         shape: &Shape,
         at: &mut Vec<Segment>,
-    ) -> PyResult<Value> {
+    ) -> Read {
         Ok(match shape {
             Shape::Scalar => self.scalar(value)?,
             Shape::Sequence(len) => {
+                // Each element counts as it is converted; a declared length
+                // beyond what is left is refused before the list is allocated.
+                if *len > self.count.remaining() {
+                    return Err(too_many_values(self.count.limit()).into());
+                }
                 let mut items = Vec::with_capacity(*len);
                 for i in 0..*len {
                     at.push(Segment::Index(i as u64));
                     items.push(match value.get_item(i) {
                         Ok(item) => self.convert(&item, at)?,
-                        Err(error) => self.raised(value.py(), error, at),
+                        Err(error) => self.placed_error(value.py(), error, at)?,
                     });
                     at.pop();
                 }
@@ -341,9 +400,12 @@ impl Reader {
                     at.push(Segment::Key(key.clone()));
                     let item = match lookup(value, shape, &key) {
                         Found::Value(item) => Some(self.convert(&item, at)?),
-                        Found::Missing if record => Some(Value::Null(NullCause::Null)),
+                        Found::Missing if record => {
+                            self.count.add(1)?;
+                            Some(Value::Null(NullCause::Null))
+                        }
                         Found::Missing => None,
-                        Found::Raised(error) => Some(self.raised(value.py(), error, at)),
+                        Found::Raised(error) => Some(self.placed_error(value.py(), error, at)?),
                     };
                     at.pop();
                     if let Some(item) = item {

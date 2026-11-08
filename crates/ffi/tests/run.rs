@@ -506,7 +506,8 @@ fn review_cases_are_refused() {
         )
     });
     let json = cleanrules::json::to_string(&failure.err().unwrap().json);
-    assert!(json.contains("cr_grid_new: header is NULL"), "{json}");
+    assert!(json.contains(r#""message":"header is NULL""#), "{json}");
+    assert!(!json.contains("cr_grid_new"), "{json}");
 }
 
 #[test]

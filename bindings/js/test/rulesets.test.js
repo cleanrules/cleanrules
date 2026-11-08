@@ -167,7 +167,7 @@ describe(`the package (${build})`, () => {
     }
     const internal = (layer) =>
       Object.keys(layer)
-        .filter((name) => /^(node|rule|decision|explanation|summary|action|document|write|grid|file)[A-Z]|^(NodeList|RuleList|Native[A-Z]\w*|stringifiable)$/.test(name))
+        .filter((name) => /^(node|rule|decision|explanation|summary|action|document|write|grid|file|maxValues)[A-Z]|^(NodeList|RuleList|Native[A-Z]\w*|stringifiable)$/.test(name))
         .sort()
     assert.deepEqual(internal(napiLayer), [...INTERNAL].sort())
     assert.deepEqual(internal(wasmLayer), [...INTERNAL].sort())

@@ -13,7 +13,7 @@ use super::hooks::{hook, throw};
 use super::{OrFail, fail, raw, raw_limits, raw_list, raw_options};
 use crate::common::core::{
     ActionFailure, DecisionCore, DocumentCore, NodeCore, PathSegment, RulesCore, TreeKind,
-    action_error, cause_index, not_a_batch, path_segments, undefined_row,
+    action_error, cause_index, max_values_error, not_a_batch, path_segments, undefined_row,
 };
 use crate::common::wire::{Read, decode};
 use crate::common::{Problem, Raw, UNDEFINED_INPUT, limits, strings, text, tree_options};
@@ -41,6 +41,9 @@ pub struct Limits {
     pub max_yaml_size: Option<f64>,
     /// The largest text in the rule syntax or CSV, in bytes.
     pub max_text_size: Option<f64>,
+    /// The most values read from the native data of one input (1,000,000 by
+    /// default; `spec/data-model.md`, *Reading native data*, *Limits*).
+    pub max_values: Option<f64>,
 }
 
 /// How a text is read: its format (JSON when left out) and limits.
@@ -61,7 +64,8 @@ pub struct TreeOptions {
     pub logic: Option<String>,
     /// Whether evaluation is strict; `false` by default.
     pub strict: Option<bool>,
-    /// The limits for an input given as JSON; ignored for native data.
+    /// The limits: `maxValues` for native data, the others for an input given
+    /// as JSON.
     pub limits: Option<Limits>,
 }
 
@@ -70,7 +74,8 @@ pub struct TreeOptions {
 pub struct ValueTreeOptions {
     /// Whether evaluation is strict; `false` by default.
     pub strict: Option<bool>,
-    /// The limits for an input given as JSON; ignored for native data.
+    /// The limits: `maxValues` for native data, the others for an input given
+    /// as JSON.
     pub limits: Option<Limits>,
 }
 
@@ -214,19 +219,31 @@ pub(crate) struct Native<'env> {
     thrown: Option<Array<'env>>,
 }
 
-/// Read `data` along the paths of `owner` (`lib/read.js`).
+/// Read `data` along the paths of `owner` (`lib/read.js`), at most
+/// `max_values` values of it; beyond them, the core's `limit_exceeded`, with
+/// the `row` of a batch.
 pub(crate) fn read<'env>(
     env: &'env Env,
     data: Unknown<'env>,
     owner: Unknown<'env>,
+    max_values: usize,
+    row: Option<usize>,
 ) -> Result<Native<'env>> {
-    let read = hook::<FnArgs<(Unknown<'env>, Unknown<'env>)>, Array<'env>>(env, "read")?;
-    let result = read.call(FnArgs::from((data, owner)))?;
-    let wire: String = result
-        .get(0)?
-        .ok_or_else(|| napi::Error::from_reason("the reader returned no encoding"))?;
+    let read = hook::<FnArgs<(Unknown<'env>, Unknown<'env>, f64)>, Array<'env>>(env, "read")?;
+    #[allow(clippy::cast_precision_loss)] // Limits beyond 2^53 are no limit at all.
+    let result = read.call(FnArgs::from((data, owner, max_values as f64)))?;
+    let encoding: Option<Option<String>> = result.get(0)?;
+    let wire = match encoding {
+        Some(Some(wire)) => wire,
+        // No encoding: the input is beyond `max_values`.
+        Some(None) => {
+            let error = max_values_error(max_values, None, row);
+            return Err(throw(env, &error, None, None));
+        }
+        None => return Err(napi::Error::from_reason("the reader returned no encoding")),
+    };
     let thrown: Option<Array<'env>> = result.get(1)?;
-    let read = decode(&wire).map_err(|problem| {
+    let read = decode(&wire, max_values).map_err(|problem| {
         fail(
             env,
             Problem::Internal(format!("the reader's encoding is wrong ({problem})")),
@@ -336,8 +353,9 @@ impl RuleSet {
         env: &'env Env,
         this: Unknown<'env>,
         data: Unknown<'env>,
+        max_values: usize,
     ) -> Result<Decision> {
-        let native = read(env, data, this)?;
+        let native = read(env, data, this, max_values, None)?;
         let core = self
             .core
             .evaluate(native.read.value.clone())
@@ -471,24 +489,28 @@ impl RuleSet {
     }
 
     /// Evaluate native JavaScript data (`spec/data-model.md`, *JavaScript and
-    /// TypeScript*), read along the rule set's paths only.
+    /// TypeScript*), read along the rule set's paths only, at most
+    /// `limits.maxValues` values of it.
     ///
     /// # Errors
     ///
     /// In strict mode, `EvaluationError` and its subclasses; a `read_error`
-    /// has the value its getter threw as `cause`. A `TypeError` for an
-    /// `undefined` input.
-    #[napi(ts_args_type = "data: unknown")]
+    /// has the value its getter threw as `cause`; `FormatError`
+    /// (`limit_exceeded`) for an input beyond `maxValues`. A `TypeError` for
+    /// an `undefined` input.
+    #[napi(ts_args_type = "data: unknown, limits?: Limits | null")]
     pub fn evaluate<'env>(
         &self,
         env: &'env Env,
         this: This<'env>,
         data: Unknown<'env>,
+        limits: Option<Unknown<'env>>,
     ) -> Result<Decision> {
         if is_undefined(&data)? {
             return Err(fail(env, Problem::Type(UNDEFINED_INPUT.to_owned())));
         }
-        self.evaluate_native(env, unknown(&this), data)
+        let max_values = optional_limits(env, limits)?.max_values;
+        self.evaluate_native(env, unknown(&this), data, max_values)
     }
 
     /// Evaluate an input given as a JSON value (`spec/json-format.md`,
@@ -517,13 +539,15 @@ impl RuleSet {
     /// As `evaluate`, for the first input that fails, whose position is the
     /// error's `row`; `EvaluationError` when `rows` is not an array or an
     /// input is `undefined` (with its `row`).
-    #[napi(ts_args_type = "rows: unknown[]")]
+    #[napi(ts_args_type = "rows: unknown[], limits?: Limits | null")]
     pub fn evaluate_many<'env>(
         &self,
         env: &'env Env,
         this: This<'env>,
         rows: Unknown<'env>,
+        limits: Option<Unknown<'env>>,
     ) -> Result<Vec<Decision>> {
+        let max_values = optional_limits(env, limits)?.max_values;
         if !rows.is_array()? {
             return Err(fail(env, not_a_batch()));
         }
@@ -537,7 +561,7 @@ impl RuleSet {
             if is_undefined(&row)? {
                 return Err(fail(env, undefined_row(index as usize)));
             }
-            natives.push(read(env, row, owner)?);
+            natives.push(read(env, row, owner, max_values, Some(index as usize))?);
         }
         let inputs = natives.iter().map(|n| n.read.value.clone()).collect();
         let decisions = self.core.evaluate_many(inputs).map_err(|error| {
@@ -629,7 +653,7 @@ impl RuleSet {
     /// not run); a `TypeError` if an action is not a function; and as
     /// `evaluate`.
     #[napi(
-        ts_args_type = "data: unknown, actions: Record<string, (call: ActionCall) => void> | Map<string, (call: ActionCall) => void>"
+        ts_args_type = "data: unknown, actions: Record<string, (call: ActionCall) => void> | Map<string, (call: ActionCall) => void>, limits?: Limits | null"
     )]
     pub fn run<'env>(
         &self,
@@ -637,7 +661,9 @@ impl RuleSet {
         this: This<'env>,
         data: Unknown<'env>,
         actions: Unknown<'env>,
+        limits: Option<Unknown<'env>>,
     ) -> Result<ClassInstance<'env, Decision>> {
+        let max_values = optional_limits(env, limits)?.max_values;
         // `[names, functions]`, checked by the hook.
         let registry = hook::<FnArgs<(Unknown<'env>,)>, Array<'env>>(env, "actions")?
             .call(FnArgs::from((actions,)))?;
@@ -658,7 +684,7 @@ impl RuleSet {
         if is_undefined(&data)? {
             return Err(fail(env, Problem::Type(UNDEFINED_INPUT.to_owned())));
         }
-        let decision = self.evaluate_native(env, unknown(&this), data)?;
+        let decision = self.evaluate_native(env, unknown(&this), data, max_values)?;
         let steps = self.core.action_steps(&decision.core, &names);
         let decision = decision.into_instance(env)?;
         let call =
@@ -853,7 +879,7 @@ impl Node {
         if is_undefined(&data)? {
             return Err(fail(env, Problem::Type(UNDEFINED_INPUT.to_owned())));
         }
-        let native = read(env, data, unknown(this))?;
+        let native = read(env, data, unknown(this), options.limits.max_values, None)?;
         self.core
             .tree(kind, &native.read.value, &options)
             .map_err(|error| chained(env, &error, &native))

@@ -8,13 +8,14 @@ import java.util.Arrays;
  * <i>Errors and limits</i>): an immutable value, which starts from the core's
  * defaults ({@link #defaults()}) and changes one limit at a time
  * ({@link #withMaxSize(long)}...). A document or input beyond a limit is a
- * {@link FormatException} with the code {@code limit_exceeded}.
+ * {@link FormatException} with the code {@code limit_exceeded}, also Java
+ * data beyond {@link #maxValues()}, in every mode.
  *
  * <p>Limits hold no native memory and are safe to share between threads.
  */
 public final class Limits {
     private static final String[] NAMES = {
-        "maxSize", "maxNesting", "maxDepth", "maxTableSize", "maxYamlSize", "maxTextSize"
+        "maxSize", "maxNesting", "maxDepth", "maxTableSize", "maxYamlSize", "maxTextSize", "maxValues"
     };
     private static final int SIZE = 0;
     private static final int NESTING = 1;
@@ -22,6 +23,7 @@ public final class Limits {
     private static final int TABLE_SIZE = 3;
     private static final int YAML_SIZE = 4;
     private static final int TEXT_SIZE = 5;
+    private static final int VALUES = 6;
 
     private static final class Defaults {
         static final Limits LIMITS = new Limits(Native.defaultLimits());
@@ -109,6 +111,33 @@ public final class Limits {
      */
     public long maxTextSize() {
         return values[TEXT_SIZE];
+    }
+
+    /**
+     * The most values read from the Java (or Scala) data of one input
+     * ({@code spec/data-model.md}, <i>Reading native data</i>, <i>Limits</i>):
+     * 1,000,000 by default. Each value placed where a path ends or stops
+     * counts, with everything inside it, an object met through several
+     * references each time, and a list along the paths counts its size.
+     * An input beyond it is refused, not evaluated: a {@link FormatException}
+     * with the code {@code limit_exceeded}, in every mode. Constants and
+     * metadata are converted under the default.
+     *
+     * @return the limit
+     */
+    public long maxValues() {
+        return values[VALUES];
+    }
+
+    /**
+     * These limits with another limit on the values read from native data.
+     *
+     * @param count the most values, 0 or more
+     * @return the new limits
+     * @throws IllegalArgumentException if {@code count} is negative
+     */
+    public Limits withMaxValues(long count) {
+        return with(count, "maxValues", VALUES);
     }
 
     /**

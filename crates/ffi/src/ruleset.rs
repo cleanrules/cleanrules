@@ -58,7 +58,7 @@ pub unsafe extern "C" fn cr_ruleset_from_document(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_from_document", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Read a rule set in `format` (`CR_FORMAT_*`): a rule set, a decision table,
@@ -99,7 +99,7 @@ pub unsafe extern "C" fn cr_ruleset_read(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_read", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Write a rule set in `format` (`CR_FORMAT_*`): JSON, YAML or the rule syntax.
@@ -128,7 +128,7 @@ pub unsafe extern "C" fn cr_ruleset_write(
         unsafe { give_text(out, len, text) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_write", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The rule set's summary (`spec/explain.md`, *Summaries*) as a JSON or YAML
@@ -157,7 +157,7 @@ pub unsafe extern "C" fn cr_ruleset_summary(
         unsafe { give_text(out, len, text) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_summary", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A name argument that may be left out (`NULL`).
@@ -248,7 +248,7 @@ pub unsafe extern "C" fn cr_ruleset_new(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_new", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The position of the rule named `name`, for a lookup by name: a name the
@@ -278,7 +278,7 @@ pub unsafe extern "C" fn cr_ruleset_rule_position(
         unsafe { write_out(out, position, "out") }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_rule_position", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The rule set's summary, as `cr_ruleset_summary` gives it, with the rules
@@ -332,7 +332,7 @@ pub unsafe extern "C" fn cr_ruleset_summary_actions(
         unsafe { give_text(out, len, text) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_summary_actions", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Paths as a list of paths, each a list of strings (keys) and ints (indexes),
@@ -412,7 +412,7 @@ pub unsafe extern "C" fn cr_ruleset_rule_name(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_rule_name", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A copy of the rule at position `rule`, freed with `cr_rule_free`: its
@@ -450,7 +450,7 @@ pub unsafe extern "C" fn cr_ruleset_rule(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_rule", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The rule set's hit policy (`first`, `priority`, `unique`, `any`,
@@ -561,7 +561,7 @@ pub unsafe extern "C" fn cr_ruleset_field_paths(
         unsafe { give_new_value(out, paths) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_field_paths", error, body) }
+    unsafe { call(error, body) }
 }
 
 #[cfg(test)]

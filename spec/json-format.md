@@ -813,7 +813,7 @@ it would have (`/condition/right`), and an unknown or extra key by its own
 | `registry_error` | a name that should be registered (a logic) is not |
 | `decision_mismatch` | a decision does not belong to, or is not consistent with, the rule set it is read with |
 | `unsupported` | this build of the core, or this version of the format, cannot do the operation: a logic built out by a Cargo feature, a writer given an action, reading an output-only document, or explaining a decision made with a graded logic |
-| `limit_exceeded` | the document is larger, or nested deeper, than the reader allows |
+| `limit_exceeded` | the document is larger, or nested deeper, than the reader allows; also native data beyond `max_values` (below) |
 
 A reader reports **one** error, the first it finds in this order:
 
@@ -850,6 +850,19 @@ nest deeper, and a decision can be larger than its rule set, so writers do not
 enforce these limits, and callers that read large decisions raise them. The
 caller can raise the limits, but never disable them. A reader must not overflow its stack on any
 input within its limits.
+
+Inputs given as native data have a limit of their own, **`max_values`**: at
+most **1,000,000** values read from the native data of one input (and
+converted for one native constant), counted as `data-model.md` (*Reading
+native data*, *Limits*) says. An input beyond it is refused with
+`limit_exceeded`, in strict mode and outside it, as a document beyond a limit
+is. It applies only where a binding reads native data: an input given as JSON
+is already bounded by the size and nesting limits, and a value built directly
+(in Rust, or through the C ABI's value builder) is built by the program one
+value at a time. It travels with the other limits (`max_values=` in Python,
+`maxValues` in JavaScript, `Limits.withMaxValues` on the JVM,
+`CR_LIMIT_MAX_VALUES` in the C ABI) and, like them, can be raised but never
+disabled.
 
 The core walks conditions, result trees, explanations and data with explicit
 stacks on the heap, not with recursion, so its call stack does not grow with

@@ -65,7 +65,7 @@ pub unsafe extern "C" fn cr_document_read(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_document_read", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// What a document holds, its content (`CR_DOCUMENT_*`). 0 for `NULL`.
@@ -112,7 +112,7 @@ pub unsafe extern "C" fn cr_document_write(
         unsafe { give_text(out, len, text) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_document_write", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Hand a new document out.
@@ -122,7 +122,6 @@ pub unsafe extern "C" fn cr_document_write(
 /// `out` is `NULL` or points to a writable `cr_document *`; `error` is `NULL`
 /// or points to a writable `cr_error *` set to `NULL`.
 unsafe fn make(
-    name: &str,
     out: *mut *mut cr_document,
     error: *mut *mut cr_error,
     content: impl FnOnce() -> Outcome<Document>,
@@ -136,7 +135,7 @@ unsafe fn make(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call(name, error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A document holding a condition (copied), to write it with
@@ -160,7 +159,7 @@ pub unsafe extern "C" fn cr_document_new_condition(
         Ok(Document::condition(node.clone())?)
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { make("cr_document_new_condition", out, error, content) }
+    unsafe { make(out, error, content) }
 }
 
 /// A document holding a rule (copied), to write it with `cr_document_write`.
@@ -182,7 +181,7 @@ pub unsafe extern "C" fn cr_document_new_rule(
         Ok(Document::Rule(rule.rule.clone()))
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { make("cr_document_new_rule", out, error, content) }
+    unsafe { make(out, error, content) }
 }
 
 /// A document of another kind than the function reads.
@@ -222,7 +221,7 @@ pub unsafe extern "C" fn cr_document_condition(
         }
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { crate::construct::build("cr_document_condition", out, error, make) }
+    unsafe { crate::construct::build(out, error, make) }
 }
 
 /// A copy of the rule a `CR_DOCUMENT_RULE` document holds, freed with
@@ -252,7 +251,7 @@ pub unsafe extern "C" fn cr_document_rule(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_document_rule", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Free a document. `NULL` is ignored.

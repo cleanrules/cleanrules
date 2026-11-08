@@ -126,7 +126,10 @@ class Conformance {
             "a decimal infinity in the vector's data or constants, which no Java value holds (spec/data-model.md,"
                     + " Java and Scala: BigDecimal cannot hold it, and a Double infinity is a float)",
             "zone_unknown_to_java",
-            "a datetime in a zone that Java's zone database does not know, which no Java value holds");
+            "a datetime in a zone that Java's zone database does not know, which no Java value holds",
+            "native",
+            "max_values bounds what is read from native data only, so evaluate vectors with limits run in the native"
+                    + " route");
 
     /** The exception class of each error code (spec/errors.md, Codes). */
     private static final Map<String, Class<? extends CleanRulesException>> CLASSES = Map.ofEntries(
@@ -147,7 +150,7 @@ class Conformance {
             Map.entry("unsupported", UnsupportedException.class));
 
     /** The fields of an evaluation error that are compared (spec/errors.md, Comparing errors). */
-    private static final List<String> EVALUATION = List.of("code", "rule", "path", "types", "rules", "row");
+    private static final List<String> EVALUATION = List.of("code", "rule", "path", "types", "rules", "row", "name");
 
     /** The context fields an error may carry, in the order of its JSON form. */
     private static final List<String> CONTEXT =
@@ -331,6 +334,7 @@ class Conformance {
                 case "max_table_size" -> made.withMaxTableSize(n);
                 case "max_yaml_size" -> made.withMaxYamlSize(n);
                 case "max_text_size" -> made.withMaxTextSize(n);
+                case "max_values" -> made.withMaxValues(n);
                 default -> throw new VectorError("unknown limit " + limit.getKey());
             };
         }
@@ -680,6 +684,9 @@ class Conformance {
                 }
             }
             case "evaluate", "explain" -> {
+                if (given.containsKey("limits")) {
+                    throw new Skip("native");
+                }
                 try (io.github.cleanrules.ffi.RuleSet rules =
                         io.github.cleanrules.ffi.RuleSet.read(rulesetDocument(given), Format.JSON)) {
                     return evaluateJson(rules, kind, given, expect);
@@ -1519,9 +1526,11 @@ class Conformance {
         }
         Object input = inputOf(given);
         boolean failing = expect.containsKey("error");
+        // `max_values`, for the idiomatic API and the native layer.
+        Limits limits = limitsOf(given);
         if (given.containsKey("inputs")) {
             List<?> rows = (List<?>) input;
-            Attempt outcome = attempt(() -> ruleset.evaluateMany(rows));
+            Attempt outcome = attempt(() -> ruleset.evaluateMany(rows, limits));
             if (outcome.error() != null || failing) {
                 String issue = compare(outcome, expect, "decisions", NATIVE);
                 if (!issue.isEmpty()) {
@@ -1552,7 +1561,7 @@ class Conformance {
                 String exact = compare(
                         attempt(() -> {
                             List<Object> written = new ArrayList<>();
-                            for (io.github.cleanrules.ffi.Decision decision : layer.evaluateMany(rows)) {
+                            for (io.github.cleanrules.ffi.Decision decision : layer.evaluateMany(rows, limits)) {
                                 try (decision) {
                                     written.add(content(decision.write(), "decision"));
                                 }
@@ -1565,7 +1574,7 @@ class Conformance {
                 return exact.isEmpty() ? "" : "native layer: " + exact;
             }
         }
-        Attempt outcome = attempt(() -> ruleset.evaluate(input));
+        Attempt outcome = attempt(() -> ruleset.evaluate(input, limits));
         if (outcome.error() != null || failing) {
             String issue = compare(outcome, expect, "decision", NATIVE);
             if (!issue.isEmpty()) {
@@ -1611,7 +1620,7 @@ class Conformance {
             io.github.cleanrules.ffi.Decision[] made = new io.github.cleanrules.ffi.Decision[1];
             String written = compare(
                     attempt(() -> {
-                        made[0] = layer.evaluate(input);
+                        made[0] = layer.evaluate(input, limits);
                         return content(made[0].write(), "decision");
                     }),
                     expect,

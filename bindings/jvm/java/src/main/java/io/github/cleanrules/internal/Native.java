@@ -68,6 +68,7 @@ public final class Native {
     public static final int CR_OK = 0;
     public static final int CR_INVALID_ARGUMENT = -1;
     public static final int CR_INTERNAL_ERROR = -2;
+    public static final int CR_LIMIT_EXCEEDED = 3;
     public static final int CR_ACTION_ERROR = 14;
 
     public static final int CR_DOCUMENT_CONDITION = 1;
@@ -98,6 +99,7 @@ public final class Native {
     public static final int CR_LIMIT_MAX_TABLE_SIZE = 4;
     public static final int CR_LIMIT_MAX_YAML_SIZE = 5;
     public static final int CR_LIMIT_MAX_TEXT_SIZE = 6;
+    public static final int CR_LIMIT_MAX_VALUES = 7;
 
     /** The native linker, or null on a Java runtime that has none for this platform. */
     private static final Linker LINKER;
@@ -449,6 +451,8 @@ public final class Native {
             bind("cr_ruleset_summary_actions", fn(I, P, P, SIZE_T, I, P, P, P));
     private static final MethodHandle ERROR_NEW_ACTION =
             bind("cr_error_new_action", fn(I, P, SIZE_T, P, SIZE_T, P, SIZE_T, P, P, P));
+    private static final MethodHandle ERROR_NEW_MAX_VALUES =
+            bind("cr_error_new_max_values", fn(I, SIZE_T, L, P, SIZE_T, P, P));
     private static final MethodHandle DECISION_EXPLANATION = bind("cr_decision_explain_value", fn(I, P, P, P));
 
     // Documents, rules, decision tables and result trees (G.1d).
@@ -502,6 +506,7 @@ public final class Native {
     // Values.
     private static final MethodHandle VALUE_NEW_NULL = bind("cr_value_new_null", fn(P));
     private static final MethodHandle VALUE_NEW_NULL_REASON = bind("cr_value_new_null_reason", fn(I, I, P, SIZE_T, P, P));
+
     private static final MethodHandle VALUE_NEW_BOOL = bind("cr_value_new_bool", fn(P, B));
     private static final MethodHandle VALUE_NEW_INT = bind("cr_value_new_int", fn(P, L));
     private static final MethodHandle VALUE_NEW_FLOAT = bind("cr_value_new_float", fn(P, JAVA_DOUBLE));
@@ -645,7 +650,7 @@ public final class Native {
     /** The core's default limits, in the order of {@code CR_LIMIT_*}. */
     public static long[] defaultLimits() {
         ensureLoaded();
-        long[] values = new long[6];
+        long[] values = new long[CR_LIMIT_MAX_VALUES];
         MemorySegment limits = limitsNew();
         try (Scope scope = new Scope()) {
             for (int i = 0; i < values.length; i++) {
@@ -1885,6 +1890,15 @@ public final class Native {
             MemorySegment error) {
         try {
             return (int) ERROR_NEW_ACTION.invokeExact(rule, ruleLen, action, actionLen, detail, detailLen, executed, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int errorNewMaxValues(
+            long maxValues, long row, MemorySegment rule, long ruleLen, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) ERROR_NEW_MAX_VALUES.invokeExact(maxValues, row, rule, ruleLen, out, error);
         } catch (Throwable thrown) {
             throw rethrow(thrown);
         }

@@ -181,6 +181,18 @@ tree.truth  # Truth.UNKNOWN
 tree.children[1].reason.code  # 'missing_field': there is no country
 ```
 
+The binding reads only the paths the rules read, and converts what it finds
+there. Data that shares objects (the same list or object referenced from
+several places) is converted once per reference, so the values read from one
+input are bounded by `max_values`, 1,000,000 by default (a list along the
+paths counts its length): an input beyond it is refused, not evaluated, in
+every mode, with a `FormatError` whose code is `limit_exceeded` and whose
+`name` is `max_values` (`row` in a batch). Rule metadata is converted under
+the default limit too, naming the rule. Raise it
+where large inputs are expected: `rules.evaluate(data, max_values=5_000_000)`
+(also `evaluate_many`, `run`, `DecisionTable.evaluate`, `evaluate_tree` and
+`evaluate_value_tree`).
+
 Wheels: one `abi3` wheel for CPython 3.11 and later, a version-specific wheel for
 free-threaded CPython 3.14, and one `abi3t` wheel for CPython 3.15 and later,
 free-threaded or not.

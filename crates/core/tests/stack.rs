@@ -190,10 +190,8 @@ fn rule_sets_at_the_depth_limit() {
             let decision = ruleset.evaluate(&input).unwrap();
             // A decision can be larger than its rule set: in YAML, each level
             // is indented further, and its reader raises the limits.
-            let large = Limits {
-                max_yaml_size: 16 << 20,
-                ..limits
-            };
+            let mut large = limits;
+            large.max_yaml_size = 16 << 20;
             for format in formats() {
                 let Ok(written) = write_decision_as(&decision, format) else {
                     continue; // a decision has no text form
@@ -272,11 +270,9 @@ fn data_at_the_nesting_limit() {
         // A decision document holds the recorded values a few levels down
         // (`decision`, `results`, `when`, `children`…): data in a decision may
         // nest deeper than the limit, so its reader raises it.
-        let raised = Limits {
-            max_nesting: NESTING + 16,
-            max_yaml_size: 16 << 20,
-            ..limits
-        };
+        let mut raised = limits;
+        raised.max_nesting = NESTING + 16;
+        raised.max_yaml_size = 16 << 20;
         for format in formats() {
             let Ok(written) = write_decision_as(&decision, format) else {
                 continue;

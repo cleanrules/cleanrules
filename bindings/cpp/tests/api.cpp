@@ -163,6 +163,16 @@ void documents_and_limits() {
         CHECK(e.info().is(cr::errc::format_error));
     }
     CHECK_THROWS(l.set(static_cast<cr::limit>(99), 1), cr::invalid_argument_error);
+    // max_values: a million by default, carried for the bindings that read native data.
+    CHECK(cr::limits().get(cr::limit::max_values) == 1000000);
+    l.set(cr::limit::max_values, 12);
+    CHECK(l.get(cr::limit::max_values) == 12);
+    // Messages of the C ABI never name its functions.
+    try {
+        l.set(static_cast<cr::limit>(99), 1);
+    } catch (const cr::error &e) {
+        CHECK(std::string(e.what()).find("cr_") == std::string::npos);
+    }
 }
 
 void values() {

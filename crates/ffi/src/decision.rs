@@ -241,7 +241,7 @@ pub unsafe extern "C" fn cr_ruleset_evaluate(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_evaluate", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Read a recorded decision, in JSON or YAML (`CR_FORMAT_*`), with the rule set
@@ -282,7 +282,7 @@ pub unsafe extern "C" fn cr_ruleset_read_decision(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_read_decision", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Write a decision as a JSON or YAML document (`CR_FORMAT_*`). A decision has
@@ -312,7 +312,7 @@ pub unsafe extern "C" fn cr_decision_write(
         unsafe { give_text(out, len, text) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_decision_write", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The decision's single output (`spec/rules.md`, *Outputs*), as a JSON data
@@ -344,7 +344,7 @@ pub unsafe extern "C" fn cr_decision_output(
         unsafe { give_text(out, len, to_string(&json)) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_decision_output", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The outputs of the selected rules, in rule order, as a JSON array of data
@@ -371,7 +371,7 @@ pub unsafe extern "C" fn cr_decision_outputs(
         unsafe { give_text(out, len, to_string(&write_value(&decision.outputs()))) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_decision_outputs", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The decision's explanation (`spec/explain.md`) as a JSON or YAML document,
@@ -401,7 +401,7 @@ pub unsafe extern "C" fn cr_decision_explain(
         unsafe { give_text(out, len, text) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_decision_explain", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The decision's explanation (`spec/explain.md`) as a new value, freed with
@@ -434,7 +434,7 @@ pub unsafe extern "C" fn cr_decision_explain_value(
         unsafe { give_new_value(out, value) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_decision_explain_value", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A copy of a decision that the caller owns, freed with `cr_decision_free`:
@@ -463,7 +463,7 @@ pub unsafe extern "C" fn cr_decision_clone(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_decision_clone", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Free a decision. `NULL` is ignored.
@@ -512,7 +512,7 @@ pub unsafe extern "C" fn cr_ruleset_evaluate_value(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_ruleset_evaluate_value", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A truth value (`CR_TRUTH_*`).
@@ -559,7 +559,7 @@ pub unsafe extern "C" fn cr_decision_fired(
         unsafe { write_out(out, fired, "out") }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_decision_fired", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The truth value of the condition of the rule at position `rule`
@@ -589,7 +589,7 @@ pub unsafe extern "C" fn cr_decision_truth(
         unsafe { write_out(out, truth, "out") }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_decision_truth", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The number of rules the hit policy selected; 0 for `NULL`.
@@ -634,7 +634,7 @@ pub unsafe extern "C" fn cr_decision_selected(
         unsafe { write_out(rule, position, "rule") }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_decision_selected", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The decision's single output as a new value, freed with `cr_value_free`: a
@@ -665,7 +665,7 @@ pub unsafe extern "C" fn cr_decision_output_value(
         unsafe { give_new_value(out, value) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_decision_output_value", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The outputs of the selected rules, in rule order, as a new list of maps,
@@ -689,7 +689,7 @@ pub unsafe extern "C" fn cr_decision_outputs_value(
         unsafe { give_new_value(out, decision.outputs()) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_decision_outputs_value", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The name of the rule at position `rule`, borrowed from the decision and not
@@ -720,7 +720,7 @@ pub unsafe extern "C" fn cr_decision_rule_name(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_decision_rule_name", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The output of the rule at position `rule`, as a new map freed with
@@ -759,7 +759,7 @@ pub unsafe extern "C" fn cr_decision_rule_output(
         unsafe { give_new_value(out, value) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_decision_rule_output", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Check that an input nests no deeper than the limits allow, as JSON input

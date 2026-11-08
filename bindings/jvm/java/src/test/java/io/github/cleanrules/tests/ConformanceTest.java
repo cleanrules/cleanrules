@@ -33,7 +33,7 @@ class ConformanceTest {
 
     /** The skips each route may have; any other is a failure. */
     private static final Map<String, Set<String>> ALLOWED_SKIPS =
-            Map.of("json", Set.of("grid"), "native", Set.of("decimal_infinity", "zone_unknown_to_java"));
+            Map.of("json", Set.of("grid", "native"), "native", Set.of("decimal_infinity", "zone_unknown_to_java"));
 
     /** What a route did with the vectors. */
     private static final class Counts {
@@ -116,6 +116,15 @@ class ConformanceTest {
                     .map(Map.Entry::getKey)
                     .toList();
             assertEquals(grids, counts.get("json").skipped.getOrDefault("grid", List.of()));
+            // And evaluate vectors with limits: `max_values` bounds native data only.
+            List<String> limited = vectors.entrySet().stream()
+                    .filter(v -> {
+                        Map<?, ?> given = (Map<?, ?>) v.getValue().get("given");
+                        return "evaluate".equals(given.get("kind")) && given.containsKey("limits");
+                    })
+                    .map(Map.Entry::getKey)
+                    .toList();
+            assertEquals(limited, counts.get("json").skipped.getOrDefault("native", List.of()));
         }));
         return tests;
     }

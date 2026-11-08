@@ -859,6 +859,7 @@ module.exports.Format = nativeBinding.Format
 module.exports.FORMAT_VERSION = nativeBinding.FORMAT_VERSION
 module.exports.gridNew = nativeBinding.gridNew
 module.exports.HitPolicy = nativeBinding.HitPolicy
+module.exports.maxValuesErrorData = nativeBinding.maxValuesErrorData
 module.exports.nodeArith = nativeBinding.nodeArith
 module.exports.nodeBetween = nativeBinding.nodeBetween
 module.exports.nodeChildren = nativeBinding.nodeChildren

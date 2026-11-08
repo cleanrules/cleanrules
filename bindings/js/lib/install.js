@@ -5,7 +5,7 @@
 
 import { actions, call } from './actions.js'
 import { fromNative } from './errors.js'
-import { read, useTypes } from './read.js'
+import { read, useLimitError, useTypes } from './read.js'
 import { setDecimalCheck } from './values.js'
 
 /**
@@ -30,6 +30,8 @@ export function install(native, types) {
   useTypes(types, classes)
   setDecimalCheck(native.decimalProblem)
   native.setHooks({ read, error: fromNative, actions, call })
+  // The core's error for a constant or metadata beyond `max_values`.
+  useLimitError((maxValues, rule) => fromNative(native.maxValuesErrorData(maxValues, rule)))
 
   // `using` works with both builds: the addon's objects need no release, so
   // their `[Symbol.dispose]()` does nothing (the module's frees the object).

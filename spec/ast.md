@@ -138,7 +138,10 @@ data*). So a rule loaded from a file cannot reach into the process, and
 `F.d.year` on a date is missing in every language.
 
 If reading raises an error, the value is null with reason `read_error`, and
-strict mode raises `EvaluationError` chained to the original error.
+strict mode raises `EvaluationError` chained to the original error. Native data
+beyond the `max_values` limit is not evaluated: the input is refused with
+`limit_exceeded`, in every mode (`data-model.md`, *Reading native data*,
+*Limits*).
 
 ### Truth values
 

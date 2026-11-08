@@ -26,9 +26,6 @@ pub(crate) enum Failure {
     /// The caller broke the ABI's rules (`CR_INVALID_ARGUMENT`): what, and how
     /// to fix it.
     Invalid(String, &'static str),
-    /// An error of the core about an argument, whose message the function's
-    /// name begins.
-    Argument(cleanrules::Error),
     /// An action failed (`CR_ACTION_ERROR`); the error keeps the decision.
     Action(cleanrules::Error, Box<crate::decision::cr_decision>),
     /// A panic (`CR_INTERNAL_ERROR`).
@@ -59,38 +56,19 @@ fn panic_message(panic: &(dyn Any + Send)) -> String {
     format!("cleanrules failed ({what}); please report it")
 }
 
-/// Run the body of the function `name`, catching panics, and report a failure
-/// through `error`, naming the function when the caller broke the ABI's rules.
+/// Run the body of an exported function, catching panics, and report a
+/// failure through `error`. Messages never name the C function, so that every
+/// binding shows them as they are (`spec/errors.md`, *JSON form*).
 ///
 /// # Safety
 ///
 /// `error` is `NULL` or points to a writable `cr_error *`.
-pub(crate) unsafe fn call(
-    name: &str,
-    error: *mut *mut cr_error,
-    body: impl FnOnce() -> Outcome,
-) -> cr_status {
+pub(crate) unsafe fn call(error: *mut *mut cr_error, body: impl FnOnce() -> Outcome) -> cr_status {
     let outcome = catch_unwind(AssertUnwindSafe(body))
         .unwrap_or_else(|panic| Err(Failure::Internal(panic_message(panic.as_ref()))));
     match outcome {
         Ok(()) => CR_OK,
         Err(failure) => {
-            let failure = match failure {
-                Failure::Invalid(message, hint) => {
-                    Failure::Invalid(format!("{name}: {message}"), hint)
-                }
-                Failure::Argument(error) => {
-                    let named = cleanrules::Error::new(
-                        error.code(),
-                        format!("{name}: {}", error.message()),
-                    );
-                    Failure::Core(match error.hint() {
-                        Some(hint) => named.with_hint(hint),
-                        None => named,
-                    })
-                }
-                other => other,
-            };
             let failure = cr_error::from(failure);
             let status = failure.status();
             if !error.is_null() {
@@ -128,7 +106,7 @@ pub(crate) unsafe fn bytes<'a>(text: *const c_char, len: usize, what: &str) -> O
 /// `format_error` that names it otherwise.
 pub(crate) fn utf8_arg<'a>(bytes: &'a [u8], what: &str) -> Outcome<&'a str> {
     std::str::from_utf8(bytes).map_err(|error| {
-        Failure::Argument(
+        Failure::Core(
             cleanrules::Error::new(
                 cleanrules::ErrorCode::FormatError,
                 format!("{what} is not valid UTF-8 at byte {}", error.valid_up_to()),
@@ -293,7 +271,7 @@ mod tests {
     fn a_panic_is_an_internal_error() {
         let mut error = ptr::null_mut();
         // SAFETY: a writable error.
-        let status = unsafe { call("cr_test", &raw mut error, || panic!("boom")) };
+        let status = unsafe { call(&raw mut error, || panic!("boom")) };
         assert_eq!(status, CR_INTERNAL_ERROR);
         // SAFETY: the error the call gave out, freed once.
         unsafe {
@@ -301,16 +279,16 @@ mod tests {
             cr_error_free(error);
         }
         // SAFETY: no error asked for.
-        let status = unsafe { call("cr_test", ptr::null_mut(), || Ok(())) };
+        let status = unsafe { call(ptr::null_mut(), || Ok(())) };
         assert_eq!(status, CR_OK);
     }
 
     #[test]
-    fn an_invalid_argument_names_the_function() {
+    fn an_invalid_argument_does_not_name_the_function() {
         let mut error = ptr::null_mut();
         // SAFETY: a writable error.
         let status = unsafe {
-            call("cr_test", &raw mut error, || {
+            call(&raw mut error, || {
                 Err(Failure::Invalid("x is NULL".into(), "pass x"))
             })
         };
@@ -319,7 +297,7 @@ mod tests {
         // is freed.
         unsafe {
             let message = std::ffi::CStr::from_ptr(cr_error_message(error));
-            assert_eq!(message.to_str().unwrap(), "cr_test: x is NULL");
+            assert_eq!(message.to_str().unwrap(), "x is NULL");
             cr_error_free(error);
         }
     }

@@ -51,19 +51,20 @@ const FRESH_TOKENS: u64 = 1 << 53;
 ///
 /// # Errors
 ///
-/// A message naming the form that is wrong: a bug in `lib/read.js`.
-pub(crate) fn decode(text: &str) -> Result<Read, String> {
+/// A message naming the form that is wrong: a bug in `lib/read.js`, which
+/// also counts what it reads against `max_values`. The lists of the form `L`
+/// are checked against `max_values` before they are allocated, so that a
+/// short text never makes a long list.
+pub(crate) fn decode(text: &str, max_values: usize) -> Result<Read, String> {
     // The reader nests at most 256 containers, three arrays each.
-    let limits = Limits {
-        max_nesting: 1024,
-        ..Limits::default()
-    }
-    .with_max_size(usize::MAX);
+    let mut limits = Limits::default().with_max_size(usize::MAX);
+    limits.max_nesting = 1024;
     let json = parse(text, &limits).map_err(|error| error.to_string())?;
     let mut decoder = Decoder {
         errors: Vec::new(),
         at: Vec::new(),
         fresh: FRESH_TOKENS,
+        positions: max_values,
     };
     let value = decoder.value(&json)?;
     Ok(Read {
@@ -76,6 +77,8 @@ struct Decoder {
     errors: Vec<(Vec<Segment>, u32)>,
     at: Vec<Segment>,
     fresh: u64,
+    /// How many more positions the lists of the form `L` may declare.
+    positions: usize,
 }
 
 fn integer(json: Option<&Json>) -> Result<i128, String> {
@@ -225,6 +228,10 @@ impl Decoder {
             }
             "L" => {
                 let len: usize = small(arg(1))?;
+                self.positions = self
+                    .positions
+                    .checked_sub(len)
+                    .ok_or_else(|| format!("a list of {len} is beyond max_values"))?;
                 // The list keeps its length; holes stand for elements no path reads.
                 let mut list = vec![Value::Null(NullCause::Null); len];
                 for entry in items(arg(2))? {

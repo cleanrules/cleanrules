@@ -52,7 +52,7 @@ its cause.
 |---|---|---|
 | `format_error` | a document's JSON or shape is invalid (`json-format.md`) | **`pointer`**, or **`line`** and **`column`** for a syntax error |
 | `unsupported_version` | a document's `version` is missing or unknown | **`pointer`** |
-| `limit_exceeded` | a document is too large or nested too deep | for node depth, **`pointer`** to the first node too deep, or in text **`line`** and **`column`** where it starts; for JSON nesting, **`line`** and **`column`** of the bracket that exceeds it, and in text of the token that nests too deep (`text.md`); for size, none |
+| `limit_exceeded` | a document is too large or nested too deep; or an input's native data, or a native constant, holds more values than `max_values` (`data-model.md`, *Reading native data*, *Limits*) | for node depth, **`pointer`** to the first node too deep, or in text **`line`** and **`column`** where it starts; for JSON nesting, **`line`** and **`column`** of the bracket that exceeds it, and in text of the token that nests too deep (`text.md`); for size, none; for `max_values`, **`name`** (`max_values`), the **`row`** of the input in a batch, and `rule` for a rule's metadata or payload constant when the binding knows it |
 | `decision_mismatch` | a decision does not belong to the rule set it is read with | **`pointer`** |
 | `expression_error` | a condition node breaks a construction rule (`ast.md`) | `rule`, `node`; **`pointer`** when read from JSON; **`line`** and **`column`** when read from text (`text.md`) |
 | `rule_definition_error` | a rule or rule set breaks a construction rule (`rules.md`, `json-format.md`) | **`rule`** when known; **`pointer`** when read from JSON; **`line`** and **`column`** when read from text |
@@ -81,6 +81,7 @@ Context fields:
 - `node`: the failing node, as a condition node in JSON form, when it can be
   written (a NaN constant cannot);
 - `name`, `available`: the name looked up, and the names that exist, sorted;
+  for `limit_exceeded`, `name` is the limit's (`max_values`);
 - `operation`, `reason`: what was not supported, and why, in words.
 
 **`hit_policy_error`** is raised when `UNIQUE` sees more than one rule fire
@@ -153,4 +154,8 @@ only, and compares the two objects without regard to member order:
   policies. Strict mode raises only for `missing_field`, `type_mismatch`,
   `unorderable` (as `type_mismatch`) and `read_error`; nulls, division by zero,
   overflows and NaN results stay nulls with their reasons.
+- Native data beyond `max_values` (`data-model.md`, *Reading native data*,
+  *Limits*), in every mode and before any error of the evaluation, since an
+  input is read before it is evaluated: in a batch, the first such input in
+  order, with its `row`.
 - In a batch, the first input in order that fails; its `row` says which.

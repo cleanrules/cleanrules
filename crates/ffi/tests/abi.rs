@@ -101,7 +101,8 @@ fn an_error_has_a_message_a_hint_and_its_json_form() {
         }
         cr_error_free(error);
     }
-    // An invalid argument names the function and says how to fix it.
+    // An invalid argument says which one and how to fix it, without the
+    // function's name, in the message and in the JSON form.
     let failure = common::read_document(b"{}", 0, None).err().unwrap();
     let Json::Object(members) = &failure.json else {
         panic!()
@@ -110,7 +111,12 @@ fn an_error_has_a_message_a_hint_and_its_json_form() {
         Some((_, Json::String(s))) => s.clone(),
         _ => panic!("no {key}"),
     };
-    assert!(text("message").starts_with("cr_document_read: format 0"));
+    assert!(
+        text("message").starts_with("format 0"),
+        "{}",
+        text("message")
+    );
+    assert!(!text("message").contains("cr_"));
     assert!(text("hint").contains("CR_FORMAT_JSON (1)"));
     assert!(common::read_ruleset(b"", CR_FORMAT_JSON).is_err());
     // SAFETY: NULL is accepted everywhere an error is read.
@@ -241,6 +247,7 @@ fn limits_are_set_and_read() {
         (CR_LIMIT_MAX_DEPTH, 7),
         (CR_LIMIT_MAX_NESTING, 5),
         (CR_LIMIT_MAX_TABLE_SIZE, 3),
+        (CR_LIMIT_MAX_VALUES, 12),
     ]);
     for (which, wanted) in [
         (CR_LIMIT_MAX_SIZE, 10),
@@ -249,6 +256,7 @@ fn limits_are_set_and_read() {
         (CR_LIMIT_MAX_TABLE_SIZE, 3),
         (CR_LIMIT_MAX_YAML_SIZE, 10),
         (CR_LIMIT_MAX_TEXT_SIZE, 10),
+        (CR_LIMIT_MAX_VALUES, 12),
     ] {
         let mut value = 0;
         // SAFETY: a live handle and a writable value.
@@ -273,6 +281,28 @@ fn limits_are_set_and_read() {
         .unwrap();
     assert_eq!(failure.status, CR_LIMIT_EXCEEDED);
     assert!(common::read_document(RULES.as_bytes(), CR_FORMAT_JSON, Some(&limits)).is_ok());
+    // max_values defaults to a million, and is the last limit.
+    let mut value = 0;
+    // SAFETY: a live handle and a writable value.
+    let status = unsafe {
+        cr_limits_get(
+            limits.0,
+            CR_LIMIT_MAX_VALUES,
+            &raw mut value,
+            ptr::null_mut(),
+        )
+    };
+    assert_eq!((status, value), (CR_OK, 1_000_000));
+    let mut error = ptr::null_mut();
+    // SAFETY: a live handle and a writable value and error.
+    let status = unsafe { cr_limits_get(limits.0, 8, &raw mut value, &raw mut error) };
+    assert_eq!(status, CR_INVALID_ARGUMENT);
+    let failure = common::take(error);
+    let Json::Object(members) = &failure.json else {
+        panic!()
+    };
+    assert!(members.iter().any(|(k, v)| k == "hint"
+        && matches!(v, Json::String(h) if h.contains("CR_LIMIT_MAX_VALUES (7)"))));
 }
 
 #[test]

@@ -295,7 +295,14 @@ fn conformance_vectors() {
                 continue;
             };
             for vector in vectors {
-                let kind = text(get(get(vector, "given").unwrap(), "kind")).unwrap();
+                let given = get(vector, "given").unwrap();
+                let kind = text(get(given, "kind")).unwrap();
+                // `max_values` bounds native data, which the core never reads:
+                // only the bindings' native runs check these vectors.
+                if get(given, "limits").is_some() && kind == "evaluate" {
+                    *pending.entry("native-only limits".to_owned()).or_default() += 1;
+                    continue;
+                }
                 if !matches!(
                     kind,
                     "condition" | "value" | "evaluate" | "explain" | "summary"

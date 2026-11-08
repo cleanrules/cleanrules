@@ -7,6 +7,7 @@ use std::ptr;
 use cleanrules::format::write_error;
 use cleanrules::json::{Json, to_string};
 use cleanrules::rules::{ActionFailure, action_error};
+use cleanrules::value::too_many_values;
 use cleanrules::{ErrorCode, Value};
 
 use crate::boundary::{Failure, bytes, call, clear, free, give, utf8_arg};
@@ -137,8 +138,6 @@ impl From<Failure> for cr_error {
                 &message,
                 Some(hint),
             ),
-            // `call` names the function before the error is made.
-            Failure::Argument(error) => Self::from(Failure::Core(error)),
             Failure::Internal(message) => {
                 Self::own(CR_INTERNAL_ERROR, "internal_error", &message, None)
             }
@@ -227,7 +226,49 @@ pub unsafe extern "C" fn cr_error_new_action(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_error_new_action", error, body) }
+    unsafe { call(error, body) }
+}
+
+/// A new `limit_exceeded` for native data beyond `max_values`
+/// (`spec/data-model.md`, *Reading native data*, *Limits*), made by the core
+/// for the bindings that read native data on this ABI and count what they
+/// convert: its context has `name` = `max_values`, the `row` of a batch when
+/// `row` is 0 or more, and the `rule` whose metadata or payload constant it is
+/// when `rule` is not `NULL`. It is given through `out`, owned by the caller
+/// and freed with `cr_error_free`; the call's own failures go to `error`.
+///
+/// # Safety
+///
+/// `rule` is `NULL` or points to `rule_len` readable bytes; `out` is `NULL` or
+/// points to a writable `cr_error *`; `error` is `NULL` or points to a
+/// writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_error_new_max_values(
+    max_values: usize,
+    row: i64,
+    rule: *const c_char,
+    rule_len: usize,
+    out: *mut *mut cr_error,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        let rule = if rule.is_null() {
+            None
+        } else {
+            // SAFETY: `rule` and `rule_len` (# Safety).
+            Some(utf8_arg(unsafe { bytes(rule, rule_len, "rule") }?, "rule")?.to_owned())
+        };
+        let mut failed = too_many_values(max_values);
+        failed.context_mut().row = u64::try_from(row).ok();
+        failed.context_mut().rule = rule;
+        // SAFETY: `out` passed `clear`.
+        unsafe { give(out, cr_error::core(&failed, None)) };
+        Ok(())
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call(error, body) }
 }
 
 /// The error's status: an error code, `CR_INVALID_ARGUMENT` or

@@ -27,7 +27,7 @@ use crate::convert;
 use crate::errors::path_to_py;
 use crate::errors::{self, IntoPyResult, to_py};
 use crate::node::PyNode;
-use crate::read::{Native, Paths, read};
+use crate::read::{Native, Paths, Stop, read};
 
 /// A rule of the core, immutable.
 #[pyclass(frozen, name = "Rule", module = "cleanrules._cleanrules")]
@@ -139,7 +139,15 @@ pub(crate) fn rule(
     if let Some(action) = action {
         rule = rule.action_name(action).or_raise(py)?;
     }
-    let metadata = match convert::metadata(metadata)? {
+    let converted = match convert::metadata(metadata) {
+        Ok(converted) => converted,
+        Err(Stop::Python(error)) => return Err(error),
+        Err(Stop::Limit(mut error)) => {
+            error.context_mut().rule = Some(name.to_owned());
+            return Err(errors::to_py(py, &error));
+        }
+    };
+    let metadata = match converted {
         Ok(Value::Map(map)) => map,
         Ok(_) => return Err(PyValueError::new_err("metadata must be a dict")),
         Err(problem) => {
@@ -202,9 +210,16 @@ pub(crate) fn ruleset(
 
 #[pymethods]
 impl PyRuleSet {
-    /// Evaluate one input.
-    fn evaluate(&self, py: Python<'_>, data: &Bound<'_, PyAny>) -> PyResult<PyDecision> {
-        let native = read(data, &self.paths)?;
+    /// Evaluate one input, reading at most `max_values` values from it
+    /// (`spec/data-model.md`, *Reading native data*, *Limits*).
+    #[pyo3(signature = (data, max_values=None))]
+    fn evaluate(
+        &self,
+        py: Python<'_>,
+        data: &Bound<'_, PyAny>,
+        max_values: Option<usize>,
+    ) -> PyResult<PyDecision> {
+        let native = read(data, &self.paths, max_values_or_default(max_values), None)?;
         // The core does not touch Python objects: other threads may run meanwhile.
         let decision = py
             .detach(|| self.ruleset.evaluate(&native.value))
@@ -248,14 +263,18 @@ impl PyRuleSet {
 
     /// Evaluate a batch: errors name the input's position (`row`).
     #[allow(clippy::needless_pass_by_value)] // PyO3 extracts lists by value.
+    #[pyo3(signature = (data, max_values=None))]
     fn evaluate_many(
         &self,
         py: Python<'_>,
         data: Vec<Bound<'_, PyAny>>,
+        max_values: Option<usize>,
     ) -> PyResult<Vec<PyDecision>> {
+        let max_values = max_values_or_default(max_values);
         let natives = data
             .iter()
-            .map(|item| read(item, &self.paths))
+            .enumerate()
+            .map(|(row, item)| read(item, &self.paths, max_values, Some(row)))
             .collect::<PyResult<Vec<_>>>()?;
         let inputs: Vec<Value> = natives.iter().map(|n| n.value.clone()).collect();
         let decisions = py
@@ -298,6 +317,11 @@ impl PyRuleSet {
     fn overview(&self, actions: Vec<bool>) -> Summary<'_> {
         summary(&self.ruleset).with_actions(actions)
     }
+}
+
+/// The limit on values read from one input: `max_values=`, or the default.
+pub(crate) fn max_values_or_default(max_values: Option<usize>) -> usize {
+    max_values.unwrap_or_else(|| Limits::default().max_values)
 }
 
 /// The Python exception of a core error; a `read_error` in strict mode is

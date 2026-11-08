@@ -301,23 +301,33 @@ so the build does not use it.
 |---|---|
 | `Document.read(text, { format, limits }?)` | a condition, rule, rule set or decision table; `kind`, `write(format?)` |
 | `RuleSet.read(text, { format, limits }?)`, `RuleSet.fromDocument(doc)` | a rule set (a rule document is a rule set of that rule; a CSV table is compiled) |
-| `ruleset.evaluate(data)`, `evaluateJson(text, limits?)` | one decision, from native data or from a JSON value |
-| `ruleset.evaluateMany(rows)`, `evaluateManyJson(text, limits?)` | a batch; an error names its `row` |
-| `ruleset.run(data, actions)` | evaluate, then call the selected rules' actions, in rule order |
+| `ruleset.evaluate(data, limits?)`, `evaluateJson(text, limits?)` | one decision, from native data (at most `limits.maxValues` values of it) or from a JSON value |
+| `ruleset.evaluateMany(rows, limits?)`, `evaluateManyJson(text, limits?)` | a batch; an error names its `row` |
+| `ruleset.run(data, actions, limits?)` | evaluate, then call the selected rules' actions, in rule order |
 | `ruleset.readDecision(text, { format, limits }?)` | a recorded decision, checked against the rule set |
 | `ruleset.write(format?)`, `summary(format?)` | the document (JSON by default), and the summary (text by default, or JSON or YAML) |
 | `ruleset.length`, `ruleNames()`, `hitPolicy`, `aggregate`, `logic`, `strict`, `fieldPaths()` | what it is and what it reads |
 | `decision.length`, `ruleName(i)`, `firedAt(i)`, `truth(i)`, `selected()` | each rule's result |
 | `decision.outputJson()`, `outputsJson()`, `ruleOutputJson(i)` | outputs, in the JSON format; `null` for none |
 | `decision.write(format?)`, `explain(format?)` | the decision document (JSON by default), and its explanation (text by default, or JSON or YAML) |
-| `Node.read(text, { format, limits }?)` | one condition or value node; `write`, `fieldPaths`, `evaluateTree(data, { logic, strict }?)`, `evaluateValueTree(data, { strict }?)`, and `evaluateTreeJson(text, { logic, strict, limits }?)` and `evaluateValueTreeJson(text, { strict, limits }?)` |
+| `Node.read(text, { format, limits }?)` | one condition or value node; `write`, `fieldPaths`, `evaluateTree(data, { logic, strict, limits }?)`, `evaluateValueTree(data, { strict, limits }?)`, and `evaluateTreeJson(text, { logic, strict, limits }?)` and `evaluateValueTreeJson(text, { strict, limits }?)` |
 
 Formats are `"json"`, `"yaml"`, `"text"` (the rule syntax) and `"csv"`
 (decision tables). Texts are strings or bytes (`Uint8Array`, `Buffer`); bytes
 that are not UTF-8 are a `FormatError` at their line and column. `limits` is an
 object with any of `maxSize` (bytes, for every format), `maxNesting`,
-`maxDepth`, `maxTableSize`, `maxYamlSize` and `maxTextSize`. The defaults
-(explanations and summaries as text) are those of C++.
+`maxDepth`, `maxTableSize`, `maxYamlSize`, `maxTextSize` and `maxValues`. The
+defaults (explanations and summaries as text) are those of C++. `maxValues`
+(1,000,000 by default) bounds what is read from native data, the only limit
+that applies to it: each value placed where a path ends or stops counts, with
+everything inside it, an object referenced from several places each time, and
+a list along the paths counts its length, so data shared as a "diamond" or an
+array with a huge `length` cannot exhaust memory. An input beyond it is
+refused, not evaluated, in every mode: a `FormatError` with the code
+`limit_exceeded`, `context.name` `'max_values'` and, in a batch,
+`context.row` (`spec/data-model.md`, *Reading native data*, *Limits*).
+Constants and rule metadata are converted under the default limit too, and a
+larger one is the same error, with the `rule` when there is one.
 
 In this layer, outputs, explanations and summaries come out as text in the
 JSON format (`spec/json-format.md`), with `{"$decimal": ...}`, `{"$int": ...}`
@@ -422,8 +432,8 @@ given as a name is written as its name, and one given as code is an
 | `rule.name`, `when`, `then`, `priority`, `tags`, `description`, `metadata`, `do`, `actionName` | the rule, as the core keeps it (tags sorted, without repeats) |
 | `ruleset.rules`, `length`, iteration, `get(name)`, `has(name)`, `rule(name)` | the rules; `get` gives `undefined` for an unknown name, like `Map`, and `rule` throws a `RuleNotFoundError` listing them |
 | `ruleset.hitPolicy`, `aggregate`, `logic`, `strict`, `fieldPaths()` | its configuration and what it reads |
-| `ruleset.evaluate(data)`, `evaluateMany(rows)`, `readDecision(text, { format, limits }?)` | decisions |
-| `ruleset.bind(actions)`, `run(data)` | actions (below) |
+| `ruleset.evaluate(data, { limits }?)`, `evaluateMany(rows, { limits }?)`, `readDecision(text, { format, limits }?)` | decisions; `limits.maxValues` bounds the values read from each input (above) |
+| `ruleset.bind(actions)`, `run(data, { limits }?)` | actions (below) |
 | `ruleset.summary()` | a `Summary`: `hitPolicy`, `rules`, `fields`, `outputs`, `tags`; `toString()` and `toJSON()` |
 | `decision.ruleset`, `results`, `selected`, `fired`, `hitPolicy` | each rule's `RuleResult` (`rule`, `fired`, `truth`, `output`) |
 | `decision.output`, `outputs`, `aggregated` | native values; `output` throws a `HitPolicyError` for `rule_order`, and `collect` without an aggregate |
@@ -551,8 +561,8 @@ tree.children[1].reason.code     // 'missing_field'
 evaluateValueTree(F.price.mul(F.quantity), { price: 2.5, quantity: 4 }).value   // 10
 ```
 
-`evaluateTree(condition, data, { logic, strict }?)` and
-`evaluateValueTree(value, data, { strict }?)` evaluate one node on native data
+`evaluateTree(condition, data, { logic, strict, limits }?)` and
+`evaluateValueTree(value, data, { strict, limits }?)` evaluate one node on native data
 and give its `ResultTree` (`evaluateTree` refuses a value node with an
 `ExpressionError`): `node` (an `Expr`; a `between` has its two half
 comparisons as children), `truth` (for a condition) or `value` (for a value,

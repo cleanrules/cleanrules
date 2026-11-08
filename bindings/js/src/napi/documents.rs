@@ -444,7 +444,7 @@ pub fn node_tree<'env>(
     if is_undefined(&data)? {
         return Err(fail(env, Problem::Type(UNDEFINED_INPUT.to_owned())));
     }
-    let native = read(env, data, node)?;
+    let native = read(env, data, node, options.limits.max_values, None)?;
     instance
         .core
         .tree_data(&kind, &native.read.value, &options)

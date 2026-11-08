@@ -271,7 +271,7 @@ pub unsafe extern "C" fn cr_value_new_null_reason(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_new_null_reason", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A decimal from its text (`-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?`, `inf` or
@@ -299,7 +299,7 @@ pub unsafe extern "C" fn cr_value_new_decimal(
             Ok(decimal) => Value::Decimal(decimal),
             Err(DecimalError::DoesNotFit) => Value::Null(NullCause::DecimalOverflow),
             Err(DecimalError::Malformed) => {
-                return Err(Failure::Argument(
+                return Err(Failure::Core(
                     Error::new(ErrorCode::FormatError, format!("{text:?} is not a decimal"))
                         .with_hint("write digits with an optional point and exponent: 0.15, 1e3"),
                 ));
@@ -310,7 +310,7 @@ pub unsafe extern "C" fn cr_value_new_decimal(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_new_decimal", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A string, copied. Bytes that are not UTF-8 are a `CR_FORMAT_ERROR`.
@@ -337,7 +337,7 @@ pub unsafe extern "C" fn cr_value_new_string(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_new_string", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A day of the proleptic Gregorian calendar, years 1 to 9999.
@@ -385,7 +385,7 @@ pub unsafe extern "C" fn cr_value_new_date(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_new_date", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A datetime without a zone, years 1 to 9999, to the microsecond (0 to
@@ -431,7 +431,7 @@ pub unsafe extern "C" fn cr_value_new_naive_datetime(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_new_naive_datetime", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// An aware datetime: an instant (`seconds` since 1970-01-01T00:00:00Z, and
@@ -488,7 +488,7 @@ pub unsafe extern "C" fn cr_value_new_aware_datetime(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_new_aware_datetime", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// An opaque value: a native value with no equivalent, by its type's name and a
@@ -523,7 +523,7 @@ pub unsafe extern "C" fn cr_value_new_opaque(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_new_opaque", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Take the item out of its handle for a parent, unless it is the parent.
@@ -580,7 +580,7 @@ pub unsafe extern "C" fn cr_value_list_set(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_list_set", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Move `item` into `map` under `key`, replacing a value under the same key in
@@ -617,7 +617,7 @@ pub unsafe extern "C" fn cr_value_map_insert(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_map_insert", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Read a value from JSON (`spec/json-format.md`, *Values*), as data. Writing
@@ -650,7 +650,7 @@ pub unsafe extern "C" fn cr_value_from_json(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_from_json", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A deep copy of a value, freed with `cr_value_free`: the same value, null
@@ -677,7 +677,7 @@ pub unsafe extern "C" fn cr_value_clone(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_clone", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Write a value as JSON (`spec/json-format.md`, *Values*), freed with
@@ -704,7 +704,7 @@ pub unsafe extern "C" fn cr_value_to_json(
         unsafe { give_text(out, len, to_string(&write_value(value))) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_to_json", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// What a value is (`CR_VALUE_*`); 0 for `NULL`.
@@ -782,10 +782,12 @@ pub unsafe extern "C" fn cr_value_get_null(
             return Err(wrong(value, "a null"));
         };
         let (code, text) = match cause {
-            NullCause::Null => (CR_REASON_NULL, None),
             NullCause::IntOverflow => (CR_REASON_INT_OVERFLOW, None),
             NullCause::DecimalOverflow => (CR_REASON_DECIMAL_OVERFLOW, None),
             NullCause::ReadError(detail) => (CR_REASON_READ_ERROR, Some(detail.as_str())),
+            // A plain null, and any cause the core adds later until the ABI
+            // has a constant for it (`NullCause` is non-exhaustive).
+            _ => (CR_REASON_NULL, None),
         };
         if !reason.is_null() {
             // SAFETY: a non-null `reason` is writable (# Safety).
@@ -796,7 +798,7 @@ pub unsafe extern "C" fn cr_value_get_null(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_get_null", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Read one scalar of a value through `out`: `read` gives it, or `None` when
@@ -806,7 +808,6 @@ pub unsafe extern "C" fn cr_value_get_null(
 ///
 /// As the exported getters below.
 unsafe fn get<T>(
-    name: &str,
     value: *const cr_value,
     out: *mut T,
     error: *mut *mut cr_error,
@@ -821,7 +822,7 @@ unsafe fn get<T>(
         unsafe { write_out(out, read, "out") }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call(name, error, body) }
+    unsafe { call(error, body) }
 }
 
 // The getters are written out, not made by a macro, so that cbindgen sees
@@ -842,17 +843,10 @@ pub unsafe extern "C" fn cr_value_get_bool(
 ) -> cr_status {
     // SAFETY: the caller's promises are `get`'s.
     unsafe {
-        get(
-            "cr_value_get_bool",
-            value,
-            out,
-            error,
-            "a boolean",
-            |v| match v {
-                Value::Bool(b) => Some(*b),
-                _ => None,
-            },
-        )
+        get(value, out, error, "a boolean", |v| match v {
+            Value::Bool(b) => Some(*b),
+            _ => None,
+        })
     }
 }
 
@@ -871,17 +865,10 @@ pub unsafe extern "C" fn cr_value_get_int(
 ) -> cr_status {
     // SAFETY: the caller's promises are `get`'s.
     unsafe {
-        get(
-            "cr_value_get_int",
-            value,
-            out,
-            error,
-            "an int",
-            |v| match v {
-                Value::Int(i) => Some(*i),
-                _ => None,
-            },
-        )
+        get(value, out, error, "an int", |v| match v {
+            Value::Int(i) => Some(*i),
+            _ => None,
+        })
     }
 }
 
@@ -900,17 +887,10 @@ pub unsafe extern "C" fn cr_value_get_float(
 ) -> cr_status {
     // SAFETY: the caller's promises are `get`'s.
     unsafe {
-        get(
-            "cr_value_get_float",
-            value,
-            out,
-            error,
-            "a float",
-            |v| match v {
-                Value::Float(f) => Some(*f),
-                _ => None,
-            },
-        )
+        get(value, out, error, "a float", |v| match v {
+            Value::Float(f) => Some(*f),
+            _ => None,
+        })
     }
 }
 
@@ -929,17 +909,10 @@ pub unsafe extern "C" fn cr_value_get_opaque_token(
 ) -> cr_status {
     // SAFETY: the caller's promises are `get`'s.
     unsafe {
-        get(
-            "cr_value_get_opaque_token",
-            value,
-            out,
-            error,
-            "an opaque value",
-            |v| match v {
-                Value::Opaque(o) => Some(o.token),
-                _ => None,
-            },
-        )
+        get(value, out, error, "an opaque value", |v| match v {
+            Value::Opaque(o) => Some(o.token),
+            _ => None,
+        })
     }
 }
 
@@ -970,7 +943,7 @@ pub unsafe extern "C" fn cr_value_get_decimal(
         unsafe { give_text(out, len, decimal.to_string()) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_get_decimal", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A string's bytes, UTF-8, borrowed from the value and not NUL-terminated.
@@ -1000,7 +973,7 @@ pub unsafe extern "C" fn cr_value_get_string(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_get_string", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// An opaque value's type name, borrowed from the value and not NUL-terminated.
@@ -1030,7 +1003,7 @@ pub unsafe extern "C" fn cr_value_get_opaque_type(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_get_opaque_type", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Write the parts of a datetime through optional out-parameters.
@@ -1078,7 +1051,7 @@ pub unsafe extern "C" fn cr_value_get_date(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_get_date", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The parts of a datetime without a zone. Every out-parameter may be `NULL`.
@@ -1121,7 +1094,7 @@ pub unsafe extern "C" fn cr_value_get_naive_datetime(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_get_naive_datetime", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// An aware datetime's instant (`seconds` since 1970-01-01T00:00:00Z, and
@@ -1184,7 +1157,7 @@ pub unsafe extern "C" fn cr_value_get_aware_datetime(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_get_aware_datetime", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The number of items of a list or entries of a map; 0 for anything else.
@@ -1281,7 +1254,7 @@ pub unsafe extern "C" fn cr_value_map_entry(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_value_map_entry", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A map's value under `key`, borrowed from the map; `NULL` when `value` is not

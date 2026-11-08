@@ -14,7 +14,7 @@ use super::{
 };
 use crate::common::core::{
     ActionFailure, DecisionCore, DocumentCore, NodeCore, PathSegment, RulesCore, TreeKind,
-    action_error, cause_index, not_a_batch, path_segments, undefined_row,
+    action_error, cause_index, max_values_error, not_a_batch, path_segments, undefined_row,
 };
 use crate::common::wire::{Read, decode};
 use crate::common::{Problem, RawLimits, UNDEFINED_INPUT, limits, strings, text, tree_options};
@@ -41,15 +41,28 @@ pub(crate) struct Native {
     thrown: Array,
 }
 
-/// Read `data` along the paths `owner` (`lib/read.js`).
-pub(crate) fn read(data: &JsValue, owner: &JsValue) -> Result<Native, JsValue> {
-    let result = call_read(data, owner)?;
-    let Some(wire) = result.get(0).as_string() else {
+/// Read `data` along the paths `owner` (`lib/read.js`), at most `max_values`
+/// values of it; beyond them, the core's `limit_exceeded`, with the `row` of
+/// a batch.
+pub(crate) fn read(
+    data: &JsValue,
+    owner: &JsValue,
+    max_values: usize,
+    row: Option<usize>,
+) -> Result<Native, JsValue> {
+    let result = call_read(data, owner, max_values)?;
+    let encoding = result.get(0);
+    if encoding.is_null() {
+        // No encoding: the input is beyond `max_values`.
+        let error = max_values_error(max_values, None, row);
+        return Err(core_error(&error, &JsValue::NULL, &JsValue::NULL));
+    }
+    let Some(wire) = encoding.as_string() else {
         return Err(fail(Problem::Internal(
             "the reader returned no encoding".to_owned(),
         )));
     };
-    let read = decode(&wire).map_err(|problem| {
+    let read = decode(&wire, max_values).map_err(|problem| {
         fail(Problem::Internal(format!(
             "the reader's encoding is wrong ({problem})"
         )))
@@ -155,8 +168,9 @@ impl RuleSet {
         Self { core, paths }
     }
 
-    fn evaluate_native(&self, data: &JsValue) -> Result<DecisionCore, JsValue> {
-        let native = read(data, &self.paths)?;
+    fn evaluate_native(&self, data: &JsValue, limits: &JsValue) -> Result<DecisionCore, JsValue> {
+        let max_values = optional_limits(limits)?.max_values;
+        let native = read(data, &self.paths, max_values, None)?;
         self.core
             .evaluate(native.read.value.clone())
             .map_err(|error| chained(&error, &native))
@@ -273,12 +287,12 @@ impl RuleSet {
     /// # Errors
     ///
     /// As in the napi-rs build.
-    pub fn evaluate(&self, data: &JsValue) -> Result<Decision, JsValue> {
+    pub fn evaluate(&self, data: &JsValue, limits: &JsValue) -> Result<Decision, JsValue> {
         if data.is_undefined() {
             return Err(undefined_input());
         }
         Ok(Decision {
-            core: self.evaluate_native(data)?,
+            core: self.evaluate_native(data, limits)?,
         })
     }
 
@@ -302,7 +316,12 @@ impl RuleSet {
     ///
     /// As in the napi-rs build.
     #[wasm_bindgen(js_name = evaluateMany)]
-    pub fn evaluate_many(&self, rows: &JsValue) -> Result<Vec<Decision>, JsValue> {
+    pub fn evaluate_many(
+        &self,
+        rows: &JsValue,
+        limits: &JsValue,
+    ) -> Result<Vec<Decision>, JsValue> {
+        let max_values = optional_limits(limits)?.max_values;
         if !Array::is_array(rows) {
             return Err(fail(not_a_batch()));
         }
@@ -311,7 +330,7 @@ impl RuleSet {
             if row.is_undefined() {
                 return Err(fail(undefined_row(index)));
             }
-            natives.push(read(&row, &self.paths)?);
+            natives.push(read(&row, &self.paths, max_values, Some(index))?);
         }
         let inputs = natives.iter().map(|n| n.read.value.clone()).collect();
         let decisions = self.core.evaluate_many(inputs).map_err(|error| {
@@ -378,7 +397,12 @@ impl RuleSet {
     /// # Errors
     ///
     /// As in the napi-rs build.
-    pub fn run(&self, data: &JsValue, actions: &JsValue) -> Result<JsValue, JsValue> {
+    pub fn run(
+        &self,
+        data: &JsValue,
+        actions: &JsValue,
+        limits: &JsValue,
+    ) -> Result<JsValue, JsValue> {
         // `[names, functions]`, checked by the hook.
         let registry = call_actions(actions)?;
         let functions = Array::from(&registry.get(1));
@@ -390,7 +414,7 @@ impl RuleSet {
         if data.is_undefined() {
             return Err(undefined_input());
         }
-        let core = self.evaluate_native(data)?;
+        let core = self.evaluate_native(data, limits)?;
         let steps = self.core.action_steps(&core, &names);
         let decision: JsValue = Decision { core }.into();
         let mut executed: Vec<String> = Vec::new();
@@ -584,7 +608,7 @@ impl Node {
         if data.is_undefined() {
             return Err(undefined_input());
         }
-        let native = read(data, self.paths())?;
+        let native = read(data, self.paths(), options.limits.max_values, None)?;
         self.core
             .tree(kind, &native.read.value, &options)
             .map_err(|error| chained(&error, &native))

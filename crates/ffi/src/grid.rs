@@ -224,7 +224,7 @@ pub unsafe extern "C" fn cr_grid_new(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_grid_new", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// A cell of a row given as a value: a string is text, anything else a value.
@@ -293,7 +293,7 @@ pub unsafe extern "C" fn cr_grid_new_open(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_grid_new_open", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Add a column to an open header.
@@ -303,7 +303,6 @@ pub unsafe extern "C" fn cr_grid_new_open(
 /// `grid` is `NULL` or a live `cr_grid` that no other thread uses during the
 /// call; `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
 unsafe fn add_column(
-    name: &str,
     grid: *mut cr_grid,
     error: *mut *mut cr_error,
     item: impl FnOnce() -> Outcome<HeaderItem>,
@@ -316,7 +315,7 @@ unsafe fn add_column(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call(name, error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Add a column to an open header as its CSV header text: `RULE`,
@@ -342,7 +341,7 @@ pub unsafe extern "C" fn cr_grid_add_column_text(
         Ok(HeaderItem::Text(text.to_owned()))
     };
     // SAFETY: the caller's promises are `add_column`'s.
-    unsafe { add_column("cr_grid_add_column_text", grid, error, item) }
+    unsafe { add_column(grid, error, item) }
 }
 
 /// Add an input column to an open header: its expression, a value node such
@@ -366,7 +365,7 @@ pub unsafe extern "C" fn cr_grid_add_column_input(
         Ok(HeaderItem::Input(input.node.clone()))
     };
     // SAFETY: the caller's promises are `add_column`'s.
-    unsafe { add_column("cr_grid_add_column_input", grid, error, item) }
+    unsafe { add_column(grid, error, item) }
 }
 
 /// Add an output column to an open header: its payload key and its output
@@ -401,7 +400,7 @@ pub unsafe extern "C" fn cr_grid_add_column_output(
         Ok(HeaderItem::Output(output.values(list.to_vec())))
     };
     // SAFETY: the caller's promises are `add_column`'s.
-    unsafe { add_column("cr_grid_add_column_output", grid, error, item) }
+    unsafe { add_column(grid, error, item) }
 }
 
 /// Add a row whose cells may be nodes: cell `c` is `nodes[c]` when it is not
@@ -463,7 +462,7 @@ pub unsafe extern "C" fn cr_grid_push_row_nodes(
         grid.push(cells)
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_grid_push_row_nodes", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Add a row: a list of cells in column order. A string is text, read as a
@@ -494,7 +493,7 @@ pub unsafe extern "C" fn cr_grid_push_row(
         grid.push(cells)
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_grid_push_row", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Check and compile the table: a document holding it, which
@@ -535,7 +534,7 @@ pub unsafe extern "C" fn cr_grid_finish(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_grid_finish", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The decision table a `CR_DOCUMENT_DECISION_TABLE` document holds; a
@@ -612,7 +611,7 @@ pub unsafe extern "C" fn cr_document_table_value(
         unsafe { give_new_value(out, Value::Map(map)) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_document_table_value", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// The row at position `row` of a decision table, apart from its cells, as a
@@ -649,7 +648,7 @@ pub unsafe extern "C" fn cr_document_table_row(
         unsafe { give_new_value(out, Value::Map(map)) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_document_table_row", error, body) }
+    unsafe { call(error, body) }
 }
 
 fn table_row(table: &DecisionTable, row: usize) -> Outcome<&cleanrules::table::TableRow> {
@@ -688,7 +687,7 @@ pub unsafe extern "C" fn cr_document_table_input(
         })
     };
     // SAFETY: `out` and `error` (# Safety).
-    unsafe { build("cr_document_table_input", out, error, make) }
+    unsafe { build(out, error, make) }
 }
 
 /// A copy of the node of the cell at row `row` and column `column`, freed
@@ -736,7 +735,7 @@ pub unsafe extern "C" fn cr_document_table_cell(
         Ok(())
     };
     // SAFETY: `error` is NULL or writable (# Safety).
-    unsafe { call("cr_document_table_cell", error, body) }
+    unsafe { call(error, body) }
 }
 
 /// Free a grid that was not finished. `NULL` is ignored.

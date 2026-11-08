@@ -36,6 +36,7 @@ export const MINIMUM_VECTORS = 2508
 /** Why a vector does not run one way: each is counted and listed. */
 export const SKIPS = {
   grid: 'grids are native data: cleanrules/native reads documents only, so table_grid vectors run in the native route (DecisionTable)',
+  native: 'max_values bounds what is read from native data only, so evaluate vectors with limits run in the native route',
 }
 
 /** The class of each error code (`spec/errors.md`, *Codes*). */
@@ -58,11 +59,17 @@ const CLASSES = {
 }
 
 /** The fields of an evaluation error that are compared (`spec/errors.md`, *Comparing errors*). */
-const EVALUATION = ['code', 'rule', 'path', 'types', 'rules', 'row']
+const EVALUATION = ['code', 'rule', 'path', 'types', 'rules', 'row', 'name']
 /** The context fields an error may carry, as `toJSON()` names them. */
 const CONTEXT = ['pointer', 'line', 'column', 'name', 'rule', 'path', 'types', 'rules', 'row']
 /** The vector's limits, by the names of the native layer. */
-const LIMITS = { max_size: 'maxSize', max_nesting: 'maxNesting', max_depth: 'maxDepth', max_table_size: 'maxTableSize' }
+const LIMITS = {
+  max_size: 'maxSize',
+  max_nesting: 'maxNesting',
+  max_depth: 'maxDepth',
+  max_table_size: 'maxTableSize',
+  max_values: 'maxValues',
+}
 
 const MAX_SAFE = 2n ** 53n - 1n
 
@@ -403,6 +410,7 @@ export function conformance(R, N) {
       }
       case 'evaluate':
       case 'explain': {
+        if (given.has('limits')) return { skip: 'native' }
         const rules = N.RuleSet.read(rulesetDocument(given))
         if (given.has('inputs')) {
           let batch
@@ -1027,8 +1035,11 @@ export function conformance(R, N) {
     const input = inputOf(given)
     const layer = N.RuleSet.read(rulesetDocument(given))
     const failing = expect.has('error')
+    // `max_values`, for the idiomatic API and the native layer.
+    const limits = limitsOf(given)
+    const options = limits === undefined ? undefined : { limits }
     if (given.has('inputs')) {
-      const outcome = attempt(R, () => ruleset.evaluateMany(input))
+      const outcome = attempt(R, () => ruleset.evaluateMany(input, options))
       if (outcome.error !== undefined || failing) {
         const issue = compare(outcome, expect, 'decisions', idiomatic)
         if (issue !== '') return issue
@@ -1042,13 +1053,13 @@ export function conformance(R, N) {
       }
       // The same native data through the native layer, compared exactly.
       const exact = compare(
-        attempt(R, () => layer.evaluateMany(input).map((d) => content(d.write(), 'decision'))),
+        attempt(R, () => layer.evaluateMany(input, limits).map((d) => content(d.write(), 'decision'))),
         expect,
         'decisions',
       )
       return exact === '' ? '' : `cleanrules/native: ${exact}`
     }
-    const outcome = attempt(R, () => ruleset.evaluate(input))
+    const outcome = attempt(R, () => ruleset.evaluate(input, options))
     if (outcome.error !== undefined || failing) {
       const issue = compare(outcome, expect, 'decision', idiomatic)
       if (issue !== '') return issue
@@ -1075,7 +1086,7 @@ export function conformance(R, N) {
     let exact
     const written = compare(
       attempt(R, () => {
-        exact = layer.evaluate(input)
+        exact = layer.evaluate(input, limits)
         return content(exact.write(), 'decision')
       }),
       expect,
