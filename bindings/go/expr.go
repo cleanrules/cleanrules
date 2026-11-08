@@ -169,16 +169,24 @@ func Const(v any) *Expr {
 // the library cannot hold a NaN or a time finer than a microsecond, which
 // data would read as a null or truncate (spec/data-model.md, Constants).
 func constant(v any) (*C.cr_value, error) {
+	if err := checkConstant(v); err != nil {
+		return nil, err
+	}
+	return newReader().read(v, wholePaths)
+}
+
+// checkConstant makes the checks of constant.
+func checkConstant(v any) error {
 	inner, _ := deref(reflect.ValueOf(v))
 	if inner.IsValid() {
 		switch {
 		case (inner.Kind() == reflect.Float32 || inner.Kind() == reflect.Float64) && math.IsNaN(inner.Float()):
-			return nil, newError(CodeExpression, fmt.Sprintf("a constant cannot be NaN (%v)", inner.Interface()), "test for missing values with IsNull()")
+			return newError(CodeExpression, fmt.Sprintf("a constant cannot be NaN (%v)", inner.Interface()), "test for missing values with IsNull()")
 		case inner.Type() == timeType && inner.Interface().(time.Time).Nanosecond()%1000 != 0:
-			return nil, newError(CodeExpression, fmt.Sprintf("the datetime %v is finer than a microsecond", inner.Interface()), "datetimes hold microseconds; round the constant first")
+			return newError(CodeExpression, fmt.Sprintf("the datetime %v is finer than a microsecond", inner.Interface()), "datetimes hold microseconds; round the constant first")
 		}
 	}
-	return newReader().read(v, wholePaths)
+	return nil
 }
 
 // constants converts the values of IsIn into a list, each checked as a

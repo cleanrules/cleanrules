@@ -38,3 +38,7 @@ site/
 # Claude Code: personal overrides only (.claude/settings.json is shared)
 .claude/settings.local.json
 .claude/worktrees/
+
+# Go: the prebuilt libraries and header that bindings/go/scripts/smoke.sh copies in
+bindings/go/lib/
+bindings/go/include/

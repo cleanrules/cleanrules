@@ -1,0 +1,196 @@
+name: Go libraries
+
+# Builds the prebuilt static library of every platform of the Go module,
+# assembles the module as Go users get it, checks it and uses it as they
+# would, without publishing anything (task H.2 publishes the module from its
+# own repository, github.com/cleanrules/cleanrules-go):
+#
+# 1. The static library of each platform with Rust 1.97, the version of the
+#    link files' system libraries (bindings/go/scripts/build-lib.sh: release
+#    with fat LTO and one codegen unit, debug information stripped, rustc's
+#    system libraries checked against the platform's link_*.go file): natively on
+#    macOS and Windows (Rust's GNU target on x64, for MinGW-w64's GCC, and its
+#    GNU LLVM target on arm64, for llvm-mingw); the glibc ones in
+#    manylinux_2_28 containers and the musl ones in Alpine, where a C probe
+#    (bindings/go/scripts/probe.c) is linked from the library with the link
+#    file's system libraries and run.
+# 2. The module (bindings/go/scripts/assemble.py): the package's Go files as
+#    they build with the tag cleanrules_prebuilt, the header and the eight
+#    libraries under lib/<os>_<arch>[_musl]/, checked against what it must
+#    hold and nothing else (bindings/go/scripts/check-libs.py: each library
+#    an archive of objects of its platform, macOS 11.0 at most, glibc's or
+#    musl's own symbols, and the probes: glibc 2.28 at most, or musl's libc).
+#    It is the artifact go-module.
+# 3. On every platform there is a runner for, and in Alpine: a clean module
+#    whose go.mod replaces the binding with the assembled one runs a smoke
+#    program (go vet, go build, and again vendored), and the package's tests
+#    run against the prebuilt library (bindings/go/scripts/smoke.sh). No cargo
+#    there.
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "bindings/go/**"
+      - "crates/core/**"
+      - "crates/ffi/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/go-libs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-libs-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # llvm-mingw for cgo on Windows on arm64 (GCC has no such target), pinned
+  # with the SHA-256 that GitHub gives for the release asset.
+  LLVM_MINGW: llvm-mingw-20261020-ucrt-aarch64
+  LLVM_MINGW_URL: https://github.com/mstorsjo/llvm-mingw/releases/download/20261020/llvm-mingw-20261020-ucrt-aarch64.zip
+  LLVM_MINGW_SHA256: 8f24fedd0b75c674c6c83dec2d76a7ac31a690120212843a17e465ef49854f69
+
+jobs:
+  native:
+    name: Library (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-15-intel, target: x86_64-apple-darwin, platform: darwin_amd64 }
+          - { runner: macos-latest, target: aarch64-apple-darwin, platform: darwin_arm64 }
+          - { runner: windows-latest, target: x86_64-pc-windows-gnu, platform: windows_amd64 }
+          - { runner: windows-11-arm, target: aarch64-pc-windows-gnullvm, platform: windows_arm64 }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      # Rust 1.97, the version whose --print native-static-libs the link
+      # files list (build-lib.sh checks them against it).
+      - uses: dtolnay/rust-toolchain@1.97
+        with:
+          targets: ${{ matrix.target }}
+          components: llvm-tools
+      - run: bash bindings/go/scripts/build-lib.sh ${{ matrix.target }} ${{ matrix.platform }} go-libs
+      - uses: actions/upload-artifact@v7
+        with:
+          name: go-lib-${{ matrix.platform }}
+          path: go-libs/
+          if-no-files-found: error
+
+  linux:
+    name: Library (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, image: quay.io/pypa/manylinux_2_28_x86_64, target: x86_64-unknown-linux-gnu, platform: linux_amd64 }
+          - { runner: ubuntu-24.04-arm, image: quay.io/pypa/manylinux_2_28_aarch64, target: aarch64-unknown-linux-gnu, platform: linux_arm64 }
+          - { runner: ubuntu-latest, image: alpine:3.22, target: x86_64-unknown-linux-musl, platform: linux_amd64_musl }
+          - { runner: ubuntu-24.04-arm, image: alpine:3.22, target: aarch64-unknown-linux-musl, platform: linux_arm64_musl }
+    steps:
+      - uses: actions/checkout@v7
+      # Built natively in the oldest environment each library supports
+      # (manylinux_2_28 is AlmaLinux 8, glibc 2.28), where the probe is linked
+      # and run; the containers run by hand, as in jvm-natives.yml.
+      - env:
+          IMAGE: ${{ matrix.image }}
+          TARGET: ${{ matrix.target }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work -e TARGET -e PLATFORM "$IMAGE" sh -euxc '
+            if command -v apk; then apk add --no-cache bash build-base curl; fi
+            curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.97 \
+              --target "$TARGET" --component llvm-tools
+            . "$HOME/.cargo/env"
+            ldd --version 2>&1 | head -n 1 || true
+            bash bindings/go/scripts/build-lib.sh "$TARGET" "$PLATFORM" go-libs --probe
+          '
+      - uses: actions/upload-artifact@v7
+        with:
+          name: go-lib-${{ matrix.platform }}
+          path: go-libs/
+          if-no-files-found: error
+
+  module:
+    name: Assemble and check the module
+    needs: [native, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: go-lib-*
+          merge-multiple: true
+          path: go-libs
+      - run: python3 bindings/go/scripts/assemble.py go-libs/libs module
+      - run: python3 bindings/go/scripts/check-libs.py module --probes go-libs/probes
+      - uses: actions/upload-artifact@v7
+        with:
+          name: go-module
+          path: module/
+          if-no-files-found: error
+
+  smoke:
+    name: Smoke (${{ matrix.os }})
+    needs: module
+    runs-on: ${{ matrix.os }}
+    env:
+      CGO_ENABLED: "1"
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-15-intel, macos-latest, windows-latest, windows-11-arm]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # For the smoke program and the package's tests: the module is the artifact.
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: 1.24.x
+          cache-dependency-path: bindings/go/go.mod
+      - uses: actions/download-artifact@v8
+        with:
+          name: go-module
+          path: ${{ runner.temp }}/module
+      # cgo on Windows on arm64 needs llvm-mingw, which the runner lacks.
+      - if: matrix.os == 'windows-11-arm'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/llvm-mingw.zip" "$LLVM_MINGW_URL"
+          echo "$LLVM_MINGW_SHA256  $RUNNER_TEMP/llvm-mingw.zip" | sha256sum -c -
+          7z x -o"$RUNNER_TEMP" "$RUNNER_TEMP/llvm-mingw.zip" > /dev/null
+          echo "$RUNNER_TEMP/$LLVM_MINGW/bin" >> "$GITHUB_PATH"
+          echo "CC=aarch64-w64-mingw32-clang" >> "$GITHUB_ENV"
+      - run: go env CC CGO_ENABLED GOOS GOARCH
+      - run: bash bindings/go/scripts/smoke.sh "$RUNNER_TEMP/module" "$RUNNER_TEMP/smoke"
+
+  smoke-musl:
+    name: Smoke (Alpine, ${{ matrix.runner }})
+    needs: module
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: go-module
+          path: module
+      # Go 1.24 on Alpine, with gcc for cgo, by hand as the musl build; the
+      # musl libraries need the tag cleanrules_musl.
+      - run: |
+          docker run --rm -v "$PWD:/work" -w /work golang:1.24-alpine sh -euxc '
+            apk add --no-cache bash build-base
+            bash bindings/go/scripts/smoke.sh /work/module /tmp/smoke cleanrules_musl
+          '

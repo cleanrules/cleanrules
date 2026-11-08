@@ -52,49 +52,16 @@ type RuleSet struct {
 	actions   Actions
 }
 
-// RuleSetOption sets a rule set's hit policy, aggregate, logic or strict
-// mode in NewRuleSet.
-type RuleSetOption struct {
-	apply func(*ruleSetSettings)
-}
-
-type ruleSetSettings struct {
-	hitPolicy, aggregate, logic *string
-	strict                      bool
-}
-
-// WithHitPolicy sets the hit policy, HitPolicyFirst by default.
-func WithHitPolicy(policy HitPolicy) RuleSetOption {
-	return RuleSetOption{func(s *ruleSetSettings) { name := string(policy); s.hitPolicy = &name }}
-}
-
-// WithAggregate sets the aggregate of HitPolicyCollect; none by
-// default.
-func WithAggregate(aggregate Aggregate) RuleSetOption {
-	return RuleSetOption{func(s *ruleSetSettings) { name := string(aggregate); s.aggregate = &name }}
-}
-
-// WithLogic sets the logic by name, "boolean" (Kleene's) by default.
-func WithLogic(name string) RuleSetOption {
-	return RuleSetOption{func(s *ruleSetSettings) { s.logic = &name }}
-}
-
-// WithStrict sets strict mode: a field that cannot be read is an error
-// instead of unknown (spec/rules.md, Strict mode and errors).
-func WithStrict(strict bool) RuleSetOption {
-	return RuleSetOption{func(s *ruleSetSettings) { s.strict = strict }}
-}
-
 // NewRuleSet makes a rule set of rules, in order, and options. An unknown
 // hit policy or aggregate, a repeated rule name or an aggregate without
 // HitPolicyCollect is a rule_definition_error; an unknown logic, a registry_error.
 func NewRuleSet(rules []*Rule, options ...RuleSetOption) (*RuleSet, error) {
 	var settings ruleSetSettings
 	for _, option := range options {
-		if option.apply == nil {
-			return nil, errZeroOption
+		if option == nil {
+			return nil, nilOption(ruleSetOptions)
 		}
-		option.apply(&settings)
+		option.applyRuleSet(&settings)
 	}
 	pointers := make([]*C.cr_rule, len(rules))
 	for i, rule := range rules {

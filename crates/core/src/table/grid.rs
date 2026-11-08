@@ -56,7 +56,8 @@ pub enum Cell {
     /// A value. Null is an empty cell. Otherwise, under an input `x`, the
     /// condition `x = value`; under an output, the value; under `RULE` or
     /// `DESCRIPTION`, a string, read as text; under `PRIORITY`, an int or a
-    /// float with an integral value.
+    /// float with an integral value. A string is a value here, never text to
+    /// parse: under an input, `Value::String("VIP")` is `x = 'VIP'`.
     Value(Value),
     /// A node built in a host language: an input cell's condition, which tests
     /// its column, or an output cell's value.
@@ -174,7 +175,9 @@ fn priority(cell: Cell, pointer: impl Fn() -> String) -> Result<Option<i64>> {
         )
     };
     match cell {
-        Cell::Text(text) | Cell::Value(Value::String(text)) => {
+        // Text is read as a number; a string value (an enum constant) is not
+        // a number, whatever it says (spec/tables.md, Grids).
+        Cell::Text(text) => {
             let text = text.trim();
             if text.is_empty() {
                 return Ok(None);
@@ -480,6 +483,36 @@ mod tests {
         )
         .unwrap();
         assert_eq!(built.to_csv(), read.to_csv());
+    }
+
+    #[test]
+    fn a_string_value_is_a_constant_name_or_description_by_its_column() {
+        let high = || Cell::Value(Value::String("HIGH".into()));
+        let table = build(
+            headers(&["RULE", "x", "THEN t", "DESCRIPTION"]),
+            vec![vec![
+                Cell::Value(Value::String("a".into())),
+                high(),
+                high(),
+                high(),
+            ]],
+        )
+        .unwrap();
+        // Under an input and an output, the string; never the field HIGH.
+        assert_eq!(
+            table.to_csv(),
+            "HIT POLICY,first\nRULE,x,THEN t,DESCRIPTION\na,'HIGH','HIGH',HIGH\n"
+        );
+        // Under PRIORITY, a string value is not a number, whatever it says.
+        for priority in ["5", "HIGH"] {
+            let error = build(
+                headers(&["x", "PRIORITY"]),
+                vec![vec![text("1"), Cell::Value(Value::String(priority.into()))]],
+            )
+            .unwrap_err();
+            assert_eq!(error.code(), ErrorCode::FormatError);
+            assert_eq!(pointer(&error), "/rows/0/1", "{error}");
+        }
     }
 
     /// A header, its rows, and where the error points.

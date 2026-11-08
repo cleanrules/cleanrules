@@ -1,7 +1,6 @@
 package cleanrules
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../../crates/ffi/include
 #include <stdlib.h>
 #include "cleanrules.h"
 */

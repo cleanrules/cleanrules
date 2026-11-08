@@ -170,11 +170,12 @@ object DecisionTable:
     case Some(inner) => javaCell(inner, pointer)
     case text: String => text
     case node: Expr => node.asJava
-    // An enum case without parameters or a case object is a constant, its
-    // name, and only strings are text (spec/tables.md, *Grids*): the string
-    // literal of its name, as the Java builder writes a Java enum constant.
-    case constant: scala.reflect.Enum if constant.productArity == 0 => s"'${constant.productPrefix}'"
-    case module: Product if ToJava.caseObject(module) => s"'${module.productPrefix}'"
+    // An enum case without parameters or a case object is a value, its name,
+    // and only strings are text (spec/tables.md, *Grids*): the Java builder
+    // gives any CharSequence that is not a String as a value (CR_CELL_VALUE),
+    // which the core reads by its column, as it does a Java enum constant.
+    case constant: scala.reflect.Enum if constant.productArity == 0 => java.nio.CharBuffer.wrap(constant.productPrefix)
+    case module: Product if ToJava.caseObject(module) => java.nio.CharBuffer.wrap(module.productPrefix)
     case constant => Expr.constant(constant, Some(pointer))
 
 /**

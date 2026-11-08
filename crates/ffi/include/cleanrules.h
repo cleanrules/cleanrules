@@ -126,6 +126,9 @@ typedef int32_t cr_truth;
 // What a document holds, its content (`CR_DOCUMENT_*`).
 typedef int32_t cr_document_content;
 
+// What a cell of `cr_grid_push_row_cells` is (`CR_CELL_*`).
+typedef int32_t cr_cell_kind;
+
 // A limit of `cr_limits` (`CR_LIMIT_*`).
 typedef int32_t cr_limit;
 
@@ -223,6 +226,21 @@ typedef int32_t cr_value_type;
 
 // `unsupported`.
 #define CR_UNSUPPORTED 15
+
+// The row's item, a string, read as text: an unquoted CSV field (`'VIP'` is
+// the string, `VIP` the field).
+#define CR_CELL_TEXT 1
+
+// The row's item as a value, strings included (a host language's enum
+// constant): null is an empty cell; under an input `x`, the condition
+// `x = value`; under an output, the value; under `RULE` or `DESCRIPTION`, a
+// string's text; under `PRIORITY`, an int or a float with an integral value
+// (`spec/tables.md`, *Grids*). The core decides by the column.
+#define CR_CELL_VALUE 2
+
+// A node, from `nodes`: an input's condition, which tests its column, or an
+// output's value; the row's item is not read.
+#define CR_CELL_NODE 3
 
 // The largest text of every format, in bytes. Set, it sets the JSON, YAML and
 // text limits at once; read, it gives the JSON one.
@@ -1005,6 +1023,30 @@ cr_status cr_grid_new_open(const char *hit_policy,
 cr_status cr_grid_push_row(struct cr_grid *grid,
                            const struct cr_value *row,
                            struct cr_error **error);
+
+// Add a row whose cells say what they are: cell `c` is `kinds[c]`
+// (`CR_CELL_TEXT`, `CR_CELL_VALUE` or `CR_CELL_NODE`) of the row's item `c`,
+// or of `nodes[c]` for a node (copied). Unlike `cr_grid_push_row`, a string
+// can be a value: a host language's enum constant is a constant under an
+// input or an output, and a name or description under `RULE` or
+// `DESCRIPTION`. `len` is the row's length; `nodes` may be `NULL` when no
+// cell is a node. A text cell that is not a string, a node cell without a
+// node and an unknown kind are `CR_INVALID_ARGUMENT`. As with
+// `cr_grid_push_row`, after a row fails the grid can only be freed.
+//
+// # Safety
+//
+// `grid` is `NULL` or a live `cr_grid` that no other thread uses during the
+// call; `row` is `NULL` or a live `cr_value`; `kinds` is `NULL` or points to
+// `len` readable kinds; `nodes` is `NULL` or points to `len` readable
+// pointers, each `NULL` or a live `cr_node`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_grid_push_row_cells(struct cr_grid *grid,
+                                 const struct cr_value *row,
+                                 const cr_cell_kind *kinds,
+                                 const struct cr_node *const *nodes,
+                                 size_t len,
+                                 struct cr_error **error);
 
 // Add a row whose cells may be nodes: cell `c` is `nodes[c]` when it is not
 // `NULL` (an input's condition, which tests its column, or an output's

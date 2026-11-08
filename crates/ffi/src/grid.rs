@@ -465,6 +465,115 @@ pub unsafe extern "C" fn cr_grid_push_row_nodes(
     unsafe { call(error, body) }
 }
 
+/// What a cell of `cr_grid_push_row_cells` is (`CR_CELL_*`).
+pub type cr_cell_kind = i32;
+
+/// The row's item, a string, read as text: an unquoted CSV field (`'VIP'` is
+/// the string, `VIP` the field).
+pub const CR_CELL_TEXT: cr_cell_kind = 1;
+/// The row's item as a value, strings included (a host language's enum
+/// constant): null is an empty cell; under an input `x`, the condition
+/// `x = value`; under an output, the value; under `RULE` or `DESCRIPTION`, a
+/// string's text; under `PRIORITY`, an int or a float with an integral value
+/// (`spec/tables.md`, *Grids*). The core decides by the column.
+pub const CR_CELL_VALUE: cr_cell_kind = 2;
+/// A node, from `nodes`: an input's condition, which tests its column, or an
+/// output's value; the row's item is not read.
+pub const CR_CELL_NODE: cr_cell_kind = 3;
+
+/// Add a row whose cells say what they are: cell `c` is `kinds[c]`
+/// (`CR_CELL_TEXT`, `CR_CELL_VALUE` or `CR_CELL_NODE`) of the row's item `c`,
+/// or of `nodes[c]` for a node (copied). Unlike `cr_grid_push_row`, a string
+/// can be a value: a host language's enum constant is a constant under an
+/// input or an output, and a name or description under `RULE` or
+/// `DESCRIPTION`. `len` is the row's length; `nodes` may be `NULL` when no
+/// cell is a node. A text cell that is not a string, a node cell without a
+/// node and an unknown kind are `CR_INVALID_ARGUMENT`. As with
+/// `cr_grid_push_row`, after a row fails the grid can only be freed.
+///
+/// # Safety
+///
+/// `grid` is `NULL` or a live `cr_grid` that no other thread uses during the
+/// call; `row` is `NULL` or a live `cr_value`; `kinds` is `NULL` or points to
+/// `len` readable kinds; `nodes` is `NULL` or points to `len` readable
+/// pointers, each `NULL` or a live `cr_node`; `error` is `NULL` or points to a
+/// writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_grid_push_row_cells(
+    grid: *mut cr_grid,
+    row: *const cr_value,
+    kinds: *const cr_cell_kind,
+    nodes: *const *const cr_node,
+    len: usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `grid` is NULL or live and used by this call only (# Safety).
+        let grid = unsafe { handle_mut(grid, "grid") }?;
+        // SAFETY: `row` is NULL or live (# Safety).
+        let values = items(unsafe { borrow_value(row, "row") }?, "row")?;
+        if len != values.len() {
+            return Err(Failure::Invalid(
+                format!("len is {len}, but the row has {} cells", values.len()),
+                "pass one kind per cell",
+            ));
+        }
+        let kinds: &[cr_cell_kind] = if len == 0 {
+            &[]
+        } else if kinds.is_null() {
+            return Err(Failure::Invalid(
+                format!("kinds is NULL with a length of {len}"),
+                "pass an array of CR_CELL_* kinds, one per cell",
+            ));
+        } else {
+            // SAFETY: the caller promises `len` readable kinds.
+            unsafe { std::slice::from_raw_parts(kinds, len) }
+        };
+        let nodes: &[*const cr_node] = if len == 0 || nodes.is_null() {
+            &[]
+        } else {
+            // SAFETY: the caller promises `len` readable pointers.
+            unsafe { std::slice::from_raw_parts(nodes, len) }
+        };
+        let mut cells = Vec::with_capacity(len);
+        for (c, (value, &kind)) in values.iter().zip(kinds).enumerate() {
+            cells.push(match kind {
+                CR_CELL_TEXT => match value {
+                    Value::String(text) => Cell::Text(text.clone()),
+                    _ => {
+                        return Err(Failure::Invalid(
+                            format!("cell {c} is CR_CELL_TEXT, but its item is not a string"),
+                            "give text as a string, or the cell as CR_CELL_VALUE",
+                        ));
+                    }
+                },
+                CR_CELL_VALUE => Cell::Value(value.clone()),
+                CR_CELL_NODE => {
+                    // SAFETY: each pointer is NULL or a live node (# Safety).
+                    match nodes.get(c).and_then(|&node| unsafe { node.as_ref() }) {
+                        Some(node) => Cell::Node(node.node.clone()),
+                        None => {
+                            return Err(Failure::Invalid(
+                                format!("cell {c} is CR_CELL_NODE, but it has no node"),
+                                "pass the cell's node in nodes",
+                            ));
+                        }
+                    }
+                }
+                other => {
+                    return Err(Failure::Invalid(
+                        format!("cell {c} has the unknown kind {other}"),
+                        "use CR_CELL_TEXT, CR_CELL_VALUE or CR_CELL_NODE",
+                    ));
+                }
+            });
+        }
+        grid.push(cells)
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call(error, body) }
+}
+
 /// Add a row: a list of cells in column order. A string is text, read as a
 /// CSV field (`'VIP'` is the string, `VIP` the field); null is an empty cell;
 /// any other value is a constant. The row stays the caller's. After a row

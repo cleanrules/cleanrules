@@ -34,6 +34,7 @@ type ActionContext struct {
 	position int
 	data     any
 	decision *Decision
+	tree     actionTree
 }
 
 // Rule is the rule whose action runs.

@@ -19,7 +19,7 @@ func TestDiscountsExample(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		program += ".exe"
 	}
-	build := exec.Command(goTool, "build", "-o", program, filepath.Join("..", "..", "docs", "examples", "discounts.go"))
+	build := exec.Command(goTool, "build", tagsFlag(), "-o", program, filepath.Join("..", "..", "docs", "examples", "discounts.go"))
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
@@ -31,6 +31,42 @@ func TestDiscountsExample(t *testing.T) {
 		t.Errorf("got:\n%s\nwant:\n%s", out, discountsOutput)
 	}
 }
+
+// TestRiskTableExample builds docs/examples/risk_table.go and runs it on
+// risk.csv: the output of RiskTable.java, line by line.
+func TestRiskTableExample(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds and runs a program")
+	}
+	goTool := filepath.Join(runtime.GOROOT(), "bin", "go")
+	program := filepath.Join(t.TempDir(), "risk_table")
+	if runtime.GOOS == "windows" {
+		program += ".exe"
+	}
+	examples := filepath.Join("..", "..", "docs", "examples")
+	build := exec.Command(goTool, "build", tagsFlag(), "-o", program, filepath.Join(examples, "risk_table.go"))
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	out, err := exec.Command(program, filepath.Join(examples, "risk.csv")).CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if string(out) != riskTableOutput {
+		t.Errorf("got:\n%s\nwant:\n%s", out, riskTableOutput)
+	}
+}
+
+const riskTableOutput = `risk: medium, discount: 0.05
+HIT POLICY priority: selected big
+same table: true
+rows: new, vip, big, default
+version: 1
+decision_table:
+  hit_policy: "priority"
+vip: unknown; order.total > 1000 is unknown (missing_field)
+notify for vip: customer.years > 5 is true
+`
 
 const discountsOutput = `discount: 0.15
 fired: [vip loyal]

@@ -426,7 +426,7 @@ jobs:
             -- --print native-static-libs 2>&1) || { echo "$out"; exit 1; }
           echo "$out"
           wanted=$(echo "$out" | grep -o 'native-static-libs: .*' | sed 's/native-static-libs: //')
-          linked=$(grep "#cgo ${{ matrix.goos }} LDFLAGS" link.go)
+          linked=$(grep -E "#cgo ${{ matrix.goos }}(,amd64)? LDFLAGS" link.go)
           for lib in $wanted; do
             case $lib in -lc|-lSystem) continue ;; esac
             case " $linked " in *" $lib "*) ;; *) echo "::warning::rustc asks for $lib, which link.go does not give ($wanted)" ;; esac

@@ -19,8 +19,15 @@ type Rule struct {
 
 // RuleOption sets a part of a rule in NewRule and Rule.With: Then,
 // WithPriority, WithTags, WithDescription, WithMetadata and WithAction.
-type RuleOption struct {
-	apply func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error
+type RuleOption interface {
+	applyRule(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error
+}
+
+// ruleOption is every RuleOption: a step from a rule to a new one.
+type ruleOption func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error
+
+func (o ruleOption) applyRule(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
+	return o(rule, out, e)
 }
 
 // NewRule makes a rule: a name, its condition and the options, applied in
@@ -64,15 +71,15 @@ func (r *Rule) With(options ...RuleOption) (*Rule, error) {
 func applyOptions(rule *C.cr_rule, owned bool, options []RuleOption) (*Rule, error) {
 	current := rule
 	for _, option := range options {
-		if option.apply == nil {
+		if option == nil {
 			if owned {
 				C.cr_rule_free(current)
 			}
-			return nil, errZeroOption
+			return nil, nilOption(ruleOptions)
 		}
 		var next *C.cr_rule
 		var e *C.cr_error
-		err := option.apply(current, &next, &e)
+		err := option.applyRule(current, &next, &e)
 		if owned {
 			C.cr_rule_free(current)
 		}
@@ -108,54 +115,50 @@ func (r *Rule) use(f func(*C.cr_rule) error) error {
 
 var errNilRule = newError(CodeRuleDefinition, "a nil or zero *Rule is not a rule", "make rules with NewRule")
 
-// errZeroOption is the error of a zero RuleOption or RuleSetOption, which
-// sets nothing.
-var errZeroOption = newError(CodeRuleDefinition, "a zero option sets nothing", "make options with Then, WithPriority, WithHitPolicy and the other functions of the package")
-
 // Then adds key to the payload with value: an *Expr (a value node, such as
 // Field("order", "total").Mul(0.9)) or a constant. A new key goes last; a key
 // the payload has keeps its place and takes the new value.
 func Then(key string, value any) RuleOption {
 	node := operand(value)
-	return RuleOption{func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
+	return ruleOption(func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
 		return node.use(func(n *C.cr_node) error {
 			p, l := text(key)
 			return check(C.cr_rule_with_payload(rule, p, l, n, out, e), *e)
 		})
-	}}
+	})
 }
 
 // WithPriority sets the priority, for HitPolicyPriority.
 func WithPriority(priority int64) RuleOption {
-	return RuleOption{func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
+	return ruleOption(func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
 		return check(C.cr_rule_with_priority(rule, C.int64_t(priority), out, e), *e)
-	}}
+	})
 }
 
 // WithTags sets the tags, which the rule keeps sorted and without repeats.
 func WithTags(tags ...string) RuleOption {
-	return RuleOption{func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
+	return ruleOption(func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
 		list, err := newReader().read(tags, wholePaths)
 		if err != nil {
 			return err
 		}
 		defer C.cr_value_free(list)
 		return check(C.cr_rule_with_tags(rule, list, out, e), *e)
-	}}
+	})
 }
 
 // WithDescription sets the description.
 func WithDescription(description string) RuleOption {
-	return RuleOption{func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
+	return ruleOption(func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
 		p, n := text(description)
 		return check(C.cr_rule_with_description(rule, p, n, out, e), *e)
-	}}
+	})
 }
 
 // WithMetadata sets the metadata: data values, read as data is (a Go map is
 // sorted by key). An opaque value in it is a rule_definition_error.
 func WithMetadata(metadata map[string]any) RuleOption {
-	return RuleOption{func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
+	return ruleOption(func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
 		value, err := newReader().read(metadata, wholePaths)
 		if err != nil {
 			return err
@@ -167,16 +170,16 @@ func WithMetadata(metadata map[string]any) RuleOption {
 		}
 		defer C.cr_value_free(value)
 		return check(C.cr_rule_with_metadata(rule, value, out, e), *e)
-	}}
+	})
 }
 
 // WithAction names the rule's action, which RuleSet.Bind resolves in a
 // registry of Go functions (spec/rules.md, Actions).
 func WithAction(name string) RuleOption {
-	return RuleOption{func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
+	return ruleOption(func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
 		p, n := text(name)
 		return check(C.cr_rule_with_action(rule, p, n, out, e), *e)
-	}}
+	})
 }
 
 // ---- Reading a rule.

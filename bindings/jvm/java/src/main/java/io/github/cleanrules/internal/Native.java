@@ -71,6 +71,13 @@ public final class Native {
     public static final int CR_LIMIT_EXCEEDED = 3;
     public static final int CR_ACTION_ERROR = 14;
 
+    /** A grid cell read as text ({@code cr_grid_push_row_cells}). */
+    public static final int CR_CELL_TEXT = 1;
+    /** A grid cell that is a value, strings included. */
+    public static final int CR_CELL_VALUE = 2;
+    /** A grid cell that is a node. */
+    public static final int CR_CELL_NODE = 3;
+
     public static final int CR_DOCUMENT_CONDITION = 1;
     public static final int CR_DOCUMENT_RULE = 2;
     public static final int CR_DOCUMENT_RULESET = 3;
@@ -483,7 +490,8 @@ public final class Native {
     private static final MethodHandle GRID_ADD_COLUMN_INPUT = bind("cr_grid_add_column_input", fn(I, P, P, P));
     private static final MethodHandle GRID_ADD_COLUMN_OUTPUT =
             bind("cr_grid_add_column_output", fn(I, P, P, SIZE_T, P, P));
-    private static final MethodHandle GRID_PUSH_ROW_NODES = bind("cr_grid_push_row_nodes", fn(I, P, P, P, SIZE_T, P));
+    private static final MethodHandle GRID_PUSH_ROW_CELLS =
+            bind("cr_grid_push_row_cells", fn(I, P, P, P, P, SIZE_T, P));
     private static final MethodHandle GRID_FINISH = bind("cr_grid_finish", fn(I, P, P, P));
     private static final MethodHandle GRID_FREE = bind("cr_grid_free", proc(P));
     private static final MethodHandle TREE_NEW_CONDITION =
@@ -2085,10 +2093,15 @@ public final class Native {
         }
     }
 
-    public static int gridPushRowNodes(
-            MemorySegment grid, MemorySegment row, MemorySegment nodes, long nodesLen, MemorySegment error) {
+    public static int gridPushRowCells(
+            MemorySegment grid,
+            MemorySegment row,
+            MemorySegment kinds,
+            MemorySegment nodes,
+            long len,
+            MemorySegment error) {
         try {
-            return (int) GRID_PUSH_ROW_NODES.invokeExact(grid, row, nodes, nodesLen, error);
+            return (int) GRID_PUSH_ROW_CELLS.invokeExact(grid, row, kinds, nodes, len, error);
         } catch (Throwable thrown) {
             throw rethrow(thrown);
         }

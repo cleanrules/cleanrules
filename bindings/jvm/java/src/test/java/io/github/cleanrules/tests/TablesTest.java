@@ -122,6 +122,27 @@ class TablesTest {
                 .row("-", Risk.LOW)
                 .build();
         assertEquals(List.of(TableOutput.of("t", "HIGH", "LOW")), listed.outputs());
+        // Under RULE and DESCRIPTION, an enum constant is the name or
+        // description (its name, unquoted); under PRIORITY, an error: the core
+        // decides by the column (cr_grid_push_row_cells).
+        DecisionTable named = DecisionTable.builder()
+                .header("RULE", "x", "THEN t", "DESCRIPTION")
+                .row(Risk.HIGH, "> 1", 1, Risk.LOW)
+                .build();
+        assertEquals(Optional.of("HIGH"), named.rows().getFirst().name());
+        assertEquals(Optional.of("LOW"), named.rows().getFirst().description());
+        assertEquals("HIT POLICY,first\nRULE,x,THEN t,DESCRIPTION\nHIGH,> 1,1,LOW\n", dumps(named, Format.CSV));
+        FormatException priority = assertThrows(FormatException.class, () -> DecisionTable.builder()
+                .header("x", "PRIORITY", "THEN t")
+                .row("> 1", Risk.HIGH, 1)
+                .build());
+        assertEquals(Optional.of("/rows/0/1"), priority.pointer());
+        // Any CharSequence that is not a String is a value too.
+        DecisionTable chars = DecisionTable.builder()
+                .header("x", "THEN t")
+                .row(new StringBuilder("VIP"), "1")
+                .build();
+        assertEquals(List.of(Optional.of(field("x").eq("VIP"))), chars.rows().getFirst().inputs());
     }
 
     @Test

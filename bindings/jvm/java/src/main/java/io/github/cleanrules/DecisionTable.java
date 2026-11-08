@@ -42,8 +42,9 @@ import java.util.function.Function;
  * ({@code field("age").lt(18)} under {@code age}), or an output's value;
  * {@code null} and {@code Optional.empty()} are empty cells; any other cell is
  * a constant, an enum constant its name as a string (under an input {@code x},
- * the test {@code x = value}; under an output, the value). Rows may be shorter
- * than the header.
+ * the test {@code x = value}; under an output, the value; under {@code RULE} or
+ * {@code DESCRIPTION}, the name or description; under {@code PRIORITY}, an
+ * error). Rows may be shorter than the header.
  *
  * <p>Or read one with {@link Documents#load(java.nio.file.Path)} or
  * {@link Documents#loads(String, Format)} (CSV, JSON or YAML), and write it
@@ -343,21 +344,23 @@ public final class DecisionTable implements DocumentContent {
         private static void row(MemorySegment grid, List<Object> cells, int r) {
             List<Object> values = new ArrayList<>(cells.size());
             List<Expr> nodes = new ArrayList<>(cells.size());
+            int[] kinds = new int[cells.size()];
             for (int c = 0; c < cells.size(); c++) {
                 Object cell = cells.get(c);
                 while (cell instanceof Optional<?> optional) {
                     cell = optional.orElse(null);
                 }
-                // An enum constant is a constant, its name (spec/data-model.md),
-                // and only strings are text (spec/tables.md, Grids): the string
-                // literal of its name, which needs no escaping.
-                if (cell instanceof Enum<?> constant) {
-                    cell = "'" + constant.name() + "'";
-                }
                 if (cell instanceof Expr node) {
                     values.add(null);
                     nodes.add(node);
+                    kinds[c] = Native.CR_CELL_NODE;
                 } else {
+                    // Only strings are text (spec/tables.md, Grids). Any other
+                    // value, an enum constant (its name) included, is a value,
+                    // which the core reads by its column: a constant under an
+                    // input or an output, a name or description under RULE or
+                    // DESCRIPTION.
+                    kinds[c] = cell instanceof String ? Native.CR_CELL_TEXT : Native.CR_CELL_VALUE;
                     if (!(cell instanceof String)) {
                         Build.check(cell, "/rows/" + r + "/" + c);
                     }
@@ -374,7 +377,8 @@ public final class DecisionTable implements DocumentContent {
                         all[c] = nodes.get(c) == null ? MemorySegment.NULL : pointers[next++];
                     }
                     try (Scope scope = new Scope()) {
-                        scope.check(Native.gridPushRowNodes(grid, row, scope.pointers(all), all.length, scope.error()));
+                        scope.check(Native.gridPushRowCells(
+                                grid, row, scope.ints(kinds), scope.pointers(all), all.length, scope.error()));
                     }
                     return null;
                 });

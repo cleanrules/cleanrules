@@ -498,8 +498,9 @@ or when they are slices or maps sharing their storage (slices also of the
 same length); two functions never are.
 
 **Values given back.** Outputs, payloads, aggregates, metadata, the values of
-an action's context and the values in an explanation (the values a cause
-read, a counterfactual's target) come back to Go as follows:
+an action's context, the values in an explanation (the values a cause
+read, a counterfactual's target), the output values of a decision table and
+the values in a result tree come back to Go as follows:
 
 | Value | Go |
 |---|---|
@@ -514,14 +515,16 @@ read, a counterfactual's target) come back to Go as follows:
 | aware datetime | `time.Time` at its instant: in its IANA zone when Go's zone database knows it (`time.LoadLocation`), whose rules then give the local fields; otherwise at its offset (`time.FixedZone`), and `Z` in `time.UTC` |
 | list | `[]any` |
 | map | `map[string]any`: Go's maps have no order, so the value's order is not kept |
-| opaque | the value it was read from (*Opaque values* above), the same object |
+| opaque | the value it was read from (*Opaque values* above), the same object; `nil` in a decision read from a document, which keeps only the type's name |
 
 A counterfactual's gap is an `int64`, `float64` or `cr.Decimal`, like the int,
 float or decimal above; between dates it is a `cr.GapDays`, and between
 datetimes a `cr.GapMicroseconds`, each an `int64` (a `time.Duration` cannot
-hold every gap). Priorities in notes and summaries are `int64` (`*int64` where
-a note may lack them). Each value reads back as the same value, except a map,
-whose keys come back sorted, and two kinds of aware datetimes, which read
+hold every gap). Priorities in notes, summaries and a decision table's rows
+are `int64` (`*int64` where a note or a row may lack them). Each value reads
+back as the same value, except a map, whose keys come back sorted, an opaque
+value of a decision read from a document, which comes back as `nil`, and two
+kinds of aware datetimes, which read
 back at their offset: one in a zone Go's database does not know, which comes
 back at its offset already, and one in a zone with a single offset for all
 time (`Etc/GMT+5`; the zone `UTC`, which comes back as `time.UTC`, reads back

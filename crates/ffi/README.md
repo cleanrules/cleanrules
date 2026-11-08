@@ -200,7 +200,11 @@ The whole program, with explanations and errors, is
   with a node, `cr_grid_add_column_output` with a key and a list of output
   values), which are read and checked at the first row or at
   `cr_grid_finish`, and may push rows whose cells are nodes
-  (`cr_grid_push_row_nodes`, one node pointer or `NULL` per cell). Errors
+  (`cr_grid_push_row_nodes`, one node pointer or `NULL` per cell), or rows
+  whose cells say what they are (`cr_grid_push_row_cells`: `CR_CELL_TEXT`,
+  `CR_CELL_VALUE` or `CR_CELL_NODE` per cell), so that a string can be a
+  value, such as an enum constant: a constant under an input or an output, a
+  name or description under `RULE` or `DESCRIPTION`. Errors
   point at `/header/<c>` or `/rows/<r>/<c>`. What a table holds:
   `cr_document_table_value` (its settings, the number of inputs and rows, and
   the outputs with their values), `cr_document_table_row` (a row's name,

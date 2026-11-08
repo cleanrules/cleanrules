@@ -143,6 +143,9 @@ class TablesSuite extends munit.FunSuite:
     // A case object as well (not a Cell type, so given as Any at run time, as from Java collections).
     val silver = DecisionTable(Seq("x", "THEN t"), Seq(Seq[Any]("1", Tiers.Silver).asInstanceOf[Seq[DecisionTable.Cell]]))
     assertEquals(silver.rows.head.outputs, Seq(Some(Const("Silver"))))
+    // Under RULE and DESCRIPTION, the name or description, unquoted.
+    val labels = DecisionTable(Seq("RULE", "x", "THEN t", "DESCRIPTION"), Seq(Seq(Level.High, "> 1", 1, Level.Low)))
+    assertEquals((labels.rows.head.name, labels.rows.head.description), (Some("High"), Some("Low")))
     // Rows may be shorter than the header.
     assertEquals(DecisionTable(Seq("a", "b", "THEN n"), Seq(Seq("> 1"))).rows.head.inputs, Seq(Some(F.a > 1), None))
 

@@ -224,8 +224,12 @@ spreadsheet or a data frame holds them in memory. A grid is the CSV of a table
 without its text layer. The settings are given apart, as in JSON (hit policy,
 aggregate, logic and strictness), and each cell is text, read as a CSV field,
 or a value. Bindings read their language's strings as text (in Erlang,
-binaries), so `'VIP'` is a string and `VIP` the field named `VIP`, as in the
-CSV file. A data frame keeps the types its library gave each column, so it
+binaries; in Go, values of type `string` itself), so `'VIP'` is a string and
+`VIP` the field named `VIP`, as in the CSV file. An enumeration constant is a
+value, never text: Java's enum constants and Scala's enum cases are their
+name, and a value of a Go named string type (`type Level string`, Go's
+enums) is its string, so `Level("high")` is the string `high`, not the field
+`high`. A data frame keeps the types its library gave each column, so it
 builds the table of the CSV file it was read from only when it was read as
 text: a library that reads `0.15` as a float makes it a float, where CSV reads
 a decimal.
@@ -241,12 +245,19 @@ a decimal.
 - **Cells**: text is read as an unquoted CSV field: `-`, `> 5`, `'VIP'`, names
   and descriptions without the space around them, and nothing or only space
   for an empty cell. Null is an empty cell (in JavaScript, `null`, `undefined`
-  and holes; in Java, `null` and `Optional.empty()`). Any other value `v` is, under an
-  input `x`, the condition `x = v`; under an output, the value `v`; under
-  `RULE` or `DESCRIPTION`, a string is read as text; and under `PRIORITY`, an
-  int, or a float with an integral value (data frames store ints with missing
-  values as floats), is the priority. Any other value under `RULE`,
-  `PRIORITY` or `DESCRIPTION` is a `format_error`. A host language may also
+  and holes; in Java, `null` and `Optional.empty()`; in Go, `nil` and a nil
+  pointer). Any other value `v` is, under an input `x`, the condition
+  `x = v`; under an output, the value `v`; under `RULE` or `DESCRIPTION`, a
+  string value is the name or description (its text, without the space around
+  it); and under `PRIORITY`, an int, or a float with an integral value (data
+  frames store ints with missing values as floats), is the priority. Any other
+  value under `RULE`, `PRIORITY` or `DESCRIPTION` is a `format_error`; under
+  `PRIORITY` that includes a string value, even one that spells a number,
+  since only text is read as a number. So an enumeration constant (a string
+  value) is a constant under an input or an output, a name or description
+  under `RULE` or `DESCRIPTION`, and an error under `PRIORITY`; the core
+  decides by the column, and the C ABI takes such cells with their kind
+  (`cr_grid_push_row_cells`, `CR_CELL_VALUE`). A host language may also
   give a cell as a node it built: under an input, the cell's condition, which
   must test its column (*Canonical text*); under an output, its value.
 

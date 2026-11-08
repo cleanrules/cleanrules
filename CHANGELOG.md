@@ -707,6 +707,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `limit::max_values`. Conformance: 14 vectors in `rules/limits.json`, with
   the new optional `limits` (`max_values`) of `evaluate` vectors, run with
   native data only. Go follows with H.1c.
+- Go binding, second part (task H.1b): documents, decision tables, result
+  trees and prebuilt libraries. `Loads` (a string; bytes as `string(b)`) and
+  `Load` (a file, its format from its extension `.json`, `.yaml`, `.yml`,
+  `.rules` or `.csv`, refused before reading when beyond its size limit) give
+  a `Document`, a sealed interface of `*Expr`, `*Rule`, `*RuleSet` and
+  `*DecisionTable` read with a type switch; `Dumps` and `Dump` write one.
+  Options of their own types (`LoadOption`, `TextOption`, `DumpOption`,
+  `ReadOption`, `TableOption`, `TreeOption`, `ValueTreeOption`), and an option
+  shared by several functions is a value of all their types (`FormatOption`,
+  `LimitsOption`, `ActionsOption`, `AggregateOption`, `LogicOption`,
+  `StrictOption`), so the compiler rejects an option where it does not apply:
+  `WithFormat` (`FormatJSON`, `FormatYAML`, `FormatText`, `FormatCSV`),
+  `WithLimits` with a `Limits` struct mirroring the C ABI's limits
+  (`DefaultLimits`; a 0 field keeps the default, a negative one is a
+  `format_error`; `MaxSize` sets every size limit unless `MaxYAMLSize` or
+  `MaxTextSize` is set) and `WithActions` (binds a rule set's action names on
+  loading; checks a rule's). A nil option of any kind is a
+  `rule_definition_error` whose hint lists the function's options. Go has no
+  `omit_actions`: a Go rule only names its action, which is always written.
+  `RuleFromText` (fuzzytool's verb), `RuleSet.ReadDecision` with format and
+  limits. `NewDecisionTable(header, rows, ...TableOption)` over the C ABI's
+  open grid: header items are CSV header texts (through pointers, named
+  string types too), input `*Expr`s or `TableOutput`s; cells are text
+  (`string`), empty (`nil` or a nil pointer), nodes (`*Expr`), named string
+  types as values (`type Level string`, Go's enums: a constant under inputs
+  and outputs, the name or description under `RULE` and `DESCRIPTION`, an
+  error under `PRIORITY`, never a field name) and other constants, each
+  given with its kind (`cr_grid_push_row_cells`), with errors pointing at
+  `/header/<c>` and `/rows/<r>/<c>`; `WithTablePolicy`
+  (`TablePolicyFirst`...`TablePolicyOutputOrder`, `TablePolicyCollect`), and
+  `WithAggregate`, `WithLogic` and `WithStrict` shared with rule sets.
+  `DecisionTable` gives `HitPolicy`, `Aggregate`, `Logic`, `Strict`,
+  `Inputs`, `Outputs`, `Len`, `Rows` (`TableRow`: name, priority as
+  `*int64`, description, cells as `*Expr` or nil), `RuleSet` (compiled once),
+  `Evaluate`, `EvaluateMany`, `Summary`, `JSON` and `Close`.
+  `Expr.EvaluateTree` (with `WithLogic` and `WithStrict`),
+  `EvaluateValueTree` (with `WithStrict`) and `ActionContext.Tree` give a
+  `ResultTree` (`Tag`, `Path`, `Truth`, `Value`, `Reason`, `Children`,
+  `Node()`, `JSON()`). Prebuilt static libraries (release with fat LTO and
+  one codegen unit, debug information stripped: 5 to 12 MB each) for eight
+  platforms at `lib/<os>_<arch>[_musl]/libcleanrules_ffi.a` of the module Go
+  users will get (task H.2), linked by `link_<os>_<arch>.go` files with each
+  target's system libraries as Rust 1.97 lists them: macOS x64 and arm64
+  (macOS 11.0), Linux x64 and arm64 with glibc 2.28 or later, the same with
+  musl (Alpine) under the tag `cleanrules_musl`, Windows x64 (MinGW-w64's GCC,
+  Rust's GNU target) and arm64 (llvm-mingw, Rust's GNU LLVM target); another
+  platform, Android and iOS included, stops the build with an error that
+  names the problem, and so does a build without cgo. In this repository
+  they need the tag `cleanrules_prebuilt`, and the default stays the library
+  cargo builds. `bindings/go/scripts/assemble.py` writes the module (the
+  package as it builds with that tag, the header, the libraries, and empty
+  packages so that `go mod vendor` copies them), `check-libs.py` checks it
+  (each library an archive of objects of its platform, and C probes linked
+  in manylinux_2_28 and Alpine: glibc 2.28 at most, or musl's libc), and the
+  workflow "Go libraries" (`go-libs.yml`, Rust 1.97) builds, assembles and
+  checks it and uses it from a clean module, also vendored, with the
+  package's tests, on Linux, macOS and Windows, x64 and arm64, and in Alpine.
+  Example `docs/examples/risk_table.go`.
+- C ABI: `cr_grid_push_row_cells`, a grid row whose cells say what they are
+  (`CR_CELL_TEXT`, `CR_CELL_VALUE`, `CR_CELL_NODE`), so that a string can be
+  a value, such as a host language's enum constant, which the core reads by
+  its column (task H.1b review).
 - C ABI, for what rules, documents, tables and result trees hold (task
   G.1d): `cr_ruleset_rule`, `cr_rule_name`, `cr_rule_description`,
   `cr_rule_action`, `cr_rule_priority`, `cr_rule_when`, `cr_rule_payload_len`,
@@ -955,6 +1017,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   vectors gain `rules/limits.json` and an optional `limits` for `evaluate`
   vectors (`conformance/README.md`, `vectors.schema.json`), which the runners
   without native data (core, C ABI, C++) and the JSON routes skip.
+- Go binding (task H.1b): `RuleOption` and `RuleSetOption` are interfaces,
+  and `WithLogic`, `WithStrict` and `WithAggregate` also apply to decision
+  tables (and the first two to result trees); a nil option is the
+  `rule_definition_error` a zero one was. On Windows on arm64 the repository
+  links `target/aarch64-pc-windows-gnullvm/debug`. `spec/tables.md`
+  (*Grids*): in Go, only values of type `string` are text, a named string
+  type is a value, and `nil` is an empty cell; a string value (an enum
+  constant) is a constant under an input or an output, the name or
+  description under `RULE` or `DESCRIPTION`, and a `format_error` under
+  `PRIORITY`; `spec/data-model.md` (*Go*): table output values, result trees
+  and row priorities given back, and opaque values of a decision read from a
+  document as `nil`.
+- Core: a string value in a grid's `PRIORITY` column is a `format_error`, as
+  `spec/tables.md` says, even one that spells a number; only text is read as
+  a number (task H.1b review).
+- Java and Scala: an enum constant in a `DecisionTable` row is given to the
+  core as a value (`cr_grid_push_row_cells`) instead of a quoted literal, so
+  under `RULE` or `DESCRIPTION` it is the name or description (its name, not
+  `'HIGH'`), and under `PRIORITY` an error; any `CharSequence` that is not a
+  `String` is a value too, as only strings are text; Scala's enum cases and
+  case objects follow (task H.1b review).
 - Core: a value or the null constant read as a condition document (JSON, YAML
   or text) says "only a condition can be a document, not the value ..." (it
   was "'add' is not a condition"), with a hint; the code and the pointer or

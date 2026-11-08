@@ -31,10 +31,23 @@
 // RuleSet.Bind and Run call Go functions for the actions the selected rules
 // name.
 //
+// # Documents, tables and result trees
+//
+// Loads and Load read a condition, rule, rule set or decision table from
+// JSON, YAML, the rule syntax or CSV, as a Document to read with a type
+// switch; Dumps and Dump write one; RuleFromText reads one rule, and
+// RuleSet.ReadDecision a recorded decision. NewDecisionTable builds a
+// decision table from a header and rows of cells. Expr.EvaluateTree,
+// Expr.EvaluateValueTree and ActionContext.Tree give a ResultTree. Each
+// function takes options of its own type (WithFormat, WithLimits,
+// WithActions, WithTablePolicy...).
+//
 // # Errors
 //
 // Every error is an *Error with a stable Code and its context, except
-// ErrClosed, for a RuleSet or Decision used after Close; errors.Is matches
+// ErrClosed, for a RuleSet, Decision or DecisionTable used after Close, and
+// the errors of files that Load and Dump cannot read, write or tell the
+// format of; errors.Is matches
 // an *Error with the sentinel of its code or of an ancestor (ErrEvaluation
 // for a missing_field), and errors.As reads its fields.
 //
@@ -47,17 +60,22 @@
 // unreachable (runtime.AddCleanup). The maps and slices a Decision gives are
 // copies. Each action runs on a goroutine of its own while Run's goroutine
 // waits, so that a panic or runtime.Goexit never unwinds through the
-// core's frames. Calls into the core run on the thread's stack, not the goroutine's
-// (as every cgo call does). At the default limits a call needs at most 128
-// KiB of it with a release build of the library, and 512 KiB with a debug
-// build, which is what cargo build gives by default: well within the default
-// thread stacks of Linux (8 MiB), but at the edge of macOS's 512 KiB for
-// threads other than the main one, so link a release build in production
-// (README.md, Linking another build).
+// core's frames. Calls into the core run on the thread's stack, not the
+// goroutine's (as every cgo call does). At the default limits a call needs at
+// most 128 KiB of it with a release build of the library, as the prebuilt
+// ones are, and 512 KiB with a debug build, which is what cargo build gives
+// by default in the repository: well within the default thread stacks of
+// Linux (8 MiB), but at the edge of macOS's 512 KiB for threads other than
+// the main one.
 //
 // # Linking
 //
-// The package links the static library cargo builds in the repository
-// (cargo build -p cleanrules-ffi; on Windows, for the x86_64-pc-windows-gnu
-// target, because cgo uses MinGW-w64). See README.md.
+// The module Go users get links a prebuilt static library of the core for
+// its platform: macOS and Linux on x64 and arm64, Linux with musl under the
+// tag cleanrules_musl (Go has no GOOS for it), and Windows on x64 (MinGW-w64)
+// and arm64 (llvm-mingw); another platform stops the build with an error
+// that names it. In the repository, the package links the static library
+// cargo builds (cargo build -p cleanrules-ffi), and the tag
+// cleanrules_prebuilt the prebuilt ones; with the tag cleanrules_external,
+// CGO_LDFLAGS gives the library. See README.md.
 package cleanrules

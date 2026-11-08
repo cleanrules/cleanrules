@@ -177,9 +177,9 @@ func TestNoInvalidArgument(t *testing.T) {
 		"lookup":      func() error { _, err := rs.Rule(bad); return err }(),
 		"decimal":     func() error { _, err := ParseDecimal("abc"); return err }(),
 		"text test":   Field("x").Contains(bad).Err(),
-		"zero option": func() error { _, err := NewRule("r", x, RuleOption{}); return err }(),
+		"zero option": func() error { _, err := NewRule("r", x, nil); return err }(),
 		"zero set option": func() error {
-			_, err := NewRuleSet(nil, RuleSetOption{})
+			_, err := NewRuleSet(nil, nil)
 			return err
 		}(),
 	}

@@ -300,6 +300,93 @@ fn push_nodes(grid: &Grid, row: &str, nodes: &[Option<&Node>]) -> Result<(), Fai
     })
 }
 
+fn push_cells(
+    grid: &Grid,
+    row: &str,
+    kinds: &[cr_cell_kind],
+    nodes: Option<&[Option<&Node>]>,
+) -> Result<(), Failure> {
+    let row = value_from_json(row).unwrap();
+    let pointers: Option<Vec<*const cr_node>> = nodes.map(|nodes| {
+        nodes
+            .iter()
+            .map(|n| n.map_or(ptr::null(), |n| n.0.cast_const()))
+            .collect()
+    });
+    let nodes = pointers.as_ref().map_or(ptr::null(), Vec::as_ptr);
+    // SAFETY: a live grid and row, `kinds.len()` kinds, and NULL or as many
+    // NULL or live nodes.
+    ok_or(|e| unsafe {
+        cr_grid_push_row_cells(grid.0, row.0, kinds.as_ptr(), nodes, kinds.len(), e)
+    })
+}
+
+#[test]
+fn typed_cells_make_a_string_a_constant_a_name_or_a_description_by_column() {
+    let grid = open_grid("first");
+    for text in ["RULE", "x", "THEN t", "DESCRIPTION", "PRIORITY"] {
+        add_text(&grid, text).unwrap();
+    }
+    let (t, v, n) = (CR_CELL_TEXT, CR_CELL_VALUE, CR_CELL_NODE);
+    // A string value: the name and description's text, the constant under
+    // the input and the output.
+    push_cells(
+        &grid,
+        r#"["a", "HIGH", "HIGH", "HIGH", 3]"#,
+        &[v, v, v, v, v],
+        None,
+    )
+    .unwrap();
+    let low = read_node("x = 'LOW'", CR_FORMAT_TEXT).unwrap();
+    push_cells(
+        &grid,
+        r#"["b", null, "'LOW'", null, "2"]"#,
+        &[t, n, t, v, t],
+        Some(&[None, Some(&low), None, None, None]),
+    )
+    .unwrap();
+    let table = finish(grid).unwrap();
+    assert_eq!(
+        write_document(&table, CR_FORMAT_CSV).unwrap(),
+        "HIT POLICY,first\nRULE,PRIORITY,x,THEN t,DESCRIPTION\na,3,'HIGH','HIGH',HIGH\nb,2,'LOW','LOW',\n"
+    );
+
+    // Under PRIORITY, a string value is not a number.
+    let grid = open_grid("first");
+    add_text(&grid, "x").unwrap();
+    add_text(&grid, "PRIORITY").unwrap();
+    let failure = push_cells(&grid, r#"["1", "5"]"#, &[t, v], None)
+        .err()
+        .unwrap();
+    assert_eq!(failure.status, CR_FORMAT_ERROR);
+    assert!(cleanrules::json::to_string(&failure.json).contains("/rows/0/1"));
+
+    // Misuse: a text cell that is not a string, a node cell without a node,
+    // an unknown kind, a length that is not the row's, NULL kinds.
+    let grid = open_grid("first");
+    add_text(&grid, "x").unwrap();
+    for (row, kinds, nodes) in [
+        ("[1]", vec![t], None),
+        ("[null]", vec![n], None),
+        ("[null]", vec![n], Some(&[None][..])),
+        ("[null]", vec![9], None),
+        ("[null, null]", vec![v], None),
+    ] {
+        let failure = push_cells(&grid, row, &kinds, nodes).err().unwrap();
+        assert_eq!(failure.status, CR_INVALID_ARGUMENT, "{row} {kinds:?}");
+    }
+    let row = value_from_json("[null]").unwrap();
+    // SAFETY: a live grid and row; NULL kinds, which the call refuses.
+    let status = unsafe {
+        cr_grid_push_row_cells(grid.0, row.0, ptr::null(), ptr::null(), 1, ptr::null_mut())
+    };
+    assert_eq!(status, CR_INVALID_ARGUMENT);
+    // Those misuses did not spoil the grid; an empty row is fine.
+    push_cells(&grid, "[]", &[], None).unwrap();
+    push_cells(&grid, r#"["> 1"]"#, &[t], None).unwrap();
+    finish(grid).unwrap();
+}
+
 #[test]
 fn an_open_grid_takes_nodes_and_outputs_and_the_table_says_what_it_holds() {
     let grid = open_grid("priority");

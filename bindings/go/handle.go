@@ -7,9 +7,10 @@ import (
 	"unsafe"
 )
 
-// ErrClosed is returned by a method of a RuleSet or a Decision used after
-// Close, and of a nil or zero RuleSet or Decision (one not made by this
-// package). It is the one error of the package that is not an *Error.
+// ErrClosed is returned by a method of a RuleSet, a Decision or a
+// DecisionTable used after Close, and of a nil or zero one (one not made by
+// this package). It is not an *Error, nor are the errors of the files Load
+// and Dump cannot read, write or tell the format of.
 var ErrClosed = errors.New("cleanrules: the object is closed")
 
 // handle owns one object of the C ABI and frees it once: when Close is

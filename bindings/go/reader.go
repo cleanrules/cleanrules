@@ -118,8 +118,21 @@ var (
 		reflect.TypeFor[TagUsage]():        true,
 		reflect.TypeFor[PayloadEntry]():    true,
 		reflect.TypeFor[ActionContext]():   true,
-		reflect.TypeFor[RuleOption]():      true,
-		reflect.TypeFor[RuleSetOption]():   true,
+		reflect.TypeFor[ruleOption]():      true,
+		reflect.TypeFor[DecisionTable]():   true,
+		reflect.TypeFor[TableRow]():        true,
+		reflect.TypeFor[TableOutput]():     true,
+		reflect.TypeFor[ResultTree]():      true,
+		reflect.TypeFor[Limits]():          true,
+		// The options' own types (the option types are interfaces).
+		reflect.TypeFor[hitPolicyOption]():   true,
+		reflect.TypeFor[tablePolicyOption](): true,
+		reflect.TypeFor[aggregateOption]():   true,
+		reflect.TypeFor[logicOption]():       true,
+		reflect.TypeFor[strictOption]():      true,
+		reflect.TypeFor[formatOption]():      true,
+		reflect.TypeFor[limitsOption]():      true,
+		reflect.TypeFor[actionsOption]():     true,
 	}
 )
 

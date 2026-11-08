@@ -3,33 +3,82 @@
 The Go binding of cleanrules: the same engine and the same concepts as every
 other language (`Rule`, `RuleSet`, `Decision`, `Explain`, `Summary`), on the C
 ABI ([`crates/ffi`](../../crates/ffi/README.md)) through cgo. Go builds
-conditions and rules in code, reads Go data into the engine's values, and gets
-decisions, explanations and summaries back as Go values; the core checks,
-evaluates, explains and summarizes everything (no rule logic in Go).
+conditions, rules and decision tables in code or reads them from documents
+(JSON, YAML, the rule syntax, CSV), reads Go data into the engine's values,
+and gets decisions, explanations, summaries and result trees back as Go
+values; the core reads, checks, evaluates, explains and summarizes everything
+(no rule logic in Go).
 
-Go 1.24 or later, standard library only. Module
-`github.com/cleanrules/cleanrules/bindings/go` (package `cleanrules`), not
-published yet: task H.2 publishes it from its own repository,
-`github.com/cleanrules/cleanrules-go`, with prebuilt libraries. This first
-part (task H.1a) builds rules in code; documents (`loads`/`dumps`),
-`RuleFromText`, decision tables, result trees and the prebuilt libraries come
-with task H.1b.
+Go 1.24 or later, standard library only; cgo, so a C compiler (see
+*Platforms*). Module `github.com/cleanrules/cleanrules/bindings/go` (package
+`cleanrules`), not published yet: task H.2 publishes it from its own
+repository, `github.com/cleanrules/cleanrules-go`, with the prebuilt
+libraries below, so that `go get` needs no Rust.
 
-## Building
+## Installing
 
-The package links the static library that cargo builds in this repository,
-by its full path (`link.go`), so build that first. From the repository's
-root, on Linux and macOS:
+The module Go users get holds a prebuilt static library for each platform
+(`lib/<os>_<arch>[_musl]/libcleanrules_ffi.a`) and the C ABI's header
+(`include/`), and links the library of the platform it builds for: nothing to
+build, no Rust. Until H.2 publishes it, CI assembles it as the artifact
+`go-module` of the workflow "Go libraries" (`.github/workflows/go-libs.yml`);
+use it with a `replace` directive:
+
+```text
+require github.com/cleanrules/cleanrules/bindings/go v0.0.0
+replace github.com/cleanrules/cleanrules/bindings/go => ../go-module
+```
+
+### Platforms
+
+| Platform | Library | C compiler cgo needs |
+|---|---|---|
+| macOS x64, arm64 | `darwin_amd64`, `darwin_arm64` (macOS 11.0 or later, as Go 1.24) | Xcode's command line tools |
+| Linux x64, arm64, glibc | `linux_amd64`, `linux_arm64` (glibc 2.28 or later) | gcc or clang |
+| Linux x64, arm64, musl (Alpine) | `linux_amd64_musl`, `linux_arm64_musl`, with **`-tags cleanrules_musl`** | `apk add build-base` |
+| Windows x64 | `windows_amd64`, for MinGW-w64's GCC (Rust's `x86_64-pc-windows-gnu`) | MinGW-w64 gcc (MSYS2, w64devkit...) |
+| Windows arm64 | `windows_arm64`, for llvm-mingw (Rust's `aarch64-pc-windows-gnullvm`) | [llvm-mingw](https://github.com/mstorsjo/llvm-mingw), with `CC=aarch64-w64-mingw32-clang` |
+
+The package needs cgo: `CGO_ENABLED=1` (Go's default when it finds a C
+compiler; cross-compiling turns it off unless set) and the C compiler of the
+table. Without cgo the build stops with `undefined:
+cleanrules_needs_cgo__set_CGO_ENABLED_1_and_install_a_C_compiler__see_README_md_Platforms`.
+
+Go has no GOOS for musl, so a program for Alpine (or any musl system) builds
+with `go build -tags cleanrules_musl`; without it, the glibc library fails to
+link there. On Windows, cgo's C compiler decides: GCC's MinGW-w64 on x64, and
+on arm64 llvm-mingw, since GCC has no Windows on arm64 target (the libraries
+of Rust's MSVC targets expect Microsoft's linker and C runtime instead). On
+any other platform, Android and iOS included (whose builds also take the
+files of Linux and macOS), the build stops with the error `undefined:
+cleanrules_has_no_prebuilt_library_for_this_GOOS_and_GOARCH__see_README_md_Platforms`:
+build the library there from the repository and link it as *Linking another
+build* says.
+
+The libraries are release builds with fat link-time optimization and one
+codegen unit, stripped of debug information (but Windows on arm64's, which
+`llvm-strip` cannot rewrite): 5 to 8 MB each, 12 MB on Windows on arm64,
+about 60 MB for the eight (built with Rust 1.97 on macOS; CI builds them on
+each platform). Each one links the system libraries that
+`rustc --print native-static-libs` asks for on its target with Rust 1.97
+(`link_*.go`, which CI checks against rustc, pinned to that version). `go mod vendor` works: the library and header
+directories hold empty packages that the module imports, so that they are
+copied.
+
+## Building in this repository
+
+In this repository the package links the static library that cargo builds,
+by its full path (`link.go`), so contributors need no prebuilt library: build
+that first. From the repository's root, on Linux and macOS:
 
 ```bash
 cargo build -p cleanrules-ffi
 (cd bindings/go && go test -count=1 ./...)
 ```
 
-On Windows, cgo compiles and links with MinGW-w64's `gcc`, whose objects and C
-runtime are GNU's; the library of Rust's default MSVC target expects
-Microsoft's runtime and linker. So build the library for the GNU target (only
-the static library, which needs no linker of its own):
+On Windows, build the library for the GNU target (only the static library,
+which needs no linker of its own): `x86_64-pc-windows-gnu` on x64, and
+`aarch64-pc-windows-gnullvm` on arm64 (with llvm-mingw as cgo's compiler):
 
 ```bash
 rustup target add x86_64-pc-windows-gnu
@@ -47,11 +96,42 @@ is there).
 `ok (cached)`. With `-count=1` the test binary is linked and run again; CI
 always uses it.
 
+### The prebuilt libraries
+
+The tag `cleanrules_prebuilt` links the prebuilt libraries instead
+(`link_<os>_<arch>.go`, `link_musl_linux_<arch>.go` and
+`include_prebuilt.go`), from `lib/` and `include/` in `bindings/go`
+(ignored by git). To build them and the module, as CI does, from the
+repository's root:
+
+```bash
+rustup component add llvm-tools
+bash bindings/go/scripts/build-lib.sh aarch64-apple-darwin darwin_arm64 go-libs   # one per platform
+python3 bindings/go/scripts/assemble.py go-libs/libs go-module                    # needs all eight
+python3 bindings/go/scripts/check-libs.py go-module                               # --probes go-libs/probes for Linux
+bash bindings/go/scripts/smoke.sh go-module /tmp/smoke                            # [cleanrules_musl]
+```
+
+`build-lib.sh` builds a platform's library in release (`cargo rustc
+--crate-type staticlib --target ...`, which needs no linker of the target, so
+every library can be built on any host that has its Rust target), checks
+that its link file links every system library rustc asks for, strips it and,
+with `--probe` on Linux, links and runs `scripts/probe.c` with it.
+`assemble.py` writes the module: the package's Go files as they build with
+`cleanrules_prebuilt` (the tag removed; `link.go` and `include.go` left out),
+the header, the libraries and their empty packages. `check-libs.py` checks
+it: exactly the eight libraries, each an archive of objects of its system and
+processor, macOS 11.0 at most, glibc's own symbols in the glibc ones and none
+in the musl ones, and, from the probes CI links in manylinux_2_28 and Alpine,
+glibc 2.28 at most or musl's libc. `smoke.sh` uses the module from a clean
+module (also vendored), then runs this package's tests with the tag. The
+workflow "Go libraries" runs all of it on every platform, and publishes
+nothing.
+
 ### Linking another build
 
-`link.go` links `target/debug` (or `target/x86_64-pc-windows-gnu/debug`) of
-this repository. To link another build, such as a release one, build with the
-tag `cleanrules_external` and give the library and the system libraries that
+To link another build, such as a release one, build with the tag
+`cleanrules_external` and give the library and the system libraries that
 Rust's standard library needs in `CGO_LDFLAGS`. From the repository's root,
 on macOS:
 
@@ -61,15 +141,16 @@ cargo build -p cleanrules-ffi --release
     go test -count=1 -tags cleanrules_external ./...)
 ```
 
-The system libraries of each platform are those of `link.go`, which are the
-ones `cargo rustc -p cleanrules-ffi --lib --crate-type staticlib -- --print native-static-libs`
+The system libraries of each platform are those of `link.go` and of the
+`link_*.go` files, which are the ones
+`cargo rustc -p cleanrules-ffi --lib --crate-type staticlib -- --print native-static-libs`
 prints with Rust 1.97 (without the C library, which the compiler links
-anyway): Linux `-lgcc_s -lutil -lrt -lpthread -lm -ldl`, macOS `-lm`, Windows
-`-lkernel32 -lntdll -luserenv -lws2_32 -ldbghelp`. CI prints the list on each
-platform and warns when it differs from `link.go`. Link the static library by
-its path rather than with `-L` and `-l`: cargo writes the shared library next
-to it, which the linkers of Linux and macOS would prefer, and which the
-program then has to find when it runs.
+anyway): Linux with glibc `-lgcc_s -lutil -lrt -lpthread -lm -ldl`, with musl
+`-lgcc_s`, macOS `-lm`, Windows x64 `-lkernel32 -lntdll -luserenv -lws2_32
+-ldbghelp`, and Windows arm64 the same and `-lunwind`. Link the static
+library by its path rather than with `-L` and `-l`: cargo writes the shared
+library next to it, which the linkers of Linux and macOS would prefer, and
+which the program then has to find when it runs.
 
 ## Conditions and rules in code
 
@@ -230,6 +311,140 @@ panic, or `runtime.Goexit` (what `t.FailNow` and `t.Fatal` call), stops the
 run too, and `Run` then panics again with the same value, or calls
 `runtime.Goexit`, on its own goroutine.
 
+## Documents
+
+Conditions, rules, rule sets and decision tables are read from and written to
+documents: JSON (`spec/json-format.md`), the contract between languages, YAML
+with the same documents, the rule syntax (`spec/text.md`) and CSV for
+decision tables (`spec/tables.md`). The core reads and writes them, strictly
+and within limits.
+
+```go
+doc, err := cr.Load("pricing.yaml", cr.WithActions(cr.Actions{"notify_sales": notify}))
+switch doc := doc.(type) {                 // a cr.Document
+case *cr.RuleSet:                          // bound: doc.Run(order) calls notify
+case *cr.DecisionTable:
+case *cr.Rule:
+case *cr.Expr:                             // a condition document
+}
+doc, err = cr.Loads(text, cr.WithFormat(cr.FormatText), cr.WithLimits(cr.Limits{MaxDepth: 32}))
+yaml, err := cr.Dumps(rules, cr.WithFormat(cr.FormatYAML))
+err = cr.Dump(rules, "pricing.rules")      // the format of the extension
+vip, err := cr.RuleFromText("RULE vip IF customer.years > 5 THEN discount = 0.15")
+recorded, err := rules.ReadDecision(decisionJSON)   // checked against its rule set
+```
+
+`Loads` takes a string, as `RuleFromText` and `ReadDecision` do (give bytes
+as `string(b)`), and gives a `Document`: an interface that only `*Expr`, `*Rule`, `*RuleSet` and
+`*DecisionTable` implement, read with a type switch or `doc.(*cr.RuleSet)`,
+the way Go reads a union (there are no typed variants: a type assertion is
+one line). `Load` and `Dump` take the format of the file's extension (`.json`,
+`.yaml`, `.yml`, `.rules`, `.csv`) unless `WithFormat` gives one, and `Load`
+refuses a file beyond the size limit of its format before reading it
+(`limit_exceeded`, whose hint names the `Limits` field to raise). A file that
+cannot be read gives the `*fs.PathError` of `os`, and an extension that tells
+no format a plain error: neither is a `*cr.Error`.
+
+Each function takes options of its own type, and an option that means the
+same for several is a value of all their types, so the compiler rejects one
+where it does not apply: `WithFormat` (`FormatJSON` by default, `FormatYAML`,
+`FormatText`, `FormatCSV`) for `Loads`, `Load`, `Dumps`, `Dump` and
+`ReadDecision`; `WithLimits` for those that read and `NewDecisionTable`;
+`WithActions` for `Loads`, `Load` and `RuleFromText`. A nil option is a
+`rule_definition_error` whose hint lists the function's options.
+
+`Limits` mirrors the C ABI's limits (`MaxSize`, `MaxNesting`, `MaxDepth`,
+`MaxTableSize`, `MaxYAMLSize`, `MaxTextSize`). A field left at 0 keeps the
+core's default, and a negative one is a `format_error` that names it.
+`MaxSize` is the size limit of every format at once, and `MaxYAMLSize` and
+`MaxTextSize`, when set, change those of YAML and of text and CSV:
+
+```go
+cr.Limits{MaxSize: 1 << 20}                    // JSON, YAML and text: 1 MiB
+cr.Limits{MaxSize: 1 << 20, MaxYAMLSize: 4096} // JSON and text 1 MiB, YAML 4 KiB
+limits := cr.DefaultLimits()                   // every field set, to the defaults:
+limits.MaxSize = 64 << 20                      // so this raises JSON's only
+```
+
+`DefaultLimits` gives the real defaults (MaxSize the JSON one) rather than 0
+for "follow MaxSize": a `Limits` made from it means the defaults exactly, and
+YAML keeps its smaller default (1 MiB) unless changed.
+
+Rules read from a document keep the core's own rules, so they write back
+exactly. A rule's action is a name, never code: `WithActions` binds the names
+of a rule set (as `Bind` does, so a missing name is a `registry_error`); a
+`*Rule` holds no function in Go, so for a rule it only checks the name, and a
+decision table has no actions. A Go rule only ever names its action, which
+is always written as its name, so writing never refuses a rule for its
+action and Go has no `omit_actions` option (`spec/json-format.md`, *Writing
+errors*).
+
+## Decision tables
+
+```go
+table, err := cr.NewDecisionTable(
+    []any{"RULE", cr.Field("customer", "years"), "order.total", "THEN discount",
+        cr.TableOutput{Name: "risk", Values: []any{"high", "medium", "low"}}},
+    [][]any{
+        {"new", cr.Field("customer", "years").Lt(1), "> 1000", 0, "'high'"},
+        {"vip", "> 5", "-", cr.MustDecimal("0.15"), "'low'"},
+        {"big", nil, "> 5000", cr.MustDecimal("0.05"), Medium},   // type Risk string
+    },
+    cr.WithTablePolicy(cr.TablePolicyPriority))
+decision, err := table.Evaluate(order)
+csv, err := cr.Dumps(table, cr.WithFormat(cr.FormatCSV))
+```
+
+A table is a grid (`spec/tables.md`, *Grids*). Each header item is a CSV
+header text (`"RULE"`, `"PRIORITY"`, `"DESCRIPTION"`, `"THEN key"`,
+`"THEN key IN (...)"` or an input expression; through pointers, and a named
+string type too), an input `*Expr`, or a `TableOutput` (or a pointer to one)
+with its output values, highest priority first. Each row holds cells in column order, and may be shorter than the
+header:
+
+| Cell | Meaning |
+|---|---|
+| `string` (also through a pointer) | text, as in the CSV: `"> 5"`, `"-"`, `"'VIP'"` (the string), `"VIP"` (the field) |
+| `nil`, a nil pointer | empty |
+| `*Expr` | under an input, its condition, which must test its column; under an output, its value |
+| a named string type (`type Risk string`) | a value, its string: under an input or an output a constant (`'medium'`), under `RULE` or `DESCRIPTION` the name or description, under `PRIORITY` a `format_error`; Go's enums are never field names |
+| any other value | a constant, as `Const` reads it: under an input `x`, the test `x = value`; under `PRIORITY`, an int |
+
+The core decides what a value means by its column: the package gives each
+cell with its kind (text, value or node, `cr_grid_push_row_cells`), as Java
+gives its enum constants.
+
+Errors point into the grid, counting from 0: `/header/<c>`, `/rows/<r>/<c>`,
+`/rows/<r>`, `/aggregate`. Options: `WithTablePolicy` (`TablePolicyFirst` by
+default, ...`Priority`, ...`Unique`, ...`Any`, ...`RuleOrder`,
+...`OutputOrder`, ...`Collect`), `WithAggregate`, `WithLogic`, `WithStrict`
+and `WithLimits`. A table gives `HitPolicy`, `Aggregate`, `Logic`, `Strict`,
+`Inputs`, `Outputs` (output values as Go values; nil for any value), `Len`,
+`Rows` (`TableRow`: `Name`, `Priority` as `*int64`, `Description`, and cells
+as `*Expr`, nil for an empty one), `RuleSet` (compiled once), `Evaluate`,
+`EvaluateMany`, `Summary`, `JSON` and `Close`.
+
+## Result trees
+
+```go
+tree, err := cond.EvaluateTree(order, cr.WithLogic("boolean"), cr.WithStrict(false))
+tree.Truth                                 // *cr.Truth: nil for a value
+tree.Children[1].Reason.Code               // "missing_field"
+tree.Children[1].Node()                    // the node evaluated: order.total > 1000
+tree.JSON()                                // the core's JSON of this subtree
+value, err := cr.Field("order", "total").Mul(0.9).EvaluateValueTree(order)
+```
+
+`EvaluateTree` evaluates a condition and `EvaluateValueTree` a value, on Go
+data read along the node's paths (`spec/ast.md`, *Evaluating one node*). A
+`ResultTree` is a struct of exported fields, the tree's own (changing them
+changes nothing else): `Tag` (the node's tag, the `op` of its JSON form),
+`Path` (a field's), `Truth` (nil for a value), `Value` (as values are given
+back), `Reason` and `Children`; and two methods that read the native tree,
+`Node()` and `JSON()`. `EvaluateTree` takes `WithLogic` and `WithStrict`,
+`EvaluateValueTree` only `WithStrict` (a value has no truth to combine). In an action, `ctx.Tree()` is the result tree of the rule's
+condition in the decision.
+
 ## Errors
 
 Errors are values: every error of cleanrules is an `*cr.Error` (except
@@ -257,20 +472,24 @@ Each code has a sentinel (`ErrFormat`, `ErrExpression`, `ErrRuleDefinition`,
 `errors.Is` matches for the code and its descendants. `ErrInvalidArgument`
 (an argument the C ABI refuses, which the package checks first) and
 `ErrInternal` are bugs: please report them. `ErrClosed`, which is not an
-`*Error`, is a rule set or decision used after `Close`, or a nil or zero one.
+`*Error`, is a rule set, decision or decision table used after `Close`, or a
+nil or zero one.
 
 The core writes the messages. The package writes these few itself, as the
 other bindings do: a NaN constant and a time finer than a microsecond (which
-a value cannot carry), an unknown `Closed`, a nil or zero `*Expr`, `*Rule` or
-option, and `rule_not_found` from `WhyNot` and `Explanation.ForRule` (in the
-core's words, from the names a decision keeps). A Go program never sees the
+a value cannot carry; in a table, with the cell's pointer), an unknown
+`Closed` or `Format`, a nil or zero `*Expr`, `*Rule`, `Document` or option, a
+header item of another type, a file beyond its size limit, and
+`rule_not_found` from `WhyNot` and `Explanation.ForRule` (in the core's
+words, from the names a decision keeps). A Go program never sees the
 name of a C function in a message.
 
 ## Goroutines and memory
 
-`Expr`, `Rule`, `RuleSet` and `Decision` never change once made: any number
-of goroutines may use one at once. Nil and zero values give errors, never
-panics. `RuleSet.Close` and `Decision.Close` free
+`Expr`, `Rule`, `RuleSet`, `Decision`, `DecisionTable` and `ResultTree`
+never change once made: any number of goroutines may use one at once. Nil and
+zero values give errors, never panics. `RuleSet.Close`, `Decision.Close` and
+`DecisionTable.Close` (which closes the table's rule set too) free
 the native memory now (when the calls using it return, even on other
 goroutines); later calls give `ErrClosed`, and decisions outlive their rule
 set. Without `Close`, the memory is freed once the Go object is unreachable
@@ -293,9 +512,14 @@ The tests cover every node and its text, constants and the errors of
 construction, rules and rule sets, each Go kind both ways, structs, opaque
 values, errors with their codes and context, actions (an error, an error
 whose `Error` panics, a panic, `runtime.Goexit`, nested runs, goroutines),
-`Close`, cleanups and shared ownership, nil and zero values, concurrency, the
-example
-[`docs/examples/discounts.go`](../../docs/examples/discounts.go) and a smoke
+`Close`, cleanups and shared ownership, nil and zero values, concurrency,
+documents (each kind in each format both ways, files, limits, actions on
+loading, `RuleFromText`, `ReadDecision`), decision tables (each kind of cell,
+errors with their pointers, settings, formats), result trees and
+`ActionContext.Tree`, which files link the library on each platform and tag,
+the examples
+[`docs/examples/discounts.go`](../../docs/examples/discounts.go) and
+[`docs/examples/risk_table.go`](../../docs/examples/risk_table.go), and a smoke
 pass over 623 conformance vectors (`rules/`, `explain/`, and the generated
 rule sets and explanations) built with this API and Go data. The full runner
 is task H.2.
