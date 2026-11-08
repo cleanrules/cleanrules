@@ -271,7 +271,7 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           docker run --rm -v "$PWD:/work:ro" -w /tmp -e ARCH "$IMAGE" bash -euxo pipefail -c '
-            ldd --version | head -n 1
+            ldd --version | sed -n 1p   # sed reads it all: no SIGPIPE under pipefail
             # The latest GA build: Adoptium redirects to the release asset.
             api="https://api.adoptium.net/v3/binary/latest/25/ga/linux/$ARCH/jdk/hotspot/normal/eclipse"
             url=$(curl -fsS -o /dev/null -w "%{redirect_url}" "$api")
