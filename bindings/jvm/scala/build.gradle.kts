@@ -57,6 +57,9 @@ dependencies {
     api(project(":java"))
     api("org.scala-lang:scala3-library_3:3.3.9")
     testImplementation("org.scalameta:munit_3:1.3.6")
+    // The conformance runner's engine, shared with the Java tests (the Java
+    // project's test fixtures): the Scala route extends it.
+    testImplementation(testFixtures(project(":java")))
 }
 
 tasks.withType<ScalaCompile>().configureEach {
@@ -103,6 +106,12 @@ tasks.test {
     systemProperty("cleanrules.library.path", library.get())
     systemProperty("cleanrules.examples", repository.resolve("docs/examples").path)
     inputs.dir(repository.resolve("docs/examples")).withPropertyName("examples")
+    // The conformance vectors and the Scala route's report (as the Java tests').
+    inputs.dir(repository.resolve("conformance/vectors")).withPropertyName("vectors")
+    systemProperty("cleanrules.conformance.vectors", repository.resolve("conformance/vectors").path)
+    val conformanceReport = layout.buildDirectory.file("reports/conformance/conformance.txt")
+    outputs.file(conformanceReport).withPropertyName("conformanceReport")
+    systemProperty("cleanrules.conformance.report", conformanceReport.get().asFile.path)
     jvmArgs("--enable-native-access=ALL-UNNAMED", "--illegal-native-access=deny")
     // As the Java tests: Java's default thread stack on Linux and Windows.
     jvmArgs("-Xss1m")

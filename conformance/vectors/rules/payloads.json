@@ -295,6 +295,91 @@
           ]
         }
       }
+    },
+    {
+      "id": "rules/payloads/map-order-kept",
+      "spec": [
+        "data-model.md#lists-and-maps",
+        "rules.md#outputs"
+      ],
+      "description": "a map passed through a payload keeps the order of its keys, which are not sorted, also in a nested map",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "m": {
+                  "op": "field",
+                  "path": [
+                    "m"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "m": {
+            "b": 1,
+            "a": {
+              "z": true,
+              "y": null
+            },
+            "\u00e9": "x",
+            "Z": 2.5
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "a",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "m": {
+                  "op": "field",
+                  "path": [
+                    "m"
+                  ],
+                  "value": {
+                    "b": 1,
+                    "a": {
+                      "z": true,
+                      "y": null
+                    },
+                    "\u00e9": "x",
+                    "Z": 2.5
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "a"
+          ]
+        }
+      }
     }
   ]
 }

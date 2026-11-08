@@ -588,6 +588,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   macOS and Windows; grids have no JSON route, and every skip is counted and
   listed in `java/build/reports/conformance/conformance.txt`. It replaces the
   smoke pass of G.1a.
+- Scala conformance route (task G.3c, `bindings/jvm`, `ScalaConformanceSuite`):
+  every vector through the Scala layer (`scala:<id>`): conditions, rules and
+  rule sets built with `F`, the operators, `Rule(...)` and `RuleSet(...)` and
+  checked against the core's reading of the same JSON; inputs as Scala data
+  (`Long`, `Int`, `BigInt`, `Double`, `BigDecimal`, `java.time`, `None` and
+  `Some`, `Vector`, `List`, `Array`, `VectorMap`, `ListMap`, `SeqMap`, plain
+  `Map`s with sorted keys, case classes); results compared as the Scala
+  values given back, each class checked, and as their `toJson`; reads through
+  `loads`, `dumps`, `ruleFromText`, `DecisionTable(...)` (grids included) and
+  `readDecision`. It runs in `./gradlew test` and `check`, so CI runs it on
+  Linux, macOS and Windows; the report is
+  `scala/build/reports/conformance/conformance.txt`. The Java runner's engine
+  (`Conformance`, `TestJson`, `JavaValues`) moved to the Java project's test
+  fixtures (Gradle's `java-test-fixtures`, not published), unchanged in what
+  it runs and checks.
+- Conformance vector `rules/payloads/map-order-kept`: a map passed through a
+  payload keeps the order of its keys, also unsorted and nested
+  (`spec/data-model.md`, *Lists and maps*); no vector checked it before.
 - Java: `RuleSet.readDecision(text, format, limits)` in the idiomatic API, as
   the native layer, Python and JavaScript have it (found by the conformance
   runner: `format/decisions/tree-too-deep` could not run through the

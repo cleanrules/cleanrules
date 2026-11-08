@@ -134,7 +134,21 @@ output, never stopping at the first one.
   `ruleFromText`, `DecisionTable` and `RuleSet.readDecision`. Grids are Java
   data, so `table_grid` vectors have no JSON run; skips are counted and listed
   in `java/build/reports/conformance/conformance.txt`. It compares with a
-  lossless JSON reader of its own (`bindings/jvm/java/src/test/java/io/github/cleanrules/tests/TestJson.java`).
+  lossless JSON reader of its own (`bindings/jvm/java/src/testFixtures/java/io/github/cleanrules/tests/TestJson.java`).
+- **Scala**: `cd bindings/jvm && ./gradlew test` also runs every vector
+  through the Scala layer (`scala:<id>`; alone:
+  `./gradlew :scala:test --tests '*ScalaConformanceSuite'`), with the Java
+  runner's engine (the Java project's test fixtures): conditions, rules and
+  rule sets built with `F`, the operators, `Rule(...)` and `RuleSet(...)` and
+  checked against the core's reading of the same JSON; inputs as Scala data
+  (`Long`, `Int` or `BigInt` in turn, `Double`, `BigDecimal`, `java.time`,
+  `None` for null, `Some`, `Vector`, `List`, `Array`, `VectorMap`, `ListMap`,
+  `SeqMap`, a plain `Map` when the keys are sorted, case classes); results
+  compared as the Scala values given back (`spec/data-model.md`) through the
+  layer's case classes and as their `toJson`. `read` vectors go through
+  `loads`, `dumps`, `ruleFromText`, `DecisionTable(...)` with Scala cells
+  (grids included) and `readDecision`. Skips are counted and listed in
+  `scala/build/reports/conformance/conformance.txt`.
 - **Each binding** runs every vector twice: once through its JSON entry points,
   and once converting `input` into the language's native data (with the
   conversions of `spec/data-model.md`: floats as floats, with `cr.float` in

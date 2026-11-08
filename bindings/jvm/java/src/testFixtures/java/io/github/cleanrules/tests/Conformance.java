@@ -50,7 +50,11 @@ import io.github.cleanrules.tests.JavaValues.NoJavaForm;
 import io.github.cleanrules.tests.JavaValues.NotGiven;
 import io.github.cleanrules.tests.TestJson.Mode;
 import io.github.cleanrules.tests.TestJson.Num;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Period;
 import java.util.ArrayList;
@@ -65,6 +69,7 @@ import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 
 /**
  * The JVM conformance runner (conformance/README.md, Runners): every vector of
@@ -102,8 +107,13 @@ import java.util.function.UnaryOperator;
  * <p>The runner only drives the library and compares: results are parsed with
  * {@link TestJson} and compared with the vectors as trees, never with the
  * library's own equality.
+ *
+ * <p>A test fixture (Gradle's {@code java-test-fixtures}), with
+ * {@link TestJson} and {@link JavaValues}: the Scala layer's tests extend it
+ * with the route {@code scala:<id>} ({@link #runRoute}), in this package so
+ * that they reach its package-private helpers.
  */
-final class Conformance {
+class Conformance {
     /** Vectors are only ever added: the count when this runner was written. */
     static final int MINIMUM_VECTORS = 2519;
 
@@ -143,7 +153,7 @@ final class Conformance {
     private static final List<String> CONTEXT =
             List.of("pointer", "line", "column", "name", "rule", "path", "types", "rules", "row");
 
-    private static final List<String> SINGLE_HIT = List.of("first", "priority", "unique", "any");
+    static final List<String> SINGLE_HIT = List.of("first", "priority", "unique", "any");
 
     /** A vector's outcome one way: passed, failed with a message, or skipped for a reason of {@link #SKIPS}. */
     record Outcome(String failure, String skip) {
@@ -164,18 +174,23 @@ final class Conformance {
     }
 
     /** What a step gave: its result, or the library's error. */
-    private record Attempt(Object result, CleanRulesException error) {}
+    record Attempt(Object result, CleanRulesException error) {}
 
     /** The vectors whose Java data used each Java class, by class. */
     final Map<String, Set<String>> forms = new TreeMap<>();
 
-    private String current = "";
+    /** The vector running, as {@code <route>:<id>}: what {@link #forms} counts. */
+    String current = "";
 
     /** Run {@code vector} one way ({@code "json"} or {@code "native"}). */
     Outcome run(Map<?, ?> vector, String route) {
         current = route + ":" + vector.get("id");
         try {
-            String failure = route.equals("json") ? runJson(vector) : runNative(vector);
+            String failure = switch (route) {
+                case "json" -> runJson(vector);
+                case "native" -> runNative(vector);
+                default -> runRoute(route, vector);
+            };
             return failure.isEmpty() ? Outcome.PASSED : new Outcome(failure, null);
         } catch (Skip skip) {
             return new Outcome(null, skip.reason);
@@ -191,8 +206,16 @@ final class Conformance {
         }
     }
 
+    /**
+     * Run {@code vector} through another route: the Scala layer's
+     * ({@code scala}, a subclass in the scala project's tests) or none.
+     */
+    protected String runRoute(String route, Map<?, ?> vector) {
+        throw new VectorError("unknown route " + route);
+    }
+
     /** A route that does not apply to a vector. */
-    private static final class Skip extends RuntimeException {
+    static final class Skip extends RuntimeException {
         private static final long serialVersionUID = 1L;
 
         final String reason;
@@ -204,6 +227,59 @@ final class Conformance {
     }
 
     // ---- Reading the vectors.
+
+    /** The vectors' root: the system property {@code cleanrules.conformance.vectors}. */
+    static Path root() {
+        return Path.of(System.getProperty("cleanrules.conformance.vectors", "../../../conformance/vectors"));
+    }
+
+    /** The vector files, by their path from the root, in the order of their paths. */
+    static Map<String, List<?>> files() {
+        Path root = root();
+        Map<String, List<?>> files = new TreeMap<>();
+        try (Stream<Path> found = Files.walk(root)) {
+            for (Path file : found.filter(p -> p.toString().endsWith(".json")).sorted().toList()) {
+                Object document = TestJson.parse(Files.readString(file));
+                String name = root.relativize(file).toString().replace('\\', '/');
+                files.put(name, array(need(document, "vectors")));
+            }
+        } catch (IOException failed) {
+            throw new UncheckedIOException(failed);
+        }
+        return files;
+    }
+
+    /**
+     * Vectors with their expected output altered, which every route must fail
+     * (the self-check of each runner): the vector's id, the text of its
+     * expected output, and what replaces it.
+     */
+    static final String[][] WRONG = {
+        // A value, a truth value, an int that should be a float, an order.
+        {"ast/nodes/div-int", "\"value\":3.5", "\"value\":3.25"},
+        {"ast/missing/missing-field", "\"truth\":null", "\"truth\":false"},
+        {"rules/batch/decisions", "\"value\":2}", "\"value\":2.0}"},
+        {"explain/summaries/pricing", "\"priority\":10", "\"priority\":11"},
+        {"explain/summaries/pricing", "\"outputs\":[\"discount\",\"total\"]", "\"outputs\":[\"total\",\"discount\"]"},
+        // What the objects do not give (a cause's `at`) is still checked,
+        // by toJson() and by the native layer.
+        {"explain/counterfactuals/at-the-limit", "\"at\":\"/decision/results/0/when\"",
+            "\"at\":\"/decision/results/0\""},
+        {"explain/counterfactuals/at-the-limit", "\"gap\":0", "\"gap\":1"},
+        {"explain/counterfactuals/datetime-gap", "\"microseconds\":9000000000", "\"microseconds\":9000000001"},
+        {"explain/counterfactuals/decimal-gap", "\"gap\":{\"$decimal\":\"0.15\"}", "\"gap\":{\"$decimal\":\"0.150\"}"},
+        {"ast/missing/strict-missing", "\"path\":[\"age\"]", "\"path\":[\"years\"]"},
+        {"format/conditions/and-flattened", "\"path\":[\"c\"]", "\"path\":[\"d\"]"},
+        {"format/tables/basic", "loyal,> 2,-,0.05", "loyal,> 3,-,0.05"},
+        // A status, a note's priority, an aggregate, a tag, a datetime, an error's pointer.
+        {"explain/counterfactuals/at-the-limit", "\"status\":\"not_fired\"", "\"status\":\"unknown\""},
+        {"explain/notes/same-priority", "\"winner_priority\":10", "\"winner_priority\":11"},
+        {"rules/aggregates/sum", "\"aggregated\":{\"n\":5.5", "\"aggregated\":{\"n\":5.25"},
+        {"explain/summaries/pricing", "\"tag\":\"risk\"", "\"tag\":\"risky\""},
+        {"ast/types/aware-by-instant", "08:30:00Z", "08:30:01Z"},
+        {"format/tables/grid-header-empty", "\"pointer\":\"/header/1\"", "\"pointer\":\"/header/0\""},
+        {"format/decisions/tree-too-deep", "\"code\":\"limit_exceeded\"", "\"code\":\"format_error\""},
+    };
 
     @SuppressWarnings("unchecked") // Parsed JSON objects have string keys.
     static Map<String, Object> object(Object value) {
@@ -228,20 +304,20 @@ final class Conformance {
         return members.get(key);
     }
 
-    private static String text(Object value, String key) {
+    static String text(Object value, String key) {
         return (String) need(value, key);
     }
 
     /** The content of a document the library wrote, such as its {@code decision}. */
-    private static Object content(String text, String key) {
+    static Object content(String text, String key) {
         return need(TestJson.parse(text), key);
     }
 
-    private static String rulesetDocument(Map<?, ?> given) {
+    static String rulesetDocument(Map<?, ?> given) {
         return "{\"version\":1,\"ruleset\":" + TestJson.write(need(given, "ruleset")) + "}";
     }
 
-    private static Limits limitsOf(Map<?, ?> given) {
+    static Limits limitsOf(Map<?, ?> given) {
         if (!(given.get("limits") instanceof Map<?, ?> limits)) {
             return null;
         }
@@ -261,14 +337,14 @@ final class Conformance {
         return made;
     }
 
-    private static Format format(String name) {
+    static Format format(String name) {
         return Format.valueOf(name.toUpperCase(Locale.ROOT));
     }
 
     /** The text a {@code read} vector reads, and its format. */
-    private record Source(String text, Format format) {}
+    record Source(String text, Format format) {}
 
-    private static Source sourceOf(Map<?, ?> given) {
+    static Source sourceOf(Map<?, ?> given) {
         if (given.get("text") instanceof String text) {
             return new Source(text, Format.JSON);
         }
@@ -289,7 +365,7 @@ final class Conformance {
 
     // ---- Comparing.
 
-    private static Attempt attempt(Supplier<?> step) {
+    static Attempt attempt(Supplier<?> step) {
         try {
             return new Attempt(step.get(), null);
         } catch (CleanRulesException error) {
@@ -297,7 +373,7 @@ final class Conformance {
         }
     }
 
-    private static void checkClass(CleanRulesException error) {
+    static void checkClass(CleanRulesException error) {
         Class<? extends CleanRulesException> wanted = CLASSES.get(error.code());
         if (wanted == null) {
             throw new VectorError("an error with the unknown code " + error.code() + ": " + error.json());
@@ -309,7 +385,7 @@ final class Conformance {
     }
 
     /** An error's JSON form, as the core writes it ({@code json()}): its code and context fields. */
-    private static Map<String, Object> jsonForm(CleanRulesException error) {
+    static Map<String, Object> jsonForm(CleanRulesException error) {
         checkClass(error);
         Map<String, Object> written = object(TestJson.parse(error.json()));
         if (!error.code().equals(written.get("code"))) {
@@ -326,7 +402,7 @@ final class Conformance {
     }
 
     /** An error's code and context fields, as its accessors give them. */
-    private static Map<String, Object> contextForm(CleanRulesException error) {
+    static Map<String, Object> contextForm(CleanRulesException error) {
         checkClass(error);
         Map<String, Object> form = new LinkedHashMap<>();
         form.put("code", error.code());
@@ -368,7 +444,7 @@ final class Conformance {
         return true;
     }
 
-    private static String compareError(Map<String, Object> actual, Map<?, ?> wanted, boolean read) {
+    static String compareError(Map<String, Object> actual, Map<?, ?> wanted, boolean read) {
         List<String> keys = read ? wanted.keySet().stream().map(String.class::cast).toList() : EVALUATION;
         Map<String, Object> got = only(actual, keys);
         Map<String, Object> want = only(wanted, keys);
@@ -376,17 +452,17 @@ final class Conformance {
     }
 
     /** How a step's outcome is compared: whose errors, in which mode, with what view of the expected tree. */
-    private record How(boolean read, Function<CleanRulesException, Map<String, Object>> form, Mode mode,
+    record How(boolean read, Function<CleanRulesException, Map<String, Object>> form, Mode mode,
             UnaryOperator<Object> view) {}
 
-    private static final How JSON = new How(false, Conformance::jsonForm, Mode.EXACT, UnaryOperator.identity());
-    private static final How JSON_READ = new How(true, Conformance::jsonForm, Mode.EXACT, UnaryOperator.identity());
-    private static final How NATIVE = new How(false, Conformance::contextForm, Mode.EXACT, UnaryOperator.identity());
-    private static final How NATIVE_READ = new How(true, Conformance::contextForm, Mode.EXACT, UnaryOperator.identity());
-    private static final How GIVEN = new How(false, Conformance::contextForm, Mode.GIVEN, UnaryOperator.identity());
+    static final How JSON = new How(false, Conformance::jsonForm, Mode.EXACT, UnaryOperator.identity());
+    static final How JSON_READ = new How(true, Conformance::jsonForm, Mode.EXACT, UnaryOperator.identity());
+    static final How NATIVE = new How(false, Conformance::contextForm, Mode.EXACT, UnaryOperator.identity());
+    static final How NATIVE_READ = new How(true, Conformance::contextForm, Mode.EXACT, UnaryOperator.identity());
+    static final How GIVEN = new How(false, Conformance::contextForm, Mode.GIVEN, UnaryOperator.identity());
 
     /** Compare what a step gave with the vector's {@code key}, or with its error. */
-    private static String compare(Attempt outcome, Map<?, ?> expect, String key, How how) {
+    static String compare(Attempt outcome, Map<?, ?> expect, String key, How how) {
         Object error = expect.get("error");
         if (outcome.error() == null && error == null) {
             Object want = how.view().apply(need(expect, key));
@@ -405,17 +481,17 @@ final class Conformance {
         return compareError(how.form().apply(outcome.error()), object(error), how.read());
     }
 
-    private static String compareText(String what, String got, Object want) {
+    static String compareText(String what, String got, Object want) {
         return got.equals(want) ? "" : what + " " + TestJson.write(got) + ", expected " + TestJson.write(want);
     }
 
-    private static String join(List<String> issues) {
+    static String join(List<String> issues) {
         return String.join("; ", issues.stream().filter(issue -> !issue.isEmpty()).toList());
     }
 
     // ---- The JSON route: the native layer.
 
-    private static Map<String, Object> outputOf(Map<?, ?> result) {
+    static Map<String, Object> outputOf(Map<?, ?> result) {
         if (!(result.get("then") instanceof Map<?, ?> then)) {
             return null;
         }
@@ -424,7 +500,7 @@ final class Conformance {
         return output;
     }
 
-    private static Truth truthOf(Object truth) {
+    static Truth truthOf(Object truth) {
         return truth == null ? Truth.UNKNOWN : (Boolean) truth ? Truth.TRUE : Truth.FALSE;
     }
 
@@ -867,7 +943,7 @@ final class Conformance {
 
     // ---- Values given back, as values of the format.
 
-    private static Object truthJson(Truth truth) {
+    static Object truthJson(Truth truth) {
         return switch (truth) {
             case TRUE -> Boolean.TRUE;
             case FALSE -> Boolean.FALSE;
@@ -914,7 +990,7 @@ final class Conformance {
         return out;
     }
 
-    private static Object gapOf(Object gap) {
+    static Object gapOf(Object gap) {
         return switch (gap) {
             case Period days -> {
                 if (days.getYears() != 0 || days.getMonths() != 0) {
@@ -1036,7 +1112,7 @@ final class Conformance {
     }
 
     /** The expected explanation without the causes' {@code at}. */
-    private static Object withoutAt(Object value) {
+    static Object withoutAt(Object value) {
         if (value instanceof List<?> items) {
             return items.stream().map(Conformance::withoutAt).toList();
         }

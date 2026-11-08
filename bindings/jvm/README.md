@@ -545,12 +545,15 @@ a library you built yourself, without cargo; cargo's `CARGO_TARGET_DIR` is
 honoured.
 
 **Conformance.** `./gradlew test` (and so `check`) runs every conformance
-vector of [`conformance/vectors`](../../conformance/README.md) twice, in a few
-seconds, so there is no separate task; to run it alone:
+vector of [`conformance/vectors`](../../conformance/README.md) three times,
+twice in Java and once in Scala, in a few seconds, so there is no separate
+task; to run them alone:
 
 ```bash
-./gradlew test --tests '*ConformanceTest'
+./gradlew :java:test --tests '*ConformanceTest'         # json:<id> and native:<id>
+./gradlew :scala:test --tests '*ScalaConformanceSuite'  # scala:<id>
 cat java/build/reports/conformance/conformance.txt   # counts per route, skips with their reasons, time
+cat scala/build/reports/conformance/conformance.txt
 ```
 
 `json:<id>` goes through the native layer with JSON text (`Document`,
@@ -567,7 +570,30 @@ exactly. `read` vectors go through `Documents.loads`/`dumps`,
 `ruleFromText`, `DecisionTable` and `RuleSet.readDecision`. Grids are Java
 data, so the 28 `table_grid` vectors have no JSON route; the report lists
 them. The runner compares with a lossless JSON reader of its own
-(`java/src/test/.../TestJson.java`), never with the library's equality.
+(`TestJson.java`), never with the library's equality.
+
+`scala:<id>` goes through the Scala layer only (`io.github.cleanrules.scaladsl`):
+conditions built with `F`, `&`, `|`, `~`, `===` and the other operators (a
+constant as a Scala value on the right, or on the left as in `1000 < F.total`,
+by turns), rules with `Rule(...)` or its `with...` steps, rule sets with
+`RuleSet(...)`, each checked against the core's reading of the vector and with
+`loads(dumps(x))`; inputs as Scala data: ints as `Long`, `Int` or `BigInt`,
+`Double`, `BigDecimal`, `java.time`, `None` for a null and `Some(x)` for some
+members, `Vector`, `List` or `Array`, maps as `VectorMap`, `ListMap` or
+`SeqMap`, as a plain `Map` when their keys are sorted and as a case class when
+one has their keys; results compared as the Scala values given back (`None`,
+`Long`, `Double`, `BigDecimal` with an unlimited `MathContext`, `Vector`,
+`VectorMap`, each class checked) through the layer's case classes
+(`RuleResult`, `Explanation`, `Cause`, `Summary`, `ResultTree`...) and as their
+`toJson`, and decisions read back with `readDecision` in JSON and YAML.
+`read` vectors go through `loads` (a string or UTF-8 bytes), `dumps`,
+`ruleFromText`, `DecisionTable(...)` with Scala cells (grids included) and
+`RuleSet.readDecision(text, format, limits)`. One grid cell is a list, which
+`DecisionTable.Cell` does not admit: the route passes it by a cast so that the
+core refuses it, and the report names it. The engine is shared: the Java
+runner (`Conformance.java`, `TestJson.java`, `JavaValues.java`) is the Java
+project's test fixtures (Gradle's own `java-test-fixtures` plugin, never
+published), which the Scala route (`ScalaConformance.scala`) extends.
 
 `./gradlew jar` builds the library of the platform it runs on with
 `cargo build --release -p cleanrules-ffi --target <its triple>` (on musl

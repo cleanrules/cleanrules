@@ -7,6 +7,11 @@ import java.util.HexFormat
 
 plugins {
     `java-library`
+    // The conformance runner's engine (src/testFixtures: Conformance,
+    // TestJson, JavaValues), which the Java tests and the Scala layer's
+    // conformance route (scala, task G.3c) share. Gradle's own plugin; the
+    // fixtures are never published (below).
+    `java-test-fixtures`
 }
 
 /** The repository's root: this build lives in bindings/jvm. */
@@ -33,6 +38,23 @@ base {
 java {
     withSourcesJar()
     withJavadocJar()
+}
+
+// The test fixtures are test code: not variants of the published artifact.
+(components["java"] as AdhocComponentWithVariants).apply {
+    withVariantsFromConfiguration(configurations["testFixturesApiElements"]) { skip() }
+    withVariantsFromConfiguration(configurations["testFixturesRuntimeElements"]) { skip() }
+}
+
+// The fixtures depend on this project, which the tests' runtime class path
+// would otherwise take as its jar: the jar bundles the host's library (and
+// building it needs a release build), and the tests check loading without it.
+// Asking for classes keeps the class directories, as without the fixtures;
+// external modules still resolve to their jars.
+configurations.testRuntimeClasspath {
+    attributes {
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES))
+    }
 }
 
 // Publishing to the local staging repository: gradle/publishing.gradle.kts.
