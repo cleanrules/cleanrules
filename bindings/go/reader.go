@@ -140,6 +140,10 @@ var (
 // only a bug or a lack of memory causes; read recovers it as an error.
 type readFailure struct{ err error }
 
+// beyondLimit stops reading an input beyond max_values; read recovers it as
+// the core's limit_exceeded.
+type beyondLimit struct{}
+
 // identity says when two opaque values are the same native object.
 type identity struct {
 	t   reflect.Type
@@ -150,6 +154,15 @@ type identity struct {
 // reader turns Go data into a value of the library (spec/data-model.md, Go),
 // reading only the paths of its tree, and keeps the native objects of the
 // opaque values it makes, by token, to give them back.
+//
+// It counts what it reads against max_values (spec/data-model.md, Reading
+// native data, Limits): each value placed where a path ends or stops, with
+// everything inside it, and each position of a slice or an array the paths
+// walk through (its length, checked before the list is allocated); maps and
+// structs walked through, keys and missing values do not count. A shared
+// container counts each time it is placed, and so does each copy, by the
+// size kept with it. Beyond the limit, reading stops at once and the input
+// is refused with the core's limit_exceeded (cr_error_new_max_values).
 type reader struct {
 	opaques  []any
 	byValue  map[any]uint64
@@ -157,13 +170,18 @@ type reader struct {
 	open     map[identity]bool
 	depth    int
 	// done holds a copy of each container already converted whole, by its
-	// identity and depth, so that each native object is read once per input
-	// (spec/data-model.md, Reading native data) and data that shares a
-	// container in many places is not read again at every place. cycles
-	// counts the containers made opaque because they were open, after
-	// which a conversion depends on its ancestors and is not kept.
-	done   map[memoKey]*C.cr_value
+	// identity and depth, with its size, so that each native object is read
+	// once per input (spec/data-model.md, Reading native data) and data that
+	// shares a container in many places is not read again at every place.
+	// cycles counts the containers made opaque because they were open,
+	// after which a conversion depends on its ancestors and is not kept.
+	done   map[memoKey]memo
 	cycles int
+	// maxValues is the most values one input may place, left how many more
+	// the current one may, row its position in a batch (or -1), and rule
+	// the rule whose metadata this reads ("" for none), for the error.
+	maxValues, left, row int
+	rule                 string
 }
 
 type memoKey struct {
@@ -171,19 +189,57 @@ type memoKey struct {
 	depth int
 }
 
-func newReader() *reader {
+// memo is a copy of a container converted whole, and how many values it
+// counted, beyond the container itself.
+type memo struct {
+	value *C.cr_value
+	size  int
+}
+
+// newReader reads at most maxValues values of each input.
+func newReader(maxValues int) *reader {
 	return &reader{
-		byValue:  map[any]uint64{},
-		byShared: map[identity]uint64{},
-		open:     map[identity]bool{},
-		done:     map[memoKey]*C.cr_value{},
+		byValue:   map[any]uint64{},
+		byShared:  map[identity]uint64{},
+		open:      map[identity]bool{},
+		done:      map[memoKey]memo{},
+		maxValues: maxValues,
+		left:      maxValues,
+		row:       -1,
 	}
+}
+
+// dataReader reads constants, metadata and other data a program writes
+// (paths, tags, table cells), under the default max_values; rule names the
+// rule whose metadata it reads, or is "".
+func dataReader(rule string) *reader {
+	r := newReader(defaultMaxValues())
+	r.rule = rule
+	return r
+}
+
+// evaluationReader reads the data of an evaluation within the MaxValues of
+// limits (the default for nil or 0). Native data has a limit of its own
+// (spec/json-format.md, Errors and limits), so the other fields do not act
+// on it, and the C ABI's evaluation gets no limits; a negative field is
+// still a format_error, as wherever limits are taken.
+func evaluationReader(limits *Limits) (*reader, error) {
+	native, err := limits.native()
+	if err != nil {
+		return nil, err
+	}
+	C.cr_limits_free(native)
+	maxValues := defaultMaxValues()
+	if limits != nil && limits.MaxValues > 0 {
+		maxValues = limits.MaxValues
+	}
+	return newReader(maxValues), nil
 }
 
 // close frees the copies kept by done.
 func (r *reader) close() {
-	for key, value := range r.done {
-		C.cr_value_free(value)
+	for key, kept := range r.done {
+		C.cr_value_free(kept.value)
 		delete(r.done, key)
 	}
 }
@@ -191,16 +247,18 @@ func (r *reader) close() {
 // read turns data into an owned value, along paths.
 func (r *reader) read(data any, paths *pathTree) (value *C.cr_value, err error) {
 	defer r.close()
-	defer recoverRead(&value, &err)
+	defer r.recoverRead(&value, &err)
+	r.left = r.maxValues
 	return r.walk(reflect.ValueOf(data), paths), nil
 }
 
-// readRows reads each item of a slice or an array along paths, into a list;
-// nil (a nil slice, pointer or interface) is an empty list, and any other
-// data is read whole, for the library to reject.
+// readRows reads each item of a slice or an array along paths, into a list,
+// each item an input of its own for max_values; nil (a nil slice, pointer or
+// interface) is an empty list, and any other data is a null, which the
+// library rejects as not a batch.
 func (r *reader) readRows(rows any, paths *pathTree) (value *C.cr_value, err error) {
 	defer r.close()
-	defer recoverRead(&value, &err)
+	defer r.recoverRead(&value, &err)
 	v := reflect.ValueOf(rows)
 	for v.IsValid() && (v.Kind() == reflect.Interface || v.Kind() == reflect.Pointer) && !v.IsNil() {
 		v = v.Elem()
@@ -209,35 +267,71 @@ func (r *reader) readRows(rows any, paths *pathTree) (value *C.cr_value, err err
 		return newList(0), nil
 	}
 	if (v.Kind() != reflect.Slice && v.Kind() != reflect.Array) || isBytes(v.Type()) {
-		return r.convert(reflect.ValueOf(rows)), nil
+		return C.cr_value_new_null(), nil
 	}
-	list := newList(v.Len())
+	// The rows are inputs of their own, which max_values counts one by one,
+	// so their number is not counted: a list of them that cannot be
+	// allocated is an error, not the panic of a value's list.
+	list := C.cr_value_new_list(C.size_t(v.Len()))
+	if list == nil {
+		return nil, newError(CodeEvaluation,
+			fmt.Sprintf("a batch of %d rows is more than memory can hold", v.Len()),
+			"evaluate the rows in smaller batches")
+	}
 	defer freeOnPanic(list)
 	for i := range v.Len() {
+		r.row, r.left = i, r.maxValues
 		setItem(list, i, r.walk(v.Index(i), paths))
 	}
+	r.row = -1
 	return list, nil
 }
 
-// recoverRead turns a readFailure into the read's error; other panics go on.
-func recoverRead(value **C.cr_value, err *error) {
+// recoverRead turns a readFailure into the read's error, and beyondLimit
+// into the core's limit_exceeded for the input being read; other panics go
+// on.
+func (r *reader) recoverRead(value **C.cr_value, err *error) {
 	if p := recover(); p != nil {
-		failure, ok := p.(readFailure)
-		if !ok {
+		switch p := p.(type) {
+		case readFailure:
+			*value, *err = nil, p.err
+		case beyondLimit:
+			*value, *err = nil, maxValuesError(r.maxValues, r.row, r.rule)
+		default:
 			panic(p)
 		}
-		*value, *err = nil, failure.err
 	}
+}
+
+// maxValuesError is the core's limit_exceeded for an input beyond
+// maxValues, with its row in a batch (or -1) and the rule whose metadata it
+// is (or "").
+func maxValuesError(maxValues, row int, rule string) error {
+	p, n := text(rule)
+	var out, e *C.cr_error
+	if err := check(C.cr_error_new_max_values(C.size_t(maxValues), C.int64_t(row), p, n, &out, &e), e); err != nil {
+		return err
+	}
+	return check(C.CR_LIMIT_EXCEEDED, out)
+}
+
+// tick counts n values about to be placed, and stops reading beyond the
+// limit, before anything of them is built.
+func (r *reader) tick(n int) {
+	if n > r.left {
+		panic(beyondLimit{})
+	}
+	r.left -= n
 }
 
 // ---- Walking along paths.
 
+// walk reads v along node: through lists, maps and structs; what it finds
+// where a path ends or stops (a null, a scalar, an opaque value) is
+// converted whole, and counted there.
 func (r *reader) walk(v reflect.Value, node *pathTree) *C.cr_value {
-	inner, outer := deref(v)
-	if !inner.IsValid() {
-		return C.cr_value_new_null()
-	}
-	if node.end {
+	inner, _ := deref(v)
+	if !inner.IsValid() || node.end {
 		return r.convert(v)
 	}
 	switch shape(inner.Type()) {
@@ -247,8 +341,6 @@ func (r *reader) walk(v reflect.Value, node *pathTree) *C.cr_value {
 		return r.walkMap(inner, node)
 	case shapeStruct:
 		return r.walkStruct(inner, node)
-	case shapeOpaque:
-		return r.opaque(outer)
 	default:
 		return r.convert(v)
 	}
@@ -256,6 +348,9 @@ func (r *reader) walk(v reflect.Value, node *pathTree) *C.cr_value {
 
 func (r *reader) walkList(v reflect.Value, node *pathTree) *C.cr_value {
 	length := v.Len()
+	// The core holds a value for each position (the unread ones are nulls):
+	// counted before the list is allocated.
+	r.tick(length)
 	list := newList(length)
 	defer freeOnPanic(list)
 	for _, index := range node.indexes {
@@ -356,7 +451,9 @@ func (r *reader) walkStruct(v reflect.Value, node *pathTree) *C.cr_value {
 
 // ---- Whole values, where a path ends.
 
+// convert converts v whole, counting it and everything inside it.
 func (r *reader) convert(v reflect.Value) *C.cr_value {
+	r.tick(1)
 	inner, outer := deref(v)
 	if !inner.IsValid() {
 		return C.cr_value_new_null()
@@ -423,8 +520,11 @@ func (r *reader) container(v, outer reflect.Value) *C.cr_value {
 	id, shared := sharedIdentity(v, outer)
 	key := memoKey{id, r.depth}
 	if shared {
-		if copied, ok := r.done[key]; ok {
-			return r.clone(copied)
+		if kept, ok := r.done[key]; ok {
+			// A copy counts every value it holds, as if converted again,
+			// and is never made beyond the limit.
+			r.tick(kept.size)
+			return r.clone(kept.value)
 		}
 	}
 	if r.depth >= maxDepth || (shared && r.open[id]) {
@@ -433,10 +533,10 @@ func (r *reader) container(v, outer reflect.Value) *C.cr_value {
 		}
 		return r.opaque(outer)
 	}
-	cycles := r.cycles
+	cycles, left := r.cycles, r.left
 	value := r.whole(v, id, shared)
 	if shared && r.cycles == cycles {
-		r.done[key] = r.clone(value)
+		r.done[key] = memo{r.clone(value), left - r.left}
 	}
 	return value
 }
@@ -450,6 +550,9 @@ func (r *reader) whole(v reflect.Value, id identity, shared bool) *C.cr_value {
 	defer func() { r.depth-- }()
 	switch shape(v.Type()) {
 	case shapeList:
+		// Each element counts as it is converted: a length beyond what is
+		// left is refused before the list is allocated.
+		r.fits(v.Len())
 		list := newList(v.Len())
 		defer freeOnPanic(list)
 		for i := range v.Len() {
@@ -458,6 +561,7 @@ func (r *reader) whole(v reflect.Value, id identity, shared bool) *C.cr_value {
 		return list
 	case shapeMap:
 		keys, values := stringEntries(v)
+		r.fits(len(keys))
 		m := C.cr_value_new_map()
 		defer freeOnPanic(m)
 		for _, key := range keys {
@@ -475,6 +579,14 @@ func (r *reader) whole(v reflect.Value, id identity, shared bool) *C.cr_value {
 			insertItem(m, f.name, r.convert(item))
 		}
 		return m
+	}
+}
+
+// fits refuses a container of n elements, each of which counts at least one
+// value, when they cannot all fit, before anything of it is built.
+func (r *reader) fits(n int) {
+	if n > r.left {
+		panic(beyondLimit{})
 	}
 }
 

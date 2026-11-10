@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -108,7 +107,8 @@ type Error struct {
 	// Row is the position of the input in a batch, or -1.
 	Row int
 	// Name is the name looked up (a logic, an action, a rule), and Available
-	// the names that exist, sorted.
+	// the names that exist, sorted; for a limit_exceeded of the Go data an
+	// evaluation reads (Limits.MaxValues), the limit's name, "max_values".
 	Name      string
 	Available []string
 	// Node is the failing node in its JSON form, when it can be written.
@@ -212,23 +212,10 @@ func errorOf(status C.cr_status, e *C.cr_error) *Error {
 		return newError(CodeInternal, "cleanrules: unreadable error: "+err.Error(), "")
 	}
 	out.fill(form)
-	out.Message = withoutFunction(staticString(C.cr_error_message(e)))
+	out.Message = staticString(C.cr_error_message(e))
 	out.Hint = staticString(C.cr_error_hint(e))
 	out.JSON = text
-	if prefix := abiFunction.FindString(form.Message); prefix != "" {
-		// The function of the C ABI that checked an argument means
-		// nothing to a Go program: the message starts after it.
-		out.JSON = strings.Replace(text, `"message":"`+prefix, `"message":"`, 1)
-	}
 	return out
-}
-
-// abiFunction matches the name of a C ABI function that starts the message
-// of an argument it refused, such as "cr_rule_new: ".
-var abiFunction = regexp.MustCompile(`^cr_[a-z0-9_]+: `)
-
-func withoutFunction(message string) string {
-	return strings.TrimPrefix(message, abiFunction.FindString(message))
 }
 
 func (e *Error) fill(form errorForm) {

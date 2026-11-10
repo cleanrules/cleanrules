@@ -275,6 +275,50 @@ itself, or is nested more than 256 deep, is opaque there.
 A counterfactual's gap is an `int64`, `float64` or `cr.Decimal`, a
 `cr.GapDays` between dates or a `cr.GapMicroseconds` between datetimes.
 
+### How much Go data is read
+
+Data can share objects (the same slice, map or pointer in many places), and
+a value of the core shares nothing, so each place is read (or copied) again:
+a "diamond" that holds one object twice at each of 30 levels would be 2^31
+values. So what an evaluation reads from the data of one input is counted
+against `Limits.MaxValues`, 1,000,000 values by default
+([`spec/data-model.md`](../../spec/data-model.md), *Reading native data*,
+*Limits*):
+
+- each value placed where a path ends, or where it stops early (a scalar, a
+  `nil`, an opaque value, a null with a reason), with everything inside it: a
+  slice, map or struct counts one, and each element, entry value or field
+  one more;
+- each position of a slice or an array the paths go through (its length:
+  the core holds a value at every position), checked before anything is
+  allocated, so `make([]struct{}, math.MaxInt)` is refused at once;
+- a shared object each time it is placed, and so does each copy of it, whole;
+- not the maps and structs the paths go through, their keys, or what is
+  missing.
+
+Beyond the limit the input is refused, not evaluated, in strict mode and
+outside it: the evaluation gives a `limit_exceeded` error (`ErrLimitExceeded`,
+an `ErrFormat`) whose `Name` is `"max_values"`, with the `Row` in a batch
+(the first row beyond it, before any error of the evaluation, since every
+row is read before any is evaluated). `WithLimits` sets it for
+`RuleSet.Evaluate`, `EvaluateMany` and `Run`, `DecisionTable.Evaluate` and
+`EvaluateMany`, and `EvaluateTree` and `EvaluateValueTree`; Go data has a
+limit of its own, so there only `MaxValues` acts (the other fields bound
+documents):
+
+```go
+decision, err := rules.Evaluate(data, cr.WithLimits(cr.Limits{MaxValues: 10_000}))
+if errors.Is(err, cr.ErrLimitExceeded) {
+    // too much data for one input: refused
+}
+```
+
+A limit is never off, and 0 is the default, as for every field of `Limits`.
+Constants (`Const`, the Go values of comparisons and `Then`, `IsIn`), tags
+and metadata are read under the default: beyond it, building the node or
+rule gives the same `limit_exceeded`, which names the rule for `WithTags` and
+`WithMetadata`.
+
 `Decimal`, `Date`, `DateTime` and `Truth` implement `encoding.TextMarshaler`
 and `TextUnmarshaler`, so `encoding/json` writes them as their text (`"0.15"`,
 `"2026-10-31"`, `"2026-10-31T09:30:00"`, `"true"`) and reads them back.
@@ -349,13 +393,16 @@ Each function takes options of its own type, and an option that means the
 same for several is a value of all their types, so the compiler rejects one
 where it does not apply: `WithFormat` (`FormatJSON` by default, `FormatYAML`,
 `FormatText`, `FormatCSV`) for `Loads`, `Load`, `Dumps`, `Dump` and
-`ReadDecision`; `WithLimits` for those that read and `NewDecisionTable`;
+`ReadDecision`; `WithLimits` for those that read, `NewDecisionTable`, the
+evaluations (`Evaluate`, `EvaluateMany` and `Run`, of rule sets and tables)
+and result trees;
 `WithActions` for `Loads`, `Load` and `RuleFromText`. A nil option is a
 `rule_definition_error` whose hint lists the function's options.
 
 `Limits` mirrors the C ABI's limits (`MaxSize`, `MaxNesting`, `MaxDepth`,
-`MaxTableSize`, `MaxYAMLSize`, `MaxTextSize`). A field left at 0 keeps the
-core's default, and a negative one is a `format_error` that names it.
+`MaxTableSize`, `MaxYAMLSize`, `MaxTextSize`, and `MaxValues` for the Go data
+of evaluations, above). A field left at 0 keeps the core's default, and a
+negative one is a `format_error` that names it.
 `MaxSize` is the size limit of every format at once, and `MaxYAMLSize` and
 `MaxTextSize`, when set, change those of YAML and of text and CSV:
 
@@ -441,8 +488,9 @@ data read along the node's paths (`spec/ast.md`, *Evaluating one node*). A
 changes nothing else): `Tag` (the node's tag, the `op` of its JSON form),
 `Path` (a field's), `Truth` (nil for a value), `Value` (as values are given
 back), `Reason` and `Children`; and two methods that read the native tree,
-`Node()` and `JSON()`. `EvaluateTree` takes `WithLogic` and `WithStrict`,
-`EvaluateValueTree` only `WithStrict` (a value has no truth to combine). In an action, `ctx.Tree()` is the result tree of the rule's
+`Node()` and `JSON()`. `EvaluateTree` takes `WithLogic`, `WithStrict` and
+`WithLimits` (its `MaxValues`), `EvaluateValueTree` only `WithStrict` and
+`WithLimits` (a value has no truth to combine). In an action, `ctx.Tree()` is the result tree of the rule's
 condition in the decision.
 
 ## Errors
@@ -479,10 +527,12 @@ The core writes the messages. The package writes these few itself, as the
 other bindings do: a NaN constant and a time finer than a microsecond (which
 a value cannot carry; in a table, with the cell's pointer), an unknown
 `Closed` or `Format`, a nil or zero `*Expr`, `*Rule`, `Document` or option, a
-header item of another type, a file beyond its size limit, and
+header item of another type, a file beyond its size limit, a batch with more
+rows than memory can hold (`evaluation_error`; the rows are not counted, as
+each is an input of its own), and
 `rule_not_found` from `WhyNot` and `Explanation.ForRule` (in the core's
-words, from the names a decision keeps). A Go program never sees the
-name of a C function in a message.
+words, from the names a decision keeps). The C ABI writes no names of its
+functions in messages, so a Go program never sees one.
 
 ## Goroutines and memory
 
@@ -516,10 +566,15 @@ whose `Error` panics, a panic, `runtime.Goexit`, nested runs, goroutines),
 documents (each kind in each format both ways, files, limits, actions on
 loading, `RuleFromText`, `ReadDecision`), decision tables (each kind of cell,
 errors with their pointers, settings, formats), result trees and
-`ActionContext.Tree`, which files link the library on each platform and tag,
+`ActionContext.Tree`, `Limits.MaxValues` (a diamond 30 levels deep refused at
+once, what counts at the limit and one over it, lengths beyond memory,
+batches, constants and metadata), which files link the library on each
+platform and tag,
 the examples
 [`docs/examples/discounts.go`](../../docs/examples/discounts.go) and
 [`docs/examples/risk_table.go`](../../docs/examples/risk_table.go), and a smoke
-pass over 623 conformance vectors (`rules/`, `explain/`, and the generated
-rule sets and explanations) built with this API and Go data. The full runner
-is task H.2.
+pass over 637 conformance vectors (`rules/`, `explain/`, and the generated
+rule sets and explanations) built with this API and Go data, `rules/limits.json`
+among them with its `max_values` on Go data; the one vector with a limit of 0
+is skipped and counted, since 0 is the default in Go. The full runner is task
+H.2.

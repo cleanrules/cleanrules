@@ -137,7 +137,7 @@ func TestLimits(t *testing.T) {
 			t.Errorf("default %d is %d", i, *field)
 		}
 	}
-	if defaults.MaxYAMLSize >= defaults.MaxSize {
+	if defaults.MaxYAMLSize >= defaults.MaxSize || defaults.MaxValues != 1_000_000 || defaultMaxValues() != 1_000_000 {
 		t.Errorf("defaults %+v", defaults)
 	}
 	if got := must((&Limits{}).effective())(t); got != defaults {
@@ -167,6 +167,14 @@ func TestLimits(t *testing.T) {
 			"NewDecisionTable": func() error { _, err := NewDecisionTable([]any{"x", "THEN y"}, nil, WithLimits(l)); return err }(),
 			"ReadDecision":     func() error { _, err := echo(t).ReadDecision("{}", WithLimits(l)); return err }(),
 			"Load":             func() error { _, err := Load("x.json", WithLimits(l)); return err }(),
+			"Evaluate":         func() error { _, err := echo(t).Evaluate(nil, WithLimits(l)); return err }(),
+			"EvaluateMany":     func() error { _, err := echo(t).EvaluateMany(nil, WithLimits(l)); return err }(),
+			"Run":              func() error { _, err := echo(t).Run(nil, WithLimits(l)); return err }(),
+			"EvaluateTree":     func() error { _, err := Field("x").IsNull().EvaluateTree(nil, WithLimits(l)); return err }(),
+			"EvaluateValueTree": func() error {
+				_, err := Field("x").EvaluateValueTree(nil, WithLimits(l))
+				return err
+			}(),
 		} {
 			if codeOf(err) != CodeFormat {
 				t.Errorf("%s with %s: %v", name, field, err)

@@ -2,13 +2,15 @@ package cleanrules
 
 // Options. Each function with optional parts takes functional options of its
 // own type: NewRule and Rule.With a RuleOption, NewRuleSet a RuleSetOption,
-// NewDecisionTable a TableOption, Expr.EvaluateTree a TreeOption and
-// Expr.EvaluateValueTree a ValueTreeOption, Loads and Load a LoadOption,
-// RuleFromText a TextOption, Dumps and Dump a DumpOption, and
-// RuleSet.ReadDecision a ReadOption. An option that means the same for
-// several of them is one value of all their types (WithLogic is a
-// RuleSetOption, a TableOption and a TreeOption, but not a ValueTreeOption),
-// so the compiler rejects an option where it does not apply. The option
+// NewDecisionTable a TableOption, RuleSet.Evaluate, EvaluateMany and Run and
+// DecisionTable.Evaluate and EvaluateMany an EvaluateOption,
+// Expr.EvaluateTree a TreeOption and Expr.EvaluateValueTree a
+// ValueTreeOption, Loads and Load a LoadOption, RuleFromText a TextOption,
+// Dumps and Dump a DumpOption, and RuleSet.ReadDecision a ReadOption. An
+// option that means the same for several of them is one value of all their
+// types (WithLogic is a RuleSetOption, a TableOption and a TreeOption, but
+// not a ValueTreeOption), so the compiler rejects an option where it does
+// not apply. The option
 // types are interfaces whose methods are the package's own: only the
 // functions of the package make them. A nil option sets nothing: a
 // rule_definition_error, whose hint lists the function's options.
@@ -27,14 +29,22 @@ type TableOption interface {
 	applyTable(*tableSettings)
 }
 
-// TreeOption sets the logic and strict mode of Expr.EvaluateTree: WithLogic
-// and WithStrict.
+// EvaluateOption sets how RuleSet.Evaluate, EvaluateMany and Run, and
+// DecisionTable.Evaluate and EvaluateMany, read their Go data: WithLimits
+// (Limits.MaxValues).
+type EvaluateOption interface {
+	applyEvaluate(*evaluateSettings)
+}
+
+// TreeOption sets the logic, strict mode and limits of Expr.EvaluateTree:
+// WithLogic, WithStrict and WithLimits (Limits.MaxValues).
 type TreeOption interface {
 	applyTree(*treeSettings)
 }
 
-// ValueTreeOption sets the strict mode of Expr.EvaluateValueTree:
-// WithStrict. A value has no truth to combine, so it takes no logic.
+// ValueTreeOption sets the strict mode and limits of
+// Expr.EvaluateValueTree: WithStrict and WithLimits (Limits.MaxValues). A
+// value has no truth to combine, so it takes no logic.
 type ValueTreeOption interface {
 	applyValueTree(*treeSettings)
 }
@@ -95,12 +105,16 @@ type FormatOption interface {
 }
 
 // LimitsOption is WithLimits's option, for reading documents, rules,
-// decisions and decision tables.
+// decisions and decision tables, and the Go data of evaluations and result
+// trees.
 type LimitsOption interface {
 	LoadOption
 	TextOption
 	ReadOption
 	TableOption
+	EvaluateOption
+	TreeOption
+	ValueTreeOption
 }
 
 // ActionsOption is WithActions's option, for reading documents and rules.
@@ -123,6 +137,11 @@ type tableSettings struct {
 type treeSettings struct {
 	logic  *string
 	strict bool
+	limits *Limits
+}
+
+type evaluateSettings struct {
+	limits *Limits
 }
 
 type documentSettings struct {
@@ -187,16 +206,23 @@ func (o formatOption) applyDump(s *documentSettings) { f := Format(o); s.format 
 func (o formatOption) applyRead(s *documentSettings) { f := Format(o); s.format = &f }
 
 // WithLimits sets the limits of reading (spec/json-format.md, Limits;
-// spec/tables.md, Limits); the core's defaults otherwise. See Limits for
-// how its fields combine.
+// spec/tables.md, Limits; spec/data-model.md, Reading native data, Limits);
+// the core's defaults otherwise. See Limits for how its fields combine. In
+// an evaluation or a result tree, only MaxValues acts: it bounds the Go data
+// read from each input, which has a limit of its own (spec/json-format.md,
+// Errors and limits); the other fields do not bound it, and a negative one
+// is still a format_error.
 func WithLimits(limits Limits) LimitsOption { return limitsOption(limits) }
 
 type limitsOption Limits
 
-func (o limitsOption) applyLoad(s *documentSettings) { l := Limits(o); s.limits = &l }
-func (o limitsOption) applyText(s *documentSettings) { l := Limits(o); s.limits = &l }
-func (o limitsOption) applyRead(s *documentSettings) { l := Limits(o); s.limits = &l }
-func (o limitsOption) applyTable(s *tableSettings)   { l := Limits(o); s.limits = &l }
+func (o limitsOption) applyLoad(s *documentSettings)     { l := Limits(o); s.limits = &l }
+func (o limitsOption) applyText(s *documentSettings)     { l := Limits(o); s.limits = &l }
+func (o limitsOption) applyRead(s *documentSettings)     { l := Limits(o); s.limits = &l }
+func (o limitsOption) applyTable(s *tableSettings)       { l := Limits(o); s.limits = &l }
+func (o limitsOption) applyEvaluate(s *evaluateSettings) { l := Limits(o); s.limits = &l }
+func (o limitsOption) applyTree(s *treeSettings)         { l := Limits(o); s.limits = &l }
+func (o limitsOption) applyValueTree(s *treeSettings)    { l := Limits(o); s.limits = &l }
 
 // WithActions binds the actions that the rules read name to Go functions
 // (spec/rules.md, Actions), as RuleSet.Bind does: a rule set comes back
@@ -227,13 +253,27 @@ const (
 	ruleOptions      = "Then, WithPriority, WithTags, WithDescription, WithMetadata and WithAction"
 	ruleSetOptions   = "WithHitPolicy, WithAggregate, WithLogic and WithStrict"
 	tableOptions     = "WithTablePolicy, WithAggregate, WithLogic, WithStrict and WithLimits"
-	treeOptions      = "WithLogic and WithStrict"
-	valueTreeOptions = "WithStrict"
+	evaluateOptions  = "WithLimits"
+	treeOptions      = "WithLogic, WithStrict and WithLimits"
+	valueTreeOptions = "WithStrict and WithLimits"
 	loadOptions      = "WithFormat, WithLimits and WithActions"
 	textOptions      = "WithLimits and WithActions"
 	dumpOptions      = "WithFormat"
 	readOptions      = "WithFormat and WithLimits"
 )
+
+// evaluationSettings applies the options of an evaluation, or gives the error
+// of a nil one.
+func evaluationSettings(options []EvaluateOption) (evaluateSettings, error) {
+	var settings evaluateSettings
+	for _, option := range options {
+		if option == nil {
+			return settings, nilOption(evaluateOptions)
+		}
+		option.applyEvaluate(&settings)
+	}
+	return settings, nil
+}
 
 // documentOptions applies the options of a reading or writing function, or
 // gives the error of a nil one.

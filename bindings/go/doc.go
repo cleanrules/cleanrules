@@ -27,9 +27,11 @@
 // structs by their exported fields, pointers, time.Time, math/big, Decimal,
 // Date and DateTime; spec/data-model.md, Go) along the paths the rule set
 // reads only, and gives a Decision with Go values back, its Explain and
-// WhyNot, and its JSON document. RuleSet.Summary describes a rule set;
-// RuleSet.Bind and Run call Go functions for the actions the selected rules
-// name.
+// WhyNot, and its JSON document. What it reads from one input is counted
+// against Limits.MaxValues (1,000,000 values by default, set with
+// WithLimits): beyond it, the input is refused with a limit_exceeded error.
+// RuleSet.Summary describes a rule set; RuleSet.Bind and Run call Go
+// functions for the actions the selected rules name.
 //
 // # Documents, tables and result trees
 //

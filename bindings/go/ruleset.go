@@ -244,10 +244,21 @@ func (rs *RuleSet) FieldPaths() ([][]any, error) {
 // cleanrules tag, else its json tag, else its name, and unexported fields are
 // never read. In strict mode, a field that cannot be read is an error
 // (missing_field, type_mismatch...); otherwise it is unknown, with a reason.
-func (rs *RuleSet) Evaluate(data any) (*Decision, error) {
+//
+// What is read is counted against Limits.MaxValues, 1,000,000 values by
+// default (WithLimits changes it): data beyond it is refused, strict or not,
+// with a limit_exceeded error (an ErrFormat) whose Name is "max_values".
+func (rs *RuleSet) Evaluate(data any, options ...EvaluateOption) (*Decision, error) {
+	settings, err := evaluationSettings(options)
+	if err != nil {
+		return nil, err
+	}
 	var decision *Decision
-	err := rs.use(func(ptr *C.cr_ruleset) error {
-		r := newReader()
+	err = rs.use(func(ptr *C.cr_ruleset) error {
+		r, err := evaluationReader(settings.limits)
+		if err != nil {
+			return err
+		}
 		input, err := r.read(data, rs.paths)
 		if err != nil {
 			return err
@@ -266,11 +277,21 @@ func (rs *RuleSet) Evaluate(data any) (*Decision, error) {
 
 // EvaluateMany decides on each item of rows, a slice or an array, in order.
 // The first item that fails gives the error, with its position as Row;
-// rows that are not a slice or an array are an evaluation_error.
-func (rs *RuleSet) EvaluateMany(rows any) ([]*Decision, error) {
+// rows that are not a slice or an array are an evaluation_error. Each item
+// is an input of its own for Limits.MaxValues; all are read before any is
+// evaluated, so the first item beyond it gives its limit_exceeded, with its
+// Row, before any error of the evaluation.
+func (rs *RuleSet) EvaluateMany(rows any, options ...EvaluateOption) ([]*Decision, error) {
+	settings, err := evaluationSettings(options)
+	if err != nil {
+		return nil, err
+	}
 	var decisions []*Decision
-	err := rs.use(func(ptr *C.cr_ruleset) error {
-		r := newReader()
+	err = rs.use(func(ptr *C.cr_ruleset) error {
+		r, err := evaluationReader(settings.limits)
+		if err != nil {
+			return err
+		}
 		inputs, err := r.readRows(rows, rs.paths)
 		if err != nil {
 			return err

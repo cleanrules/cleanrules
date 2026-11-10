@@ -861,6 +861,7 @@ is already bounded by the size and nesting limits, and a value built directly
 (in Rust, or through the C ABI's value builder) is built by the program one
 value at a time. It travels with the other limits (`max_values=` in Python,
 `maxValues` in JavaScript, `Limits.withMaxValues` on the JVM,
+`Limits.MaxValues` in Go, where 0 keeps the default as for its other limits,
 `CR_LIMIT_MAX_VALUES` in the C ABI) and, like them, can be raised but never
 disabled.
 

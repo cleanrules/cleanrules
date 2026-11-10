@@ -24,6 +24,7 @@ import (
 // The vector files of the smoke pass.
 var smokeFiles = []string{
 	"rules/policies.json", "rules/aggregates.json", "rules/payloads.json", "rules/strict.json", "rules/batch.json",
+	"rules/limits.json",
 	"explain/counterfactuals.json", "explain/notes.json", "explain/requirements.json", "explain/summaries.json",
 	"generated/rulesets.json", "generated/explanations.json",
 }
@@ -778,9 +779,25 @@ func compareSummary(s *Summary, want *object) string {
 	return ""
 }
 
+// zeroLimit says that a vector sets a limit to 0, which Go cannot say:
+// Limits{MaxValues: 0} is the default (the convention of every field of
+// Limits), and a limit of 0 refuses every input.
+func zeroLimit(given *object) bool {
+	limits, ok := given.get("limits").(*object)
+	if !ok {
+		return false
+	}
+	for _, value := range limits.values {
+		if value.(json.Number) == "0" {
+			return true
+		}
+	}
+	return false
+}
+
 func TestConformanceSmoke(t *testing.T) {
 	root := filepath.Join("..", "..", "conformance", "vectors")
-	ran := 0
+	ran, skipped := 0, 0
 	for _, file := range smokeFiles {
 		data, err := os.ReadFile(filepath.Join(root, file))
 		if err != nil {
@@ -791,6 +808,10 @@ func TestConformanceSmoke(t *testing.T) {
 			vector := item.(*object)
 			id := vector.get("id").(string)
 			given, expect := vector.get("given").(*object), vector.get("expect").(*object)
+			if zeroLimit(given) {
+				skipped++
+				continue
+			}
 			ran++
 			if diff := runVector(t, given, expect); diff != "" {
 				t.Errorf("%s: %s", id, diff)
@@ -800,7 +821,11 @@ func TestConformanceSmoke(t *testing.T) {
 	if ran < 600 {
 		t.Errorf("only %d vectors ran", ran)
 	}
-	t.Logf("%d vectors", ran)
+	// Only rules/limits/value-where-a-path-stops-one-over has a limit of 0.
+	if skipped != 1 {
+		t.Errorf("%d vectors skipped for a limit of 0, want 1", skipped)
+	}
+	t.Logf("%d vectors, %d skipped (a limit of 0 is the default in Go)", ran, skipped)
 }
 
 func runVector(t *testing.T, given, expect *object) string {
@@ -823,8 +848,21 @@ func runVector(t *testing.T, given, expect *object) string {
 		}
 		return compareSummary(s, expect.get("summary").(*object))
 	case "evaluate", "explain":
+		// The limits of native data (max_values), which these Go inputs are.
+		var options []EvaluateOption
+		if limits, ok := given.get("limits").(*object); ok {
+			var l Limits
+			for _, key := range limits.keys {
+				if key != "max_values" {
+					return "unknown limit " + key
+				}
+				n, _ := limits.values[key].(json.Number).Int64()
+				l.MaxValues = int(n)
+			}
+			options = append(options, WithLimits(l))
+		}
 		if inputs, ok := given.values["inputs"]; ok {
-			decisions, err := rs.EvaluateMany(goData(t, inputs))
+			decisions, err := rs.EvaluateMany(goData(t, inputs), options...)
 			if hasErr {
 				return compareError(err, wantErr)
 			}
@@ -842,7 +880,7 @@ func runVector(t *testing.T, given, expect *object) string {
 			}
 			return ""
 		}
-		d, err := rs.Evaluate(goData(t, given.get("input")))
+		d, err := rs.Evaluate(goData(t, given.get("input")), options...)
 		if hasErr {
 			return compareError(err, wantErr)
 		}

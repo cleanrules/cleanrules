@@ -11,6 +11,7 @@ import (
 func TestNilOptions(t *testing.T) {
 	x := Field("x").Gt(1)
 	rs := echo(t)
+	table := must(NewDecisionTable([]any{"x", "THEN y"}, [][]any{{"> 1", 1}}))(t)
 	cases := []struct {
 		name, hint string
 		err        error
@@ -27,6 +28,11 @@ func TestNilOptions(t *testing.T) {
 		{"Dumps", dumpOptions, func() error { _, err := Dumps(x, nil); return err }()},
 		{"Dump", dumpOptions, func() error { return Dump(x, "x.json", nil) }()},
 		{"ReadDecision", readOptions, func() error { _, err := rs.ReadDecision("{}", nil); return err }()},
+		{"Evaluate", evaluateOptions, func() error { _, err := rs.Evaluate(nil, nil); return err }()},
+		{"EvaluateMany", evaluateOptions, func() error { _, err := rs.EvaluateMany(nil, nil); return err }()},
+		{"Run", evaluateOptions, func() error { _, err := rs.Run(nil, nil); return err }()},
+		{"DecisionTable.Evaluate", evaluateOptions, func() error { _, err := table.Evaluate(nil, nil); return err }()},
+		{"DecisionTable.EvaluateMany", evaluateOptions, func() error { _, err := table.EvaluateMany(nil, nil); return err }()},
 	}
 	for _, c := range cases {
 		var e *Error

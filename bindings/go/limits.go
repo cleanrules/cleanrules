@@ -5,13 +5,17 @@ package cleanrules
 */
 import "C"
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 // Limits bound what reading a document, a rule, a decision or a decision
-// table may take (spec/json-format.md, Limits; spec/tables.md, Limits), as
-// the C ABI's cr_limits does. Pass them with WithLimits. A field left at 0
-// keeps the core's default, so Limits{MaxDepth: 32} changes one limit; a
-// negative field is a format_error that names it.
+// table may take (spec/json-format.md, Limits; spec/tables.md, Limits), and
+// how many values an evaluation reads from Go data (MaxValues), as the C
+// ABI's cr_limits does. Pass them with WithLimits. A field left at 0 keeps
+// the core's default, so Limits{MaxDepth: 32} changes one limit; a negative
+// field is a format_error that names it.
 //
 // MaxSize is the size limit of every format at once, and MaxYAMLSize and
 // MaxTextSize then change those of YAML and of text and CSV:
@@ -40,19 +44,29 @@ type Limits struct {
 	MaxYAMLSize int
 	// MaxTextSize is the largest text in the rule syntax or CSV, in bytes.
 	MaxTextSize int
+	// MaxValues is the most values an evaluation reads from the Go data of
+	// one input, 1,000,000 by default (spec/data-model.md, Reading native
+	// data, Limits): each value placed where a path ends or stops, with
+	// everything inside it, and each position of a slice or an array the
+	// paths walk through. Beyond it the input is refused, strict or not,
+	// with a limit_exceeded error whose Name is "max_values" (and Row, in a
+	// batch). It bounds RuleSet.Evaluate, EvaluateMany and Run,
+	// DecisionTable.Evaluate and EvaluateMany, and Expr.EvaluateTree and
+	// EvaluateValueTree; constants and metadata are read under the default.
+	MaxValues int
 }
 
 // limitCodes are the limits in the order they are set: MaxSize first, since
 // it sets the YAML and text limits too.
 var limitCodes = []C.cr_limit{
 	C.CR_LIMIT_MAX_SIZE, C.CR_LIMIT_MAX_NESTING, C.CR_LIMIT_MAX_DEPTH,
-	C.CR_LIMIT_MAX_TABLE_SIZE, C.CR_LIMIT_MAX_YAML_SIZE, C.CR_LIMIT_MAX_TEXT_SIZE,
+	C.CR_LIMIT_MAX_TABLE_SIZE, C.CR_LIMIT_MAX_YAML_SIZE, C.CR_LIMIT_MAX_TEXT_SIZE, C.CR_LIMIT_MAX_VALUES,
 }
 
-var limitNames = []string{"MaxSize", "MaxNesting", "MaxDepth", "MaxTableSize", "MaxYAMLSize", "MaxTextSize"}
+var limitNames = []string{"MaxSize", "MaxNesting", "MaxDepth", "MaxTableSize", "MaxYAMLSize", "MaxTextSize", "MaxValues"}
 
 func (l *Limits) fields() []*int {
-	return []*int{&l.MaxSize, &l.MaxNesting, &l.MaxDepth, &l.MaxTableSize, &l.MaxYAMLSize, &l.MaxTextSize}
+	return []*int{&l.MaxSize, &l.MaxNesting, &l.MaxDepth, &l.MaxTableSize, &l.MaxYAMLSize, &l.MaxTextSize, &l.MaxValues}
 }
 
 // DefaultLimits are the core's default limits, every field set (MaxSize
@@ -62,6 +76,10 @@ func DefaultLimits() Limits {
 	defer C.cr_limits_free(native)
 	return limitsOf(native)
 }
+
+// defaultMaxValues is the core's default max_values, for constants and
+// metadata and for evaluations given no MaxValues.
+var defaultMaxValues = sync.OnceValue(func() int { return DefaultLimits().MaxValues })
 
 func limitsOf(native *C.cr_limits) Limits {
 	var l Limits

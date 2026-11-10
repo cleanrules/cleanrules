@@ -143,7 +143,7 @@ func segments(path []any) (*C.cr_value, error) {
 	if path == nil {
 		path = []any{} // an empty path, which the core rejects
 	}
-	return newReader().read(path, wholePaths)
+	return dataReader("").read(path, wholePaths)
 }
 
 // Const is a constant (spec/ast.md, const) from a Go value, converted as data
@@ -172,7 +172,7 @@ func constant(v any) (*C.cr_value, error) {
 	if err := checkConstant(v); err != nil {
 		return nil, err
 	}
-	return newReader().read(v, wholePaths)
+	return dataReader("").read(v, wholePaths)
 }
 
 // checkConstant makes the checks of constant.
@@ -189,20 +189,21 @@ func checkConstant(v any) error {
 	return nil
 }
 
-// constants converts the values of IsIn into a list, each checked as a
-// constant.
-func constants(values []any) (*C.cr_value, error) {
-	if values == nil {
-		values = []any{} // no values, which the core rejects
+// constants converts the values of IsIn, a slice or an array, into a list,
+// under the default max_values (so a slice of any length is refused before
+// its elements are visited), then checks each value as a constant.
+func constants(values reflect.Value) (*C.cr_value, error) {
+	list, err := dataReader("").read(values.Interface(), wholePaths)
+	if err != nil {
+		return nil, err
 	}
-	for _, v := range values {
-		value, err := constant(v)
-		if err != nil {
+	for i := range values.Len() {
+		if err := checkConstant(values.Index(i).Interface()); err != nil {
+			C.cr_value_free(list)
 			return nil, err
 		}
-		C.cr_value_free(value)
 	}
-	return newReader().read(values, wholePaths)
+	return list, nil
 }
 
 // And is the conjunction of conditions (and, flattened).
@@ -318,26 +319,32 @@ func (e *Expr) IsNull() *Expr {
 }
 
 // IsIn tests membership in constants: IsIn("ES", "PT"), or IsIn(codes) with
-// one slice of them. The core keeps them sorted and without repeats.
+// one slice of them. The core keeps them sorted and without repeats. More
+// than 1,000,000 values (the default Limits.MaxValues, counting the list) is
+// a limit_exceeded.
 func (e *Expr) IsIn(values ...any) *Expr {
 	if err := e.Err(); err != nil {
 		return failed(err) // the first node that failed is the receiver
 	}
+	if values == nil {
+		values = []any{} // no values, which the core rejects
+	}
+	list := reflect.ValueOf(values)
 	if len(values) == 1 {
 		if v := reflect.ValueOf(values[0]); v.IsValid() && (v.Kind() == reflect.Slice || v.Kind() == reflect.Array) && !isBytes(v.Type()) {
-			values = make([]any, v.Len())
-			for i := range values {
-				values[i] = v.Index(i).Interface()
+			list = v
+			if v.Kind() == reflect.Slice && v.IsNil() {
+				list = reflect.ValueOf([]any{})
 			}
 		}
 	}
-	list, err := constants(values)
+	converted, err := constants(list)
 	if err != nil {
 		return failed(err)
 	}
-	defer C.cr_value_free(list)
+	defer C.cr_value_free(converted)
 	return unary(e, func(n *C.cr_node, out **C.cr_node, err **C.cr_error) C.cr_status {
-		return C.cr_node_new_is_in(n, list, out, err)
+		return C.cr_node_new_is_in(n, converted, out, err)
 	})
 }
 

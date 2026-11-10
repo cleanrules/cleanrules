@@ -162,8 +162,9 @@ func readResult(shared *treeShared, m map[string]any, route []int, next *int) *R
 // Evaluating one node), under the logic of WithLogic ("boolean" by
 // default), strict or not (WithStrict): its result tree, whose root holds
 // the truth value. Data is read as RuleSet.Evaluate reads it, along the
-// paths the node reads. A value node, such as Field("a").Add(1), is an
-// expression_error; an unknown logic a registry_error.
+// paths the node reads, within Limits.MaxValues (WithLimits). A value node,
+// such as Field("a").Add(1), is an expression_error; an unknown logic a
+// registry_error.
 func (e *Expr) EvaluateTree(data any, options ...TreeOption) (*ResultTree, error) {
 	var settings treeSettings
 	for _, option := range options {
@@ -176,7 +177,8 @@ func (e *Expr) EvaluateTree(data any, options ...TreeOption) (*ResultTree, error
 }
 
 // EvaluateValueTree evaluates the node as a value on data, strict or not
-// (WithStrict): its result tree, whose root holds the value. A condition,
+// (WithStrict), read within Limits.MaxValues (WithLimits): its result tree,
+// whose root holds the value. A condition,
 // such as Field("a").Gt(1), is an expression_error.
 func (e *Expr) EvaluateValueTree(data any, options ...ValueTreeOption) (*ResultTree, error) {
 	var settings treeSettings
@@ -196,7 +198,10 @@ func (e *Expr) evaluateTree(data any, settings treeSettings, condition bool) (*R
 	}
 	var result *ResultTree
 	err = e.use(func(node *C.cr_node) error {
-		r := newReader()
+		r, err := evaluationReader(settings.limits)
+		if err != nil {
+			return err
+		}
 		input, err := r.read(data, newPathTree(paths))
 		if err != nil {
 			return err

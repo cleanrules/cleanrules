@@ -204,7 +204,7 @@ func addOutput(grid *C.cr_grid, pointer string, output TableOutput) error {
 			}
 		}
 		var err error
-		if values, err = newReader().read(output.Values, wholePaths); err != nil {
+		if values, err = dataReader("").read(output.Values, wholePaths); err != nil {
 			return err
 		}
 		defer C.cr_value_free(values)
@@ -261,13 +261,13 @@ func pushRow(grid *C.cr_grid, r int, cells []any) error {
 // and a name or description under RULE or DESCRIPTION, never text.
 func cellValue(cell any) (C.cr_cell_kind, *C.cr_value, error) {
 	if inner, _ := deref(reflect.ValueOf(cell)); inner.IsValid() && inner.Type() == stringType && utf8.ValidString(inner.String()) {
-		value, err := newReader().read(inner.String(), wholePaths)
+		value, err := dataReader("").read(inner.String(), wholePaths)
 		return C.CR_CELL_TEXT, value, err
 	}
 	if err := checkConstant(cell); err != nil {
 		return 0, nil, err
 	}
-	value, err := newReader().read(cell, wholePaths)
+	value, err := dataReader("").read(cell, wholePaths)
 	return C.CR_CELL_VALUE, value, err
 }
 
@@ -498,23 +498,25 @@ func (t *DecisionTable) RuleSet() (*RuleSet, error) {
 }
 
 // Evaluate decides on data with the table's rule set, as RuleSet.Evaluate
-// does.
-func (t *DecisionTable) Evaluate(data any) (*Decision, error) {
+// does, with its options: the limits given to NewDecisionTable bound the
+// table's reading, not the data, whose Limits.MaxValues WithLimits sets
+// here.
+func (t *DecisionTable) Evaluate(data any, options ...EvaluateOption) (*Decision, error) {
 	rs, err := t.RuleSet()
 	if err != nil {
 		return nil, err
 	}
-	return rs.Evaluate(data)
+	return rs.Evaluate(data, options...)
 }
 
 // EvaluateMany decides on each item of rows with the table's rule set, as
-// RuleSet.EvaluateMany does.
-func (t *DecisionTable) EvaluateMany(rows any) ([]*Decision, error) {
+// RuleSet.EvaluateMany does, with its options (see Evaluate).
+func (t *DecisionTable) EvaluateMany(rows any, options ...EvaluateOption) ([]*Decision, error) {
 	rs, err := t.RuleSet()
 	if err != nil {
 		return nil, err
 	}
-	return rs.EvaluateMany(rows)
+	return rs.EvaluateMany(rows, options...)
 }
 
 // Summary describes the table's rule set (spec/explain.md, Summaries).

@@ -93,10 +93,7 @@ func applyOptions(rule *C.cr_rule, owned bool, options []RuleOption) (*Rule, err
 
 func wrapRule(ptr *C.cr_rule) *Rule {
 	r := &Rule{}
-	var name *C.char
-	var n C.size_t
-	C.cr_rule_name(ptr, &name, &n, nil)
-	r.name = goString(name, n)
+	r.name = ruleName(ptr)
 	r.h = newHandle(r, unsafe.Pointer(ptr), func(p unsafe.Pointer) { C.cr_rule_free((*C.cr_rule)(p)) })
 	return r
 }
@@ -136,9 +133,11 @@ func WithPriority(priority int64) RuleOption {
 }
 
 // WithTags sets the tags, which the rule keeps sorted and without repeats.
+// More than 1,000,000 values (the default Limits.MaxValues) is a
+// limit_exceeded naming the rule.
 func WithTags(tags ...string) RuleOption {
 	return ruleOption(func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
-		list, err := newReader().read(tags, wholePaths)
+		list, err := dataReader(ruleName(rule)).read(tags, wholePaths)
 		if err != nil {
 			return err
 		}
@@ -156,10 +155,12 @@ func WithDescription(description string) RuleOption {
 }
 
 // WithMetadata sets the metadata: data values, read as data is (a Go map is
-// sorted by key). An opaque value in it is a rule_definition_error.
+// sorted by key). An opaque value in it is a rule_definition_error, and
+// metadata of more than 1,000,000 values (the default Limits.MaxValues) a
+// limit_exceeded naming the rule.
 func WithMetadata(metadata map[string]any) RuleOption {
 	return ruleOption(func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
-		value, err := newReader().read(metadata, wholePaths)
+		value, err := dataReader(ruleName(rule)).read(metadata, wholePaths)
 		if err != nil {
 			return err
 		}
@@ -171,6 +172,15 @@ func WithMetadata(metadata map[string]any) RuleOption {
 		defer C.cr_value_free(value)
 		return check(C.cr_rule_with_metadata(rule, value, out, e), *e)
 	})
+}
+
+// ruleName is the name of a rule of the C ABI, for the errors of its
+// options.
+func ruleName(rule *C.cr_rule) string {
+	var name *C.char
+	var n C.size_t
+	C.cr_rule_name(rule, &name, &n, nil)
+	return goString(name, n)
 }
 
 // WithAction names the rule's action, which RuleSet.Bind resolves in a

@@ -707,6 +707,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `limit::max_values`. Conformance: 14 vectors in `rules/limits.json`, with
   the new optional `limits` (`max_values`) of `evaluate` vectors, run with
   native data only. Go follows with H.1c.
+- Go binding (task H.1c): `max_values` on Go data. `Limits.MaxValues`
+  (1,000,000 by default; 0 keeps the default, a negative value is a
+  `format_error`), and `WithLimits` now also applies to `RuleSet.Evaluate`,
+  `EvaluateMany` and `Run` and `DecisionTable.Evaluate` and `EvaluateMany`
+  (a new option type, `EvaluateOption`, which these take as variadic
+  options) and to `Expr.EvaluateTree` and `EvaluateValueTree`, where only
+  `MaxValues` acts: Go data has a limit of its own, and the evaluations give
+  the C ABI no limits, as before. The reader counts what it places as the specification says
+  (a copy of a shared container counts its size, kept with it, and is never
+  made beyond the limit; a slice or an array along the paths counts its
+  length before it is allocated, so `make([]struct{}, math.MaxInt)` is
+  refused at once) and refuses an input beyond the limit, strict or not,
+  with the core's `limit_exceeded` (`Name` `"max_values"`, `Row` in a batch).
+  `Const`, comparisons with Go values, `Then`, `IsIn`, `WithTags` and
+  `WithMetadata` convert under the default limit, the errors of tags and
+  metadata naming the rule.
+  The Go smoke pass runs `rules/limits.json` with Go data (13 vectors; the
+  one with a limit of 0 is skipped and counted, since 0 is the default in
+  Go).
 - Go binding, second part (task H.1b): documents, decision tables, result
   trees and prebuilt libraries. `Loads` (a string; bytes as `string(b)`) and
   `Load` (a file, its format from its extension `.json`, `.yaml`, `.yml`,
@@ -1009,6 +1028,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Go binding (task H.1c): `IsIn` with one slice converts it as a whole under
+  the default `max_values` before checking each value (it copied the slice
+  into a `[]any` first), and `EvaluateMany` with rows that are not a slice or
+  an array no longer converts them before the core's `evaluation_error`.
+  Errors are read as the C ABI writes them: the package no longer strips the
+  name of a C function from messages and JSON forms, which the ABI no longer
+  writes. `RuleSet.Evaluate`, `EvaluateMany` and `Run` and
+  `DecisionTable.Evaluate` and `EvaluateMany` gained variadic options
+  (`...EvaluateOption`): every call still compiles, but a type that declared
+  the old method set (`interface{ Evaluate(any) (*Decision, error) }`) or a
+  function value of the old type no longer matches (harmless before the
+  module is published, H.2). `WithTags` beyond the default `max_values` names
+  its rule, as `WithMetadata` does. A batch with more rows than memory can
+  hold is an `evaluation_error` instead of a panic.
 - Specification: `max_values` in `spec/json-format.md` (*Errors and limits*)
   and `spec/data-model.md` (*Reading native data*, *Limits*, and *Constants*);
   `limit_exceeded` for native data and constants beyond it, with `name` and

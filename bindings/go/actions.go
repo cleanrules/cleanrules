@@ -112,11 +112,21 @@ func (rs *RuleSet) Bind(actions Actions) (*RuleSet, error) {
 // (t.FailNow and t.Fatal do), stops the run too; once the native frames are
 // gone, Run panics again with the same value, or calls runtime.Goexit, on
 // its own goroutine.
-func (rs *RuleSet) Run(data any) (*Decision, error) {
+//
+// Data is read as Evaluate reads it, within Limits.MaxValues (WithLimits):
+// beyond it, the limit_exceeded comes before anything runs.
+func (rs *RuleSet) Run(data any, options ...EvaluateOption) (*Decision, error) {
+	settings, err := evaluationSettings(options)
+	if err != nil {
+		return nil, err
+	}
 	var decision *Decision
 	var stopped *runState
-	err := rs.use(func(ptr *C.cr_ruleset) error {
-		r := newReader()
+	err = rs.use(func(ptr *C.cr_ruleset) error {
+		r, err := evaluationReader(settings.limits)
+		if err != nil {
+			return err
+		}
 		input, err := r.read(data, rs.paths)
 		if err != nil {
 			return err
