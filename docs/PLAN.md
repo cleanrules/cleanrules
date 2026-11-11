@@ -63,9 +63,9 @@ Lo que nos diferencia es la combinación: **condiciones como AST serializable** 
 - [x] Java: FFM sobre la C ABI, sin código nativo propio, con Java 25 (LTS) como mínimo (decidido el 2026-11-05); sin JNI.
 - [x] JavaScript: los dos, con la misma API (decidido el 2026-11-04): napi-rs para Node, con binarios precompilados por plataforma (F.1a), y wasm-bindgen para navegador y Deno (F.1b). Los usuarios instalan solo `cleanrules`, que carga el addon nativo en Node y wasm en navegadores, Deno y otros entornos por condiciones de `exports` (F.1b); los binarios van en paquetes opcionales por plataforma del scope `@cleanrules` (el autor crea el scope antes de M.2). Node 22 como mínimo.
 - [x] MSRV de Rust y edición: edición 2024 y MSRV 1.95, la estable menos dos (decidido el 2026-10-31).
-- [ ] UNKNOWN en lógica difusa como intervalo `[0, 1]` (ver `spec/ast.md`).
-- [ ] Erlang: cómo se distribuye el NIF (binarios precompilados por plataforma frente a compilarlo con Rust al instalar) y si hay además una capa Elixir. Propuesto: precompilados; Elixir y Gleam usan el módulo Erlang directamente, y una capa propia solo si se pide.
-- [ ] Agentes: SDK de MCP en Rust (propuesto: `rmcp`, el oficial) y frameworks con adaptador propio. Propuesto: Claude Agent SDK, OpenAI Agents SDK, LangChain/LangGraph y Pydantic AI en Python; Vercel AI SDK en JavaScript; LangChain4j y Spring AI en la JVM; los demás, por MCP.
+- [x] UNKNOWN en lógica difusa como intervalo `[0, 1]` (ver `spec/ast.md`). Decidido el 2026-11-11: sí, como el borrador de `spec/ast.md` (un grado conocido `d` es `[d, d]`, las conectivas trabajan sobre las cotas como `eval_interval` de fuzzytool y una regla se dispara con grado `lo`).
+- [x] Erlang: cómo se distribuye el NIF (binarios precompilados por plataforma frente a compilarlo con Rust al instalar) y si hay además una capa Elixir. Propuesto: precompilados; Elixir y Gleam usan el módulo Erlang directamente, y una capa propia solo si se pide. Decidido el 2026-11-11: lo propuesto (NIF con `rustler`, binarios precompilados por plataforma, sin capa Elixir).
+- [x] Agentes: SDK de MCP en Rust (propuesto: `rmcp`, el oficial) y frameworks con adaptador propio. Propuesto: Claude Agent SDK, OpenAI Agents SDK, LangChain/LangGraph y Pydantic AI en Python; Vercel AI SDK en JavaScript; LangChain4j y Spring AI en la JVM; los demás, por MCP. Decidido el 2026-11-11: lo propuesto (`rmcp` solo en `crates/mcp`; adaptadores como extras opcionales de carga perezosa, probados contra versiones fijadas).
 - [x] Organización de GitHub: `cleanrules` (la crea el autor el 2026-10-31). La necesitan el groupId de Maven y la ruta del módulo Go.
 
 ## 2. Estructura objetivo del repositorio
@@ -1216,6 +1216,20 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
 | Seguridad | Sin `unsafe` en `core`; `unsafe` en `ffi` con comentario `// SAFETY:` y `miri`; regex en tiempo lineal; límites de profundidad y tamaño al parsear; lectura de datos solo de atributos públicos |
 | Rendimiento | Nadie afirma una mejora sin benchmark (`/bench`), con mediana y rango intercuartílico |
 | Versionado | SemVer común a todos los paquetes; la versión del formato JSON es independiente |
+
+## 4bis. Plan de cierre (2026-11-11)
+
+El autor quiere terminar el plan cuanto antes. Cuatro pistas en paralelo, cada tarea en su *worktree* con `/plan-task`, sus puertas, CI en la rama y *fast-forward* a `main` (las tareas de una pista van en serie; entre pistas, *rebase* sobre `main` antes de fusionar):
+
+| Ola | Núcleo y semántica | Agentes | Bindings | Visualización |
+|---|---|---|---|---|
+| 1 | J.1 | O.1 | G.4, N.1 | V.1 |
+| 2 | J.2, J.4 | O.2, O.3 | N.2, N.3 | V.2 |
+| 3 | I.1, I.2 | O.4, O.5 | N.4, I.3 | V.3, V.4 |
+| 4 | K.1, K.2 | O.7, O.8 | J.3, L.1 | L.2 |
+| 5 | K.3, K.4 | O.6 | — | M.0, M.1 |
+
+Al final, M.3 (paper) y M.2: la publicación la hace el autor (los comandos de publicación están denegados), con lo preparado en F.3b, G.3b y H.2b.
 
 ## 5. Dependencias entre fases
 
