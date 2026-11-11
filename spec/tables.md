@@ -246,7 +246,8 @@ a decimal.
   and descriptions without the space around them, and nothing or only space
   for an empty cell. Null is an empty cell (in JavaScript, `null`, `undefined`
   and holes; in Java, `null` and `Optional.empty()`; in Go, `nil` and a nil
-  pointer). Any other value `v` is, under an input `x`, the condition
+  pointer, except a nil `*Expr`, which is an `expression_error` as everywhere
+  else in Go). Any other value `v` is, under an input `x`, the condition
   `x = v`; under an output, the value `v`; under `RULE` or `DESCRIPTION`, a
   string value is the name or description (its text, without the space around
   it); and under `PRIORITY`, an int, or a float with an integral value (data

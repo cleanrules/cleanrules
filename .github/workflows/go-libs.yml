@@ -1,9 +1,10 @@
 name: Go libraries
 
 # Builds the prebuilt static library of every platform of the Go module,
-# assembles the module as Go users get it, checks it and uses it as they
-# would, without publishing anything (task H.2 publishes the module from its
-# own repository, github.com/cleanrules/cleanrules-go):
+# assembles the module github.com/cleanrules/cleanrules-go as Go users get
+# it, checks it and uses it as they would, without publishing anything (task
+# M.2 pushes the tree to its own repository, github.com/cleanrules/cleanrules-go,
+# and tags it; nothing here pushes, tags or creates a repository):
 #
 # 1. The static library of each platform with Rust 1.97, the version of the
 #    link files' system libraries (bindings/go/scripts/build-lib.sh: release
@@ -14,18 +15,25 @@ name: Go libraries
 #    manylinux_2_28 containers and the musl ones in Alpine, where a C probe
 #    (bindings/go/scripts/probe.c) is linked from the library with the link
 #    file's system libraries and run.
-# 2. The module (bindings/go/scripts/assemble.py): the package's Go files as
-#    they build with the tag cleanrules_prebuilt, the header and the eight
-#    libraries under lib/<os>_<arch>[_musl]/, checked against what it must
-#    hold and nothing else (bindings/go/scripts/check-libs.py: each library
-#    an archive of objects of its platform, macOS 11.0 at most, glibc's or
-#    musl's own symbols, and the probes: glibc 2.28 at most, or musl's libc).
-#    It is the artifact go-module.
+# 2. The module (bindings/go/scripts/assemble.py): go.mod with the module path
+#    github.com/cleanrules/cleanrules-go, the package's Go files as they build
+#    with the tag cleanrules_prebuilt, the header and the eight libraries
+#    under lib/<os>_<arch>[_musl]/, a README for Go users
+#    (bindings/go/scripts/README.module.md), LICENSE, NOTICE and VERSION (the
+#    workspace's, from Cargo.toml). bindings/go/scripts/check-module.py checks
+#    it against what it must hold and nothing else, Go's and GitHub's limits,
+#    the README's links, the version (--release on tags: the tag's, not
+#    0.0.0) and, through check-libs.py, the libraries (each an archive of
+#    objects of its platform, macOS 11.0 at most, glibc's or musl's own
+#    symbols, and the probes: glibc 2.28 at most, or musl's libc). It is the
+#    artifact go-module.
 # 3. On every platform there is a runner for, and in Alpine: a clean module
-#    whose go.mod replaces the binding with the assembled one runs a smoke
-#    program (go vet, go build, and again vendored), and the package's tests
-#    run against the prebuilt library (bindings/go/scripts/smoke.sh). No cargo
-#    there.
+#    outside the repository that requires github.com/cleanrules/cleanrules-go
+#    and replaces it with the assembled tree, with GOPROXY=off (nothing is
+#    fetched), resolves it, vets, builds and runs a smoke program (which
+#    checks the library's version against VERSION) and the README's example,
+#    again vendored; then the package's tests run against the prebuilt
+#    library (bindings/go/scripts/smoke.sh). No cargo there.
 
 on:
   push:
@@ -131,7 +139,16 @@ jobs:
           merge-multiple: true
           path: go-libs
       - run: python3 bindings/go/scripts/assemble.py go-libs/libs module
-      - run: python3 bindings/go/scripts/check-libs.py module --probes go-libs/probes
+      # On a tag, the module's version must be the tag's (v<VERSION>): a
+      # release with the workspace's placeholder 0.0.0 fails here.
+      - run: |
+          release=()
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then release=(--release "${GITHUB_REF_NAME#v}"); fi
+          python3 bindings/go/scripts/check-module.py module --probes go-libs/probes "${release[@]}"
+      # M.2 adds here the push of module/ to github.com/cleanrules/cleanrules-go
+      # and its tag v<VERSION> (the repository does not exist yet): until then
+      # nothing is pushed, tagged or published, and the tree is only this
+      # artifact.
       - uses: actions/upload-artifact@v7
         with:
           name: go-module

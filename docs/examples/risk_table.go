@@ -16,7 +16,7 @@ import (
 	"os"
 	"strings"
 
-	cr "github.com/cleanrules/cleanrules/bindings/go"
+	cr "github.com/cleanrules/cleanrules-go"
 )
 
 func main() {

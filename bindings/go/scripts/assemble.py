@@ -1,13 +1,24 @@
-"""Assemble the Go module with the prebuilt static libraries of every platform.
+"""Assemble the Go module github.com/cleanrules/cleanrules-go, with the prebuilt libraries.
 
 Usage: python3 assemble.py <libs> <out>
 
 <libs> holds <platform>/libcleanrules_ffi.a for each platform that a file
 link_*.go of the package names (lib/<platform>/libcleanrules_ffi.a in its
 #cgo LDFLAGS): those files are the one list of platforms. <out>, which must
-not exist, receives the module as Go users get it (task H.2 publishes it):
+not exist, receives the module as Go users get it, the tree of the
+repository github.com/cleanrules/cleanrules-go (task M.2 pushes and tags it;
+nothing here publishes anything):
 
-- go.mod, README.md, and the repository's LICENSE and NOTICE;
+- go.mod: the module path github.com/cleanrules/cleanrules-go and the go
+  directive, as bindings/go/go.mod gives them; it must hold only those two
+  (the package needs no other module), and that path: the package has the
+  published path in this repository too, so that its examples and tests
+  import what Go users import;
+- README.md, written for Go users with absolute links
+  (bindings/go/scripts/README.module.md), and the repository's LICENSE and
+  NOTICE;
+- VERSION, the workspace's version (Cargo.toml), which the libraries report
+  (Version()) and the module's tag must give (v<VERSION>; check-module.py);
 - the package's Go files but its tests, as they build with the tag
   cleanrules_prebuilt: a file that needs the tag loses it (the link files and
   include_prebuilt.go), a file that needs its absence is left out (link.go,
@@ -29,26 +40,68 @@ import argparse
 import re
 import shutil
 import sys
+import tomllib
 from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parent.parent
 REPOSITORY = PACKAGE.parent.parent
 HEADER = REPOSITORY / "crates" / "ffi" / "include" / "cleanrules.h"
+README = PACKAGE / "scripts" / "README.module.md"
 LIBRARY = "libcleanrules_ffi.a"
 TAG = "cleanrules_prebuilt"
 LINKED = re.compile(r"\$\{SRCDIR\}/lib/([a-z0-9_]+)/" + re.escape(LIBRARY))
+# The module path Go users import, that of the repository the module is
+# published from.
+MODULE = "github.com/cleanrules/cleanrules-go"
 
 
 class AssemblyError(Exception):
     """A problem that stops the assembly."""
 
 
+def go_mod() -> tuple[str, str]:
+    """The module path and go directive of bindings/go/go.mod, which holds only those."""
+    path = go = None
+    for number, raw in enumerate((PACKAGE / "go.mod").read_text().split("\n"), 1):
+        line = raw.split("//", 1)[0].strip()
+        if not line:
+            continue
+        words = line.split()
+        if words[0] == "module" and len(words) == 2 and path is None:
+            path = words[1]
+        elif words[0] == "go" and len(words) == 2 and go is None:
+            go = words[1]
+        else:
+            raise AssemblyError(
+                f"bindings/go/go.mod:{number}: {line!r}: the module holds only its module"
+                " path and go directive (no require, replace, toolchain...)"
+            )
+    if path is None or go is None:
+        raise AssemblyError("bindings/go/go.mod lacks its module path or go directive")
+    return path, go
+
+
 def module_path() -> str:
-    """The module path of go.mod."""
-    match = re.search(r"^module\s+(\S+)", (PACKAGE / "go.mod").read_text(), re.MULTILINE)
-    if not match:
-        raise AssemblyError("go.mod names no module")
-    return match[1]
+    """The module path of bindings/go/go.mod, which must be the published one."""
+    path = go_mod()[0]
+    if path != MODULE:
+        raise AssemblyError(f"bindings/go/go.mod names the module {path}, not {MODULE}")
+    return path
+
+
+def published_go_mod() -> str:
+    """The go.mod of the published module: its path and go directive, and nothing else."""
+    return f"module {module_path()}\n\ngo {go_mod()[1]}\n"
+
+
+def workspace_version() -> str:
+    """The version of the workspace, [workspace.package] in Cargo.toml."""
+    with (REPOSITORY / "Cargo.toml").open("rb") as file:
+        manifest = tomllib.load(file)
+    version = manifest.get("workspace", {}).get("package", {}).get("version")
+    if not isinstance(version, str):
+        raise AssemblyError("Cargo.toml has no [workspace.package] version")
+    return version
 
 
 def platforms() -> list[str]:
@@ -92,6 +145,31 @@ def transform(source: str, name: str) -> str | None:
     return result
 
 
+def go_files() -> dict[str, str]:
+    """The package's Go files the module holds, by name, with their text."""
+    files = {}
+    for file in sorted(PACKAGE.glob("*.go")):
+        if file.name.endswith("_test.go"):
+            continue
+        text = transform(file.read_text(encoding="utf-8"), file.name)
+        if text is not None:
+            files[file.name] = text
+    return files
+
+
+def vendor_go(targets: list[str]) -> str:
+    """vendor.go, which imports the empty packages of include/ and of each lib/<platform>/."""
+    imports = [f"{MODULE}/include"] + [f"{MODULE}/lib/{platform}" for platform in targets]
+    lines = "".join(f'\t_ "{path}"\n' for path in imports)
+    return (
+        "package cleanrules\n\n"
+        "// The directories of the header and of the prebuilt libraries hold no\n"
+        "// code, and go mod vendor copies only those of packages: so each holds an\n"
+        "// empty package, imported here (written by bindings/go/scripts/assemble.py).\n"
+        f"import (\n{lines})\n"
+    )
+
+
 def empty_package(directory: str, doc: str) -> str:
     """An empty package for directory, with its documentation."""
     package = directory.rsplit("/", 1)[-1]
@@ -102,7 +180,6 @@ def assemble(libs: Path, out: Path) -> list[str]:
     """Write the module into out; the files written, relative to it."""
     if out.exists():
         raise AssemblyError(f"{out} exists: give a new directory")
-    module = module_path()
     targets = platforms()
     missing = [p for p in targets if not (libs / p / LIBRARY).is_file()]
     if missing:
@@ -124,23 +201,22 @@ def assemble(libs: Path, out: Path) -> list[str]:
         shutil.copyfile(source, path)
         written.append(relative)
 
+    go_mod_text = published_go_mod()
+    version = workspace_version()
+    files = go_files()
     out.mkdir(parents=True)
-    copy(PACKAGE / "go.mod", "go.mod")
-    copy(PACKAGE / "README.md", "README.md")
+    write("go.mod", go_mod_text)
+    copy(README, "README.md")
     copy(REPOSITORY / "LICENSE", "LICENSE")
     copy(REPOSITORY / "NOTICE", "NOTICE")
-    for file in sorted(PACKAGE.glob("*.go")):
-        if file.name.endswith("_test.go"):
-            continue
-        text = transform(file.read_text(encoding="utf-8"), file.name)
-        if text is not None:
-            write(file.name, text)
+    write("VERSION", f"{version}\n")
+    for name, text in files.items():
+        write(name, text)
     copy(HEADER, "include/cleanrules.h")
     write(
         "include/include.go",
         empty_package("include", "holds the header of the C ABI of cleanrules, cleanrules.h."),
     )
-    imports = [f"{module}/include"]
     for platform in targets:
         copy(libs / platform / LIBRARY, f"lib/{platform}/{LIBRARY}")
         write(
@@ -149,16 +225,7 @@ def assemble(libs: Path, out: Path) -> list[str]:
                 platform, f"holds the prebuilt static library of cleanrules for {platform}."
             ),
         )
-        imports.append(f"{module}/lib/{platform}")
-    lines = "".join(f'\t_ "{path}"\n' for path in imports)
-    write(
-        "vendor.go",
-        "package cleanrules\n\n"
-        "// The directories of the header and of the prebuilt libraries hold no\n"
-        "// code, and go mod vendor copies only those of packages: so each holds an\n"
-        "// empty package, imported here (written by bindings/go/scripts/assemble.py).\n"
-        f"import (\n{lines})\n",
-    )
+    write("vendor.go", vendor_go(targets))
     return written
 
 
@@ -178,7 +245,10 @@ def main() -> int:
         return 1
     for relative in written:
         print(relative)
-    print(f"{arguments.out}: the module with {len(platforms())} prebuilt libraries")
+    print(
+        f"{arguments.out}: the module {MODULE}, version {workspace_version()},"
+        f" with {len(platforms())} prebuilt libraries"
+    )
     return 0
 
 

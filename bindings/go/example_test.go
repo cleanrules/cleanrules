@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	cr "github.com/cleanrules/cleanrules/bindings/go"
+	cr "github.com/cleanrules/cleanrules-go"
 )
 
 // Conditions are built with functions and methods; String is the core's

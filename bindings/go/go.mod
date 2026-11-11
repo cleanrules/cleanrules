@@ -1,3 +1,3 @@
-module github.com/cleanrules/cleanrules/bindings/go
+module github.com/cleanrules/cleanrules-go
 
 go 1.24

@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"log"
 
-	cr "github.com/cleanrules/cleanrules/bindings/go"
+	cr "github.com/cleanrules/cleanrules-go"
 )
 
 // Customer is read through its exported fields, named by their tags.

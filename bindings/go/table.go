@@ -101,7 +101,8 @@ type DecisionTable struct {
 //   - a string: text, read as an unquoted CSV field in the rule syntax:
 //     "> 5", "-", "'VIP'" for the string VIP, since "VIP" is the field named
 //     VIP;
-//   - nil (or a nil pointer): an empty cell;
+//   - nil (or a nil pointer): an empty cell, except a nil *Expr, which is an
+//     expression_error as everywhere else;
 //   - an *Expr: under an input, the cell's condition, which must test its
 //     column (Field("age").Lt(18) under age); under an output, its value;
 //   - a value of a named string type (type Level string, Go's enums): a

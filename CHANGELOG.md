@@ -767,7 +767,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   limits. `NewDecisionTable(header, rows, ...TableOption)` over the C ABI's
   open grid: header items are CSV header texts (through pointers, named
   string types too), input `*Expr`s or `TableOutput`s; cells are text
-  (`string`), empty (`nil` or a nil pointer), nodes (`*Expr`), named string
+  (`string`), empty (`nil` or a nil pointer other than a nil
+  `*Expr`, which is an `expression_error`), nodes (`*Expr`), named string
   types as values (`type Level string`, Go's enums: a constant under inputs
   and outputs, the name or description under `RULE` and `DESCRIPTION`, an
   error under `PRIORITY`, never a field name) and other constants, each
@@ -802,6 +803,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checks it and uses it from a clean module, also vendored, with the
   package's tests, on Linux, macOS and Windows, x64 and arm64, and in Alpine.
   Example `docs/examples/risk_table.go`.
+- Go module `github.com/cleanrules/cleanrules-go`, assembled and checked but
+  not published (task H.2b; its repository, push and tags are M.2):
+  `bindings/go/scripts/assemble.py` writes the tree that repository will
+  hold, with `go.mod` (the module path and go directive only), the package's
+  Go files as they build with the prebuilt libraries, the header, the eight
+  libraries, a README for Go users with absolute links
+  (`bindings/go/scripts/README.module.md`), LICENSE, NOTICE and `VERSION`
+  (the workspace's). `bindings/go/scripts/check-module.py` checks it: exactly
+  those files, each Go file as assembled from `bindings/go`, Go's and
+  GitHub's size limits, no `require` or `replace`, the version (a semantic
+  version, the workspace's; `--release` on tags, and 0.0.0 refused there),
+  the README's links (absolute, and to files and headings that exist) and
+  its table of platforms (the same as the binding's README), LICENSE,
+  NOTICE and header as the repository's, and the libraries as
+  `check-libs.py` checks them. `bindings/go/scripts/smoke.sh` now resolves
+  the tree from a clean module outside the repository with `GOPROXY=off`
+  (no other module, no `go.sum`), checks that the library reports the
+  tree's `VERSION`, and runs the README's example, also vendored. The
+  workflow "Go libraries" runs it on every platform and in Alpine, and
+  pushes, tags and publishes nothing.
 - C ABI: `cr_grid_push_row_cells`, a grid row whose cells say what they are
   (`CR_CELL_TEXT`, `CR_CELL_VALUE`, `CR_CELL_NODE`), so that a string can be
   a value, such as a host language's enum constant, which the core reads by
@@ -1046,6 +1067,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Go binding (task H.2b): the module path is
+  `github.com/cleanrules/cleanrules-go`, the one Go users will import, in this
+  repository too (it was `github.com/cleanrules/cleanrules/bindings/go`, never
+  published); the examples and tests import it.
 - Go binding (task H.1c): `IsIn` with one slice converts it as a whole under
   the default `max_values` before checking each value (it copied the slice
   into a `[]any` first), and `EvaluateMany` with rows that are not a slice or

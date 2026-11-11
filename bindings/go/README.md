@@ -10,23 +10,31 @@ values; the core reads, checks, evaluates, explains and summarizes everything
 (no rule logic in Go).
 
 Go 1.24 or later, standard library only; cgo, so a C compiler (see
-*Platforms*). Module `github.com/cleanrules/cleanrules/bindings/go` (package
-`cleanrules`), not published yet: task H.2 publishes it from its own
-repository, `github.com/cleanrules/cleanrules-go`, with the prebuilt
-libraries below, so that `go get` needs no Rust.
+*Platforms*). Module `github.com/cleanrules/cleanrules-go` (package
+`cleanrules`), not published yet: it is published from its own repository,
+`github.com/cleanrules/cleanrules-go`, with the prebuilt libraries below, so
+that `go get` needs no Rust. This directory is where the package is written
+and tested, under the same module path; *Go module* below says how the
+published tree is assembled and checked.
 
 ## Installing
 
 The module Go users get holds a prebuilt static library for each platform
 (`lib/<os>_<arch>[_musl]/libcleanrules_ffi.a`) and the C ABI's header
 (`include/`), and links the library of the platform it builds for: nothing to
-build, no Rust. Until H.2 publishes it, CI assembles it as the artifact
-`go-module` of the workflow "Go libraries" (`.github/workflows/go-libs.yml`);
-use it with a `replace` directive:
+build, no Rust. Once it is published:
+
+```bash
+go get github.com/cleanrules/cleanrules-go
+```
+
+Until then, CI assembles it as the artifact `go-module` of the workflow "Go
+libraries" (`.github/workflows/go-libs.yml`; *Go module* below); use it with a
+`replace` directive:
 
 ```text
-require github.com/cleanrules/cleanrules/bindings/go v0.0.0
-replace github.com/cleanrules/cleanrules/bindings/go => ../go-module
+require github.com/cleanrules/cleanrules-go v0.0.0
+replace github.com/cleanrules/cleanrules-go => ../go-module
 ```
 
 ### Platforms
@@ -108,7 +116,7 @@ repository's root:
 rustup component add llvm-tools
 bash bindings/go/scripts/build-lib.sh aarch64-apple-darwin darwin_arm64 go-libs   # one per platform
 python3 bindings/go/scripts/assemble.py go-libs/libs go-module                    # needs all eight
-python3 bindings/go/scripts/check-libs.py go-module                               # --probes go-libs/probes for Linux
+python3 bindings/go/scripts/check-module.py go-module                             # --probes go-libs/probes for Linux
 bash bindings/go/scripts/smoke.sh go-module /tmp/smoke                            # [cleanrules_musl]
 ```
 
@@ -119,14 +127,15 @@ that its link file links every system library rustc asks for, strips it and,
 with `--probe` on Linux, links and runs `scripts/probe.c` with it.
 `assemble.py` writes the module: the package's Go files as they build with
 `cleanrules_prebuilt` (the tag removed; `link.go` and `include.go` left out),
-the header, the libraries and their empty packages. `check-libs.py` checks
-it: exactly the eight libraries, each an archive of objects of its system and
-processor, macOS 11.0 at most, glibc's own symbols in the glibc ones and none
-in the musl ones, and, from the probes CI links in manylinux_2_28 and Alpine,
-glibc 2.28 at most or musl's libc. `smoke.sh` uses the module from a clean
-module (also vendored), then runs this package's tests with the tag. The
-workflow "Go libraries" runs all of it on every platform, and publishes
-nothing.
+the header, the libraries and their empty packages, and the rest of *Go
+module* below. `check-libs.py` checks its libraries: exactly the eight, each
+an archive of objects of its system and processor, macOS 11.0 at most,
+glibc's own symbols in the glibc ones and none in the musl ones, and, from the
+probes CI links in manylinux_2_28 and Alpine, glibc 2.28 at most or musl's
+libc; `check-module.py` runs those checks and the module's own. `smoke.sh`
+uses the module from a clean module (also vendored), then runs this
+package's tests with the tag. The workflow "Go libraries" runs all of it on
+every platform, and publishes nothing.
 
 ### Linking another build
 
@@ -152,13 +161,91 @@ library by its path rather than with `-L` and `-l`: cargo writes the shared
 library next to it, which the linkers of Linux and macOS would prefer, and
 which the program then has to find when it runs.
 
+## Go module
+
+Go users get the package from its own repository,
+`github.com/cleanrules/cleanrules-go`, whose tagged commits hold the eight
+prebuilt libraries (as go-duckdb does), so that `go get` needs no Rust. This
+directory has the same module path, so the examples and tests here import
+what Go users import. Nothing is published yet: the workflow "Go libraries"
+assembles the tree that repository will hold, checks it and resolves it from
+a clean module; the repository, its pushes and its tags come with the first
+release. From the repository's root, with the eight libraries built as *The
+prebuilt libraries* says:
+
+```bash
+python3 bindings/go/scripts/assemble.py go-libs/libs go-module
+python3 bindings/go/scripts/check-module.py go-module [--probes go-libs/probes] [--release 0.1.0]
+bash bindings/go/scripts/smoke.sh go-module /tmp/smoke [cleanrules_musl]
+```
+
+| Path | What it is |
+|---|---|
+| `go.mod` | `module github.com/cleanrules/cleanrules-go` and the go directive of this directory's `go.mod` (1.24); nothing else: the module needs no other |
+| `*.go` | the package's files but its tests, as they build with `cleanrules_prebuilt` (the tag removed; `link.go` and `include.go` left out) |
+| `vendor.go`, `include/include.go`, `lib/<platform>/lib.go` | empty packages, imported so that `go mod vendor` copies the header and the libraries |
+| `include/cleanrules.h` | the C ABI's header |
+| `lib/<os>_<arch>[_musl]/libcleanrules_ffi.a` | the eight prebuilt libraries (*Platforms*) |
+| `README.md` | [`scripts/README.module.md`](scripts/README.module.md): for Go users, with absolute links (installing, an example, platforms, tags, versions) |
+| `LICENSE`, `NOTICE` | the repository's |
+| `VERSION` | the workspace's version (`Cargo.toml`), that of the tag `v<VERSION>` and the one `Version()` reports |
+
+The tree is about 56 MiB, nearly all of it the libraries (4.8 to 7.9 MB each,
+11.9 MB on Windows on arm64); about 15 MiB compressed, as the module zip that
+Go's proxy serves.
+
+`check-module.py` (standard library only; it loads `assemble.py` and
+`check-libs.py`) checks the tree against this repository and against what Go,
+its module proxy and GitHub require:
+
+- exactly the files above, nothing else: each Go file the same text that
+  `assemble.py` writes from this directory, no tests, no symbolic links or
+  empty directories, names that a module zip and every file system take,
+  distinct when case is ignored;
+- Go's limits for a module (500 MiB, 16 MiB for `go.mod` and `LICENSE`) and
+  GitHub's for a file (100 MiB, and a warning past 50 MiB);
+- `go.mod` with only the module path and go directive (no `require`,
+  `replace`, `exclude`, `retract`, `toolchain`, `godebug` or `tool`);
+- `VERSION`, the workspace's version, a semantic version as Go's (and from
+  2.0.0 on, a module path ending in `/v<major>`, which Go would require);
+  with `--release <version>`, that version and not the placeholder 0.0.0,
+  which is otherwise a warning;
+- `README.md`: only absolute https links, those into
+  `github.com/cleanrules/cleanrules` to files, directories and headings
+  that exist on `main`; `go get` and the import of the module path; a
+  *Platforms* section (the build errors of `link_unsupported.go` and
+  `cgo_required.go` point there) whose table is this README's, the same text;
+  the tags `cleanrules_musl` and `cleanrules_external`; an example with
+  `package main`; no task of the plan;
+- `LICENSE`, `NOTICE` and the header, the repository's byte for byte; no
+  text file naming the package's former module path, a university or an
+  affiliation;
+- the libraries, as `check-libs.py` checks them (and the probes, with
+  `--probes`).
+
+`smoke.sh` makes a clean module outside the repository whose `go.mod`
+requires `github.com/cleanrules/cleanrules-go v0.0.0` and replaces it with the
+tree, under `GOPROXY=off`, `GOSUMDB=off`, `GOFLAGS=-mod=mod`,
+`GOTOOLCHAIN=local` and `GOWORK=off`, so nothing can be fetched: `go list -m
+all` must show the replacement and no other module, and no `go.sum` is
+written. It runs `go vet`, builds and runs `scripts/smoke/main.go` (which
+checks that the linked library reports the tree's `VERSION`), runs it again
+with `go run`, and runs the README's example; then again from `vendor/`
+(`go mod vendor` must copy the header and every library), and this package's
+tests with `cleanrules_prebuilt`. CI ("Go libraries") assembles the tree from
+the libraries built on each platform, checks it with the probes (and
+`--release` on tags, so a tag with the version 0.0.0 fails), uploads it as
+`go-module`, and runs `smoke.sh` on Linux, macOS and Windows, on x64 and
+arm64, and in Alpine with `cleanrules_musl`. Nothing is pushed, tagged or
+published.
+
 ## Conditions and rules in code
 
 Go has no operator overloading, so conditions are functions and methods, as
 fuzzytool's `&`, `|` and `~` become `And`, `Or` and `Not`:
 
 ```go
-import cr "github.com/cleanrules/cleanrules/bindings/go"
+import cr "github.com/cleanrules/cleanrules-go"
 
 adult := cr.Field("customer", "age").Ge(18)          // a path, never split at dots
 cond := adult.And(cr.Field("country").IsIn("ES", "PT"))
@@ -452,7 +539,7 @@ header:
 | Cell | Meaning |
 |---|---|
 | `string` (also through a pointer) | text, as in the CSV: `"> 5"`, `"-"`, `"'VIP'"` (the string), `"VIP"` (the field) |
-| `nil`, a nil pointer | empty |
+| `nil`, a nil pointer | empty (a nil `*Expr` is an `expression_error`, as everywhere else) |
 | `*Expr` | under an input, its condition, which must test its column; under an output, its value |
 | a named string type (`type Risk string`) | a value, its string: under an input or an output a constant (`'medium'`), under `RULE` or `DESCRIPTION` the name or description, under `PRIORITY` a `format_error`; Go's enums are never field names |
 | any other value | a constant, as `Const` reads it: under an input `x`, the test `x = value`; under `PRIORITY`, an int |

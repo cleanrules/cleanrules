@@ -1,11 +1,14 @@
-// Command smoke uses the Go binding as a program outside this repository
+// Command smoke uses the Go module as a program outside this repository
 // does: CI (.github/workflows/go-libs.yml) copies it into a clean module
-// whose go.mod replaces the binding's module with the assembled one, with
-// its prebuilt libraries (bindings/go/scripts/assemble.py), and runs it on
-// every platform it can: no cargo, no target directory. It reads a rule set
-// from YAML with an action bound, builds a decision table, reads one rule
-// from text, evaluates a result tree and explains a decision, and exits
-// with status 1 at the first result that is not the expected one.
+// whose go.mod requires github.com/cleanrules/cleanrules-go and replaces it
+// with the assembled tree, with its prebuilt libraries
+// (bindings/go/scripts/assemble.py and smoke.sh), and runs it on every
+// platform it can: no cargo, no target directory, no network. It reads a
+// rule set from YAML with an action bound, builds a decision table, reads one
+// rule from text, evaluates a result tree and explains a decision, and exits
+// with status 1 at the first result that is not the expected one. Given an
+// argument, the module's version (its VERSION file), the linked library must
+// report that version.
 package main
 
 import (
@@ -14,7 +17,7 @@ import (
 	"runtime"
 	"strings"
 
-	cr "github.com/cleanrules/cleanrules/bindings/go"
+	cr "github.com/cleanrules/cleanrules-go"
 )
 
 const rules = `version: 1
@@ -33,6 +36,10 @@ ruleset:
 `
 
 func main() {
+	if len(os.Args) > 1 && cr.Version() != os.Args[1] {
+		fmt.Fprintf(os.Stderr, "smoke: the library is version %s, the module %s\n", cr.Version(), os.Args[1])
+		os.Exit(1)
+	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "smoke:", err)
 		os.Exit(1)
