@@ -380,7 +380,7 @@ func TestEvaluationLimits(t *testing.T) {
 		}
 	}
 	d := must(rs.Evaluate(data, others))(t)
-	if v := d.Results()[0].Output["v0"]; !equalValues(v, []any{[]any{[]any{int64(1)}}}) {
+	if v := d.Results()[0].Output["v0"]; !sameValue(v, []any{[]any{[]any{int64(1)}}}) {
 		t.Errorf("read %#v", v)
 	}
 }

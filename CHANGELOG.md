@@ -726,6 +726,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The Go smoke pass runs `rules/limits.json` with Go data (13 vectors; the
   one with a limit of 0 is skipped and counted, since 0 is the default in
   Go).
+- Go conformance runner (task H.2a, `bindings/go`, `TestConformance`): every
+  vector, text, YAML and table reads included, through JSON text
+  (`json:<id>`: `Loads`, `Dumps`, `ReadDecision`, and unexported JSON entry
+  points for inputs in `jsonentry.go`, over the C ABI's
+  `cr_ruleset_evaluate`, `cr_value_from_json` and `cr_node_evaluate_tree`, as
+  Python's private ones; decisions also through their methods) and through Go
+  data on the idiomatic API (`native:<id>`: conditions, rules and rule sets
+  built in code and checked against the core's reading of the same JSON;
+  inputs as every integer type, `big.Int`, `float32` and `float64`, `Decimal`,
+  `Date`, `DateTime`, `time.Time`, slices, arrays, maps and structs, named
+  types and pointers, in turn; results compared as the Go values given back,
+  each Go type checked, and as their JSON forms), with a lossless JSON reader
+  and comparer of its own. It runs in `go test` (about 6 seconds with a debug
+  library), so CI runs it on Linux, macOS and Windows, and prints its report;
+  grids have no JSON route, the `max_values` vectors run with Go data only,
+  and the one vector with a limit of 0 has no Go route (0 keeps the default):
+  every skip is counted and listed in `bindings/go/build/reports/conformance.txt`.
+  It replaces the smoke pass of H.1a.
 - Go binding, second part (task H.1b): documents, decision tables, result
   trees and prebuilt libraries. `Loads` (a string; bytes as `string(b)`) and
   `Load` (a file, its format from its extension `.json`, `.yaml`, `.yml`,

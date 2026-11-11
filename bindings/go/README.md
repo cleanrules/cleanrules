@@ -569,12 +569,49 @@ errors with their pointers, settings, formats), result trees and
 `ActionContext.Tree`, `Limits.MaxValues` (a diamond 30 levels deep refused at
 once, what counts at the limit and one over it, lengths beyond memory,
 batches, constants and metadata), which files link the library on each
-platform and tag,
-the examples
+platform and tag, and the examples
 [`docs/examples/discounts.go`](../../docs/examples/discounts.go) and
-[`docs/examples/risk_table.go`](../../docs/examples/risk_table.go), and a smoke
-pass over 637 conformance vectors (`rules/`, `explain/`, and the generated
-rule sets and explanations) built with this API and Go data, `rules/limits.json`
-among them with its `max_values` on Go data; the one vector with a limit of 0
-is skipped and counted, since 0 is the default in Go. The full runner is task
-H.2.
+[`docs/examples/risk_table.go`](../../docs/examples/risk_table.go).
+
+### Conformance
+
+`TestConformance` runs every vector of
+[`conformance/vectors`](../../conformance/vectors) twice (alone:
+`go test -count=1 -run '^TestConformance' .`; about 6 s with a debug library):
+
+- `json:<id>`: documents, inputs and results cross as JSON text. `Loads` and
+  `Dumps` read and write JSON, YAML, the rule syntax and CSV,
+  `RuleSet.ReadDecision` reads decisions, the package's unexported JSON entry
+  points (`jsonentry.go`, the C ABI's `cr_ruleset_evaluate`,
+  `cr_value_from_json` and `cr_node_evaluate_tree`) evaluate the inputs, and
+  `Decision.JSON`, `Explanation.JSON`, `Summary.JSON`, `ResultTree` documents
+  and the texts are compared exactly; decisions are also read with their
+  methods.
+- `native:<id>`: conditions, rules and rule sets are built in code (`Field`,
+  `Const`, the methods of `Expr`, `NewRule` and its options, `NewRuleSet`)
+  and checked against the core's reading of the same JSON; inputs are Go data
+  in turn: every integer type, a named one, `big.Int` and `*big.Int`,
+  `float32` and `float64`, `Decimal`, `Date`, `DateTime`, `time.Time` (in
+  `time.UTC` for `Z`, in a zone by name, and in a fixed zone, unnamed, named
+  or `Etc/GMT`, for an offset), slices, arrays, maps
+  (`map[string]any`, `map[any]any`, typed and named maps) and structs (whose
+  fields keep the order of a map that is not sorted), with pointers and nils
+  of several types. Results are compared as the Go values given back
+  (`spec/data-model.md`, *Go*), checking each Go type (`int64`, `float64`,
+  `[]any`, `map[string]any` without order...), through `Decision`,
+  `Explanation`, `Summary` and `ResultTree`, and as their JSON forms. `read`
+  vectors go through `Loads`, `Dumps`, `RuleFromText`, `NewDecisionTable`
+  (grids) and `ReadDecision`.
+
+The comparison follows
+[`conformance/README.md`](../../conformance/README.md) (*Comparing*), with
+the runner's own JSON reader (order kept, numbers as written), never the
+package's equality. Each failure names its route and id, with what came back
+and what the vector expects. Skips are counted and listed with their reason:
+by JSON, the decision table grids (Go data) and the `max_values` vectors
+(native data only); by Go data, the one vector with a limit of 0, which Go
+cannot give (0 keeps the default). The report, with the counts and the Go
+forms used, is logged and written to `build/reports/conformance.txt` (ignored
+by git). `TestConformanceComparator` checks the comparison itself, and
+`TestConformanceWrongVectors` that vectors with an altered expected output
+fail by both routes.

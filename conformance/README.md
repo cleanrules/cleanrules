@@ -153,13 +153,33 @@ output, never stopping at the first one.
   `loads`, `dumps`, `ruleFromText`, `DecisionTable(...)` with Scala cells
   (grids included) and `readDecision`. Skips are counted and listed in
   `scala/build/reports/conformance/conformance.txt`.
+- **Go**: `cd bindings/go && go test -count=1 ./...` (alone:
+  `go test -count=1 -run '^TestConformance' .`) runs every vector with JSON
+  text (`json:<id>`: `Loads`, `Dumps`, `ReadDecision`, and the package's
+  unexported JSON entry points for inputs, as Python's private ones; decisions
+  also through their methods) and with Go data (`native:<id>`): conditions,
+  rules and rule sets are built in code and checked against the core's
+  reading of the same JSON; inputs are Go values (every integer type,
+  `big.Int`, `float32` and `float64`, `Decimal`, `Date`, `DateTime`,
+  `time.Time`, slices, arrays, maps and structs, named types and pointers, in
+  turn); results are compared as the Go values given back
+  (`spec/data-model.md`, which gives a map back without order, the zone `UTC`
+  as `time.UTC` and a zone Go does not know at its offset) and as their JSON
+  forms. `read` vectors go through `Loads`, `Dumps`, `RuleFromText`,
+  `NewDecisionTable` and `ReadDecision`. Grids are Go data, so `table_grid`
+  vectors have no JSON run, and the vector with a limit of 0 has no Go run (0
+  keeps the default in Go); skips are counted and listed in
+  `bindings/go/build/reports/conformance.txt`. It compares with a lossless
+  JSON reader of its own (`bindings/go/conformance_json_test.go`).
 - **Each binding** runs every vector twice: once through its JSON entry points,
   and once converting `input` into the language's native data (with the
   conversions of `spec/data-model.md`: floats as floats, with `cr.float` in
   JavaScript, decimals as the language's decimal, maps as an ordered map) and
   calling the idiomatic API. The second run tests the binding's own code, its
-  data conversion. In a language whose maps have no order (Go), maps passed
-  through to outputs are compared without regard to member order in that run.
+  data conversion. In a language whose maps have no order (Go), maps given
+  back are compared without regard to member order in that run; Go's runner
+  gives a map whose keys are not sorted as a struct, whose fields keep their
+  order, so the JSON forms of its results are still compared exactly.
 
 ## Coverage
 

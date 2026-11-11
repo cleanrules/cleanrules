@@ -297,25 +297,31 @@ func (rs *RuleSet) EvaluateMany(rows any, options ...EvaluateOption) ([]*Decisio
 			return err
 		}
 		defer C.cr_value_free(inputs)
-		var batch *C.cr_batch
-		var e *C.cr_error
-		if err := check(C.cr_ruleset_evaluate_many(ptr, inputs, nil, &batch, &e), e); err != nil {
-			return err
-		}
-		defer C.cr_batch_free(batch)
-		n := int(C.cr_batch_len(batch))
-		decisions = make([]*Decision, n)
-		for i := range n {
-			var copied *C.cr_decision
-			var ce *C.cr_error
-			if err := check(C.cr_decision_clone(C.cr_batch_get(batch, C.size_t(i)), &copied, &ce), ce); err != nil {
-				return err
-			}
-			decisions[i] = newDecision(rs, copied, r.opaques, true)
-		}
-		return nil
+		decisions, err = rs.evaluateBatch(ptr, inputs, r.opaques)
+		return err
 	})
 	return decisions, err
+}
+
+// evaluateBatch evaluates a list of inputs: a decision for each, in order.
+func (rs *RuleSet) evaluateBatch(ptr *C.cr_ruleset, inputs *C.cr_value, opaques []any) ([]*Decision, error) {
+	var batch *C.cr_batch
+	var e *C.cr_error
+	if err := check(C.cr_ruleset_evaluate_many(ptr, inputs, nil, &batch, &e), e); err != nil {
+		return nil, err
+	}
+	defer C.cr_batch_free(batch)
+	n := int(C.cr_batch_len(batch))
+	decisions := make([]*Decision, n)
+	for i := range n {
+		var copied *C.cr_decision
+		var ce *C.cr_error
+		if err := check(C.cr_decision_clone(C.cr_batch_get(batch, C.size_t(i)), &copied, &ce), ce); err != nil {
+			return nil, err
+		}
+		decisions[i] = newDecision(rs, copied, opaques, true)
+	}
+	return decisions, nil
 }
 
 // Summary describes the rule set without evaluating it: its rules, the
