@@ -127,6 +127,9 @@ class Conformance {
                     + " Java and Scala: BigDecimal cannot hold it, and a Double infinity is a float)",
             "zone_unknown_to_java",
             "a datetime in a zone that Java's zone database does not know, which no Java value holds",
+            "agents",
+            "the tools for agents (spec/agents.md) are not in the JVM binding yet (docs/PLAN.md, O.1), so tool"
+                    + " vectors run in the core and Python runners",
             "native",
             "max_values bounds what is read from native data only, so evaluate vectors with limits run in the native"
                     + " route");
@@ -188,6 +191,9 @@ class Conformance {
     /** Run {@code vector} one way ({@code "json"} or {@code "native"}). */
     Outcome run(Map<?, ?> vector, String route) {
         current = route + ":" + vector.get("id");
+        if ("tool".equals(((Map<?, ?>) vector.get("given")).get("kind"))) {
+            return new Outcome(null, "agents");
+        }
         try {
             String failure = switch (route) {
                 case "json" -> runJson(vector);

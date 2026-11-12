@@ -1,0 +1,42 @@
+{
+  "tool": "evaluate",
+  "arguments": {
+    "ruleset": "pricing",
+    "input": {
+      "customer": {
+        "years": 7
+      }
+    },
+    "verbose": true
+  },
+  "result": {
+    "ruleset": "pricing",
+    "selected": [
+      "vip"
+    ],
+    "unknown": [],
+    "output": {
+      "discount": {
+        "$decimal": "0.15"
+      },
+      "label": "vip"
+    },
+    "outputs": [
+      {
+        "discount": {
+          "$decimal": "0.15"
+        },
+        "label": "vip"
+      }
+    ]
+  },
+  "error": {
+    "code": "hit_policy_error",
+    "message": "2 rules fired under the unique hit policy",
+    "hint": "make the conditions mutually exclusive, or use first or priority",
+    "rules": [
+      "p",
+      "q"
+    ]
+  }
+}

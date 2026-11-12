@@ -1068,6 +1068,9 @@ int main(int argc, char **argv) {
     const std::filesystem::path dir = argc > 1 ? argv[1] : CLEANRULES_VECTORS;
     std::size_t ran = 0;
     std::size_t skipped = 0;
+    // The tools for agents (spec/agents.md) are not in the C ABI or C++ yet
+    // (docs/PLAN.md, O.1): their vectors are counted and skipped.
+    std::size_t tools = 0;
     std::size_t passed_json = 0;
     std::size_t ran_native = 0;
     std::size_t passed_native = 0;
@@ -1088,6 +1091,10 @@ int main(int argc, char **argv) {
                 const json::value &given = need(vector, "given");
                 if (need(given, "kind").text == "evaluate" && given.get("limits") != nullptr) {
                     ++skipped;
+                    continue;
+                }
+                if (need(given, "kind").text == "tool") {
+                    ++tools;
                     continue;
                 }
                 ++ran;
@@ -1115,8 +1122,8 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "%s\n", failed.c_str());
     }
     std::printf("conformance: %zu vectors; json %zu of %zu passed, native %zu of %zu passed; %zu "
-                "native-only skipped\n",
-                ran, passed_json, ran, passed_native, ran_native, skipped);
+                "native-only and %zu tool vectors (agents, not in C++ yet) skipped\n",
+                ran, passed_json, ran, passed_native, ran_native, skipped, tools);
     if (!failures.empty()) {
         std::fprintf(stderr, "conformance: %zu failures\n", failures.size());
         return EXIT_FAILURE;

@@ -96,13 +96,18 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
   const limited = [...vectors.values()]
     .filter((v) => v.get('given').get('kind') === 'evaluate' && v.get('given').has('limits'))
     .map((v) => v.get('id'))
+  // And both routes skip the tools for agents, which this binding lacks.
+  const tools = [...vectors.values()].filter((v) => v.get('given').get('kind') === 'tool').map((v) => v.get('id'))
+  const agents = tools.length > 0 ? ['agents'] : []
   assert.deepEqual(
     [...counts.json.skipped.keys()].sort(),
-    [...(grids.length > 0 ? ['grid'] : []), ...(limited.length > 0 ? ['native'] : [])].sort(),
+    [...(grids.length > 0 ? ['grid'] : []), ...(limited.length > 0 ? ['native'] : []), ...agents].sort(),
   )
   assert.deepEqual(counts.json.skipped.get('grid') ?? [], grids)
   assert.deepEqual(counts.json.skipped.get('native') ?? [], limited)
-  assert.equal(counts.native.skipped.size, 0)
+  assert.deepEqual(counts.json.skipped.get('agents') ?? [], tools)
+  assert.deepEqual([...counts.native.skipped.keys()], agents)
+  assert.deepEqual(counts.native.skipped.get('agents') ?? [], tools)
 })
 
 /** `vector` with `from` replaced by `to` in its expected output only. */

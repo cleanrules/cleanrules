@@ -193,6 +193,26 @@ where large inputs are expected: `rules.evaluate(data, max_values=5_000_000)`
 (also `evaluate_many`, `run`, `DecisionTable.evaluate`, `evaluate_tree` and
 `evaluate_value_tree`).
 
+For AI agents, a `cleanrules.Catalog` of rule sets by name answers the tools
+of [`spec/agents.md`](../../spec/agents.md) (`list_rulesets`, `summary`,
+`evaluate`, `explain`, `validate`), with JSON arguments and a JSON result that
+are the same in every language and in the MCP server. Tools never run actions,
+and a mistake comes back as a tool error with a pointer and a hint that a model
+can act on. Arguments may be JSON text, or Python data whose `Decimal`, `date`
+and `datetime` values are written in the JSON format's encoding:
+
+```python
+catalog = cleanrules.Catalog({"discounts": rules})
+arguments = {"ruleset": "discounts", "input": {"customer": {"years": 3}}, "budget": 600}
+result = catalog.call(cleanrules.Tool.EXPLAIN, arguments)
+result.is_error, result.content["selected"], result.content["explanation"]["text"]
+```
+
+`rules.input_schema()` is the JSON Schema of the input a rule set reads, and
+`decision.explain().compact(budget=2000)` the explanation's text cut to fit a
+model's context. A runnable example is in
+[`docs/examples/agent_tools.py`](../../docs/examples/agent_tools.py).
+
 Wheels: one `abi3` wheel for CPython 3.11 and later, a version-specific wheel for
 free-threaded CPython 3.14, and one `abi3t` wheel for CPython 3.15 and later,
 free-threaded or not.

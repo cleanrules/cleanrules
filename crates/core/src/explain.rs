@@ -99,6 +99,8 @@ pub enum Gap {
 
 mod text;
 
+pub(crate) use text::{header, places};
+
 /// One elementary condition behind a rule's outcome.
 #[derive(Clone, Debug)]
 #[non_exhaustive]

@@ -1,0 +1,18 @@
+{
+  "tool": "evaluate",
+  "arguments": {
+    "ruleset": "prices",
+    "input": {}
+  },
+  "error": {
+    "code": "registry_error",
+    "message": "there is no rule set \"prices\"",
+    "hint": "call list_rulesets for the rule sets you can use",
+    "pointer": "/ruleset",
+    "name": "prices",
+    "available": [
+      "points",
+      "pricing"
+    ]
+  }
+}

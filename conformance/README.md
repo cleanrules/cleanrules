@@ -54,6 +54,7 @@ A vector file is a JSON document:
 | `evaluate` | `ruleset` (a rule set document's content), and `input` or `inputs` (a batch); optional `limits` (`max_values`, `spec/data-model.md`, *Reading native data*, *Limits*) | `evaluate`, or its batch form | `decision`, or `decisions` for a batch, or `error` |
 | `explain` | `ruleset`, `input` | `evaluate`, then `explain` | `decision` (which `at` pointers refer to) and `explanation`, optionally `text` (the exact text of `explain()`), or `error` |
 | `summary` | `ruleset` | `summary` | `summary`, and optionally `text` |
+| `tool` | `rulesets` (an object: each name with a rule set document's content; none for an empty catalog), `tool`, and `arguments` (JSON) or `arguments_text` (JSON text, for texts a vector cannot hold, such as repeated keys) | the tool call on a catalog of those rule sets (`spec/agents.md`) | `output`: the result, or `error`: the tool error |
 
 Optional flags such as `strict` are omitted when false. An `evaluate` vector
 with `limits` checks `max_values`, which bounds what is read from native data
@@ -76,6 +77,13 @@ because the spec says that they are informative:
 - any two opaque values (`{"$opaque": ...}`) are equal, whatever their type
   name;
 - errors are compared by code and compared fields only (`spec/errors.md`).
+- in `tool` vectors, an agent error (a tool error, or the `error` of a
+  `validate` result) must have a non-empty `hint`, and is compared on every
+  member of its JSON form except `message`, `hint`, `cause`, `node`,
+  `operation` and `reason`, which are dropped from the actual error: so
+  `pointer`, `name` and `available` are compared too. A tool error is compared
+  without regard to member order; a `validate` result's error is written in
+  its JSON form's order.
 
 Runners must parse the vectors without losing what is compared. A generic
 parser that turns `1.0` into `1`, reads integers through floats, or reorders
@@ -171,6 +179,12 @@ output, never stopping at the first one.
   keeps the default in Go); skips are counted and listed in
   `bindings/go/build/reports/conformance.txt`. It compares with a lossless
   JSON reader of its own (`bindings/go/conformance_json_test.go`).
+- **`tool` vectors** (the tools for agents, `spec/agents.md`) run in the core
+  and in Python (`cleanrules.Catalog`, with rule sets read from JSON and
+  arguments as JSON text in `json:<id>`, and with rule sets built with the
+  Python API and arguments as Python data in `native:<id>`). The C ABI, C++,
+  JavaScript, Java, Scala and Go runners do not have the tools yet: they skip
+  these vectors in every route, count them and say why (`docs/PLAN.md`, O.1).
 - **Each binding** runs every vector twice: once through its JSON entry points,
   and once converting `input` into the language's native data (with the
   conversions of `spec/data-model.md`: floats as floats, with `cr.float` in

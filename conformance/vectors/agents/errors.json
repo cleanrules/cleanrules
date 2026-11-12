@@ -1,0 +1,580 @@
+{
+  "version": 1,
+  "area": "agents",
+  "vectors": [
+    {
+      "id": "agents/errors/missing-field",
+      "spec": [
+        "agents.md#errors"
+      ],
+      "description": "a strict evaluation's missing field points to where it would be in the input",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "orders": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "early",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "lt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "placed"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$date": "2026-01-01"
+                        }
+                      }
+                    },
+                    {
+                      "op": "between",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "items",
+                          1,
+                          "qty"
+                        ]
+                      },
+                      "low": {
+                        "op": "const",
+                        "value": 1
+                      },
+                      "high": {
+                        "op": "const",
+                        "value": 10
+                      },
+                      "closed": "both"
+                    }
+                  ]
+                },
+                "then": {
+                  "note": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "$ref"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "pricey",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "ge",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "total"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$decimal": "99.99"
+                        }
+                      }
+                    },
+                    {
+                      "op": "matches",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "code"
+                        ]
+                      },
+                      "pattern": "^A"
+                    }
+                  ]
+                },
+                "then": {
+                  "tier": {
+                    "op": "const",
+                    "value": "gold"
+                  }
+                }
+              },
+              {
+                "name": "late",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "shipped"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-01-01T00:00:00Z"
+                    }
+                  }
+                },
+                "then": {
+                  "late": {
+                    "op": "const",
+                    "value": true
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "orders",
+          "input": {
+            "order": {
+              "placed": {
+                "$date": "2025-05-01"
+              },
+              "items": [
+                {
+                  "qty": 1
+                }
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "missing_field",
+          "pointer": "/input/order/items/1/qty",
+          "rule": "early",
+          "path": [
+            "order",
+            "items",
+            1,
+            "qty"
+          ]
+        }
+      }
+    },
+    {
+      "id": "agents/errors/type-mismatch",
+      "spec": [
+        "agents.md#errors"
+      ],
+      "description": "a strict type mismatch points to the value in the input",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "orders": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "early",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "lt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "placed"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$date": "2026-01-01"
+                        }
+                      }
+                    },
+                    {
+                      "op": "between",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "items",
+                          1,
+                          "qty"
+                        ]
+                      },
+                      "low": {
+                        "op": "const",
+                        "value": 1
+                      },
+                      "high": {
+                        "op": "const",
+                        "value": 10
+                      },
+                      "closed": "both"
+                    }
+                  ]
+                },
+                "then": {
+                  "note": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "$ref"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "pricey",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "ge",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "total"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$decimal": "99.99"
+                        }
+                      }
+                    },
+                    {
+                      "op": "matches",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "code"
+                        ]
+                      },
+                      "pattern": "^A"
+                    }
+                  ]
+                },
+                "then": {
+                  "tier": {
+                    "op": "const",
+                    "value": "gold"
+                  }
+                }
+              },
+              {
+                "name": "late",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "shipped"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-01-01T00:00:00Z"
+                    }
+                  }
+                },
+                "then": {
+                  "late": {
+                    "op": "const",
+                    "value": true
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "explain",
+        "arguments": {
+          "ruleset": "orders",
+          "input": {
+            "order": {
+              "placed": "2025-05-01"
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "type_mismatch",
+          "pointer": "/input/order/placed",
+          "rule": "early",
+          "path": [
+            "order",
+            "placed"
+          ],
+          "types": [
+            "string",
+            "date"
+          ]
+        }
+      }
+    },
+    {
+      "id": "agents/errors/through-map",
+      "spec": [
+        "agents.md#errors"
+      ],
+      "description": "the pointer goes through $map where the input uses it",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "orders": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "early",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "lt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "placed"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$date": "2026-01-01"
+                        }
+                      }
+                    },
+                    {
+                      "op": "between",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "items",
+                          1,
+                          "qty"
+                        ]
+                      },
+                      "low": {
+                        "op": "const",
+                        "value": 1
+                      },
+                      "high": {
+                        "op": "const",
+                        "value": 10
+                      },
+                      "closed": "both"
+                    }
+                  ]
+                },
+                "then": {
+                  "note": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "$ref"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "pricey",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "ge",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "total"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$decimal": "99.99"
+                        }
+                      }
+                    },
+                    {
+                      "op": "matches",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "code"
+                        ]
+                      },
+                      "pattern": "^A"
+                    }
+                  ]
+                },
+                "then": {
+                  "tier": {
+                    "op": "const",
+                    "value": "gold"
+                  }
+                }
+              },
+              {
+                "name": "late",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "shipped"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-01-01T00:00:00Z"
+                    }
+                  }
+                },
+                "then": {
+                  "late": {
+                    "op": "const",
+                    "value": true
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "orders",
+          "input": {
+            "order": {
+              "$map": {
+                "placed": "2025-05-01"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "type_mismatch",
+          "pointer": "/input/order/$map/placed",
+          "rule": "early",
+          "path": [
+            "order",
+            "placed"
+          ],
+          "types": [
+            "string",
+            "date"
+          ]
+        }
+      }
+    },
+    {
+      "id": "agents/errors/hit-policy",
+      "spec": [
+        "agents.md#errors"
+      ],
+      "description": "a hit policy that cannot decide is a tool error with the rules, and no pointer",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "unique": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "p",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "name": "q",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "unique",
+          "input": {
+            "x": 5
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "hit_policy_error",
+          "rules": [
+            "p",
+            "q"
+          ]
+        }
+      }
+    }
+  ]
+}

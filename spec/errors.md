@@ -57,7 +57,7 @@ its cause.
 | `expression_error` | a condition node breaks a construction rule (`ast.md`) | `rule`, `node`; **`pointer`** when read from JSON; **`line`** and **`column`** when read from text (`text.md`) |
 | `rule_definition_error` | a rule or rule set breaks a construction rule (`rules.md`, `json-format.md`) | **`rule`** when known; **`pointer`** when read from JSON; **`line`** and **`column`** when read from text |
 | `rule_syntax_error` | a text in the rule syntax cannot be parsed (`text.md`) | **`line`**, **`column`** |
-| `registry_error` | a name is not registered: a logic, or an action when a rule set's named actions are bound (`rules.md`, *Actions*) | **`name`**, `available`; for a logic, **`pointer`** when read from JSON, **`line`** and **`column`** when read from text; for an action, **`rule`** |
+| `registry_error` | a name is not registered: a logic, or an action when a rule set's named actions are bound (`rules.md`, *Actions*), or a rule set or a tool that a tool call names (`agents.md`, *Arguments*) | **`name`**, `available`; for a logic, **`pointer`** when read from JSON, **`line`** and **`column`** when read from text; for an action, **`rule`**; for a rule set named by a tool call, **`pointer`** (`/ruleset`) |
 | `rule_not_found` | a rule is looked up by a name the rule set does not have | **`name`**, `available` |
 | `evaluation_error` | strict mode met a value it cannot read (`read_error`), or a batch was given something that is not a collection of inputs (`rules.md`) | **`rule`**, **`path`**, `node`, **`row`** |
 | `missing_field` | strict mode met a field whose path cannot be resolved | **`rule`**, **`path`**, `node`, **`row`**, `available` |
@@ -129,11 +129,12 @@ The C ABI's own statuses are written with the codes `invalid_argument` and
 `internal_error`. JSON Schema: `schemas/v1/error.schema.json`.
 
 The member names and what they hold are stable, like the format's
-(`json-format.md`, *Versioning*): a new version may add members, never change or
-remove one. Bindings built on the C ABI (Go, the JVM) and agents read the code
-and the context from it. `message`, `hint` and `cause` are free text for people,
-whose wording may change. Conformance vectors still compare only the fields of
-*Comparing errors*.
+(`json-format.md`, *Versioning*): a new version may add members, never change
+or remove one. Bindings built on the C ABI (Go, the JVM) and agents read the
+code and the context from it; the tools for agents always add a `hint`, and
+locate the problem in the call's arguments (`agents.md`, *Errors*). `message`,
+`hint` and `cause` are free text for people, whose wording may change.
+Conformance vectors still compare only the fields of *Comparing errors*.
 
 ### Comparing errors
 

@@ -1,0 +1,32 @@
+{
+  "tool": "explain",
+  "arguments": {
+    "ruleset": "levels",
+    "input": {
+      "x": 8,
+      "region": "south"
+    },
+    "budget": 420
+  },
+  "result": {
+    "ruleset": "levels",
+    "selected": [
+      "mid"
+    ],
+    "unknown": [
+      "missing"
+    ],
+    "output": {
+      "level": "mid"
+    },
+    "outputs": [
+      {
+        "level": "mid"
+      }
+    ],
+    "explanation": {
+      "text": "HIT POLICY first: selected mid\n[ ] high (not fired): x > 50 AND region = \"north\"\n[?] missing (unknown): score >= 700\n    - score >= 700 is unknown: missing field score\n[x] mid (selected): x > 5\n    the usual case\n    - x > 5 is true (x = 8)\n[x] low (fired, not selected): x > 0\n    fired, but mid comes first\n    - x > 0 is true (x = 8)\n... 2 of 5 rules shortened or omitted to fit the budget",
+      "complete": false
+    }
+  }
+}

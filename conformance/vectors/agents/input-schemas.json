@@ -1,0 +1,1431 @@
+{
+  "version": 1,
+  "area": "agents",
+  "vectors": [
+    {
+      "id": "agents/input-schemas/types",
+      "spec": [
+        "agents.md#types-of-a-field",
+        "agents.md#building-the-schema"
+      ],
+      "description": "each field gets the types of every place that reads it: constants, arithmetic, string tests, in and between, conditions",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "types": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r1",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "eq",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "a"
+                        ]
+                      },
+                      "right": {
+                        "op": "field",
+                        "path": [
+                          "b"
+                        ]
+                      }
+                    },
+                    {
+                      "op": "lt",
+                      "left": {
+                        "op": "const",
+                        "value": 5
+                      },
+                      "right": {
+                        "op": "field",
+                        "path": [
+                          "c"
+                        ]
+                      }
+                    },
+                    {
+                      "op": "not",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "flag"
+                        ]
+                      }
+                    },
+                    {
+                      "op": "or",
+                      "operands": [
+                        {
+                          "op": "eq",
+                          "left": {
+                            "op": "field",
+                            "path": [
+                              "m"
+                            ]
+                          },
+                          "right": {
+                            "op": "const",
+                            "value": "x"
+                          }
+                        },
+                        {
+                          "op": "gt",
+                          "left": {
+                            "op": "field",
+                            "path": [
+                              "m"
+                            ]
+                          },
+                          "right": {
+                            "op": "const",
+                            "value": 3
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "then": {
+                  "v": {
+                    "op": "abs",
+                    "operand": {
+                      "op": "field",
+                      "path": [
+                        "d"
+                      ]
+                    }
+                  },
+                  "w": {
+                    "op": "field",
+                    "path": [
+                      "e"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "r2",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "between",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "f"
+                        ]
+                      },
+                      "low": {
+                        "op": "field",
+                        "path": [
+                          "g"
+                        ]
+                      },
+                      "high": {
+                        "op": "const",
+                        "value": 10
+                      },
+                      "closed": "both"
+                    },
+                    {
+                      "op": "not",
+                      "operand": {
+                        "op": "in",
+                        "operand": {
+                          "op": "field",
+                          "path": [
+                            "h"
+                          ]
+                        },
+                        "values": [
+                          {
+                            "$decimal": "1.5"
+                          },
+                          {
+                            "$decimal": "2.5"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "op": "ends_with",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "name"
+                        ]
+                      },
+                      "text": "x"
+                    },
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "neg",
+                        "operand": {
+                          "op": "field",
+                          "path": [
+                            "k"
+                          ]
+                        }
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 0
+                      }
+                    },
+                    {
+                      "op": "eq",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "t"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$datetime": "2026-01-01T09:00:00"
+                        }
+                      }
+                    },
+                    {
+                      "op": "contains",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "note"
+                        ]
+                      },
+                      "text": "y"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "tool": "summary",
+        "arguments": {
+          "ruleset": "types"
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "types",
+          "summary": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r1",
+                "priority": 0,
+                "outputs": [
+                  "v",
+                  "w"
+                ]
+              },
+              {
+                "name": "r2",
+                "priority": 0,
+                "outputs": []
+              }
+            ],
+            "fields": [
+              {
+                "path": [
+                  "a"
+                ],
+                "conditions": [
+                  "r1"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "b"
+                ],
+                "conditions": [
+                  "r1"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "c"
+                ],
+                "conditions": [
+                  "r1"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "flag"
+                ],
+                "conditions": [
+                  "r1"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "m"
+                ],
+                "conditions": [
+                  "r1"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "d"
+                ],
+                "conditions": [],
+                "payloads": [
+                  {
+                    "rule": "r1",
+                    "key": "v"
+                  }
+                ]
+              },
+              {
+                "path": [
+                  "e"
+                ],
+                "conditions": [],
+                "payloads": [
+                  {
+                    "rule": "r1",
+                    "key": "w"
+                  }
+                ]
+              },
+              {
+                "path": [
+                  "f"
+                ],
+                "conditions": [
+                  "r2"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "g"
+                ],
+                "conditions": [
+                  "r2"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "h"
+                ],
+                "conditions": [
+                  "r2"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "name"
+                ],
+                "conditions": [
+                  "r2"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "k"
+                ],
+                "conditions": [
+                  "r2"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "t"
+                ],
+                "conditions": [
+                  "r2"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "note"
+                ],
+                "conditions": [
+                  "r2"
+                ],
+                "payloads": []
+              }
+            ],
+            "outputs": [
+              "v",
+              "w"
+            ],
+            "tags": []
+          },
+          "input_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "a": {
+                "description": "conditions of r1"
+              },
+              "b": {
+                "description": "conditions of r1"
+              },
+              "c": {
+                "description": "conditions of r1",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "flag": {
+                "description": "conditions of r1",
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "m": {
+                "description": "conditions of r1",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "d": {
+                "description": "payloads of r1 (v)",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "e": {
+                "description": "payloads of r1 (w)"
+              },
+              "f": {
+                "description": "conditions of r2",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "g": {
+                "description": "conditions of r2"
+              },
+              "h": {
+                "description": "conditions of r2",
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "$decimal": {
+                        "type": "string",
+                        "pattern": "^(-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?|-?inf)$"
+                      }
+                    },
+                    "required": [
+                      "$decimal"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "description": "conditions of r2",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "k": {
+                "description": "conditions of r2",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "t": {
+                "description": "conditions of r2",
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "$datetime": {
+                        "type": "string",
+                        "pattern": "^(?!0000)[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,6})?$"
+                      }
+                    },
+                    "required": [
+                      "$datetime"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "note": {
+                "description": "conditions of r2",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/input-schemas/strict",
+      "spec": [
+        "agents.md#required-members",
+        "agents.md#building-the-schema",
+        "agents.md#types-of-a-field"
+      ],
+      "description": "a strict rule set requires what its conditions read; dates, datetimes and decimals have their typed forms; a map with a $ key is written in $map",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "orders": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "early",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "lt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "placed"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$date": "2026-01-01"
+                        }
+                      }
+                    },
+                    {
+                      "op": "between",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "items",
+                          1,
+                          "qty"
+                        ]
+                      },
+                      "low": {
+                        "op": "const",
+                        "value": 1
+                      },
+                      "high": {
+                        "op": "const",
+                        "value": 10
+                      },
+                      "closed": "both"
+                    }
+                  ]
+                },
+                "then": {
+                  "note": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "$ref"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "pricey",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "ge",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "total"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$decimal": "99.99"
+                        }
+                      }
+                    },
+                    {
+                      "op": "matches",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "code"
+                        ]
+                      },
+                      "pattern": "^A"
+                    }
+                  ]
+                },
+                "then": {
+                  "tier": {
+                    "op": "const",
+                    "value": "gold"
+                  }
+                }
+              },
+              {
+                "name": "late",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "shipped"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-01-01T00:00:00Z"
+                    }
+                  }
+                },
+                "then": {
+                  "late": {
+                    "op": "const",
+                    "value": true
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "summary",
+        "arguments": {
+          "ruleset": "orders"
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "orders",
+          "summary": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "early",
+                "priority": 0,
+                "outputs": [
+                  "note"
+                ]
+              },
+              {
+                "name": "pricey",
+                "priority": 0,
+                "outputs": [
+                  "tier"
+                ]
+              },
+              {
+                "name": "late",
+                "priority": 0,
+                "outputs": [
+                  "late"
+                ]
+              }
+            ],
+            "fields": [
+              {
+                "path": [
+                  "order",
+                  "placed"
+                ],
+                "conditions": [
+                  "early"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "order",
+                  "items",
+                  1,
+                  "qty"
+                ],
+                "conditions": [
+                  "early"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "order",
+                  "$ref"
+                ],
+                "conditions": [],
+                "payloads": [
+                  {
+                    "rule": "early",
+                    "key": "note"
+                  }
+                ]
+              },
+              {
+                "path": [
+                  "order",
+                  "total"
+                ],
+                "conditions": [
+                  "pricey"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "order",
+                  "code"
+                ],
+                "conditions": [
+                  "pricey"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "order",
+                  "shipped"
+                ],
+                "conditions": [
+                  "late"
+                ],
+                "payloads": []
+              }
+            ],
+            "outputs": [
+              "note",
+              "tier",
+              "late"
+            ],
+            "tags": []
+          },
+          "input_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "order": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "$map": {
+                        "type": "object",
+                        "properties": {
+                          "placed": {
+                            "description": "conditions of early",
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "$date": {
+                                    "type": "string",
+                                    "pattern": "^(?!0000)[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+                                  }
+                                },
+                                "required": [
+                                  "$date"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "array",
+                                "prefixItems": [
+                                  {},
+                                  {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "qty": {
+                                            "description": "conditions of early",
+                                            "anyOf": [
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "qty"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                ],
+                                "minItems": 2
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "$ref": {
+                            "description": "payloads of early (note)"
+                          },
+                          "total": {
+                            "description": "conditions of pricey",
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "$decimal": {
+                                    "type": "string",
+                                    "pattern": "^(-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?|-?inf)$"
+                                  }
+                                },
+                                "required": [
+                                  "$decimal"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "code": {
+                            "description": "conditions of pricey",
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "shipped": {
+                            "description": "conditions of late",
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "$datetime": {
+                                    "type": "string",
+                                    "pattern": "^(?!0000)[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,6})?(Z|[+-]((0[0-9]|1[0-7]):[0-5][0-9](:[0-5][0-9])?|18:00(:00)?)(\\[[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*\\])?)$"
+                                  }
+                                },
+                                "required": [
+                                  "$datetime"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "placed",
+                          "items",
+                          "total",
+                          "code",
+                          "shipped"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "$map"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "order"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/input-schemas/no-fields",
+      "spec": [
+        "agents.md#building-the-schema"
+      ],
+      "description": "a rule set that reads nothing accepts any input",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "empty": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": []
+          }
+        },
+        "tool": "summary",
+        "arguments": {
+          "ruleset": "empty"
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "empty",
+          "summary": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [],
+            "fields": [],
+            "outputs": [],
+            "tags": []
+          },
+          "input_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema"
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/input-schemas/lists",
+      "spec": [
+        "agents.md#building-the-schema"
+      ],
+      "description": "an input read by keys and by indices is a map or a list, items not read being {}",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "lists": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "or",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          0,
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "a"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 2
+                      }
+                    },
+                    {
+                      "op": "eq",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          2
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": "z"
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "summary",
+        "arguments": {
+          "ruleset": "lists"
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "lists",
+          "summary": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "priority": 0,
+                "outputs": [
+                  "v"
+                ]
+              }
+            ],
+            "fields": [
+              {
+                "path": [
+                  0,
+                  "x"
+                ],
+                "conditions": [
+                  "r"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "a"
+                ],
+                "conditions": [
+                  "r"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  2
+                ],
+                "conditions": [
+                  "r"
+                ],
+                "payloads": []
+              }
+            ],
+            "outputs": [
+              "v"
+            ],
+            "tags": []
+          },
+          "input_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "a": {
+                    "description": "conditions of r",
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "x": {
+                            "description": "conditions of r",
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {},
+                  {
+                    "description": "conditions of r",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/input-schemas/far-index",
+      "spec": [
+        "agents.md#building-the-schema",
+        "agents.md#required-members"
+      ],
+      "description": "a list whose largest index is 256 or more has no prefixItems",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "far": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "items",
+                          300
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    {
+                      "op": "field",
+                      "path": [
+                        "items",
+                        2,
+                        "ok"
+                      ]
+                    }
+                  ]
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "summary",
+        "arguments": {
+          "ruleset": "far"
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "far",
+          "summary": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "r",
+                "priority": 0,
+                "outputs": [
+                  "v"
+                ]
+              }
+            ],
+            "fields": [
+              {
+                "path": [
+                  "items",
+                  300
+                ],
+                "conditions": [
+                  "r"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "items",
+                  2,
+                  "ok"
+                ],
+                "conditions": [
+                  "r"
+                ],
+                "payloads": []
+              }
+            ],
+            "outputs": [
+              "v"
+            ],
+            "tags": []
+          },
+          "input_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "minItems": 301
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "items"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/input-schemas/field-and-map",
+      "spec": [
+        "agents.md#building-the-schema"
+      ],
+      "description": "a field that is also read into is its types or a map",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "both": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "or",
+                  "operands": [
+                    {
+                      "op": "eq",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": "guest"
+                      }
+                    },
+                    {
+                      "op": "ge",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "age"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 18
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "summary",
+        "arguments": {
+          "ruleset": "both"
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "both",
+          "summary": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "priority": 0,
+                "outputs": [
+                  "v"
+                ]
+              }
+            ],
+            "fields": [
+              {
+                "path": [
+                  "customer"
+                ],
+                "conditions": [
+                  "r"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "customer",
+                  "age"
+                ],
+                "conditions": [
+                  "r"
+                ],
+                "payloads": []
+              }
+            ],
+            "outputs": [
+              "v"
+            ],
+            "tags": []
+          },
+          "input_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "customer": {
+                "description": "conditions of r",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "age": {
+                        "description": "conditions of r",
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

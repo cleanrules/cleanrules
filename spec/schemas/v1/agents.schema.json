@@ -1,0 +1,554 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanrules.github.io/schemas/v1/agents.schema.json",
+  "title": "cleanrules tool call for agents",
+  "description": "A call of one of the tools of spec/agents.md (normative) with its arguments, and the result or the tool error it gave. The $defs hold each tool's arguments (toolnameArguments) and result (toolnameResult), from which a server writes its tool definitions. Not a document: it has no version.",
+  "type": "object",
+  "properties": {
+    "tool": {
+      "enum": [
+        "evaluate",
+        "explain",
+        "list_rulesets",
+        "summary",
+        "validate"
+      ]
+    },
+    "arguments": {
+      "type": "object"
+    },
+    "result": {
+      "$ref": "#/$defs/result"
+    },
+    "error": {
+      "$ref": "#/$defs/agentError"
+    }
+  },
+  "required": [
+    "tool",
+    "arguments"
+  ],
+  "oneOf": [
+    {
+      "required": [
+        "result"
+      ]
+    },
+    {
+      "required": [
+        "error"
+      ]
+    }
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "tool": {
+            "const": "list_rulesets"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "arguments": {
+            "$ref": "#/$defs/listRulesetsArguments"
+          },
+          "result": {
+            "$ref": "#/$defs/listRulesetsResult"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool": {
+            "const": "summary"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "arguments": {
+            "$ref": "#/$defs/summaryArguments"
+          },
+          "result": {
+            "$ref": "#/$defs/summaryResult"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool": {
+            "const": "evaluate"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "arguments": {
+            "$ref": "#/$defs/evaluateArguments"
+          },
+          "result": {
+            "$ref": "#/$defs/evaluateResult"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool": {
+            "const": "explain"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "arguments": {
+            "$ref": "#/$defs/explainArguments"
+          },
+          "result": {
+            "$ref": "#/$defs/explainResult"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool": {
+            "const": "validate"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "arguments": {
+            "$ref": "#/$defs/validateArguments"
+          },
+          "result": {
+            "$ref": "#/$defs/validateResult"
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "listRulesetsArguments": {
+      "type": "object",
+      "additionalProperties": false
+    },
+    "listRulesetsResult": {
+      "type": "object",
+      "properties": {
+        "rulesets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "rules": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "hit_policy": {
+                "$ref": "ruleset.schema.json#/$defs/ruleset/properties/hit_policy"
+              },
+              "aggregate": {
+                "$ref": "ruleset.schema.json#/$defs/ruleset/properties/aggregate"
+              },
+              "logic": {
+                "$ref": "ruleset.schema.json#/$defs/ruleset/properties/logic"
+              },
+              "strict": {
+                "const": true
+              },
+              "outputs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "name",
+              "rules",
+              "hit_policy",
+              "logic",
+              "outputs"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "rulesets"
+      ],
+      "additionalProperties": false
+    },
+    "summaryArguments": {
+      "type": "object",
+      "properties": {
+        "ruleset": {
+          "type": "string",
+          "description": "The name of a rule set of the catalog (list_rulesets)."
+        }
+      },
+      "required": [
+        "ruleset"
+      ],
+      "additionalProperties": false
+    },
+    "summaryResult": {
+      "type": "object",
+      "properties": {
+        "ruleset": {
+          "type": "string",
+          "description": "The name of a rule set of the catalog (list_rulesets)."
+        },
+        "summary": {
+          "$ref": "summary.schema.json#/$defs/summary"
+        },
+        "input_schema": {
+          "$ref": "#/$defs/inputSchema"
+        }
+      },
+      "required": [
+        "ruleset",
+        "summary",
+        "input_schema"
+      ],
+      "additionalProperties": false
+    },
+    "evaluateArguments": {
+      "type": "object",
+      "properties": {
+        "ruleset": {
+          "type": "string",
+          "description": "The name of a rule set of the catalog (list_rulesets)."
+        },
+        "input": {
+          "$ref": "value.schema.json#/$defs/value",
+          "description": "The input, in the JSON format's encoding of values; the rule set's input schema (summary) says what it reads."
+        }
+      },
+      "required": [
+        "ruleset",
+        "input"
+      ],
+      "additionalProperties": false
+    },
+    "evaluateResult": {
+      "type": "object",
+      "properties": {
+        "ruleset": {
+          "type": "string",
+          "description": "The name of a rule set of the catalog (list_rulesets)."
+        },
+        "selected": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The selected rules, in selection order."
+        },
+        "unknown": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The rules whose condition is unknown, in rule order."
+        },
+        "output": {
+          "$ref": "value.schema.json#/$defs/value",
+          "description": "Single-hit policies and aggregates: the winner's payload, the aggregate, or null."
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "value.schema.json#/$defs/map"
+          },
+          "description": "The payloads of the selected rules, in rule order."
+        }
+      },
+      "required": [
+        "ruleset",
+        "selected",
+        "unknown",
+        "outputs"
+      ],
+      "additionalProperties": false
+    },
+    "explainArguments": {
+      "type": "object",
+      "properties": {
+        "ruleset": {
+          "type": "string",
+          "description": "The name of a rule set of the catalog (list_rulesets)."
+        },
+        "input": {
+          "$ref": "value.schema.json#/$defs/value",
+          "description": "The input, in the JSON format's encoding of values; the rule set's input schema (summary) says what it reads."
+        },
+        "budget": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 1048576,
+          "default": 2000,
+          "description": "The most Unicode code points of the explanation's text: an integral number (2000.0 is 2000; JSON Schema's integer already admits it)."
+        }
+      },
+      "required": [
+        "ruleset",
+        "input"
+      ],
+      "additionalProperties": false
+    },
+    "explainResult": {
+      "type": "object",
+      "properties": {
+        "ruleset": {
+          "type": "string",
+          "description": "The name of a rule set of the catalog (list_rulesets)."
+        },
+        "selected": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The selected rules, in selection order."
+        },
+        "unknown": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The rules whose condition is unknown, in rule order."
+        },
+        "output": {
+          "$ref": "value.schema.json#/$defs/value",
+          "description": "Single-hit policies and aggregates: the winner's payload, the aggregate, or null."
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "value.schema.json#/$defs/map"
+          },
+          "description": "The payloads of the selected rules, in rule order."
+        },
+        "explanation": {
+          "$ref": "#/$defs/compactExplanation"
+        }
+      },
+      "required": [
+        "ruleset",
+        "selected",
+        "unknown",
+        "outputs",
+        "explanation"
+      ],
+      "additionalProperties": false
+    },
+    "validateArguments": {
+      "type": "object",
+      "properties": {
+        "document": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "A JSON document as an object, or the text of a document in format."
+        },
+        "format": {
+          "enum": [
+            "json",
+            "yaml",
+            "text",
+            "csv"
+          ]
+        }
+      },
+      "required": [
+        "document"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "document": {
+                "type": "string"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "format"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "document": {
+                "type": "object"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "format": {
+                "const": "json"
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "validateResult": {
+      "type": "object",
+      "properties": {
+        "valid": {
+          "type": "boolean"
+        },
+        "content": {
+          "enum": [
+            "condition",
+            "rule",
+            "ruleset",
+            "decision_table"
+          ]
+        },
+        "summary": {
+          "$ref": "summary.schema.json#/$defs/summary"
+        },
+        "input_schema": {
+          "$ref": "#/$defs/inputSchema"
+        },
+        "error": {
+          "$ref": "#/$defs/agentError"
+        }
+      },
+      "required": [
+        "valid"
+      ],
+      "dependentRequired": {
+        "summary": [
+          "input_schema"
+        ],
+        "input_schema": [
+          "summary"
+        ]
+      },
+      "if": {
+        "properties": {
+          "valid": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "content"
+        ],
+        "not": {
+          "required": [
+            "error"
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "error"
+        ],
+        "maxProperties": 2
+      },
+      "additionalProperties": false
+    },
+    "result": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/listRulesetsResult"
+        },
+        {
+          "$ref": "#/$defs/summaryResult"
+        },
+        {
+          "$ref": "#/$defs/evaluateResult"
+        },
+        {
+          "$ref": "#/$defs/explainResult"
+        },
+        {
+          "$ref": "#/$defs/validateResult"
+        }
+      ]
+    },
+    "compactExplanation": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "The explanation's text cut to the budget (spec/agents.md, Compact explanations)."
+        },
+        "complete": {
+          "type": "boolean",
+          "description": "Whether the text is the explanation's whole text."
+        }
+      },
+      "required": [
+        "text",
+        "complete"
+      ],
+      "additionalProperties": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "description": "A JSON Schema (draft 2020-12) of the input a rule set reads (spec/agents.md, Input schemas).",
+      "properties": {
+        "$schema": {
+          "const": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "required": [
+        "$schema"
+      ]
+    },
+    "agentError": {
+      "description": "An error's JSON form (error.schema.json), always with a hint (spec/agents.md, Errors).",
+      "allOf": [
+        {
+          "$ref": "error.schema.json"
+        },
+        {
+          "required": [
+            "hint"
+          ]
+        }
+      ]
+    },
+    "toolError": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/agentError"
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

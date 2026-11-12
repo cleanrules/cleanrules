@@ -1,0 +1,32 @@
+{
+  "tool": "evaluate",
+  "arguments": {
+    "ruleset": "pricing",
+    "input": {
+      "customer": {
+        "years": 7
+      }
+    }
+  },
+  "result": {
+    "ruleset": "pricing",
+    "selected": [
+      "vip"
+    ],
+    "unknown": [],
+    "output": {
+      "discount": {
+        "$decimal": "0.15"
+      },
+      "label": "vip"
+    },
+    "outputs": [
+      {
+        "discount": {
+          "$decimal": "0.15"
+        },
+        "label": "vip"
+      }
+    ]
+  }
+}

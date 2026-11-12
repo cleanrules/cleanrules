@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Tools for AI agents (`spec/agents.md`, task O.1): the contract that the MCP
+  server (O.2) and the agent guardrails (O.3) implement. Five tools,
+  `list_rulesets`, `summary`, `evaluate`, `explain` and `validate`, with
+  arguments read as strictly as documents and JSON results; agent errors (the
+  error's JSON form, always with a hint, and a pointer into the call's
+  arguments or, for evaluation errors, into the input); the input schema of a
+  rule set, a JSON Schema generated from its summary with the types its
+  conditions expect; and compact explanations, the explanation's text cut to a
+  budget of Unicode code points (any integral number from 256 to 1048576, 2000
+  by default) keeping the selected rules first. JSON Schema
+  `spec/schemas/v1/agents.schema.json`, and 59 conformance vectors of the new
+  kind `tool`.
+- Core: the module `cleanrules::agents`: `Catalog` (rule sets by name, with
+  `insert`, `insert_with_actions` for rules whose action is host code,
+  `remove`, `get`, `names`, `len`, `is_empty`, `FromIterator` and `Extend`,
+  `with_tools` to offer only some tools, `call` and `call_text`), `Tool`,
+  `ToolResult`, `input_schema`, `compact_explanation` (which rejects a budget
+  out of range with the tool's `format_error`), `CompactExplanation`,
+  `agent_error` and the budget constants. No new dependency.
+- Python: `cleanrules.Catalog` (from a mapping of rule sets, with `call`,
+  `names` and `tools`; arguments as JSON text or as Python data, whose
+  `Decimal`, `date` and `datetime` values are written in the JSON format's
+  encoding), `Tool`, `ToolResult`, `TOOLS`, `DEFAULT_BUDGET`, `MIN_BUDGET` and
+  `MAX_BUDGET`; `RuleSet.input_schema()`; `Explanation.compact(budget=2000)`,
+  which returns a `CompactExplanation`. Example: `docs/examples/agent_tools.py`.
+- Conformance runners: the C ABI, C++, JavaScript, Java, Scala and Go runners
+  skip `tool` vectors, counted and with their reason, until those bindings
+  offer the tools (task O.1b).
 - JSON format, version 1 (`spec/json-format.md`), the contract between
   languages: documents with `"version": 1`, the encoding of values (exact
   64-bit integers, floats with `{"$float": "inf"}`, `{"$decimal": ...}`,
@@ -1075,6 +1103,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `registry_error` is also raised for a rule set or a tool that a tool call
+  for agents names (`spec/errors.md`, `spec/agents.md`), with the pointer
+  `/ruleset` for a rule set.
 - C ABI (task G.4): two hints that every binding on the ABI shows no longer
   name a C constant or function: an input nested deeper than the nesting
   limit (`cr_ruleset_evaluate_value`, `_many`, `cr_ruleset_run`) says "raise

@@ -8,6 +8,7 @@
 //! The module supports free-threaded Python (the default of `PyO3`): it keeps no
 //! global mutable state.
 
+mod agents;
 mod convert;
 mod documents;
 mod errors;
@@ -57,6 +58,15 @@ fn native_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(documents::dump_ruleset, module)?)?;
     module.add_function(wrap_pyfunction!(trees::evaluate_condition, module)?)?;
     module.add_function(wrap_pyfunction!(trees::evaluate_value, module)?)?;
+    module.add_class::<agents::PyCatalog>()?;
+    module.add_function(wrap_pyfunction!(agents::scalar_json, module)?)?;
+    module.add(
+        "TOOLS",
+        pyo3::types::PyTuple::new(module.py(), agents::tool_names())?,
+    )?;
+    module.add("DEFAULT_BUDGET", cleanrules::agents::DEFAULT_BUDGET)?;
+    module.add("MIN_BUDGET", cleanrules::agents::MIN_BUDGET)?;
+    module.add("MAX_BUDGET", cleanrules::agents::MAX_BUDGET)?;
     module.add_function(wrap_pyfunction!(json_api::py_read_document, module)?)?;
     module.add_function(wrap_pyfunction!(json_api::py_read_decision, module)?)?;
     module.add_function(wrap_pyfunction!(json_api::py_evaluate, module)?)?;

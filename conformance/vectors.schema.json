@@ -319,6 +319,49 @@
             "ruleset"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A tool call on a catalog of named rule sets (spec/agents.md).",
+          "properties": {
+            "kind": {
+              "const": "tool"
+            },
+            "rulesets": {
+              "type": "object",
+              "description": "The catalog: each rule set's name and the content of its rule set document.",
+              "additionalProperties": {
+                "$ref": "https://cleanrules.github.io/schemas/v1/ruleset.schema.json#/$defs/ruleset"
+              }
+            },
+            "tool": {
+              "type": "string"
+            },
+            "arguments": {
+              "description": "The call's arguments, as JSON."
+            },
+            "arguments_text": {
+              "type": "string",
+              "description": "The call's arguments as JSON text, for texts a vector cannot hold as JSON (syntax errors, repeated keys)."
+            }
+          },
+          "required": [
+            "kind",
+            "tool"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "arguments"
+              ]
+            },
+            {
+              "required": [
+                "arguments_text"
+              ]
+            }
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -361,6 +404,10 @@
         "compiled": {
           "$ref": "https://cleanrules.github.io/schemas/v1/ruleset.schema.json#/$defs/ruleset",
           "description": "The rule set a decision table compiles into (spec/tables.md, Compiling)."
+        },
+        "output": {
+          "type": "object",
+          "description": "A tool's result (spec/agents.md, Results), with the error of a validate result written without its free text (conformance/README.md, Comparing)."
         },
         "error": {
           "type": "object",
@@ -436,6 +483,12 @@
             },
             "name": {
               "type": "string"
+            },
+            "available": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "required": [

@@ -9,8 +9,8 @@ use std::cmp::Ordering;
 use std::fmt::{self, Write as _};
 
 use super::{
-    Cause, Explanation, Gap, GroupKind, Note, NoteKind, Requirement, RuleExplanation, Status,
-    Summary,
+    Cause, Explanation, FieldUsage, Gap, GroupKind, Note, NoteKind, Requirement, RuleExplanation,
+    Status, Summary,
 };
 use crate::ast::CompareOp;
 use crate::error::Segment;
@@ -379,22 +379,35 @@ impl fmt::Display for RuleExplanation<'_, '_> {
     }
 }
 
+/// The first line of an explanation's text: `HIT POLICY priority: selected
+/// e`, with `AGGREGATE` when there is one.
+pub(crate) fn header(explanation: &Explanation<'_, '_>) -> String {
+    let selected: Vec<&str> = explanation
+        .decision
+        .selected()
+        .map(|r| r.rule.name())
+        .collect();
+    let chosen = if selected.is_empty() {
+        "no rule".to_owned()
+    } else {
+        names(selected)
+    };
+    let ruleset = explanation.decision.ruleset();
+    let mut line = format!("HIT POLICY {}", ruleset.hit_policy().as_str());
+    if let Some(aggregate) = ruleset.aggregate() {
+        line.push_str(" AGGREGATE ");
+        line.push_str(aggregate.as_str());
+    }
+    line.push_str(": selected ");
+    line.push_str(&chosen);
+    line
+}
+
 /// The header (`HIT POLICY priority: selected e`, with `AGGREGATE` when there
 /// is one), then every rule in order.
 impl fmt::Display for Explanation<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let selected: Vec<&str> = self.decision.selected().map(|r| r.rule.name()).collect();
-        let chosen = if selected.is_empty() {
-            "no rule".to_owned()
-        } else {
-            names(selected)
-        };
-        let ruleset = self.decision.ruleset();
-        write!(f, "HIT POLICY {}", ruleset.hit_policy().as_str())?;
-        if let Some(aggregate) = ruleset.aggregate() {
-            write!(f, " AGGREGATE {}", aggregate.as_str())?;
-        }
-        write!(f, ": selected {chosen}")?;
+        f.write_str(&header(self))?;
         for rule in &self.rules {
             write!(f, "\n{rule}")?;
         }
@@ -480,23 +493,30 @@ fn field_table(summary: &Summary<'_>, lines: &mut Vec<String>) {
     let paths: Vec<String> = summary.fields.iter().map(|u| field(&u.path)).collect();
     let column = paths.iter().map(|p| width(p)).max().unwrap_or(0);
     for (usage, shown) in summary.fields.iter().zip(&paths) {
-        let mut places = Vec::new();
-        if !usage.conditions.is_empty() {
-            places.push(format!(
-                "conditions of {}",
-                names(usage.conditions.iter().map(String::as_str))
-            ));
-        }
-        if !usage.payloads.is_empty() {
-            let pairs: Vec<String> = usage
-                .payloads
-                .iter()
-                .map(|(rule, k)| format!("{} ({})", name(rule), name(k)))
-                .collect();
-            places.push(format!("payloads of {}", pairs.join(", ")));
-        }
-        lines.push(format!("  {}  {}", pad(shown, column), places.join("; ")));
+        lines.push(format!("  {}  {}", pad(shown, column), places(usage)));
     }
+}
+
+/// Where a field is read: `conditions of vip, loyal; payloads of loyal
+/// (discount)`, as the summary's text and the input schemas of
+/// `spec/agents.md` say it.
+pub(crate) fn places(usage: &FieldUsage) -> String {
+    let mut places = Vec::new();
+    if !usage.conditions.is_empty() {
+        places.push(format!(
+            "conditions of {}",
+            names(usage.conditions.iter().map(String::as_str))
+        ));
+    }
+    if !usage.payloads.is_empty() {
+        let pairs: Vec<String> = usage
+            .payloads
+            .iter()
+            .map(|(rule, k)| format!("{} ({})", name(rule), name(k)))
+            .collect();
+        places.push(format!("payloads of {}", pairs.join(", ")));
+    }
+    places.join("; ")
 }
 
 /// The rule set's configuration, a table of its rules, the fields it reads, its

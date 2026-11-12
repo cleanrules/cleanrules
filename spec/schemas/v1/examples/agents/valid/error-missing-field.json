@@ -1,0 +1,40 @@
+{
+  "tool": "evaluate",
+  "arguments": {
+    "ruleset": "orders",
+    "input": {
+      "order": {
+        "placed": {
+          "$date": "2025-05-01"
+        },
+        "items": [
+          {
+            "qty": 1
+          }
+        ]
+      }
+    }
+  },
+  "error": {
+    "code": "missing_field",
+    "message": "missing field order.items[1].qty",
+    "hint": "add the field at the pointer to the input; the rule set's input schema lists what it reads",
+    "pointer": "/input/order/items/1/qty",
+    "rule": "early",
+    "path": [
+      "order",
+      "items",
+      1,
+      "qty"
+    ],
+    "node": {
+      "op": "field",
+      "path": [
+        "order",
+        "items",
+        1,
+        "qty"
+      ]
+    }
+  }
+}
