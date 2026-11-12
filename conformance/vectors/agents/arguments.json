@@ -1,0 +1,2294 @@
+{
+  "version": 1,
+  "area": "agents",
+  "vectors": [
+    {
+      "id": "agents/arguments/not-an-object",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "arguments that are not an object are a format_error at the root",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": []
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": ""
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/missing-ruleset",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "a required member that is missing is a format_error at its pointer",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "input": {}
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/missing-input",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "evaluate needs its input",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "pricing"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/input"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/ruleset-not-string",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "a member of the wrong JSON type is a format_error at it",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "summary",
+        "arguments": {
+          "ruleset": 1
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/unknown-member",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "a member the tool does not take is a format_error at it",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "pricing",
+          "input": {},
+          "verbose": true
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/verbose"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/missing-before-unknown",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "the tool's own members are checked before unknown ones",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "verbose": true
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/ruleset"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/list-takes-nothing",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "list_rulesets takes no members",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "list_rulesets",
+        "arguments": {
+          "page": 1
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/page"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/unknown-ruleset",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "a rule set the catalog does not have is a registry_error with the names it has",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "points": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "points": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "then": {
+                  "points": {
+                    "op": "const",
+                    "value": 3
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "prices",
+          "input": {}
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "registry_error",
+          "pointer": "/ruleset",
+          "name": "prices",
+          "available": [
+            "points",
+            "pricing"
+          ]
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/unknown-ruleset-first",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "the rule set is looked up before the input is read",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "prices",
+          "input": {
+            "$date": "2026-13-01"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "registry_error",
+          "pointer": "/ruleset",
+          "name": "prices",
+          "available": [
+            "pricing"
+          ]
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/bad-input",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "an input that does not read as data is a format_error pointing into it",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "pricing",
+          "input": {
+            "customer": {
+              "since": {
+                "$date": "2026-13-01"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/input/customer/since/$date"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/budget-too-small",
+      "spec": [
+        "agents.md#arguments",
+        "agents.md#compact-explanations"
+      ],
+      "description": "a budget below 256 is a format_error at /budget",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "explain",
+        "arguments": {
+          "ruleset": "pricing",
+          "input": {},
+          "budget": 100
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/budget"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/budget-too-large",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "a budget above 1048576 is a format_error at /budget",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "explain",
+        "arguments": {
+          "ruleset": "pricing",
+          "input": {},
+          "budget": 1048577
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/budget"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/budget-fraction",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "a budget with a fraction is not a budget",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "explain",
+        "arguments": {
+          "ruleset": "pricing",
+          "input": {},
+          "budget": 2000.5
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/budget"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/budget-integral-float",
+      "spec": [
+        "agents.md#arguments",
+        "agents.md#compact-explanations"
+      ],
+      "description": "any integral number is a budget: 2000.0 is 2000",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "explain",
+        "arguments": {
+          "ruleset": "pricing",
+          "input": {},
+          "budget": 2000.0
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "pricing",
+          "selected": [
+            "base"
+          ],
+          "unknown": [
+            "vip",
+            "loyal"
+          ],
+          "output": {
+            "discount": {
+              "$decimal": "0.00"
+            }
+          },
+          "outputs": [
+            {
+              "discount": {
+                "$decimal": "0.00"
+              }
+            }
+          ],
+          "explanation": {
+            "text": "HIT POLICY priority: selected base\n[?] vip (unknown): customer.years > 5 AND since IS NULL\n    - customer.years > 5 is unknown: missing field customer\n[?] loyal (unknown): customer.years > 2\n    - customer.years > 2 is unknown: missing field customer\n[x] base (selected): TRUE\n    - TRUE is true",
+            "complete": true
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/budget-on-evaluate",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "evaluate takes no budget",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "pricing",
+          "input": {},
+          "budget": 2000
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/budget"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/validate-text-needs-format",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "a document given as a string needs its format",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": "RULE a IF x THEN y = 1"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/format"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/validate-object-not-json",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "a document given as an object is JSON",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": {
+            "version": 1,
+            "condition": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            }
+          },
+          "format": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/format"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/validate-unknown-format",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "a format that is not one of the four is a format_error at /format",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": "x",
+          "format": "xml"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/format"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/validate-document-number",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "a document is an object or a string",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": 5
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/document"
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/unknown-tool",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "a tool the catalog does not offer is a registry_error naming the five tools",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "delete",
+        "arguments": {
+          "ruleset": "pricing"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "registry_error",
+          "name": "delete",
+          "available": [
+            "evaluate",
+            "explain",
+            "list_rulesets",
+            "summary",
+            "validate"
+          ]
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/text-syntax-error",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "arguments given as JSON text that does not parse are a format_error at the line and column",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments_text": "{\"ruleset\": \"pricing\", \"input\": }"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 1,
+          "column": 33
+        }
+      }
+    },
+    {
+      "id": "agents/arguments/text-duplicate-key",
+      "spec": [
+        "agents.md#arguments"
+      ],
+      "description": "a member given twice in JSON text is a format_error at its second occurrence",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments_text": "{\"ruleset\": \"pricing\", \"ruleset\": \"points\", \"input\": {}}"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 1,
+          "column": 24
+        }
+      }
+    }
+  ]
+}

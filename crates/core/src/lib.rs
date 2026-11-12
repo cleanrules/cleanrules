@@ -8,6 +8,7 @@
 //! The crate is being built: phase B of the roadmap adds the value model, the
 //! condition AST, the evaluator, rules and rule sets, and explanations.
 
+pub mod agents;
 pub mod ast;
 pub mod build;
 mod error;

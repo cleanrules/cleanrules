@@ -1,0 +1,57 @@
+{
+  "tool": "list_rulesets",
+  "arguments": {},
+  "result": {
+    "rulesets": [
+      {
+        "name": "empty",
+        "rules": 0,
+        "hit_policy": "first",
+        "logic": "boolean",
+        "outputs": []
+      },
+      {
+        "name": "orders",
+        "rules": 3,
+        "hit_policy": "first",
+        "logic": "boolean",
+        "strict": true,
+        "outputs": [
+          "note",
+          "tier",
+          "late"
+        ]
+      },
+      {
+        "name": "points",
+        "rules": 2,
+        "hit_policy": "collect",
+        "aggregate": "sum",
+        "logic": "boolean",
+        "outputs": [
+          "points"
+        ]
+      },
+      {
+        "name": "pricing",
+        "rules": 3,
+        "hit_policy": "priority",
+        "logic": "boolean",
+        "outputs": [
+          "discount",
+          "label"
+        ]
+      },
+      {
+        "name": "shipping",
+        "rules": 2,
+        "hit_policy": "rule_order",
+        "logic": "boolean",
+        "outputs": [
+          "zone",
+          "surcharge"
+        ]
+      }
+    ]
+  }
+}

@@ -9,15 +9,20 @@ format and the conformance vectors with every other language.
 """
 
 from cleanrules import errors
+from cleanrules._agents import TOOLS, Catalog, Tool, ToolResult
 from cleanrules._cleanrules import FORMAT_VERSION, __version__
 from cleanrules._documents import Format, dump, dumps, load, loads, rule_from_text
 from cleanrules._expr import Closed, Const, Expr, F, Field, Kind, StructuralKey
 from cleanrules._rules import (
+    DEFAULT_BUDGET,
+    MAX_BUDGET,
+    MIN_BUDGET,
     Action,
     ActionContext,
     Aggregate,
     Cause,
     CauseGroup,
+    CompactExplanation,
     Counterfactual,
     Decision,
     Explanation,
@@ -53,15 +58,21 @@ from cleanrules.errors import (
 )
 
 __all__ = [
+    "DEFAULT_BUDGET",
     "FORMAT_VERSION",
+    "MAX_BUDGET",
+    "MIN_BUDGET",
+    "TOOLS",
     "Action",
     "ActionContext",
     "ActionError",
     "Aggregate",
+    "Catalog",
     "Cause",
     "CauseGroup",
     "CleanRulesError",
     "Closed",
+    "CompactExplanation",
     "Const",
     "Counterfactual",
     "Decision",
@@ -98,6 +109,8 @@ __all__ = [
     "TableOutput",
     "TablePolicy",
     "TableRow",
+    "Tool",
+    "ToolResult",
     "Truth",
     "TypeMismatchError",
     "UnsupportedError",

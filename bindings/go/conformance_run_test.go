@@ -117,10 +117,13 @@ func TestConformance(t *testing.T) {
 	}
 	// The only skips of the JSON route: grids, and evaluate vectors with
 	// limits (max_values bounds native data only).
-	var grids, limited, zero []string
+	var grids, limited, zero, tools []string
 	for _, file := range files {
 		for _, vector := range file.vectors {
 			given, id := vector.obj("given"), vector.str("id")
+			if given.str("kind") == "tool" {
+				tools = append(tools, id)
+			}
 			if given.has("table_grid") {
 				grids = append(grids, id)
 			}
@@ -141,6 +144,12 @@ func TestConformance(t *testing.T) {
 	}
 	if !slices.Equal(counts["json"].skipped["native"], limited) {
 		t.Errorf("json skipped %v for max_values, the vectors with it are %v", counts["json"].skipped["native"], limited)
+	}
+	// Both routes skip the tools for agents, which this binding lacks.
+	for _, route := range conformanceRoutes {
+		if !slices.Equal(counts[route].skipped["agents"], tools) {
+			t.Errorf("%s skipped %v as tools for agents, the tool vectors are %v", route, counts[route].skipped["agents"], tools)
+		}
 	}
 	// A limit of 0 is the one vector Go cannot give.
 	if !slices.Equal(counts["native"].skipped["zero_limit"], zero) || len(zero) != 1 {

@@ -51,6 +51,11 @@ impl PyRuleSet {
     pub(crate) fn ruleset(&self) -> &RuleSet {
         &self.ruleset
     }
+
+    /// The rule set, shared: for the tools' catalog.
+    pub(crate) fn shared(&self) -> Arc<RuleSet> {
+        Arc::clone(&self.ruleset)
+    }
 }
 
 #[pymethods]
@@ -306,6 +311,11 @@ impl PyRuleSet {
         to_string(&write_summary(&self.overview(actions)))
     }
 
+    /// The input schema (`spec/agents.md`, *Input schemas*), as JSON text.
+    fn input_schema_json(&self) -> String {
+        to_string(&cleanrules::agents::input_schema(&summary(&self.ruleset)))
+    }
+
     /// The summary's text (`spec/explain.md`, *Summaries*).
     #[allow(clippy::needless_pass_by_value)] // PyO3 extracts lists by value.
     fn summary_text(&self, actions: Vec<bool>) -> String {
@@ -558,6 +568,16 @@ impl PyDecision {
             crate::trees::tree_to_py(py, &result.when, &self.objects(py))?,
             to_string(&cleanrules::format::write_result(&result.when)),
         ))
+    }
+
+    /// The compact explanation within `budget` code points
+    /// (`spec/agents.md`, *Compact explanations*): its text, and whether it
+    /// is whole; a budget out of range is the core's `format_error`.
+    fn compact_explanation(&self, py: Python<'_>, budget: usize) -> PyResult<(String, bool)> {
+        let decision = self.rebuild(py)?;
+        let compact =
+            cleanrules::agents::compact_explanation(&explain(&decision), budget).or_raise(py)?;
+        Ok((compact.text, compact.complete))
     }
 
     /// The explanation in the JSON format, as text.

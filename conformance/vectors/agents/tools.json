@@ -1,0 +1,2151 @@
+{
+  "version": 1,
+  "area": "agents",
+  "vectors": [
+    {
+      "id": "agents/tools/list-rulesets",
+      "spec": [
+        "agents.md#list_rulesets",
+        "agents.md#tools"
+      ],
+      "description": "list_rulesets gives each rule set's name, size, configuration and outputs, sorted by name",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "shipping": {
+            "hit_policy": "rule_order",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "domestic",
+                "when": {
+                  "op": "in",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "country"
+                    ]
+                  },
+                  "values": [
+                    "ES",
+                    "PT"
+                  ]
+                },
+                "then": {
+                  "zone": {
+                    "op": "const",
+                    "value": "domestic"
+                  }
+                }
+              },
+              {
+                "name": "heavy",
+                "when": {
+                  "op": "or",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "mul",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "weight"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 2
+                        }
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 40
+                      }
+                    },
+                    {
+                      "op": "field",
+                      "path": [
+                        "fragile"
+                      ]
+                    }
+                  ]
+                },
+                "then": {
+                  "surcharge": {
+                    "op": "mul",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "weight"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": {
+                        "$decimal": "0.5"
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "points": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "points": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "then": {
+                  "points": {
+                    "op": "const",
+                    "value": 3
+                  }
+                }
+              }
+            ]
+          },
+          "orders": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "early",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "lt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "placed"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$date": "2026-01-01"
+                        }
+                      }
+                    },
+                    {
+                      "op": "between",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "items",
+                          1,
+                          "qty"
+                        ]
+                      },
+                      "low": {
+                        "op": "const",
+                        "value": 1
+                      },
+                      "high": {
+                        "op": "const",
+                        "value": 10
+                      },
+                      "closed": "both"
+                    }
+                  ]
+                },
+                "then": {
+                  "note": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "$ref"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "pricey",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "ge",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "total"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$decimal": "99.99"
+                        }
+                      }
+                    },
+                    {
+                      "op": "matches",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "code"
+                        ]
+                      },
+                      "pattern": "^A"
+                    }
+                  ]
+                },
+                "then": {
+                  "tier": {
+                    "op": "const",
+                    "value": "gold"
+                  }
+                }
+              },
+              {
+                "name": "late",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "shipped"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-01-01T00:00:00Z"
+                    }
+                  }
+                },
+                "then": {
+                  "late": {
+                    "op": "const",
+                    "value": true
+                  }
+                }
+              }
+            ]
+          },
+          "empty": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": []
+          }
+        },
+        "tool": "list_rulesets",
+        "arguments": {}
+      },
+      "expect": {
+        "output": {
+          "rulesets": [
+            {
+              "name": "empty",
+              "rules": 0,
+              "hit_policy": "first",
+              "logic": "boolean",
+              "outputs": []
+            },
+            {
+              "name": "orders",
+              "rules": 3,
+              "hit_policy": "first",
+              "logic": "boolean",
+              "strict": true,
+              "outputs": [
+                "note",
+                "tier",
+                "late"
+              ]
+            },
+            {
+              "name": "points",
+              "rules": 2,
+              "hit_policy": "collect",
+              "aggregate": "sum",
+              "logic": "boolean",
+              "outputs": [
+                "points"
+              ]
+            },
+            {
+              "name": "pricing",
+              "rules": 3,
+              "hit_policy": "priority",
+              "logic": "boolean",
+              "outputs": [
+                "discount",
+                "label"
+              ]
+            },
+            {
+              "name": "shipping",
+              "rules": 2,
+              "hit_policy": "rule_order",
+              "logic": "boolean",
+              "outputs": [
+                "zone",
+                "surcharge"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "agents/tools/list-rulesets-empty",
+      "spec": [
+        "agents.md#list_rulesets"
+      ],
+      "description": "an empty catalog lists no rule sets",
+      "given": {
+        "kind": "tool",
+        "tool": "list_rulesets",
+        "arguments": {}
+      },
+      "expect": {
+        "output": {
+          "rulesets": []
+        }
+      }
+    },
+    {
+      "id": "agents/tools/summary",
+      "spec": [
+        "agents.md#summary",
+        "agents.md#input-schemas"
+      ],
+      "description": "summary gives the rule set's summary and its input schema",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "summary",
+        "arguments": {
+          "ruleset": "pricing"
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "pricing",
+          "summary": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "priority": 10,
+                "outputs": [
+                  "discount",
+                  "label"
+                ]
+              },
+              {
+                "name": "loyal",
+                "priority": 5,
+                "outputs": [
+                  "discount"
+                ]
+              },
+              {
+                "name": "base",
+                "priority": 0,
+                "outputs": [
+                  "discount"
+                ]
+              }
+            ],
+            "fields": [
+              {
+                "path": [
+                  "customer",
+                  "years"
+                ],
+                "conditions": [
+                  "vip",
+                  "loyal"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "since"
+                ],
+                "conditions": [
+                  "vip"
+                ],
+                "payloads": []
+              }
+            ],
+            "outputs": [
+              "discount",
+              "label"
+            ],
+            "tags": [
+              {
+                "tag": "gold",
+                "rules": [
+                  "vip"
+                ]
+              }
+            ]
+          },
+          "input_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "customer": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "years": {
+                        "description": "conditions of vip, loyal",
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "since": {
+                "description": "conditions of vip"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/tools/evaluate-priority",
+      "spec": [
+        "agents.md#evaluate"
+      ],
+      "description": "evaluate gives the selected rule, the winner's payload as output, and the outputs",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "pricing",
+          "input": {
+            "customer": {
+              "years": 7
+            }
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "pricing",
+          "selected": [
+            "vip"
+          ],
+          "unknown": [],
+          "output": {
+            "discount": {
+              "$decimal": "0.15"
+            },
+            "label": "vip"
+          },
+          "outputs": [
+            {
+              "discount": {
+                "$decimal": "0.15"
+              },
+              "label": "vip"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "agents/tools/evaluate-unknown",
+      "spec": [
+        "agents.md#evaluate"
+      ],
+      "description": "rules whose condition is unknown, because a field is missing, are listed in unknown",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "pricing",
+          "input": {}
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "pricing",
+          "selected": [
+            "base"
+          ],
+          "unknown": [
+            "vip",
+            "loyal"
+          ],
+          "output": {
+            "discount": {
+              "$decimal": "0.00"
+            }
+          },
+          "outputs": [
+            {
+              "discount": {
+                "$decimal": "0.00"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "agents/tools/evaluate-rule-order",
+      "spec": [
+        "agents.md#evaluate"
+      ],
+      "description": "under rule_order there is no output, only the outputs of every selected rule",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "shipping": {
+            "hit_policy": "rule_order",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "domestic",
+                "when": {
+                  "op": "in",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "country"
+                    ]
+                  },
+                  "values": [
+                    "ES",
+                    "PT"
+                  ]
+                },
+                "then": {
+                  "zone": {
+                    "op": "const",
+                    "value": "domestic"
+                  }
+                }
+              },
+              {
+                "name": "heavy",
+                "when": {
+                  "op": "or",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "mul",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "weight"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 2
+                        }
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 40
+                      }
+                    },
+                    {
+                      "op": "field",
+                      "path": [
+                        "fragile"
+                      ]
+                    }
+                  ]
+                },
+                "then": {
+                  "surcharge": {
+                    "op": "mul",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "weight"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": {
+                        "$decimal": "0.5"
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "shipping",
+          "input": {
+            "country": "ES",
+            "weight": 30
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "shipping",
+          "selected": [
+            "domestic",
+            "heavy"
+          ],
+          "unknown": [],
+          "outputs": [
+            {
+              "zone": "domestic"
+            },
+            {
+              "surcharge": 15.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "agents/tools/evaluate-aggregate",
+      "spec": [
+        "agents.md#evaluate"
+      ],
+      "description": "with an aggregate, output is the aggregate's map",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "points": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "points": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "then": {
+                  "points": {
+                    "op": "const",
+                    "value": 3
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "points",
+          "input": {
+            "x": 7
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "points",
+          "selected": [
+            "a",
+            "b"
+          ],
+          "unknown": [],
+          "output": {
+            "points": 5
+          },
+          "outputs": [
+            {
+              "points": 2
+            },
+            {
+              "points": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "agents/tools/evaluate-aggregate-nothing",
+      "spec": [
+        "agents.md#evaluate"
+      ],
+      "description": "an aggregate with nothing selected is null",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "points": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "points": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "then": {
+                  "points": {
+                    "op": "const",
+                    "value": 3
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "points",
+          "input": {
+            "x": 0
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "points",
+          "selected": [],
+          "unknown": [],
+          "output": null,
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "agents/tools/evaluate-nothing-selected",
+      "spec": [
+        "agents.md#evaluate"
+      ],
+      "description": "a single-hit policy with nothing selected has a null output",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "unique": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "p",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "name": "q",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "unique",
+          "input": {
+            "x": -1
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "unique",
+          "selected": [],
+          "unknown": [],
+          "output": null,
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "agents/tools/evaluate-decimal-input",
+      "spec": [
+        "agents.md#evaluate"
+      ],
+      "description": "a decimal is sent in the format's encoding, and compares exactly",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "orders": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "early",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "lt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "placed"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$date": "2026-01-01"
+                        }
+                      }
+                    },
+                    {
+                      "op": "between",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "items",
+                          1,
+                          "qty"
+                        ]
+                      },
+                      "low": {
+                        "op": "const",
+                        "value": 1
+                      },
+                      "high": {
+                        "op": "const",
+                        "value": 10
+                      },
+                      "closed": "both"
+                    }
+                  ]
+                },
+                "then": {
+                  "note": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "$ref"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "pricey",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "ge",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "total"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$decimal": "99.99"
+                        }
+                      }
+                    },
+                    {
+                      "op": "matches",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "code"
+                        ]
+                      },
+                      "pattern": "^A"
+                    }
+                  ]
+                },
+                "then": {
+                  "tier": {
+                    "op": "const",
+                    "value": "gold"
+                  }
+                }
+              },
+              {
+                "name": "late",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "shipped"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-01-01T00:00:00Z"
+                    }
+                  }
+                },
+                "then": {
+                  "late": {
+                    "op": "const",
+                    "value": true
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "orders",
+          "input": {
+            "order": {
+              "placed": {
+                "$date": "2026-05-01"
+              },
+              "items": [
+                {},
+                {
+                  "qty": 1
+                }
+              ],
+              "total": {
+                "$decimal": "99.99"
+              },
+              "code": "A-1",
+              "shipped": {
+                "$datetime": "2025-12-31T23:00:00-02:00"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "orders",
+          "selected": [
+            "pricey"
+          ],
+          "unknown": [],
+          "output": {
+            "tier": "gold"
+          },
+          "outputs": [
+            {
+              "tier": "gold"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "agents/tools/explain",
+      "spec": [
+        "agents.md#explain",
+        "agents.md#compact-explanations"
+      ],
+      "description": "explain adds the explanation's text, whole when it fits the default budget",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "explain",
+        "arguments": {
+          "ruleset": "pricing",
+          "input": {
+            "customer": {
+              "years": 3
+            }
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "pricing",
+          "selected": [
+            "loyal"
+          ],
+          "unknown": [],
+          "output": {
+            "discount": {
+              "$decimal": "0.05"
+            }
+          },
+          "outputs": [
+            {
+              "discount": {
+                "$decimal": "0.05"
+              }
+            }
+          ],
+          "explanation": {
+            "text": "HIT POLICY priority: selected loyal\n[ ] vip (not fired): customer.years > 5 AND since IS NULL\n    - customer.years > 5 is false (customer.years = 3); short by 2\n[x] loyal (selected): customer.years > 2\n    - customer.years > 2 is true (customer.years = 3)\n[x] base (fired, not selected): TRUE\n    fired, but loyal has a higher priority (5 > 0)\n    - TRUE is true",
+            "complete": true
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/tools/validate-ruleset",
+      "spec": [
+        "agents.md#validate"
+      ],
+      "description": "a rule set document given as an object reads, with its summary and input schema",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "first",
+              "rules": [
+                {
+                  "name": "adult",
+                  "when": {
+                    "op": "ge",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "age"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 18
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "valid": true,
+          "content": "ruleset",
+          "summary": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "adult",
+                "priority": 0,
+                "outputs": []
+              }
+            ],
+            "fields": [
+              {
+                "path": [
+                  "age"
+                ],
+                "conditions": [
+                  "adult"
+                ],
+                "payloads": []
+              }
+            ],
+            "outputs": [],
+            "tags": []
+          },
+          "input_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "age": {
+                "description": "conditions of adult",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/tools/validate-text-rule",
+      "spec": [
+        "agents.md#validate"
+      ],
+      "description": "a rule given as text reads as a rule, which gives a rule set of that one rule",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": "RULE adult IF age >= 18 THEN ok = TRUE",
+          "format": "text"
+        }
+      },
+      "expect": {
+        "output": {
+          "valid": true,
+          "content": "rule",
+          "summary": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "adult",
+                "priority": 0,
+                "outputs": [
+                  "ok"
+                ]
+              }
+            ],
+            "fields": [
+              {
+                "path": [
+                  "age"
+                ],
+                "conditions": [
+                  "adult"
+                ],
+                "payloads": []
+              }
+            ],
+            "outputs": [
+              "ok"
+            ],
+            "tags": []
+          },
+          "input_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "age": {
+                "description": "conditions of adult",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/tools/validate-json-text",
+      "spec": [
+        "agents.md#validate"
+      ],
+      "description": "a JSON document may be given as a string with the format json",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": "{\"version\": 1, \"rule\": {\"name\": \"adult\", \"when\": {\"op\": \"field\", \"path\": [\"adult\"]}}}",
+          "format": "json"
+        }
+      },
+      "expect": {
+        "output": {
+          "valid": true,
+          "content": "rule",
+          "summary": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "adult",
+                "priority": 0,
+                "outputs": []
+              }
+            ],
+            "fields": [
+              {
+                "path": [
+                  "adult"
+                ],
+                "conditions": [
+                  "adult"
+                ],
+                "payloads": []
+              }
+            ],
+            "outputs": [],
+            "tags": []
+          },
+          "input_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "adult": {
+                "description": "conditions of adult",
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/tools/validate-object-format-json",
+      "spec": [
+        "agents.md#validate"
+      ],
+      "description": "an object document may name its format, json",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": {
+            "version": 1,
+            "condition": {
+              "op": "field",
+              "path": [
+                "ok"
+              ]
+            }
+          },
+          "format": "json"
+        }
+      },
+      "expect": {
+        "output": {
+          "valid": true,
+          "content": "condition"
+        }
+      }
+    },
+    {
+      "id": "agents/tools/validate-condition",
+      "spec": [
+        "agents.md#validate"
+      ],
+      "description": "a condition reads, but gives no rule set, so it has no summary",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": {
+            "version": 1,
+            "condition": {
+              "op": "is_null",
+              "operand": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "valid": true,
+          "content": "condition"
+        }
+      }
+    },
+    {
+      "id": "agents/tools/validate-csv",
+      "spec": [
+        "agents.md#validate"
+      ],
+      "description": "a decision table given as CSV reads, and gives the rule set it compiles to",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": "x,THEN y\n> 1,'a'\n<= 1,'b'\n",
+          "format": "csv"
+        }
+      },
+      "expect": {
+        "output": {
+          "valid": true,
+          "content": "decision_table",
+          "summary": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "row_1",
+                "priority": 0,
+                "outputs": [
+                  "y"
+                ]
+              },
+              {
+                "name": "row_2",
+                "priority": 0,
+                "outputs": [
+                  "y"
+                ]
+              }
+            ],
+            "fields": [
+              {
+                "path": [
+                  "x"
+                ],
+                "conditions": [
+                  "row_1",
+                  "row_2"
+                ],
+                "payloads": []
+              }
+            ],
+            "outputs": [
+              "y"
+            ],
+            "tags": []
+          },
+          "input_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "x": {
+                "description": "conditions of row_1, row_2",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/tools/validate-shape-error",
+      "spec": [
+        "agents.md#validate"
+      ],
+      "description": "a document that does not read is a result with the reader's error, located in the document",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": {
+            "version": 1,
+            "condition": {
+              "op": "greater",
+              "left": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "valid": false,
+          "error": {
+            "code": "format_error",
+            "pointer": "/condition/op"
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/tools/validate-expression-error",
+      "spec": [
+        "agents.md#validate"
+      ],
+      "description": "a construction rule broken in the document is its expression_error, with the pointer into the document",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": {
+            "version": 1,
+            "condition": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": null
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "valid": false,
+          "error": {
+            "code": "expression_error",
+            "pointer": "/condition"
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/tools/validate-syntax-error",
+      "spec": [
+        "agents.md#validate"
+      ],
+      "description": "a text that does not parse gives its line and column",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": "RULE adult\nIF age >=\nTHEN ok = TRUE",
+          "format": "text"
+        }
+      },
+      "expect": {
+        "output": {
+          "valid": false,
+          "error": {
+            "code": "rule_syntax_error",
+            "line": 3,
+            "column": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/tools/validate-version",
+      "spec": [
+        "agents.md#validate"
+      ],
+      "description": "a document of another version is unsupported_version",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": {
+            "version": 2,
+            "condition": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "valid": false,
+          "error": {
+            "code": "unsupported_version",
+            "pointer": "/version"
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/tools/validate-decision",
+      "spec": [
+        "agents.md#validate"
+      ],
+      "description": "a decision is read with its rule set, so validating one is unsupported",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": {
+            "version": 1,
+            "decision": {
+              "hit_policy": "first",
+              "logic": "boolean",
+              "results": [],
+              "selected": []
+            }
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "valid": false,
+          "error": {
+            "code": "unsupported"
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/tools/validate-summary",
+      "spec": [
+        "agents.md#validate"
+      ],
+      "description": "a summary is output only, so validating one is unsupported",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": {
+            "version": 1,
+            "summary": {}
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "valid": false,
+          "error": {
+            "code": "unsupported"
+          }
+        }
+      }
+    }
+  ]
+}

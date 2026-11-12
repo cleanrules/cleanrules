@@ -1,0 +1,675 @@
+{
+  "version": 1,
+  "area": "agents",
+  "vectors": [
+    {
+      "id": "agents/compact/whole",
+      "spec": [
+        "agents.md#compact-explanations"
+      ],
+      "description": "an explanation that fits is whole and complete",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "levels": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "never",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 100
+                      }
+                    },
+                    {
+                      "op": "not",
+                      "operand": {
+                        "op": "gt",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "x"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 100
+                        }
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "never"
+                  }
+                }
+              },
+              {
+                "name": "high",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 50
+                      }
+                    },
+                    {
+                      "op": "eq",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "region"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": "north"
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "high"
+                  }
+                }
+              },
+              {
+                "name": "missing",
+                "when": {
+                  "op": "ge",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "score"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 700
+                  }
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "score"
+                  }
+                }
+              },
+              {
+                "name": "mid",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "mid"
+                  }
+                },
+                "description": "the usual case"
+              },
+              {
+                "name": "low",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "low"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "explain",
+        "arguments": {
+          "ruleset": "levels",
+          "input": {
+            "x": 8,
+            "region": "south"
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "levels",
+          "selected": [
+            "mid"
+          ],
+          "unknown": [
+            "missing"
+          ],
+          "output": {
+            "level": "mid"
+          },
+          "outputs": [
+            {
+              "level": "mid"
+            }
+          ],
+          "explanation": {
+            "text": "HIT POLICY first: selected mid\n[ ] never (not fired): x > 100 AND NOT x > 100\n    cannot fire by changing these conditions alone; they conflict:\n    - x > 100 is false (x = 8); short by 92\n[ ] high (not fired): x > 50 AND region = \"north\"\n    would fire if all of these changed:\n    - x > 50 is false (x = 8); short by 42\n    - region = \"north\" is false (region = \"south\")\n[?] missing (unknown): score >= 700\n    - score >= 700 is unknown: missing field score\n[x] mid (selected): x > 5\n    the usual case\n    - x > 5 is true (x = 8)\n[x] low (fired, not selected): x > 0\n    fired, but mid comes first\n    - x > 0 is true (x = 8)",
+            "complete": true
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/compact/smallest-budget",
+      "spec": [
+        "agents.md#compact-explanations"
+      ],
+      "description": "at the smallest budget the selected rule comes first, the rest is shortened or omitted, and the last line counts them",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "levels": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "never",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 100
+                      }
+                    },
+                    {
+                      "op": "not",
+                      "operand": {
+                        "op": "gt",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "x"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 100
+                        }
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "never"
+                  }
+                }
+              },
+              {
+                "name": "high",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 50
+                      }
+                    },
+                    {
+                      "op": "eq",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "region"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": "north"
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "high"
+                  }
+                }
+              },
+              {
+                "name": "missing",
+                "when": {
+                  "op": "ge",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "score"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 700
+                  }
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "score"
+                  }
+                }
+              },
+              {
+                "name": "mid",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "mid"
+                  }
+                },
+                "description": "the usual case"
+              },
+              {
+                "name": "low",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "low"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "explain",
+        "arguments": {
+          "ruleset": "levels",
+          "input": {
+            "x": 8,
+            "region": "south"
+          },
+          "budget": 256
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "levels",
+          "selected": [
+            "mid"
+          ],
+          "unknown": [
+            "missing"
+          ],
+          "output": {
+            "level": "mid"
+          },
+          "outputs": [
+            {
+              "level": "mid"
+            }
+          ],
+          "explanation": {
+            "text": "HIT POLICY first: selected mid\n[?] missing (unknown): score >= 700\n    - score >= 700 is unknown: missing field score\n[x] mid (selected): x > 5\n    the usual case\n    - x > 5 is true (x = 8)\n... 3 of 5 rules shortened or omitted to fit the budget",
+            "complete": false
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/compact/ranks",
+      "spec": [
+        "agents.md#compact-explanations"
+      ],
+      "description": "rules are taken by rank: selected, unknown, fired, achievable, then not achievable",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "levels": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "never",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 100
+                      }
+                    },
+                    {
+                      "op": "not",
+                      "operand": {
+                        "op": "gt",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "x"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 100
+                        }
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "never"
+                  }
+                }
+              },
+              {
+                "name": "high",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 50
+                      }
+                    },
+                    {
+                      "op": "eq",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "region"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": "north"
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "high"
+                  }
+                }
+              },
+              {
+                "name": "missing",
+                "when": {
+                  "op": "ge",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "score"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 700
+                  }
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "score"
+                  }
+                }
+              },
+              {
+                "name": "mid",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "mid"
+                  }
+                },
+                "description": "the usual case"
+              },
+              {
+                "name": "low",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "level": {
+                    "op": "const",
+                    "value": "low"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "explain",
+        "arguments": {
+          "ruleset": "levels",
+          "input": {
+            "x": 8,
+            "region": "south"
+          },
+          "budget": 420
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "levels",
+          "selected": [
+            "mid"
+          ],
+          "unknown": [
+            "missing"
+          ],
+          "output": {
+            "level": "mid"
+          },
+          "outputs": [
+            {
+              "level": "mid"
+            }
+          ],
+          "explanation": {
+            "text": "HIT POLICY first: selected mid\n[ ] high (not fired): x > 50 AND region = \"north\"\n[?] missing (unknown): score >= 700\n    - score >= 700 is unknown: missing field score\n[x] mid (selected): x > 5\n    the usual case\n    - x > 5 is true (x = 8)\n[x] low (fired, not selected): x > 0\n    fired, but mid comes first\n    - x > 0 is true (x = 8)\n... 2 of 5 rules shortened or omitted to fit the budget",
+            "complete": false
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/compact/long-line",
+      "spec": [
+        "agents.md#compact-explanations"
+      ],
+      "description": "a line longer than 160 code points is cut, and the text is then not complete",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "long": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "colour",
+                "when": {
+                  "op": "in",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "colour"
+                    ]
+                  },
+                  "values": [
+                    "amaranth",
+                    "burgundy",
+                    "cerulean",
+                    "chartreuse",
+                    "dandelion",
+                    "eggplant",
+                    "fuchsia",
+                    "gamboge",
+                    "heliotrope",
+                    "indigo",
+                    "jasmine",
+                    "lavender"
+                  ]
+                },
+                "then": {
+                  "known": {
+                    "op": "const",
+                    "value": true
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "explain",
+        "arguments": {
+          "ruleset": "long",
+          "input": {
+            "colour": "blue"
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "long",
+          "selected": [],
+          "unknown": [],
+          "output": null,
+          "outputs": [],
+          "explanation": {
+            "text": "HIT POLICY first: selected no rule\n[ ] colour (not fired): colour IN (\"amaranth\", \"burgundy\", \"cerulean\", \"chartreuse\", \"dandelion\", \"eggplant\", \"fuchsia\", \"gamboge\", \"heliotrope\", \"indigo\", \"...\n    - colour IN (\"amaranth\", \"burgundy\", \"cerulean\", \"chartreuse\", \"dandelion\", \"eggplant\", \"fuchsia\", \"gamboge\", \"heliotrope\", \"indigo\", \"jasmine\", \"lavende...",
+            "complete": false
+          }
+        }
+      }
+    }
+  ]
+}

@@ -346,6 +346,9 @@ fn the_vectors_pass_through_the_c_abi() {
     // *Errors and limits*).
     on_small_stack(|| {
         let (mut ran, mut skipped, mut failures) = (0, 0, Vec::new());
+        // The tools for agents (`spec/agents.md`) are not in the C ABI yet
+        // (`docs/PLAN.md`, O.1): their vectors are counted and skipped.
+        let mut tools = 0;
         for file in files() {
             let document = json(&fs::read_to_string(&file).unwrap());
             let Some(Json::Array(vectors)) = get(&document, "vectors") else {
@@ -358,6 +361,10 @@ fn the_vectors_pass_through_the_c_abi() {
                 if get(given, "limits").is_some() && string(get(given, "kind")) == Some("evaluate")
                 {
                     skipped += 1;
+                    continue;
+                }
+                if string(get(given, "kind")) == Some("tool") {
+                    tools += 1;
                     continue;
                 }
                 ran += 1;
@@ -374,5 +381,6 @@ fn the_vectors_pass_through_the_c_abi() {
         );
         assert!(ran >= 2508, "only {ran} vectors ran");
         assert!(skipped >= 14, "{skipped} native-only vectors skipped");
+        println!("{ran} ran, {skipped} native-only and {tools} tool vectors (agents) skipped");
     });
 }

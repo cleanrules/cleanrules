@@ -1,0 +1,102 @@
+{
+  "tool": "summary",
+  "arguments": {
+    "ruleset": "pricing"
+  },
+  "result": {
+    "ruleset": "pricing",
+    "summary": {
+      "hit_policy": "priority",
+      "logic": "boolean",
+      "rules": [
+        {
+          "name": "vip",
+          "priority": 10,
+          "outputs": [
+            "discount",
+            "label"
+          ]
+        },
+        {
+          "name": "loyal",
+          "priority": 5,
+          "outputs": [
+            "discount"
+          ]
+        },
+        {
+          "name": "base",
+          "priority": 0,
+          "outputs": [
+            "discount"
+          ]
+        }
+      ],
+      "fields": [
+        {
+          "path": [
+            "customer",
+            "years"
+          ],
+          "conditions": [
+            "vip",
+            "loyal"
+          ],
+          "payloads": []
+        },
+        {
+          "path": [
+            "since"
+          ],
+          "conditions": [
+            "vip"
+          ],
+          "payloads": []
+        }
+      ],
+      "outputs": [
+        "discount",
+        "label"
+      ],
+      "tags": [
+        {
+          "tag": "gold",
+          "rules": [
+            "vip"
+          ]
+        }
+      ]
+    },
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "customer": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "years": {
+                  "description": "conditions of vip, loyal",
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "since": {
+          "description": "conditions of vip"
+        }
+      }
+    }
+  }
+}

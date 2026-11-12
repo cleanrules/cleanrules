@@ -13,6 +13,7 @@ use std::collections::BTreeMap;
 use std::fs;
 
 use cleanrules::Error;
+use cleanrules::agents::Catalog;
 use cleanrules::eval::{Options, evaluate_tree, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
@@ -214,6 +215,97 @@ fn run_explain(vector: &Json) -> Result<(), String> {
     compare(explanation_json, expect, "explanation")
 }
 
+/// Members of an agent error that are free text or not compared
+/// (`conformance/README.md`, *Comparing*).
+const AGENT_ERROR_FREE: [&str; 6] = ["message", "hint", "cause", "node", "operation", "reason"];
+
+/// An agent error without its free text, after checking that it has a hint
+/// (`spec/agents.md`, *Errors*).
+fn agent_error_compared(error: &Json) -> Result<Json, String> {
+    match get(error, "hint") {
+        Some(Json::String(hint)) if !hint.is_empty() => {}
+        _ => return Err(format!("the agent error {} has no hint", to_string(error))),
+    }
+    let Json::Object(members) = error else {
+        return Err(format!(
+            "the agent error {} is not an object",
+            to_string(error)
+        ));
+    };
+    Ok(Json::Object(
+        members
+            .iter()
+            .filter(|(k, _)| !AGENT_ERROR_FREE.contains(&k.as_str()))
+            .cloned()
+            .collect(),
+    ))
+}
+
+/// A `tool` vector (`spec/agents.md`): a call on a catalog of the given rule
+/// sets, compared with `output` or with `error`.
+fn run_tool(vector: &Json) -> Result<(), String> {
+    let given = get(vector, "given").unwrap();
+    let expect = get(vector, "expect").unwrap();
+    let mut catalog = Catalog::new();
+    if let Some(Json::Object(rulesets)) = get(given, "rulesets") {
+        for (name, content) in rulesets {
+            let pointer = format!("/rulesets/{}", cleanrules::json::pointer_token(name));
+            let ruleset = read_ruleset(content, &pointer, &Limits::default())
+                .map_err(|e| format!("reading the rule set {name}: {e}"))?;
+            catalog.insert(name.clone(), ruleset);
+        }
+    }
+    let tool = text(get(given, "tool")).unwrap();
+    let result = match get(given, "arguments_text") {
+        Some(Json::String(arguments)) => catalog.call_text(tool, arguments),
+        _ => catalog.call(tool, get(given, "arguments").unwrap()),
+    };
+    match (result.is_error, get(expect, "error")) {
+        (true, Some(wanted)) => {
+            let actual = agent_error_compared(get(&result.content, "error").unwrap())?;
+            if same_error(&actual, wanted) {
+                Ok(())
+            } else {
+                Err(format!(
+                    "got the error {}, expected {}",
+                    to_string(&actual),
+                    to_string(wanted)
+                ))
+            }
+        }
+        (false, None) => {
+            let mut actual = result.content.clone();
+            // A `validate` result's error is compared without its free text.
+            if let Json::Object(members) = &mut actual {
+                for (key, value) in members.iter_mut() {
+                    if key == "error" {
+                        *value = agent_error_compared(value)?;
+                    }
+                }
+            }
+            let wanted = get(expect, "output").unwrap();
+            if same(&actual, wanted) {
+                Ok(())
+            } else {
+                Err(format!(
+                    "got {}\nwant {}",
+                    to_string(&actual),
+                    to_string(wanted)
+                ))
+            }
+        }
+        (true, None) => Err(format!(
+            "unexpected tool error {}",
+            to_string(&result.content)
+        )),
+        (false, Some(wanted)) => Err(format!(
+            "got {}, expected the error {}",
+            to_string(&result.content),
+            to_string(wanted)
+        )),
+    }
+}
+
 fn run(vector: &Json) -> Result<(), String> {
     let given = get(vector, "given").unwrap();
     let kind = text(get(given, "kind")).unwrap();
@@ -222,6 +314,9 @@ fn run(vector: &Json) -> Result<(), String> {
     }
     if kind == "explain" || kind == "summary" {
         return run_explain(vector);
+    }
+    if kind == "tool" {
+        return run_tool(vector);
     }
     let limits = Limits::default();
     let node_key = if kind == "condition" {
@@ -305,7 +400,7 @@ fn conformance_vectors() {
                 }
                 if !matches!(
                     kind,
-                    "condition" | "value" | "evaluate" | "explain" | "summary"
+                    "condition" | "value" | "evaluate" | "explain" | "summary" | "tool"
                 ) {
                     *pending.entry(kind.to_owned()).or_default() += 1;
                     continue;

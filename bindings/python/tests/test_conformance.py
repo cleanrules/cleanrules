@@ -368,6 +368,58 @@ def run_table(given: dict[str, Any], expect: dict[str, Any], limits: Limits) -> 
     )
 
 
+# Members of an agent error not compared (`conformance/README.md`, *Comparing*).
+AGENT_FREE = ("message", "hint", "cause", "node", "operation", "reason")
+
+
+def agent_error(error: dict[str, Any]) -> dict[str, Any]:
+    """An agent error without its free text, after checking its hint (`spec/agents.md`)."""
+    assert isinstance(error.get("hint"), str) and error["hint"], f"no hint in {error}"
+    return {k: v for k, v in error.items() if k not in AGENT_FREE}
+
+
+def run_tool(vector: dict[str, Any], route: str) -> None:
+    """Run a `tool` vector with `cleanrules.Catalog`.
+
+    Rule sets are read from JSON (`json`) or built with the Python API
+    (`native`), and the arguments are JSON text (`json`) or Python data (`native`).
+    """
+    given, expect = vector["given"], vector["expect"]
+    contents = given.get("rulesets", {})
+    if route == "json":
+        rulesets = {
+            name: cast(
+                RuleSet, cleanrules.loads(dumps({"version": Number("1"), "ruleset": content}))
+            )
+            for name, content in contents.items()
+        }
+        arguments: Any = given.get("arguments_text", None)
+        if arguments is None:
+            arguments = dumps(given["arguments"])
+    else:
+        rulesets = {name: build_ruleset(content) for name, content in contents.items()}
+        arguments = given.get("arguments_text", None)
+        if arguments is None:
+            # Python data where it is a mapping; anything else only JSON text holds.
+            given_arguments = given["arguments"]
+            is_mapping = isinstance(given_arguments, dict)
+            arguments = typed(given_arguments) if is_mapping else dumps(given_arguments)
+    result = cleanrules.Catalog(rulesets).call(given["tool"], arguments)
+    if "error" in expect:
+        assert result.is_error, f"expected the error {expect['error']}, got {result.content}"
+        actual = agent_error(result.content["error"])
+        wanted = typed(expect["error"])
+        assert set(actual) == set(wanted), f"got {actual}, expected {wanted}"
+        assert all(same(actual[k], wanted[k]) for k in wanted), f"got {actual}, expected {wanted}"
+        return
+    assert not result.is_error, f"unexpected tool error {result.content}"
+    got = dict(result.content)
+    if "error" in got:
+        got["error"] = agent_error(got["error"])
+    wanted = typed(expect["output"])
+    assert same(got, wanted), f"\ngot  {json.dumps(got)}\nwant {json.dumps(wanted)}"
+
+
 def run_json(vector: dict[str, Any]) -> None:
     given, expect = vector["given"], vector["expect"]
     kind = given["kind"]
@@ -531,6 +583,9 @@ def collect() -> list[Any]:
 
 @pytest.mark.parametrize(("vector", "run"), collect())
 def test_vector(vector: dict[str, Any], run: str) -> None:
+    if vector["given"]["kind"] == "tool":
+        run_tool(vector, run)
+        return
     (run_json if run == "json" else run_native)(vector)
 
 

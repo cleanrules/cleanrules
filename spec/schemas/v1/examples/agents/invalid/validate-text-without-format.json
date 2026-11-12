@@ -1,0 +1,62 @@
+{
+  "tool": "validate",
+  "arguments": {
+    "document": "RULE adult IF age >= 18 THEN ok = TRUE"
+  },
+  "result": {
+    "valid": true,
+    "content": "rule",
+    "summary": {
+      "hit_policy": "first",
+      "logic": "boolean",
+      "rules": [
+        {
+          "name": "adult",
+          "priority": 0,
+          "outputs": [
+            "ok"
+          ]
+        }
+      ],
+      "fields": [
+        {
+          "path": [
+            "age"
+          ],
+          "conditions": [
+            "adult"
+          ],
+          "payloads": []
+        }
+      ],
+      "outputs": [
+        "ok"
+      ],
+      "tags": []
+    },
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "age": {
+          "description": "conditions of adult",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "error": {
+      "code": "rule_syntax_error",
+      "message": "expected a field, a constant or a parenthesis, found THEN",
+      "hint": "fix the text at the line and column",
+      "line": 3,
+      "column": 1
+    }
+  }
+}

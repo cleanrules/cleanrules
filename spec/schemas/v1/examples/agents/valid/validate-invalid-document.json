@@ -1,0 +1,17 @@
+{
+  "tool": "validate",
+  "arguments": {
+    "document": "RULE adult\nIF age >=\nTHEN ok = TRUE",
+    "format": "text"
+  },
+  "result": {
+    "valid": false,
+    "error": {
+      "code": "rule_syntax_error",
+      "message": "expected a field, a constant or a parenthesis, found THEN",
+      "hint": "fix the text at the line and column",
+      "line": 3,
+      "column": 1
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "tool": "evaluate",
+  "arguments": {
+    "ruleset": "shipping",
+    "input": {
+      "country": "ES",
+      "weight": 30
+    }
+  },
+  "result": {
+    "ruleset": "shipping",
+    "selected": [
+      "domestic",
+      "heavy"
+    ],
+    "unknown": [],
+    "outputs": [
+      {
+        "zone": "domestic"
+      },
+      {
+        "surcharge": 15.0
+      }
+    ]
+  }
+}

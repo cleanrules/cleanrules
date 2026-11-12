@@ -682,6 +682,15 @@ class RuleSet(Sequence[Rule]):
         natives = self._native.evaluate_many(list(rows), max_values)
         return [Decision(self, native) for native in natives]
 
+    def input_schema(self) -> dict[str, Any]:
+        """The JSON Schema of the input it reads, for agents (`spec/agents.md`, *Input schemas*).
+
+        Built from the summary: the fields it reads, each with the types its
+        conditions expect, in the JSON format's encoding (a decimal is
+        `{"$decimal": "0.15"}`). It is advisory: inputs are never checked against it.
+        """
+        return json.loads(self._native.input_schema_json())
+
     def summary(self) -> Summary:
         """Describe the rule set without evaluating it: rules, fields read, outputs, tags."""
         actions = [rule.do is not None for rule in self._rules]
@@ -1061,6 +1070,30 @@ class _Text:
         return rule if self._cause is None else causes[self._cause]
 
 
+DEFAULT_BUDGET: int = _native.DEFAULT_BUDGET
+"""The default budget of a compact explanation, in Unicode code points."""
+MIN_BUDGET: int = _native.MIN_BUDGET
+"""The smallest budget of a compact explanation."""
+MAX_BUDGET: int = _native.MAX_BUDGET
+"""The largest budget of a compact explanation."""
+
+
+@dataclass(frozen=True)
+class CompactExplanation:
+    """An explanation's text cut to a budget (`spec/agents.md`, *Compact explanations*).
+
+    Attributes:
+        text: The text, at most the budget in Unicode code points.
+        complete: Whether it is the explanation's whole text.
+    """
+
+    text: str
+    complete: bool
+
+    def __str__(self) -> str:
+        return self.text
+
+
 class Explanation:
     """The explanation of a decision (`spec/explain.md`).
 
@@ -1107,6 +1140,26 @@ class Explanation:
     def to_dict(self) -> dict[str, Any]:
         """The explanation document of the JSON format (`spec/json-format.md`)."""
         return _document("explanation", json.loads(self._native.explanation_json()))
+
+    def compact(self, budget: int = DEFAULT_BUDGET) -> CompactExplanation:
+        """The explanation's text cut to fit a model's context (`spec/agents.md`).
+
+        Args:
+            budget: The most Unicode code points of the text, line breaks
+                included, from 256 to 1048576. Selected rules are kept first,
+                then unknown ones, then those that fired, then those that could.
+
+        Raises:
+            TypeError: If the budget is not an int (a bool is not one).
+            FormatError: If it is out of that range, with the code
+                `format_error` and the pointer `/budget`, as the tool reports it.
+        """
+        if isinstance(budget, bool) or not isinstance(budget, int):  # pyright: ignore[reportUnnecessaryIsInstance]
+            raise TypeError(f"budget must be an int, not {type(budget).__name__}")
+        # Any int outside the range is the core's error, whatever its size.
+        budget = min(max(budget, 0), MAX_BUDGET + 1)
+        text, complete = self._native.compact_explanation(budget)
+        return CompactExplanation(text=text, complete=complete)
 
     def __repr__(self) -> str:
         statuses = ", ".join(f"{entry.rule}: {entry.status.value}" for entry in self.rules)

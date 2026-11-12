@@ -52,6 +52,8 @@ var conformanceRoutes = []string{"json", "native"}
 
 // conformanceSkips says why a route does not run a vector.
 var conformanceSkips = map[string]string{
+	"agents": "the tools for agents (spec/agents.md) are not in the Go binding yet (docs/PLAN.md, O.1), so tool" +
+		" vectors run in the core and Python runners",
 	"grid": "grids are Go data: the JSON route reads documents only, so table_grid vectors run in the native" +
 		" route (NewDecisionTable)",
 	"native": "max_values bounds what is read from native data only, so evaluate vectors with limits run in the" +
@@ -63,8 +65,8 @@ var conformanceSkips = map[string]string{
 
 // allowedSkips are the skips each route may have; any other fails.
 var allowedSkips = map[string][]string{
-	"json":   {"grid", "native"},
-	"native": {"zero_limit", "zone_unknown_to_go"},
+	"json":   {"grid", "native", "agents"},
+	"native": {"zero_limit", "zone_unknown_to_go", "agents"},
 }
 
 // conformance runs vectors; it counts the Go forms of the native route.
@@ -133,6 +135,9 @@ func (c *conformance) run(vector *jsonObject, route string) (failure, skip strin
 	given, expect := vector.obj("given"), vector.obj("expect")
 	if given == nil || expect == nil {
 		failf("no given or expect")
+	}
+	if given.str("kind") == "tool" {
+		panic(vectorSkip{"agents"})
 	}
 	if route == "json" {
 		return c.runJSON(given, expect), ""

@@ -35,6 +35,7 @@ export const MINIMUM_VECTORS = 2508
 
 /** Why a vector does not run one way: each is counted and listed. */
 export const SKIPS = {
+  agents: 'the tools for agents (spec/agents.md) are not in the JavaScript binding yet (docs/PLAN.md, O.1), so tool vectors run in the core and Python runners',
   grid: 'grids are native data: cleanrules/native reads documents only, so table_grid vectors run in the native route (DecisionTable)',
   native: 'max_values bounds what is read from native data only, so evaluate vectors with limits run in the native route',
 }
@@ -1103,6 +1104,7 @@ export function conformance(R, N) {
    */
   function run(vector, route) {
     current = `${route}:${vector.get('id')}`
+    if (vector.get('given').get('kind') === 'tool') return { skip: 'agents' }
     try {
       return route === 'json' ? runJson(vector) : runNative(vector)
     } catch (error) {

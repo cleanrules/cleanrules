@@ -1,0 +1,28 @@
+{
+  "tool": "explain",
+  "arguments": {
+    "ruleset": "levels",
+    "input": {
+      "x": 8,
+      "region": "south"
+    },
+    "budget": 420
+  },
+  "result": {
+    "ruleset": "levels",
+    "selected": [
+      "mid"
+    ],
+    "unknown": [
+      "missing"
+    ],
+    "output": {
+      "level": "mid"
+    },
+    "outputs": [
+      {
+        "level": "mid"
+      }
+    ]
+  }
+}

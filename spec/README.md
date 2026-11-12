@@ -20,8 +20,9 @@ language-specific behaviour.
 | [`explain.md`](explain.md) | draft | Explanations (status, requirements, simplification, counterfactuals, notes) and summaries |
 | [`text.md`](text.md) | draft | The text syntax of conditions, rules and rule sets (`IF … THEN …`), and their canonical printed form |
 | [`tables.md`](tables.md) | draft | Decision tables: inputs, outputs, cells in the text syntax, DMN policies and output priorities, compiling into a rule set, and their JSON and CSV forms |
+| [`agents.md`](agents.md) | draft | The tools for AI agents (`list_rulesets`, `summary`, `evaluate`, `explain`, `validate`): arguments, results, agent errors with pointers and hints, input schemas generated from summaries, and compact explanations within a size budget |
 | [`json-format.md`](json-format.md) | draft, format version 1 | Documents, values, conditions, rules, rule sets, decisions, explanations, summaries and decision tables as JSON |
-| [`schemas/v1/`](schemas/v1/) | draft | JSON Schemas (draft 2020-12) for values and for every document (condition, rule, rule set, decision, explanation, summary, decision table), with valid and invalid examples checked by `schemas/check.py` |
+| [`schemas/v1/`](schemas/v1/) | draft | JSON Schemas (draft 2020-12) for values and for every document (condition, rule, rule set, decision, explanation, summary, decision table) and for the tools for agents, with valid and invalid examples checked by `schemas/check.py` |
 
 ## Conventions that apply to every spec
 

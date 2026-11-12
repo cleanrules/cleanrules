@@ -33,7 +33,8 @@ class ConformanceTest {
 
     /** The skips each route may have; any other is a failure. */
     private static final Map<String, Set<String>> ALLOWED_SKIPS =
-            Map.of("json", Set.of("grid", "native"), "native", Set.of("decimal_infinity", "zone_unknown_to_java"));
+            Map.of("json", Set.of("grid", "native", "agents"), "native",
+                    Set.of("decimal_infinity", "zone_unknown_to_java", "agents"));
 
     /** What a route did with the vectors. */
     private static final class Counts {
@@ -125,6 +126,14 @@ class ConformanceTest {
                     .map(Map.Entry::getKey)
                     .toList();
             assertEquals(limited, counts.get("json").skipped.getOrDefault("native", List.of()));
+            // Both routes skip the tools for agents, which this binding lacks.
+            List<String> tools = vectors.entrySet().stream()
+                    .filter(v -> "tool".equals(((Map<?, ?>) v.getValue().get("given")).get("kind")))
+                    .map(Map.Entry::getKey)
+                    .toList();
+            for (String route : ROUTES) {
+                assertEquals(tools, counts.get(route).skipped.getOrDefault("agents", List.of()), route);
+            }
         }));
         return tests;
     }
