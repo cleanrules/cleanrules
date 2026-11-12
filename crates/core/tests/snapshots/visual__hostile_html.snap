@@ -1,0 +1,155 @@
+---
+source: crates/core/tests/visual.rs
+expression: "drawn.join(\"\\n\")"
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>cleanrules: rule set</title>
+<style>
+.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}
+.cleanrules .title{font-weight:bold;margin:0 0 8px}
+.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}
+.cleanrules ul.tree{padding-left:0}
+.cleanrules ul.tree ul{border-left:1px solid #dadce0}
+.cleanrules li{margin:4px 0}
+.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}
+.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}
+.cleanrules .payload{font-style:italic}
+.cleanrules table{border-collapse:collapse}
+.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}
+.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}
+.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}
+.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}
+.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}
+.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}
+.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}
+.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}
+.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}
+.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}
+.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}
+.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}
+.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}
+.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}
+.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}
+</style>
+</head>
+<body>
+<div class="cleanrules cleanrules-rule-set">
+<p class="title">HIT POLICY first</p>
+<table>
+<thead><tr><th>rule</th><th>reads</th><th>outputs</th></tr></thead>
+<tbody>
+<tr><td><div class="node rule" style="background:#ffffff;border:1px solid #202124;border-radius:8px"><div class="line">1. &quot;a\&quot;b&lt;i&gt;&amp;amp;#quot;`x`&quot;</div><div class="line">`we&quot;ird&lt;key&gt;`.`k\u000ay` = &quot;&lt;/script&gt;&lt;b&gt;x&lt;/b&gt;\n--&gt; n9;%% #35; `md`&quot; AND NOT `é😀` STARTS WITH &quot;\\N...</div><div class="description">&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;
+line &quot;2&quot; &amp; é😀�</div></div></td><td><div class="line">`we&quot;ird&lt;key&gt;`.`k\u000ay`</div><div class="line">`é😀`</div></td><td><div class="line">&quot;label\&quot;&lt;&gt;&quot;</div></td></tr>
+</tbody>
+</table>
+</div>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>cleanrules: rule</title>
+<style>
+.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}
+.cleanrules .title{font-weight:bold;margin:0 0 8px}
+.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}
+.cleanrules ul.tree{padding-left:0}
+.cleanrules ul.tree ul{border-left:1px solid #dadce0}
+.cleanrules li{margin:4px 0}
+.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}
+.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}
+.cleanrules .payload{font-style:italic}
+.cleanrules table{border-collapse:collapse}
+.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}
+.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}
+.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}
+.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}
+.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}
+.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}
+.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}
+.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}
+.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}
+.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}
+.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}
+.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}
+.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}
+.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}
+.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}
+</style>
+</head>
+<body>
+<div class="cleanrules cleanrules-rule">
+<ul class="tree">
+<li><div class="node rule" style="background:#ffffff;border:1px solid #202124;border-radius:8px"><div class="line">RULE &quot;a\&quot;b&lt;i&gt;&amp;amp;#quot;`x`&quot;</div><div class="description">&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;
+line &quot;2&quot; &amp; é😀�</div></div>
+<ul>
+<li><div class="node connective" style="background:#ffffff;border:1px solid #5f6368;border-radius:12px"><div class="line">all</div></div>
+<ul>
+<li><div class="node leaf" style="background:#f8f9fa;border:1px solid #5f6368"><div class="line">`we&quot;ird&lt;key&gt;`.`k\u000ay` = &quot;&lt;/script&gt;&lt;b&gt;x&lt;/b&gt;\n--&gt; n9;%% #35; `md`&quot;</div></div></li>
+<li><div class="node connective" style="background:#ffffff;border:1px solid #5f6368;border-radius:12px"><div class="line">not</div></div>
+<ul>
+<li><div class="node leaf" style="background:#f8f9fa;border:1px solid #5f6368"><div class="line">`é😀` STARTS WITH &quot;\\N\\l{|}&quot;</div></div></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><div class="node output" style="background:#f3e8fd;border:1px solid #9334e6"><div class="line">THEN &quot;label\&quot;&lt;&gt;&quot; = &quot;&amp;lt;&quot;</div></div></li>
+</ul>
+</li>
+</ul>
+</div>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>cleanrules: explanation</title>
+<style>
+.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}
+.cleanrules .title{font-weight:bold;margin:0 0 8px}
+.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}
+.cleanrules ul.tree{padding-left:0}
+.cleanrules ul.tree ul{border-left:1px solid #dadce0}
+.cleanrules li{margin:4px 0}
+.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}
+.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}
+.cleanrules .payload{font-style:italic}
+.cleanrules table{border-collapse:collapse}
+.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}
+.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}
+.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}
+.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}
+.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}
+.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}
+.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}
+.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}
+.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}
+.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}
+.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}
+.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}
+.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}
+.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}
+.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}
+</style>
+</head>
+<body>
+<div class="cleanrules cleanrules-explanation">
+<p class="title">HIT POLICY first: selected no rule</p>
+<ul class="tree">
+<li><div class="node rule_not_fired" style="background:#ffffff;border:1px solid #5f6368;border-radius:8px"><div class="line">[ ] &quot;a\&quot;b&lt;i&gt;&amp;amp;#quot;`x`&quot; (not fired)</div><div class="line">`we&quot;ird&lt;key&gt;`.`k\u000ay` = &quot;&lt;/script&gt;&lt;b&gt;x&lt;/b&gt;\n--&gt; n9;%% #35; `md`&quot; AND NOT `é😀` STARTS WITH &quot;\\N...</div><div class="description">&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;
+line &quot;2&quot; &amp; é😀�</div></div>
+<ul>
+<li><div class="node truth_false" style="background:#fce8e6;border:1px solid #d93025"><div class="line">`we&quot;ird&lt;key&gt;`.`k\u000ay` = &quot;&lt;/script&gt;&lt;b&gt;x&lt;/b&gt;\n--&gt; n9;%% #35; `md`&quot;</div><div class="line">false (`we&quot;ird&lt;key&gt;`.`k\u000ay` = &quot;&lt;img src=x onerror=alert(1)&gt;\&quot;\n&quot;)</div></div></li>
+</ul>
+</li>
+</ul>
+</div>
+</body>
+</html>

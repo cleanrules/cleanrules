@@ -1,0 +1,24 @@
+---
+source: crates/core/tests/visual.rs
+expression: "draw_condition(&node, format, &limits()).unwrap()"
+---
+flowchart TD
+  n0(["all"])
+  n1(["any"])
+  n2["age #gt;= 18"]
+  n3(["not"])
+  n4["guardian IS NULL"]
+  n5["country IN (#quot;ES#quot;, #quot;PT#quot;)"]
+  n6(["not"])
+  n7["name STARTS WITH #quot;test#quot;"]
+  n0 --> n1
+  n1 --> n2
+  n1 --> n3
+  n3 --> n4
+  n0 --> n5
+  n0 --> n6
+  n6 --> n7
+  classDef connective fill:#ffffff,stroke:#5f6368
+  classDef leaf fill:#f8f9fa,stroke:#5f6368
+  class n0,n1,n3,n6 connective
+  class n2,n4,n5,n7 leaf

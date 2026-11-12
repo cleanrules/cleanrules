@@ -38,6 +38,8 @@ export const SKIPS = {
   agents: 'the tools for agents (spec/agents.md) are not in the JavaScript binding yet (docs/PLAN.md, O.1), so tool vectors run in the core and Python runners',
   grid: 'grids are native data: cleanrules/native reads documents only, so table_grid vectors run in the native route (DecisionTable)',
   native: 'max_values bounds what is read from native data only, so evaluate vectors with limits run in the native route',
+  diagram:
+    "diagrams (spec/visual.md) are drawn by the core and checked through the C ABI's runner; the JavaScript API draws them from phase V.2",
 }
 
 /** The class of each error code (`spec/errors.md`, *Codes*). */
@@ -390,6 +392,8 @@ export function conformance(R, N) {
     const expect = need(vector, 'expect')
     const kind = need(given, 'kind')
     switch (kind) {
+      case 'draw':
+        return { skip: 'diagram' }
       case 'read':
         return readJson(given, expect)
       case 'condition':
@@ -984,6 +988,7 @@ export function conformance(R, N) {
     const given = need(vector, 'given')
     const expect = need(vector, 'expect')
     const kind = need(given, 'kind')
+    if (kind === 'draw') return { skip: 'diagram' }
     if (kind === 'read') return readNative(given, expect)
     if (kind === 'summary') {
       const ruleset = buildRuleSet(need(given, 'ruleset'))

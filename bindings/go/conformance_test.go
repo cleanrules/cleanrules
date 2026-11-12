@@ -54,6 +54,8 @@ var conformanceRoutes = []string{"json", "native"}
 var conformanceSkips = map[string]string{
 	"agents": "the tools for agents (spec/agents.md) are not in the Go binding yet (docs/PLAN.md, O.1), so tool" +
 		" vectors run in the core and Python runners",
+	"diagram": "diagrams (spec/visual.md) are drawn by the core and checked through the C ABI's runner;" +
+		" the Go API draws them from phase V.2",
 	"grid": "grids are Go data: the JSON route reads documents only, so table_grid vectors run in the native" +
 		" route (NewDecisionTable)",
 	"native": "max_values bounds what is read from native data only, so evaluate vectors with limits run in the" +
@@ -65,8 +67,8 @@ var conformanceSkips = map[string]string{
 
 // allowedSkips are the skips each route may have; any other fails.
 var allowedSkips = map[string][]string{
-	"json":   {"grid", "native", "agents"},
-	"native": {"zero_limit", "zone_unknown_to_go", "agents"},
+	"json":   {"agents", "diagram", "grid", "native"},
+	"native": {"agents", "diagram", "zero_limit", "zone_unknown_to_go"},
 }
 
 // conformance runs vectors; it counts the Go forms of the native route.
@@ -440,6 +442,8 @@ func (c *conformance) runJSON(given, expect *jsonObject) string {
 	kind := given.str("kind")
 	strict := given.get("strict") == true
 	switch kind {
+	case "draw":
+		panic(vectorSkip{"diagram"})
 	case "read":
 		return c.readJSON(given, expect)
 	case "condition", "value":
@@ -1313,6 +1317,8 @@ func checkRecorded(rs *RuleSet, d *Decision, expected *jsonObject) string {
 func (c *conformance) runNative(given, expect *jsonObject) string {
 	kind := given.str("kind")
 	switch kind {
+	case "draw":
+		panic(vectorSkip{"diagram"})
 	case "read":
 		return c.readNative(given, expect)
 	case "summary":

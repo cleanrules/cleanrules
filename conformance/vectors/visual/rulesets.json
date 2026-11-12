@@ -1,0 +1,427 @@
+{
+  "version": 1,
+  "area": "visual",
+  "vectors": [
+    {
+      "id": "visual/rulesets/priority-mermaid",
+      "spec": [
+        "visual.md#rule-sets",
+        "visual.md#mermaid"
+      ],
+      "description": "Under priority, rules are ranked by priority, ties in rule order; payload-only reads are dashed",
+      "given": {
+        "kind": "draw",
+        "format": "mermaid",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "priority",
+            "rules": [
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "priority": 5,
+                "do": "notify",
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": 5
+                  }
+                }
+              },
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "priority": 10,
+                "description": "Best customers",
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": 15
+                  },
+                  "label": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "name"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "rest",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": 0
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "---\ntitle: \"HIT POLICY priority\"\n---\nflowchart LR\n  accTitle: HIT POLICY priority\n  n0([\"customer.years\"])\n  n1([\"since\"])\n  n2([\"customer.name\"])\n  n3(\"1. vip<br>PRIORITY 10<br>customer.years #gt; 5 AND since IS NULL\")\n  n4(\"2. loyal<br>PRIORITY 5<br>customer.years #gt; 2<br>DO notify\")\n  n5(\"3. rest<br>PRIORITY 0<br>TRUE\")\n  n6[[\"discount\"]]\n  n7[[\"label\"]]\n  n0 --> n3\n  n1 --> n3\n  n2 -.-> n3\n  n3 --> n6\n  n3 --> n7\n  n0 --> n4\n  n4 --> n6\n  n5 --> n6\n  classDef rule fill:#ffffff,stroke:#202124\n  classDef field fill:#ffffff,stroke:#5f6368\n  classDef output fill:#f3e8fd,stroke:#9334e6\n  class n3,n4,n5 rule\n  class n0,n1,n2 field\n  class n6,n7 output\n"
+      }
+    },
+    {
+      "id": "visual/rulesets/priority-dot",
+      "spec": [
+        "visual.md#rule-sets",
+        "visual.md#dot"
+      ],
+      "description": "The same rule set in DOT, left to right",
+      "given": {
+        "kind": "draw",
+        "format": "dot",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "priority",
+            "rules": [
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "priority": 5,
+                "do": "notify",
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": 5
+                  }
+                }
+              },
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "priority": 10,
+                "description": "Best customers",
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": 15
+                  },
+                  "label": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "name"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "rest",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": 0
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "digraph cleanrules {\n  graph [rankdir=LR, fontname=\"Helvetica\", label=\"HIT POLICY priority\", labelloc=t];\n  node [fontname=\"Helvetica\", fontsize=11];\n  edge [color=\"#5f6368\"];\n  n0 [label=\"customer.years\", class=\"field\", shape=ellipse, style=\"filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n1 [label=\"since\", class=\"field\", shape=ellipse, style=\"filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n2 [label=\"customer.name\", class=\"field\", shape=ellipse, style=\"filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n3 [label=\"1. vip\\nPRIORITY 10\\ncustomer.years > 5 AND since IS NULL\", class=\"rule\", shape=box, style=\"rounded,filled\", fillcolor=\"#ffffff\", color=\"#202124\"];\n  n4 [label=\"2. loyal\\nPRIORITY 5\\ncustomer.years > 2\\nDO notify\", class=\"rule\", shape=box, style=\"rounded,filled\", fillcolor=\"#ffffff\", color=\"#202124\"];\n  n5 [label=\"3. rest\\nPRIORITY 0\\nTRUE\", class=\"rule\", shape=box, style=\"rounded,filled\", fillcolor=\"#ffffff\", color=\"#202124\"];\n  n6 [label=\"discount\", class=\"output\", shape=box, style=\"filled\", fillcolor=\"#f3e8fd\", color=\"#9334e6\"];\n  n7 [label=\"label\", class=\"output\", shape=box, style=\"filled\", fillcolor=\"#f3e8fd\", color=\"#9334e6\"];\n  n0 -> n3;\n  n1 -> n3;\n  n2 -> n3 [style=dashed];\n  n3 -> n6;\n  n3 -> n7;\n  n0 -> n4;\n  n4 -> n6;\n  n5 -> n6;\n}\n"
+      }
+    },
+    {
+      "id": "visual/rulesets/first-html",
+      "spec": [
+        "visual.md#rule-sets",
+        "visual.md#html"
+      ],
+      "description": "Under first, rule order; HTML lists each rule's reads and outputs",
+      "given": {
+        "kind": "draw",
+        "format": "html",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "rules": [
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "priority": 5,
+                "do": "notify",
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": 5
+                  }
+                }
+              },
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "priority": 10,
+                "description": "Best customers",
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": 15
+                  },
+                  "label": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "name"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "rest",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": 0
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>cleanrules: rule set</title>\n<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n</head>\n<body>\n<div class=\"cleanrules cleanrules-rule-set\">\n<p class=\"title\">HIT POLICY first</p>\n<table>\n<thead><tr><th>rule</th><th>reads</th><th>outputs</th></tr></thead>\n<tbody>\n<tr><td><div class=\"node rule\" style=\"background:#ffffff;border:1px solid #202124;border-radius:8px\"><div class=\"line\">1. loyal</div><div class=\"line\">customer.years &gt; 2</div><div class=\"line\">DO notify</div></div></td><td><div class=\"line\">customer.years</div></td><td><div class=\"line\">discount</div></td></tr>\n<tr><td><div class=\"node rule\" style=\"background:#ffffff;border:1px solid #202124;border-radius:8px\"><div class=\"line\">2. vip</div><div class=\"line\">customer.years &gt; 5 AND since IS NULL</div><div class=\"description\">Best customers</div></div></td><td><div class=\"line\">customer.years</div><div class=\"line\">since</div><div class=\"line payload\">customer.name (payload)</div></td><td><div class=\"line\">discount</div><div class=\"line\">label</div></td></tr>\n<tr><td><div class=\"node rule\" style=\"background:#ffffff;border:1px solid #202124;border-radius:8px\"><div class=\"line\">3. rest</div><div class=\"line\">TRUE</div></div></td><td></td><td><div class=\"line\">discount</div></td></tr>\n</tbody>\n</table>\n</div>\n</body>\n</html>\n"
+      }
+    },
+    {
+      "id": "visual/rulesets/collect-aggregate",
+      "spec": [
+        "visual.md#rule-sets",
+        "visual.md#mermaid"
+      ],
+      "description": "The title names the aggregate; a field read by a condition and a payload has one solid edge",
+      "given": {
+        "kind": "draw",
+        "format": "mermaid",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "rules": [
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "priority": 9,
+                "then": {
+                  "n": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "y"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "n": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "---\ntitle: \"HIT POLICY collect AGGREGATE sum\"\n---\nflowchart LR\n  accTitle: HIT POLICY collect AGGREGATE sum\n  n0([\"x\"])\n  n1([\"y\"])\n  n2(\"1. b<br>x #gt; 1\")\n  n3(\"2. a<br>y #gt; 2\")\n  n4[[\"n\"]]\n  n0 --> n2\n  n2 --> n4\n  n1 --> n3\n  n3 --> n4\n  classDef rule fill:#ffffff,stroke:#202124\n  classDef field fill:#ffffff,stroke:#5f6368\n  classDef output fill:#f3e8fd,stroke:#9334e6\n  class n2,n3 rule\n  class n0,n1 field\n  class n4 output\n"
+      }
+    },
+    {
+      "id": "visual/rulesets/no-fields",
+      "spec": [
+        "visual.md#rule-sets",
+        "visual.md#html"
+      ],
+      "description": "A rule set that reads no field and has no outputs",
+      "given": {
+        "kind": "draw",
+        "format": "html_fragment",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "always",
+                "when": {
+                  "op": "const",
+                  "value": true
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n<div class=\"cleanrules cleanrules-rule-set\">\n<p class=\"title\">HIT POLICY first</p>\n<table>\n<thead><tr><th>rule</th><th>reads</th><th>outputs</th></tr></thead>\n<tbody>\n<tr><td><div class=\"node rule\" style=\"background:#ffffff;border:1px solid #202124;border-radius:8px\"><div class=\"line\">1. always</div><div class=\"line\">TRUE</div></div></td><td></td><td></td></tr>\n</tbody>\n</table>\n</div>\n"
+      }
+    }
+  ]
+}

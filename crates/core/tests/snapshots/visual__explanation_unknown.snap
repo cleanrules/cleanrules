@@ -1,0 +1,25 @@
+---
+source: crates/core/tests/visual.rs
+expression: "draw_explanation(&explain(&decision), DiagramFormat::Mermaid,\n&limits()).unwrap()"
+---
+---
+title: "HIT POLICY first: selected no rule"
+---
+flowchart TD
+  accTitle: HIT POLICY first: selected no rule
+  n0("[?] adult (unknown)<br>age #gt;= 18 OR guardian = TRUE")
+  n1(["any of"])
+  n2["age #gt;= 18<br>unknown: missing field age"]
+  n3["guardian = TRUE<br>unknown: missing field guardian"]
+  n4("[?] named (unknown)<br>name = #quot;Ana#quot;")
+  n5["name = #quot;Ana#quot;<br>unknown (name = 3): type mismatch: number vs string"]
+  n0 --> n1
+  n1 --> n2
+  n1 --> n3
+  n4 --> n5
+  classDef connective fill:#ffffff,stroke:#5f6368
+  classDef rule_unknown fill:#f1f3f4,stroke:#80868b,stroke-dasharray:4 3
+  classDef truth_unknown fill:#f1f3f4,stroke:#80868b,stroke-dasharray:4 3
+  class n1 connective
+  class n0,n4 rule_unknown
+  class n2,n3,n5 truth_unknown

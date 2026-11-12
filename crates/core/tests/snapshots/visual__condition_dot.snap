@@ -1,0 +1,24 @@
+---
+source: crates/core/tests/visual.rs
+expression: "draw_condition(&node, format, &limits()).unwrap()"
+---
+digraph cleanrules {
+  graph [rankdir=TB, fontname="Helvetica"];
+  node [fontname="Helvetica", fontsize=11];
+  edge [color="#5f6368"];
+  n0 [label="all", class="connective", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n1 [label="any", class="connective", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n2 [label="age >= 18", class="leaf", shape=box, style="filled", fillcolor="#f8f9fa", color="#5f6368"];
+  n3 [label="not", class="connective", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n4 [label="guardian IS NULL", class="leaf", shape=box, style="filled", fillcolor="#f8f9fa", color="#5f6368"];
+  n5 [label="country IN (\"ES\", \"PT\")", class="leaf", shape=box, style="filled", fillcolor="#f8f9fa", color="#5f6368"];
+  n6 [label="not", class="connective", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n7 [label="name STARTS WITH \"test\"", class="leaf", shape=box, style="filled", fillcolor="#f8f9fa", color="#5f6368"];
+  n0 -> n1;
+  n1 -> n2;
+  n1 -> n3;
+  n3 -> n4;
+  n0 -> n5;
+  n0 -> n6;
+  n6 -> n7;
+}

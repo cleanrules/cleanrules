@@ -1071,6 +1071,7 @@ int main(int argc, char **argv) {
     // The tools for agents (spec/agents.md) are not in the C ABI or C++ yet
     // (docs/PLAN.md, O.1): their vectors are counted and skipped.
     std::size_t tools = 0;
+    std::size_t skipped_draw = 0;
     std::size_t passed_json = 0;
     std::size_t ran_native = 0;
     std::size_t passed_native = 0;
@@ -1086,9 +1087,15 @@ int main(int argc, char **argv) {
             }
             for (const json::value &vector : need(document, "vectors").items) {
                 const std::string &id = need(vector, "id").text;
+                const json::value &given = need(vector, "given");
+                // Diagrams are drawn by the core and checked through the C ABI's
+                // runner; cleanrules.hpp draws them from phase V.2.
+                if (need(given, "kind").text == "draw") {
+                    ++skipped_draw;
+                    continue;
+                }
                 // `max_values` bounds native data: C++ builds its values
                 // itself, so only the bindings' native runs check these.
-                const json::value &given = need(vector, "given");
                 if (need(given, "kind").text == "evaluate" && given.get("limits") != nullptr) {
                     ++skipped;
                     continue;
@@ -1122,8 +1129,10 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "%s\n", failed.c_str());
     }
     std::printf("conformance: %zu vectors; json %zu of %zu passed, native %zu of %zu passed; %zu "
-                "native-only and %zu tool vectors (agents, not in C++ yet) skipped\n",
-                ran, passed_json, ran, passed_native, ran_native, skipped, tools);
+                "native-only, %zu tool vectors (agents, not in C++ yet) and %zu diagrams "
+                "(spec/visual.md: checked through the C ABI until cleanrules.hpp draws them) "
+                "skipped\n",
+                ran, passed_json, ran, passed_native, ran_native, skipped, tools, skipped_draw);
     if (!failures.empty()) {
         std::fprintf(stderr, "conformance: %zu failures\n", failures.size());
         return EXIT_FAILURE;

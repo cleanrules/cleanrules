@@ -194,7 +194,7 @@ impl cr_decision {
         self.with(|d| Ok(make(&d.results()[position].when)))
     }
 
-    fn with<T>(&self, read: impl FnOnce(&Decision<'_>) -> Outcome<T>) -> Outcome<T> {
+    pub(crate) fn with<T>(&self, read: impl FnOnce(&Decision<'_>) -> Outcome<T>) -> Outcome<T> {
         let decision = match &self.source {
             Source::Input(input) => self.ruleset.evaluate(input)?,
             Source::Recorded(json) => {

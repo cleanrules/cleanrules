@@ -115,14 +115,17 @@ func TestConformance(t *testing.T) {
 	if total < minimumVectors {
 		t.Errorf("only %d vectors, expected at least %d", total, minimumVectors)
 	}
-	// The only skips of the JSON route: grids, and evaluate vectors with
-	// limits (max_values bounds native data only).
-	var grids, limited, zero, tools []string
+	// The only skips of the JSON route: grids, evaluate vectors with limits
+	// (max_values bounds native data only), tools for agents and diagrams.
+	var grids, limited, zero, tools, drawn []string
 	for _, file := range files {
 		for _, vector := range file.vectors {
 			given, id := vector.obj("given"), vector.str("id")
 			if given.str("kind") == "tool" {
 				tools = append(tools, id)
+			}
+			if given.str("kind") == "draw" {
+				drawn = append(drawn, id)
 			}
 			if given.has("table_grid") {
 				grids = append(grids, id)
@@ -149,6 +152,12 @@ func TestConformance(t *testing.T) {
 	for _, route := range conformanceRoutes {
 		if !slices.Equal(counts[route].skipped["agents"], tools) {
 			t.Errorf("%s skipped %v as tools for agents, the tool vectors are %v", route, counts[route].skipped["agents"], tools)
+		}
+	}
+	// Both routes skip the diagrams, which this binding draws from phase V.2.
+	for _, route := range conformanceRoutes {
+		if !slices.Equal(counts[route].skipped["diagram"], drawn) {
+			t.Errorf("%s skipped %v as diagrams, the draw vectors are %v", route, counts[route].skipped["diagram"], drawn)
 		}
 	}
 	// A limit of 0 is the one vector Go cannot give.

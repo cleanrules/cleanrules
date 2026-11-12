@@ -1,0 +1,288 @@
+{
+  "version": 1,
+  "area": "visual",
+  "vectors": [
+    {
+      "id": "visual/rules/outputs-and-action-mermaid",
+      "spec": [
+        "visual.md#rules",
+        "visual.md#mermaid"
+      ],
+      "description": "A rule in mermaid: its header, condition, payload entries and named action",
+      "given": {
+        "kind": "draw",
+        "format": "mermaid",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "vip",
+            "when": {
+              "op": "and",
+              "operands": [
+                {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1000
+                  }
+                }
+              ]
+            },
+            "priority": 10,
+            "description": "Loyal customers\nwith <large> orders",
+            "do": "notify",
+            "then": {
+              "discount": {
+                "op": "const",
+                "value": {
+                  "$decimal": "0.15"
+                }
+              },
+              "label": {
+                "op": "const",
+                "value": "gold"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "diagram": "flowchart TD\n  n0(\"RULE vip PRIORITY 10\")\n  n1([\"all\"])\n  n2[\"customer.years #gt; 5\"]\n  n3[\"order.total #gt; 1000\"]\n  n4[[\"THEN discount = 0.15\"]]\n  n5[[\"THEN label = #quot;gold#quot;\"]]\n  n6[[\"DO notify\"]]\n  n0 --> n1\n  n1 --> n2\n  n1 --> n3\n  n0 -.-> n4\n  n0 -.-> n5\n  n0 -.-> n6\n  classDef connective fill:#ffffff,stroke:#5f6368\n  classDef leaf fill:#f8f9fa,stroke:#5f6368\n  classDef rule fill:#ffffff,stroke:#202124\n  classDef output fill:#f3e8fd,stroke:#9334e6\n  class n1 connective\n  class n2,n3 leaf\n  class n0 rule\n  class n4,n5,n6 output\n"
+      }
+    },
+    {
+      "id": "visual/rules/outputs-and-action-dot",
+      "spec": [
+        "visual.md#rules",
+        "visual.md#dot"
+      ],
+      "description": "A rule in dot: its header, condition, payload entries and named action",
+      "given": {
+        "kind": "draw",
+        "format": "dot",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "vip",
+            "when": {
+              "op": "and",
+              "operands": [
+                {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1000
+                  }
+                }
+              ]
+            },
+            "priority": 10,
+            "description": "Loyal customers\nwith <large> orders",
+            "do": "notify",
+            "then": {
+              "discount": {
+                "op": "const",
+                "value": {
+                  "$decimal": "0.15"
+                }
+              },
+              "label": {
+                "op": "const",
+                "value": "gold"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "diagram": "digraph cleanrules {\n  graph [rankdir=TB, fontname=\"Helvetica\"];\n  node [fontname=\"Helvetica\", fontsize=11];\n  edge [color=\"#5f6368\"];\n  n0 [label=\"RULE vip PRIORITY 10\", class=\"rule\", shape=box, style=\"rounded,filled\", fillcolor=\"#ffffff\", color=\"#202124\"];\n  n1 [label=\"all\", class=\"connective\", shape=ellipse, style=\"filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n2 [label=\"customer.years > 5\", class=\"leaf\", shape=box, style=\"filled\", fillcolor=\"#f8f9fa\", color=\"#5f6368\"];\n  n3 [label=\"order.total > 1000\", class=\"leaf\", shape=box, style=\"filled\", fillcolor=\"#f8f9fa\", color=\"#5f6368\"];\n  n4 [label=\"THEN discount = 0.15\", class=\"output\", shape=box, style=\"filled\", fillcolor=\"#f3e8fd\", color=\"#9334e6\"];\n  n5 [label=\"THEN label = \\\"gold\\\"\", class=\"output\", shape=box, style=\"filled\", fillcolor=\"#f3e8fd\", color=\"#9334e6\"];\n  n6 [label=\"DO notify\", class=\"output\", shape=box, style=\"filled\", fillcolor=\"#f3e8fd\", color=\"#9334e6\"];\n  n0 -> n1;\n  n1 -> n2;\n  n1 -> n3;\n  n0 -> n4 [style=dashed];\n  n0 -> n5 [style=dashed];\n  n0 -> n6 [style=dashed];\n}\n"
+      }
+    },
+    {
+      "id": "visual/rules/outputs-and-action-html",
+      "spec": [
+        "visual.md#rules",
+        "visual.md#html"
+      ],
+      "description": "A rule in html: its header, condition, payload entries and named action",
+      "given": {
+        "kind": "draw",
+        "format": "html",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "vip",
+            "when": {
+              "op": "and",
+              "operands": [
+                {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1000
+                  }
+                }
+              ]
+            },
+            "priority": 10,
+            "description": "Loyal customers\nwith <large> orders",
+            "do": "notify",
+            "then": {
+              "discount": {
+                "op": "const",
+                "value": {
+                  "$decimal": "0.15"
+                }
+              },
+              "label": {
+                "op": "const",
+                "value": "gold"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "diagram": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>cleanrules: rule</title>\n<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n</head>\n<body>\n<div class=\"cleanrules cleanrules-rule\">\n<ul class=\"tree\">\n<li><div class=\"node rule\" style=\"background:#ffffff;border:1px solid #202124;border-radius:8px\"><div class=\"line\">RULE vip PRIORITY 10</div><div class=\"description\">Loyal customers\nwith &lt;large&gt; orders</div></div>\n<ul>\n<li><div class=\"node connective\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:12px\"><div class=\"line\">all</div></div>\n<ul>\n<li><div class=\"node leaf\" style=\"background:#f8f9fa;border:1px solid #5f6368\"><div class=\"line\">customer.years &gt; 5</div></div></li>\n<li><div class=\"node leaf\" style=\"background:#f8f9fa;border:1px solid #5f6368\"><div class=\"line\">order.total &gt; 1000</div></div></li>\n</ul>\n</li>\n<li><div class=\"node output\" style=\"background:#f3e8fd;border:1px solid #9334e6\"><div class=\"line\">THEN discount = 0.15</div></div></li>\n<li><div class=\"node output\" style=\"background:#f3e8fd;border:1px solid #9334e6\"><div class=\"line\">THEN label = &quot;gold&quot;</div></div></li>\n<li><div class=\"node output\" style=\"background:#f3e8fd;border:1px solid #9334e6\"><div class=\"line\">DO notify</div></div></li>\n</ul>\n</li>\n</ul>\n</div>\n</body>\n</html>\n"
+      }
+    },
+    {
+      "id": "visual/rules/plain",
+      "spec": [
+        "visual.md#rules",
+        "visual.md#dot"
+      ],
+      "description": "A rule of priority 0 with no outputs: only its header and condition",
+      "given": {
+        "kind": "draw",
+        "format": "dot",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "adult",
+            "when": {
+              "op": "ge",
+              "left": {
+                "op": "field",
+                "path": [
+                  "age"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 18
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "diagram": "digraph cleanrules {\n  graph [rankdir=TB, fontname=\"Helvetica\"];\n  node [fontname=\"Helvetica\", fontsize=11];\n  edge [color=\"#5f6368\"];\n  n0 [label=\"RULE adult\", class=\"rule\", shape=box, style=\"rounded,filled\", fillcolor=\"#ffffff\", color=\"#202124\"];\n  n1 [label=\"age >= 18\", class=\"leaf\", shape=box, style=\"filled\", fillcolor=\"#f8f9fa\", color=\"#5f6368\"];\n  n0 -> n1;\n}\n"
+      }
+    },
+    {
+      "id": "visual/rules/quoted-names",
+      "spec": [
+        "visual.md#rules",
+        "visual.md#html"
+      ],
+      "description": "Names and keys that are not identifiers are quoted, and escaped in HTML",
+      "given": {
+        "kind": "draw",
+        "format": "html_fragment",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "a 'b' <c>",
+            "when": {
+              "op": "ne",
+              "left": {
+                "op": "field",
+                "path": [
+                  "k&y"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": "<x>"
+              }
+            },
+            "description": "a\r\nb\u0001c\td",
+            "then": {
+              "out \"1\"": {
+                "op": "const",
+                "value": "'q'"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "diagram": "<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n<div class=\"cleanrules cleanrules-rule\">\n<ul class=\"tree\">\n<li><div class=\"node rule\" style=\"background:#ffffff;border:1px solid #202124;border-radius:8px\"><div class=\"line\">RULE &quot;a &#39;b&#39; &lt;c&gt;&quot;</div><div class=\"description\">a\nb�c\td</div></div>\n<ul>\n<li><div class=\"node leaf\" style=\"background:#f8f9fa;border:1px solid #5f6368\"><div class=\"line\">`k&amp;y` != &quot;&lt;x&gt;&quot;</div></div></li>\n<li><div class=\"node output\" style=\"background:#f3e8fd;border:1px solid #9334e6\"><div class=\"line\">THEN &quot;out \\&quot;1\\&quot;&quot; = &quot;&#39;q&#39;&quot;</div></div></li>\n</ul>\n</li>\n</ul>\n</div>\n"
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+---
+source: crates/core/tests/visual.rs
+expression: "draw_rule(&rule, DiagramFormat::Mermaid, &limits()).unwrap()"
+---
+flowchart TD
+  n0("RULE vip PRIORITY 10")
+  n1(["all"])
+  n2["customer.years #gt; 5"]
+  n3["order.total #gt; 1000"]
+  n4[["THEN discount = 0.15"]]
+  n5[["THEN label = #quot;gold#quot;"]]
+  n6[["DO notify"]]
+  n0 --> n1
+  n1 --> n2
+  n1 --> n3
+  n0 -.-> n4
+  n0 -.-> n5
+  n0 -.-> n6
+  classDef connective fill:#ffffff,stroke:#5f6368
+  classDef leaf fill:#f8f9fa,stroke:#5f6368
+  classDef rule fill:#ffffff,stroke:#202124
+  classDef output fill:#f3e8fd,stroke:#9334e6
+  class n1 connective
+  class n2,n3 leaf
+  class n0 rule
+  class n4,n5,n6 output

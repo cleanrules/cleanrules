@@ -27,6 +27,7 @@ pub mod ruleset;
 pub mod run;
 pub mod tree;
 pub mod value;
+pub mod visual;
 
 mod boundary;
 
@@ -44,6 +45,7 @@ pub use ruleset::*;
 pub use run::*;
 pub use tree::*;
 pub use value::*;
+pub use visual::*;
 
 /// The version of the ABI that this header describes.
 pub const CR_ABI_VERSION: u32 = 1;

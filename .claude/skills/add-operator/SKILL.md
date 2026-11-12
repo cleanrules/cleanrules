@@ -19,9 +19,10 @@ Un operador no está terminado hasta que todos los puntos de esta lista estén h
    - la evaluación Arrow por lotes, con la misma semántica de nulos;
    - la auditoría (abstracción por intervalos o conjuntos; si no es abstraíble, se trata como desconocido, que es lo correcto);
    - Rete, si el nodo puede aparecer en patrones;
-   - el DSL de texto (sintaxis y precedencia), si existe.
+   - el DSL de texto (sintaxis y precedencia), si existe;
+   - los diagramas (`crates/core/src/visual`, `spec/visual.md`): un conector lógico nuevo (como `and`, `or`, `not`) es un nodo `connective` con su etiqueta y una arista a cada operando en `Diagram::condition`, y en la especificación; cualquier otro nodo es una hoja con su texto canónico, que no necesita código, pero sí un vector `draw` en `conformance/vectors/visual/` que lo muestre (con DOT, Mermaid y HTML si su texto tiene comillas, `<`, `&`, `#`, `` ` `` o `\`). Si el nodo cambia el árbol de causas de las explicaciones, revisa también `model::explanation`.
 4. **Bindings**: el constructor idiomático en cada binding existente (Python, C/C++, JS, JVM, Go), con sus tipos y documentación. Ninguno evalúa el nodo por su cuenta.
-5. **Tests**: unitarios y `proptest` en el núcleo, *snapshots* de `explain()`, ida y vuelta JSON/YAML/DSL, y el runner de conformidad de cada binding en verde.
+5. **Tests**: unitarios y `proptest` en el núcleo, *snapshots* de `explain()` y de los diagramas (`crates/core/tests/visual.rs`), ida y vuelta JSON/YAML/DSL, y el runner de conformidad de cada binding en verde.
 6. **Documentación**: la tabla de operadores en `docs/`, ejemplos por lenguaje y la entrada en `CHANGELOG.md`. Lanza el subagente `api-reviewer`.
 
 Al terminar, ejecuta las puertas de calidad de `/plan-task` (paso 5).

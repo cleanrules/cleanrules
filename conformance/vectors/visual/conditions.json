@@ -1,0 +1,699 @@
+{
+  "version": 1,
+  "area": "visual",
+  "vectors": [
+    {
+      "id": "visual/conditions/tree-mermaid",
+      "spec": [
+        "visual.md#conditions",
+        "visual.md#mermaid",
+        "visual.md#classes"
+      ],
+      "description": "A condition's tree in mermaid: connectives for and, or and not, a leaf for every other node",
+      "given": {
+        "kind": "draw",
+        "format": "mermaid",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "or",
+                "operands": [
+                  {
+                    "op": "ge",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "age"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 18
+                    }
+                  },
+                  {
+                    "op": "not",
+                    "operand": {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "guardian"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "in",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "country"
+                  ]
+                },
+                "values": [
+                  "ES",
+                  "PT"
+                ]
+              },
+              {
+                "op": "not",
+                "operand": {
+                  "op": "starts_with",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "name"
+                    ]
+                  },
+                  "text": "test"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "flowchart TD\n  n0([\"all\"])\n  n1([\"any\"])\n  n2[\"age #gt;= 18\"]\n  n3([\"not\"])\n  n4[\"guardian IS NULL\"]\n  n5[\"country IN (#quot;ES#quot;, #quot;PT#quot;)\"]\n  n6([\"not\"])\n  n7[\"name STARTS WITH #quot;test#quot;\"]\n  n0 --> n1\n  n1 --> n2\n  n1 --> n3\n  n3 --> n4\n  n0 --> n5\n  n0 --> n6\n  n6 --> n7\n  classDef connective fill:#ffffff,stroke:#5f6368\n  classDef leaf fill:#f8f9fa,stroke:#5f6368\n  class n0,n1,n3,n6 connective\n  class n2,n4,n5,n7 leaf\n"
+      }
+    },
+    {
+      "id": "visual/conditions/tree-dot",
+      "spec": [
+        "visual.md#conditions",
+        "visual.md#dot",
+        "visual.md#classes"
+      ],
+      "description": "A condition's tree in dot: connectives for and, or and not, a leaf for every other node",
+      "given": {
+        "kind": "draw",
+        "format": "dot",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "or",
+                "operands": [
+                  {
+                    "op": "ge",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "age"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 18
+                    }
+                  },
+                  {
+                    "op": "not",
+                    "operand": {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "guardian"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "in",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "country"
+                  ]
+                },
+                "values": [
+                  "ES",
+                  "PT"
+                ]
+              },
+              {
+                "op": "not",
+                "operand": {
+                  "op": "starts_with",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "name"
+                    ]
+                  },
+                  "text": "test"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "digraph cleanrules {\n  graph [rankdir=TB, fontname=\"Helvetica\"];\n  node [fontname=\"Helvetica\", fontsize=11];\n  edge [color=\"#5f6368\"];\n  n0 [label=\"all\", class=\"connective\", shape=ellipse, style=\"filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n1 [label=\"any\", class=\"connective\", shape=ellipse, style=\"filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n2 [label=\"age >= 18\", class=\"leaf\", shape=box, style=\"filled\", fillcolor=\"#f8f9fa\", color=\"#5f6368\"];\n  n3 [label=\"not\", class=\"connective\", shape=ellipse, style=\"filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n4 [label=\"guardian IS NULL\", class=\"leaf\", shape=box, style=\"filled\", fillcolor=\"#f8f9fa\", color=\"#5f6368\"];\n  n5 [label=\"country IN (\\\"ES\\\", \\\"PT\\\")\", class=\"leaf\", shape=box, style=\"filled\", fillcolor=\"#f8f9fa\", color=\"#5f6368\"];\n  n6 [label=\"not\", class=\"connective\", shape=ellipse, style=\"filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n7 [label=\"name STARTS WITH \\\"test\\\"\", class=\"leaf\", shape=box, style=\"filled\", fillcolor=\"#f8f9fa\", color=\"#5f6368\"];\n  n0 -> n1;\n  n1 -> n2;\n  n1 -> n3;\n  n3 -> n4;\n  n0 -> n5;\n  n0 -> n6;\n  n6 -> n7;\n}\n"
+      }
+    },
+    {
+      "id": "visual/conditions/tree-html",
+      "spec": [
+        "visual.md#conditions",
+        "visual.md#html",
+        "visual.md#classes"
+      ],
+      "description": "A condition's tree in html: connectives for and, or and not, a leaf for every other node",
+      "given": {
+        "kind": "draw",
+        "format": "html",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "or",
+                "operands": [
+                  {
+                    "op": "ge",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "age"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 18
+                    }
+                  },
+                  {
+                    "op": "not",
+                    "operand": {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "guardian"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "in",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "country"
+                  ]
+                },
+                "values": [
+                  "ES",
+                  "PT"
+                ]
+              },
+              {
+                "op": "not",
+                "operand": {
+                  "op": "starts_with",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "name"
+                    ]
+                  },
+                  "text": "test"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>cleanrules: condition</title>\n<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n</head>\n<body>\n<div class=\"cleanrules cleanrules-condition\">\n<ul class=\"tree\">\n<li><div class=\"node connective\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:12px\"><div class=\"line\">all</div></div>\n<ul>\n<li><div class=\"node connective\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:12px\"><div class=\"line\">any</div></div>\n<ul>\n<li><div class=\"node leaf\" style=\"background:#f8f9fa;border:1px solid #5f6368\"><div class=\"line\">age &gt;= 18</div></div></li>\n<li><div class=\"node connective\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:12px\"><div class=\"line\">not</div></div>\n<ul>\n<li><div class=\"node leaf\" style=\"background:#f8f9fa;border:1px solid #5f6368\"><div class=\"line\">guardian IS NULL</div></div></li>\n</ul>\n</li>\n</ul>\n</li>\n<li><div class=\"node leaf\" style=\"background:#f8f9fa;border:1px solid #5f6368\"><div class=\"line\">country IN (&quot;ES&quot;, &quot;PT&quot;)</div></div></li>\n<li><div class=\"node connective\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:12px\"><div class=\"line\">not</div></div>\n<ul>\n<li><div class=\"node leaf\" style=\"background:#f8f9fa;border:1px solid #5f6368\"><div class=\"line\">name STARTS WITH &quot;test&quot;</div></div></li>\n</ul>\n</li>\n</ul>\n</li>\n</ul>\n</div>\n</body>\n</html>\n"
+      }
+    },
+    {
+      "id": "visual/conditions/tree-html-fragment",
+      "spec": [
+        "visual.md#conditions",
+        "visual.md#html",
+        "visual.md#classes"
+      ],
+      "description": "A condition's tree in html_fragment: connectives for and, or and not, a leaf for every other node",
+      "given": {
+        "kind": "draw",
+        "format": "html_fragment",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "or",
+                "operands": [
+                  {
+                    "op": "ge",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "age"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 18
+                    }
+                  },
+                  {
+                    "op": "not",
+                    "operand": {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "guardian"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "in",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "country"
+                  ]
+                },
+                "values": [
+                  "ES",
+                  "PT"
+                ]
+              },
+              {
+                "op": "not",
+                "operand": {
+                  "op": "starts_with",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "name"
+                    ]
+                  },
+                  "text": "test"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n<div class=\"cleanrules cleanrules-condition\">\n<ul class=\"tree\">\n<li><div class=\"node connective\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:12px\"><div class=\"line\">all</div></div>\n<ul>\n<li><div class=\"node connective\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:12px\"><div class=\"line\">any</div></div>\n<ul>\n<li><div class=\"node leaf\" style=\"background:#f8f9fa;border:1px solid #5f6368\"><div class=\"line\">age &gt;= 18</div></div></li>\n<li><div class=\"node connective\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:12px\"><div class=\"line\">not</div></div>\n<ul>\n<li><div class=\"node leaf\" style=\"background:#f8f9fa;border:1px solid #5f6368\"><div class=\"line\">guardian IS NULL</div></div></li>\n</ul>\n</li>\n</ul>\n</li>\n<li><div class=\"node leaf\" style=\"background:#f8f9fa;border:1px solid #5f6368\"><div class=\"line\">country IN (&quot;ES&quot;, &quot;PT&quot;)</div></div></li>\n<li><div class=\"node connective\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:12px\"><div class=\"line\">not</div></div>\n<ul>\n<li><div class=\"node leaf\" style=\"background:#f8f9fa;border:1px solid #5f6368\"><div class=\"line\">name STARTS WITH &quot;test&quot;</div></div></li>\n</ul>\n</li>\n</ul>\n</li>\n</ul>\n</div>\n"
+      }
+    },
+    {
+      "id": "visual/conditions/one-leaf",
+      "spec": [
+        "visual.md#conditions",
+        "visual.md#mermaid"
+      ],
+      "description": "A single comparison is one leaf",
+      "given": {
+        "kind": "draw",
+        "format": "mermaid",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "le",
+            "left": {
+              "op": "field",
+              "path": [
+                "order",
+                "lines",
+                0,
+                "price"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 2.5
+            }
+          }
+        }
+      },
+      "expect": {
+        "diagram": "flowchart TD\n  n0[\"order.lines[0].price #lt;= 2.5e0\"]\n  classDef leaf fill:#f8f9fa,stroke:#5f6368\n  class n0 leaf\n"
+      }
+    },
+    {
+      "id": "visual/conditions/predicates-are-leaves",
+      "spec": [
+        "visual.md#conditions",
+        "visual.md#dot"
+      ],
+      "description": "between, in and is_null are leaves, not split",
+      "given": {
+        "kind": "draw",
+        "format": "dot",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "or",
+            "operands": [
+              {
+                "op": "between",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "low": {
+                  "op": "const",
+                  "value": 1
+                },
+                "high": {
+                  "op": "const",
+                  "value": 5
+                },
+                "closed": "left"
+              },
+              {
+                "op": "in",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "y"
+                  ]
+                },
+                "values": [
+                  1,
+                  2
+                ]
+              },
+              {
+                "op": "is_null",
+                "operand": {
+                  "op": "field",
+                  "path": [
+                    "z"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "digraph cleanrules {\n  graph [rankdir=TB, fontname=\"Helvetica\"];\n  node [fontname=\"Helvetica\", fontsize=11];\n  edge [color=\"#5f6368\"];\n  n0 [label=\"any\", class=\"connective\", shape=ellipse, style=\"filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n1 [label=\"x BETWEEN 1 AND 5 CLOSED LEFT\", class=\"leaf\", shape=box, style=\"filled\", fillcolor=\"#f8f9fa\", color=\"#5f6368\"];\n  n2 [label=\"y IN (1, 2)\", class=\"leaf\", shape=box, style=\"filled\", fillcolor=\"#f8f9fa\", color=\"#5f6368\"];\n  n3 [label=\"z IS NULL\", class=\"leaf\", shape=box, style=\"filled\", fillcolor=\"#f8f9fa\", color=\"#5f6368\"];\n  n0 -> n1;\n  n0 -> n2;\n  n0 -> n3;\n}\n"
+      }
+    },
+    {
+      "id": "visual/conditions/nested-not",
+      "spec": [
+        "visual.md#conditions",
+        "visual.md#html"
+      ],
+      "description": "Each not is a connective with its operand below",
+      "given": {
+        "kind": "draw",
+        "format": "html_fragment",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "not",
+            "operand": {
+              "op": "not",
+              "operand": {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "diagram": "<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n<div class=\"cleanrules cleanrules-condition\">\n<ul class=\"tree\">\n<li><div class=\"node connective\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:12px\"><div class=\"line\">not</div></div>\n<ul>\n<li><div class=\"node connective\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:12px\"><div class=\"line\">not</div></div>\n<ul>\n<li><div class=\"node leaf\" style=\"background:#f8f9fa;border:1px solid #5f6368\"><div class=\"line\">flag = TRUE</div></div></li>\n</ul>\n</li>\n</ul>\n</li>\n</ul>\n</div>\n"
+      }
+    },
+    {
+      "id": "visual/conditions/escaping-mermaid",
+      "spec": [
+        "visual.md#diagram-content",
+        "visual.md#mermaid"
+      ],
+      "description": "Quotes, markup, entities, backticks, backslashes, escaped line breaks and Unicode stay literal text in mermaid",
+      "given": {
+        "kind": "draw",
+        "format": "mermaid",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "we\"ird<key>",
+                    "k\ny"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": "</script><b>x</b>\n--> n9;%% #35; `md` \\n & é😀"
+                }
+              },
+              {
+                "op": "not",
+                "operand": {
+                  "op": "starts_with",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "é😀"
+                    ]
+                  },
+                  "text": "\\N\\l{|}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "flowchart TD\n  n0([\"all\"])\n  n1[\"#96;we#quot;ird#lt;key#gt;#96;.#96;k#92;u000ay#96; = #quot;#lt;/script#gt;#lt;b#gt;x#lt;/b#gt;#92;n--#gt; n9;%% #35;35; #96;md#96; #92;#92;n #amp; é😀#quot;\"]\n  n2([\"not\"])\n  n3[\"#96;é😀#96; STARTS WITH #quot;#92;#92;N#92;#92;l{|}#quot;\"]\n  n0 --> n1\n  n0 --> n2\n  n2 --> n3\n  classDef connective fill:#ffffff,stroke:#5f6368\n  classDef leaf fill:#f8f9fa,stroke:#5f6368\n  class n0,n2 connective\n  class n1,n3 leaf\n"
+      }
+    },
+    {
+      "id": "visual/conditions/escaping-dot",
+      "spec": [
+        "visual.md#diagram-content",
+        "visual.md#dot"
+      ],
+      "description": "Quotes, markup, entities, backticks, backslashes, escaped line breaks and Unicode stay literal text in dot",
+      "given": {
+        "kind": "draw",
+        "format": "dot",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "we\"ird<key>",
+                    "k\ny"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": "</script><b>x</b>\n--> n9;%% #35; `md` \\n & é😀"
+                }
+              },
+              {
+                "op": "not",
+                "operand": {
+                  "op": "starts_with",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "é😀"
+                    ]
+                  },
+                  "text": "\\N\\l{|}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "digraph cleanrules {\n  graph [rankdir=TB, fontname=\"Helvetica\"];\n  node [fontname=\"Helvetica\", fontsize=11];\n  edge [color=\"#5f6368\"];\n  n0 [label=\"all\", class=\"connective\", shape=ellipse, style=\"filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n1 [label=\"`we\\\"ird<key>`.`k\\\\u000ay` = \\\"</script><b>x</b>\\\\n--> n9;%% #35; `md` \\\\\\\\n & é😀\\\"\", class=\"leaf\", shape=box, style=\"filled\", fillcolor=\"#f8f9fa\", color=\"#5f6368\"];\n  n2 [label=\"not\", class=\"connective\", shape=ellipse, style=\"filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n3 [label=\"`é😀` STARTS WITH \\\"\\\\\\\\N\\\\\\\\l{|}\\\"\", class=\"leaf\", shape=box, style=\"filled\", fillcolor=\"#f8f9fa\", color=\"#5f6368\"];\n  n0 -> n1;\n  n0 -> n2;\n  n2 -> n3;\n}\n"
+      }
+    },
+    {
+      "id": "visual/conditions/escaping-html-fragment",
+      "spec": [
+        "visual.md#diagram-content",
+        "visual.md#html"
+      ],
+      "description": "Quotes, markup, entities, backticks, backslashes, escaped line breaks and Unicode stay literal text in html_fragment",
+      "given": {
+        "kind": "draw",
+        "format": "html_fragment",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "eq",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "we\"ird<key>",
+                    "k\ny"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": "</script><b>x</b>\n--> n9;%% #35; `md` \\n & é😀"
+                }
+              },
+              {
+                "op": "not",
+                "operand": {
+                  "op": "starts_with",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "é😀"
+                    ]
+                  },
+                  "text": "\\N\\l{|}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n<div class=\"cleanrules cleanrules-condition\">\n<ul class=\"tree\">\n<li><div class=\"node connective\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:12px\"><div class=\"line\">all</div></div>\n<ul>\n<li><div class=\"node leaf\" style=\"background:#f8f9fa;border:1px solid #5f6368\"><div class=\"line\">`we&quot;ird&lt;key&gt;`.`k\\u000ay` = &quot;&lt;/script&gt;&lt;b&gt;x&lt;/b&gt;\\n--&gt; n9;%% #35; `md` \\\\n &amp; é😀&quot;</div></div></li>\n<li><div class=\"node connective\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:12px\"><div class=\"line\">not</div></div>\n<ul>\n<li><div class=\"node leaf\" style=\"background:#f8f9fa;border:1px solid #5f6368\"><div class=\"line\">`é😀` STARTS WITH &quot;\\\\N\\\\l{|}&quot;</div></div></li>\n</ul>\n</li>\n</ul>\n</li>\n</ul>\n</div>\n"
+      }
+    },
+    {
+      "id": "visual/conditions/long-leaf-is-cut",
+      "spec": [
+        "visual.md#limits",
+        "visual.md#conditions"
+      ],
+      "description": "A leaf longer than 100 characters is cut to 97 and ...",
+      "given": {
+        "kind": "draw",
+        "format": "mermaid",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "values": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34,
+              35,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41,
+              42,
+              43,
+              44,
+              45,
+              46,
+              47,
+              48,
+              49,
+              50,
+              51,
+              52,
+              53,
+              54,
+              55,
+              56,
+              57,
+              58,
+              59
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "flowchart TD\n  n0[\"x IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 2...\"]\n  classDef leaf fill:#f8f9fa,stroke:#5f6368\n  class n0 leaf\n"
+      }
+    }
+  ]
+}

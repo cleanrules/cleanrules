@@ -1,0 +1,25 @@
+---
+source: crates/core/tests/visual.rs
+expression: "draw_ruleset(&overview, DiagramFormat::Dot, &limits()).unwrap()"
+---
+digraph cleanrules {
+  graph [rankdir=LR, fontname="Helvetica", label="HIT POLICY priority", labelloc=t];
+  node [fontname="Helvetica", fontsize=11];
+  edge [color="#5f6368"];
+  n0 [label="customer.years", class="field", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n1 [label="since", class="field", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n2 [label="customer.name", class="field", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n3 [label="1. vip\nPRIORITY 10\ncustomer.years > 5 AND since IS NULL", class="rule", shape=box, style="rounded,filled", fillcolor="#ffffff", color="#202124"];
+  n4 [label="2. loyal\nPRIORITY 5\ncustomer.years > 2\nDO notify", class="rule", shape=box, style="rounded,filled", fillcolor="#ffffff", color="#202124"];
+  n5 [label="3. rest\nPRIORITY 0\nTRUE\n+action", class="rule", shape=box, style="rounded,filled", fillcolor="#ffffff", color="#202124"];
+  n6 [label="discount", class="output", shape=box, style="filled", fillcolor="#f3e8fd", color="#9334e6"];
+  n7 [label="label", class="output", shape=box, style="filled", fillcolor="#f3e8fd", color="#9334e6"];
+  n0 -> n3;
+  n1 -> n3;
+  n2 -> n3 [style=dashed];
+  n3 -> n6;
+  n3 -> n7;
+  n0 -> n4;
+  n4 -> n6;
+  n5 -> n6;
+}

@@ -1,0 +1,40 @@
+---
+source: crates/core/tests/visual.rs
+expression: "draw_explanation(&explanation, format, &limits()).unwrap()"
+---
+---
+title: "HIT POLICY priority: selected e"
+---
+flowchart TD
+  accTitle: HIT POLICY priority: selected e
+  n0("[ ] a (not fired)<br>x #gt; 10 AND NOT y #lt;= 3")
+  n1(["all of"])
+  n2["x #gt; 10<br>false (x = 8)<br>short by 2"]
+  n3["y #lt;= 3<br>true (y = 2), but the rule needs it false<br>needs y #gt; 3 (short by 1)"]
+  n4("[ ] b (not fired)<br>x BETWEEN 0 AND 5")
+  n5["x #lt;= 5<br>false (x = 8)<br>over by 3"]
+  n6("[ ] c (not fired)<br>x #gt; 1 AND NOT x #gt; 1<br>cannot fire by changing these conditions alone; they conflict")
+  n7["x #gt; 1<br>true (x = 8), but the rule needs it false<br>needs x #lt;= 1 (over by 7)"]
+  n8("[x] d (fired, not selected)<br>x #gt; 1<br>fired, but e has a higher priority (5 #gt; 1)")
+  n9["x #gt; 1<br>true (x = 8)"]
+  n10("[x] e (selected)<br>x #gt; 0")
+  n11["x #gt; 0<br>true (x = 8)"]
+  n0 --> n1
+  n1 --> n2
+  n1 --> n3
+  n4 --> n5
+  n6 --> n7
+  n8 --> n9
+  n10 --> n11
+  classDef connective fill:#ffffff,stroke:#5f6368
+  classDef rule_selected fill:#e8f0fe,stroke:#1a73e8,stroke-width:2px
+  classDef rule_fired fill:#ffffff,stroke:#1a73e8
+  classDef rule_not_fired fill:#ffffff,stroke:#5f6368
+  classDef truth_true fill:#e6f4ea,stroke:#1e8e3e
+  classDef truth_false fill:#fce8e6,stroke:#d93025
+  class n1 connective
+  class n10 rule_selected
+  class n8 rule_fired
+  class n0,n4,n6 rule_not_fired
+  class n3,n7,n9,n11 truth_true
+  class n2,n5 truth_false

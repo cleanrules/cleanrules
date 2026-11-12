@@ -1,0 +1,28 @@
+---
+source: crates/core/tests/visual.rs
+expression: "draw_explanation(&explanation, format, &limits()).unwrap()"
+---
+digraph cleanrules {
+  graph [rankdir=TB, fontname="Helvetica", label="HIT POLICY priority: selected e", labelloc=t];
+  node [fontname="Helvetica", fontsize=11];
+  edge [color="#5f6368"];
+  n0 [label="[ ] a (not fired)\nx > 10 AND NOT y <= 3", class="rule_not_fired", shape=box, style="rounded,filled", fillcolor="#ffffff", color="#5f6368"];
+  n1 [label="all of", class="connective", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n2 [label="x > 10\nfalse (x = 8)\nshort by 2", class="truth_false", shape=box, style="filled", fillcolor="#fce8e6", color="#d93025"];
+  n3 [label="y <= 3\ntrue (y = 2), but the rule needs it false\nneeds y > 3 (short by 1)", class="truth_true", shape=box, style="filled", fillcolor="#e6f4ea", color="#1e8e3e"];
+  n4 [label="[ ] b (not fired)\nx BETWEEN 0 AND 5", class="rule_not_fired", shape=box, style="rounded,filled", fillcolor="#ffffff", color="#5f6368"];
+  n5 [label="x <= 5\nfalse (x = 8)\nover by 3", class="truth_false", shape=box, style="filled", fillcolor="#fce8e6", color="#d93025"];
+  n6 [label="[ ] c (not fired)\nx > 1 AND NOT x > 1\ncannot fire by changing these conditions alone; they conflict", class="rule_not_fired", shape=box, style="rounded,filled", fillcolor="#ffffff", color="#5f6368"];
+  n7 [label="x > 1\ntrue (x = 8), but the rule needs it false\nneeds x <= 1 (over by 7)", class="truth_true", shape=box, style="filled", fillcolor="#e6f4ea", color="#1e8e3e"];
+  n8 [label="[x] d (fired, not selected)\nx > 1\nfired, but e has a higher priority (5 > 1)", class="rule_fired", shape=box, style="rounded,filled", fillcolor="#ffffff", color="#1a73e8"];
+  n9 [label="x > 1\ntrue (x = 8)", class="truth_true", shape=box, style="filled", fillcolor="#e6f4ea", color="#1e8e3e"];
+  n10 [label="[x] e (selected)\nx > 0", class="rule_selected", shape=box, style="rounded,filled,bold", fillcolor="#e8f0fe", color="#1a73e8"];
+  n11 [label="x > 0\ntrue (x = 8)", class="truth_true", shape=box, style="filled", fillcolor="#e6f4ea", color="#1e8e3e"];
+  n0 -> n1;
+  n1 -> n2;
+  n1 -> n3;
+  n4 -> n5;
+  n6 -> n7;
+  n8 -> n9;
+  n10 -> n11;
+}

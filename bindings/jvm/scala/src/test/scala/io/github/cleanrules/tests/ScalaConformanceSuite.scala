@@ -16,8 +16,8 @@ import scala.jdk.CollectionConverters.*
  * Java route run in the Java project's `ConformanceTest`.
  */
 class ScalaConformanceSuite extends munit.FunSuite:
-  /** The skips the Scala route may have, as the Java route's: values no JVM value holds. Any other is a failure. */
-  private val allowedSkips = Set("decimal_infinity", "zone_unknown_to_java", "agents")
+  /** The skips the Scala route may have, as the Java route's: values no JVM value holds, the tools for agents (O.1) and diagrams (V.2). Any other is a failure. */
+  private val allowedSkips = Set("decimal_infinity", "zone_unknown_to_java", "agents", "diagram")
 
   private val files = Conformance.files().asScala.toVector
   private val runner = ScalaConformance()
@@ -85,6 +85,11 @@ class ScalaConformanceSuite extends munit.FunSuite:
     val grids = vectors.collect { case (id, vector) if vector.get("given").asInstanceOf[java.util.Map[?, ?]].containsKey("table_grid") => id }
     assert(grids.nonEmpty)
     assert(grids.forall(id => !skipped.values.exists(_.contains(id))), "a grid was skipped")
+    // The tools for agents and the diagrams are skipped, each with its reason.
+    def ofKind(kind: String) =
+      vectors.collect { case (id, vector) if vector.get("given").asInstanceOf[java.util.Map[?, ?]].get("kind") == kind => id }.toVector
+    assertEquals(skipped.getOrElse("agents", Vector()), ofKind("tool"))
+    assertEquals(skipped.getOrElse("diagram", Vector()), ofKind("draw"))
 
   test("a wrong expected output fails the Scala way"):
     val all = mutable.LinkedHashMap[String, java.util.Map[?, ?]]()

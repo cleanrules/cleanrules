@@ -709,7 +709,7 @@ impl DecisionTable {
 }
 
 /// `THEN key` or `THEN key IN (value, …)`, in the style of tables.
-pub(super) fn output_header(output: &TableOutput) -> String {
+pub(crate) fn output_header(output: &TableOutput) -> String {
     let key = if is_name(&output.name) {
         output.name.clone()
     } else {

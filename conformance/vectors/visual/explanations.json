@@ -1,0 +1,743 @@
+{
+  "version": 1,
+  "area": "visual",
+  "vectors": [
+    {
+      "id": "visual/explanations/priority-mermaid",
+      "spec": [
+        "visual.md#explanations",
+        "visual.md#mermaid",
+        "visual.md#classes"
+      ],
+      "description": "The explanation of spec/explain.md in mermaid: statuses, groups, causes with truth values and counterfactuals, the selected rule highlighted",
+      "given": {
+        "kind": "draw",
+        "format": "mermaid",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "priority",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 10
+                      }
+                    },
+                    {
+                      "op": "not",
+                      "operand": {
+                        "op": "le",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "y"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 3
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "between",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "low": {
+                    "op": "const",
+                    "value": 0
+                  },
+                  "high": {
+                    "op": "const",
+                    "value": 5
+                  }
+                }
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    {
+                      "op": "not",
+                      "operand": {
+                        "op": "gt",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "x"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 1
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "d",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "priority": 1
+              },
+              {
+                "name": "e",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "priority": 5
+              }
+            ]
+          }
+        },
+        "input": {
+          "x": 8,
+          "y": 2
+        }
+      },
+      "expect": {
+        "diagram": "---\ntitle: \"HIT POLICY priority: selected e\"\n---\nflowchart TD\n  accTitle: HIT POLICY priority: selected e\n  n0(\"[ ] a (not fired)<br>x #gt; 10 AND NOT y #lt;= 3\")\n  n1([\"all of\"])\n  n2[\"x #gt; 10<br>false (x = 8)<br>short by 2\"]\n  n3[\"y #lt;= 3<br>true (y = 2), but the rule needs it false<br>needs y #gt; 3 (short by 1)\"]\n  n4(\"[ ] b (not fired)<br>x BETWEEN 0 AND 5\")\n  n5[\"x #lt;= 5<br>false (x = 8)<br>over by 3\"]\n  n6(\"[ ] c (not fired)<br>x #gt; 1 AND NOT x #gt; 1<br>cannot fire by changing these conditions alone; they conflict\")\n  n7[\"x #gt; 1<br>true (x = 8), but the rule needs it false<br>needs x #lt;= 1 (over by 7)\"]\n  n8(\"[x] d (fired, not selected)<br>x #gt; 1<br>fired, but e has a higher priority (5 #gt; 1)\")\n  n9[\"x #gt; 1<br>true (x = 8)\"]\n  n10(\"[x] e (selected)<br>x #gt; 0\")\n  n11[\"x #gt; 0<br>true (x = 8)\"]\n  n0 --> n1\n  n1 --> n2\n  n1 --> n3\n  n4 --> n5\n  n6 --> n7\n  n8 --> n9\n  n10 --> n11\n  classDef connective fill:#ffffff,stroke:#5f6368\n  classDef rule_selected fill:#e8f0fe,stroke:#1a73e8,stroke-width:2px\n  classDef rule_fired fill:#ffffff,stroke:#1a73e8\n  classDef rule_not_fired fill:#ffffff,stroke:#5f6368\n  classDef truth_true fill:#e6f4ea,stroke:#1e8e3e\n  classDef truth_false fill:#fce8e6,stroke:#d93025\n  class n1 connective\n  class n10 rule_selected\n  class n8 rule_fired\n  class n0,n4,n6 rule_not_fired\n  class n3,n7,n9,n11 truth_true\n  class n2,n5 truth_false\n"
+      }
+    },
+    {
+      "id": "visual/explanations/priority-dot",
+      "spec": [
+        "visual.md#explanations",
+        "visual.md#dot",
+        "visual.md#classes"
+      ],
+      "description": "The explanation of spec/explain.md in dot: statuses, groups, causes with truth values and counterfactuals, the selected rule highlighted",
+      "given": {
+        "kind": "draw",
+        "format": "dot",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "priority",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 10
+                      }
+                    },
+                    {
+                      "op": "not",
+                      "operand": {
+                        "op": "le",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "y"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 3
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "between",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "low": {
+                    "op": "const",
+                    "value": 0
+                  },
+                  "high": {
+                    "op": "const",
+                    "value": 5
+                  }
+                }
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    {
+                      "op": "not",
+                      "operand": {
+                        "op": "gt",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "x"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 1
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "d",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "priority": 1
+              },
+              {
+                "name": "e",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "priority": 5
+              }
+            ]
+          }
+        },
+        "input": {
+          "x": 8,
+          "y": 2
+        }
+      },
+      "expect": {
+        "diagram": "digraph cleanrules {\n  graph [rankdir=TB, fontname=\"Helvetica\", label=\"HIT POLICY priority: selected e\", labelloc=t];\n  node [fontname=\"Helvetica\", fontsize=11];\n  edge [color=\"#5f6368\"];\n  n0 [label=\"[ ] a (not fired)\\nx > 10 AND NOT y <= 3\", class=\"rule_not_fired\", shape=box, style=\"rounded,filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n1 [label=\"all of\", class=\"connective\", shape=ellipse, style=\"filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n2 [label=\"x > 10\\nfalse (x = 8)\\nshort by 2\", class=\"truth_false\", shape=box, style=\"filled\", fillcolor=\"#fce8e6\", color=\"#d93025\"];\n  n3 [label=\"y <= 3\\ntrue (y = 2), but the rule needs it false\\nneeds y > 3 (short by 1)\", class=\"truth_true\", shape=box, style=\"filled\", fillcolor=\"#e6f4ea\", color=\"#1e8e3e\"];\n  n4 [label=\"[ ] b (not fired)\\nx BETWEEN 0 AND 5\", class=\"rule_not_fired\", shape=box, style=\"rounded,filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n5 [label=\"x <= 5\\nfalse (x = 8)\\nover by 3\", class=\"truth_false\", shape=box, style=\"filled\", fillcolor=\"#fce8e6\", color=\"#d93025\"];\n  n6 [label=\"[ ] c (not fired)\\nx > 1 AND NOT x > 1\\ncannot fire by changing these conditions alone; they conflict\", class=\"rule_not_fired\", shape=box, style=\"rounded,filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n7 [label=\"x > 1\\ntrue (x = 8), but the rule needs it false\\nneeds x <= 1 (over by 7)\", class=\"truth_true\", shape=box, style=\"filled\", fillcolor=\"#e6f4ea\", color=\"#1e8e3e\"];\n  n8 [label=\"[x] d (fired, not selected)\\nx > 1\\nfired, but e has a higher priority (5 > 1)\", class=\"rule_fired\", shape=box, style=\"rounded,filled\", fillcolor=\"#ffffff\", color=\"#1a73e8\"];\n  n9 [label=\"x > 1\\ntrue (x = 8)\", class=\"truth_true\", shape=box, style=\"filled\", fillcolor=\"#e6f4ea\", color=\"#1e8e3e\"];\n  n10 [label=\"[x] e (selected)\\nx > 0\", class=\"rule_selected\", shape=box, style=\"rounded,filled,bold\", fillcolor=\"#e8f0fe\", color=\"#1a73e8\"];\n  n11 [label=\"x > 0\\ntrue (x = 8)\", class=\"truth_true\", shape=box, style=\"filled\", fillcolor=\"#e6f4ea\", color=\"#1e8e3e\"];\n  n0 -> n1;\n  n1 -> n2;\n  n1 -> n3;\n  n4 -> n5;\n  n6 -> n7;\n  n8 -> n9;\n  n10 -> n11;\n}\n"
+      }
+    },
+    {
+      "id": "visual/explanations/priority-html",
+      "spec": [
+        "visual.md#explanations",
+        "visual.md#html",
+        "visual.md#classes"
+      ],
+      "description": "The explanation of spec/explain.md in html: statuses, groups, causes with truth values and counterfactuals, the selected rule highlighted",
+      "given": {
+        "kind": "draw",
+        "format": "html",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "priority",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 10
+                      }
+                    },
+                    {
+                      "op": "not",
+                      "operand": {
+                        "op": "le",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "y"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 3
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "between",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "low": {
+                    "op": "const",
+                    "value": 0
+                  },
+                  "high": {
+                    "op": "const",
+                    "value": 5
+                  }
+                }
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    {
+                      "op": "not",
+                      "operand": {
+                        "op": "gt",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "x"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 1
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "d",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "priority": 1
+              },
+              {
+                "name": "e",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "priority": 5
+              }
+            ]
+          }
+        },
+        "input": {
+          "x": 8,
+          "y": 2
+        }
+      },
+      "expect": {
+        "diagram": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>cleanrules: explanation</title>\n<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n</head>\n<body>\n<div class=\"cleanrules cleanrules-explanation\">\n<p class=\"title\">HIT POLICY priority: selected e</p>\n<ul class=\"tree\">\n<li><div class=\"node rule_not_fired\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:8px\"><div class=\"line\">[ ] a (not fired)</div><div class=\"line\">x &gt; 10 AND NOT y &lt;= 3</div></div>\n<ul>\n<li><div class=\"node connective\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:12px\"><div class=\"line\">all of</div></div>\n<ul>\n<li><div class=\"node truth_false\" style=\"background:#fce8e6;border:1px solid #d93025\"><div class=\"line\">x &gt; 10</div><div class=\"line\">false (x = 8)</div><div class=\"line\">short by 2</div></div></li>\n<li><div class=\"node truth_true\" style=\"background:#e6f4ea;border:1px solid #1e8e3e\"><div class=\"line\">y &lt;= 3</div><div class=\"line\">true (y = 2), but the rule needs it false</div><div class=\"line\">needs y &gt; 3 (short by 1)</div></div></li>\n</ul>\n</li>\n</ul>\n</li>\n<li><div class=\"node rule_not_fired\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:8px\"><div class=\"line\">[ ] b (not fired)</div><div class=\"line\">x BETWEEN 0 AND 5</div></div>\n<ul>\n<li><div class=\"node truth_false\" style=\"background:#fce8e6;border:1px solid #d93025\"><div class=\"line\">x &lt;= 5</div><div class=\"line\">false (x = 8)</div><div class=\"line\">over by 3</div></div></li>\n</ul>\n</li>\n<li><div class=\"node rule_not_fired\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:8px\"><div class=\"line\">[ ] c (not fired)</div><div class=\"line\">x &gt; 1 AND NOT x &gt; 1</div><div class=\"line\">cannot fire by changing these conditions alone; they conflict</div></div>\n<ul>\n<li><div class=\"node truth_true\" style=\"background:#e6f4ea;border:1px solid #1e8e3e\"><div class=\"line\">x &gt; 1</div><div class=\"line\">true (x = 8), but the rule needs it false</div><div class=\"line\">needs x &lt;= 1 (over by 7)</div></div></li>\n</ul>\n</li>\n<li><div class=\"node rule_fired\" style=\"background:#ffffff;border:1px solid #1a73e8;border-radius:8px\"><div class=\"line\">[x] d (fired, not selected)</div><div class=\"line\">x &gt; 1</div><div class=\"line\">fired, but e has a higher priority (5 &gt; 1)</div></div>\n<ul>\n<li><div class=\"node truth_true\" style=\"background:#e6f4ea;border:1px solid #1e8e3e\"><div class=\"line\">x &gt; 1</div><div class=\"line\">true (x = 8)</div></div></li>\n</ul>\n</li>\n<li><div class=\"node rule_selected\" style=\"background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px\"><div class=\"line\">[x] e (selected)</div><div class=\"line\">x &gt; 0</div></div>\n<ul>\n<li><div class=\"node truth_true\" style=\"background:#e6f4ea;border:1px solid #1e8e3e\"><div class=\"line\">x &gt; 0</div><div class=\"line\">true (x = 8)</div></div></li>\n</ul>\n</li>\n</ul>\n</div>\n</body>\n</html>\n"
+      }
+    },
+    {
+      "id": "visual/explanations/unknown-causes",
+      "spec": [
+        "visual.md#explanations",
+        "visual.md#mermaid"
+      ],
+      "description": "Unknown causes give their reason and are dashed",
+      "given": {
+        "kind": "draw",
+        "format": "mermaid",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "adult",
+                "when": {
+                  "op": "or",
+                  "operands": [
+                    {
+                      "op": "ge",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "age"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 18
+                      }
+                    },
+                    {
+                      "op": "eq",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "guardian"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": true
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "named",
+                "when": {
+                  "op": "eq",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "name"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": "Ana"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "input": {
+          "name": 3
+        }
+      },
+      "expect": {
+        "diagram": "---\ntitle: \"HIT POLICY first: selected no rule\"\n---\nflowchart TD\n  accTitle: HIT POLICY first: selected no rule\n  n0(\"[?] adult (unknown)<br>age #gt;= 18 OR guardian = TRUE\")\n  n1([\"any of\"])\n  n2[\"age #gt;= 18<br>unknown: missing field age\"]\n  n3[\"guardian = TRUE<br>unknown: missing field guardian\"]\n  n4(\"[?] named (unknown)<br>name = #quot;Ana#quot;\")\n  n5[\"name = #quot;Ana#quot;<br>unknown (name = 3): type mismatch: number vs string\"]\n  n0 --> n1\n  n1 --> n2\n  n1 --> n3\n  n4 --> n5\n  classDef connective fill:#ffffff,stroke:#5f6368\n  classDef rule_unknown fill:#f1f3f4,stroke:#80868b,stroke-dasharray:4 3\n  classDef truth_unknown fill:#f1f3f4,stroke:#80868b,stroke-dasharray:4 3\n  class n1 connective\n  class n0,n4 rule_unknown\n  class n2,n3,n5 truth_unknown\n"
+      }
+    },
+    {
+      "id": "visual/explanations/collect-title",
+      "spec": [
+        "visual.md#explanations",
+        "visual.md#dot"
+      ],
+      "description": "Several selected rules in the title; a rule that fired is not highlighted",
+      "given": {
+        "kind": "draw",
+        "format": "dot",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "n": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "n": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "input": {
+          "x": 5
+        }
+      },
+      "expect": {
+        "diagram": "digraph cleanrules {\n  graph [rankdir=TB, fontname=\"Helvetica\", label=\"HIT POLICY collect AGGREGATE sum: selected a, b\", labelloc=t];\n  node [fontname=\"Helvetica\", fontsize=11];\n  edge [color=\"#5f6368\"];\n  n0 [label=\"[x] a (selected)\\nx > 1\", class=\"rule_selected\", shape=box, style=\"rounded,filled,bold\", fillcolor=\"#e8f0fe\", color=\"#1a73e8\"];\n  n1 [label=\"x > 1\\ntrue (x = 5)\", class=\"truth_true\", shape=box, style=\"filled\", fillcolor=\"#e6f4ea\", color=\"#1e8e3e\"];\n  n2 [label=\"[x] b (selected)\\nx > 2\", class=\"rule_selected\", shape=box, style=\"rounded,filled,bold\", fillcolor=\"#e8f0fe\", color=\"#1a73e8\"];\n  n3 [label=\"x > 2\\ntrue (x = 5)\", class=\"truth_true\", shape=box, style=\"filled\", fillcolor=\"#e6f4ea\", color=\"#1e8e3e\"];\n  n0 -> n1;\n  n2 -> n3;\n}\n"
+      }
+    },
+    {
+      "id": "visual/explanations/hostile-data-mermaid",
+      "spec": [
+        "visual.md#explanations",
+        "visual.md#mermaid"
+      ],
+      "description": "Values read from the data are bounded and escaped in mermaid",
+      "given": {
+        "kind": "draw",
+        "format": "mermaid",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "eq",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "s"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": "ok"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "input": {
+          "s": "<img src=x onerror=alert(1)>\"\n\\n#quot;`éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        }
+      },
+      "expect": {
+        "diagram": "---\ntitle: \"HIT POLICY first: selected no rule\"\n---\nflowchart TD\n  accTitle: HIT POLICY first: selected no rule\n  n0(\"[ ] r (not fired)<br>s = #quot;ok#quot;\")\n  n1[\"s = #quot;ok#quot;<br>false (s = #quot;#lt;img src=x onerror=alert(1)#gt;#92;#quot;#92;n#92;#92;n#35;quot;#96;éééééééééééééééééé...#quot;)\"]\n  n0 --> n1\n  classDef rule_not_fired fill:#ffffff,stroke:#5f6368\n  classDef truth_false fill:#fce8e6,stroke:#d93025\n  class n0 rule_not_fired\n  class n1 truth_false\n"
+      }
+    },
+    {
+      "id": "visual/explanations/hostile-data-dot",
+      "spec": [
+        "visual.md#explanations",
+        "visual.md#dot"
+      ],
+      "description": "Values read from the data are bounded and escaped in dot",
+      "given": {
+        "kind": "draw",
+        "format": "dot",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "eq",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "s"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": "ok"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "input": {
+          "s": "<img src=x onerror=alert(1)>\"\n\\n#quot;`éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        }
+      },
+      "expect": {
+        "diagram": "digraph cleanrules {\n  graph [rankdir=TB, fontname=\"Helvetica\", label=\"HIT POLICY first: selected no rule\", labelloc=t];\n  node [fontname=\"Helvetica\", fontsize=11];\n  edge [color=\"#5f6368\"];\n  n0 [label=\"[ ] r (not fired)\\ns = \\\"ok\\\"\", class=\"rule_not_fired\", shape=box, style=\"rounded,filled\", fillcolor=\"#ffffff\", color=\"#5f6368\"];\n  n1 [label=\"s = \\\"ok\\\"\\nfalse (s = \\\"<img src=x onerror=alert(1)>\\\\\\\"\\\\n\\\\\\\\n#quot;`éééééééééééééééééé...\\\")\", class=\"truth_false\", shape=box, style=\"filled\", fillcolor=\"#fce8e6\", color=\"#d93025\"];\n  n0 -> n1;\n}\n"
+      }
+    },
+    {
+      "id": "visual/explanations/hostile-data-html-fragment",
+      "spec": [
+        "visual.md#explanations",
+        "visual.md#html"
+      ],
+      "description": "Values read from the data are bounded and escaped in html_fragment",
+      "given": {
+        "kind": "draw",
+        "format": "html_fragment",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "eq",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "s"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": "ok"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "input": {
+          "s": "<img src=x onerror=alert(1)>\"\n\\n#quot;`éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        }
+      },
+      "expect": {
+        "diagram": "<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n<div class=\"cleanrules cleanrules-explanation\">\n<p class=\"title\">HIT POLICY first: selected no rule</p>\n<ul class=\"tree\">\n<li><div class=\"node rule_not_fired\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:8px\"><div class=\"line\">[ ] r (not fired)</div><div class=\"line\">s = &quot;ok&quot;</div></div>\n<ul>\n<li><div class=\"node truth_false\" style=\"background:#fce8e6;border:1px solid #d93025\"><div class=\"line\">s = &quot;ok&quot;</div><div class=\"line\">false (s = &quot;&lt;img src=x onerror=alert(1)&gt;\\&quot;\\n\\\\n#quot;`éééééééééééééééééé...&quot;)</div></div></li>\n</ul>\n</li>\n</ul>\n</div>\n"
+      }
+    }
+  ]
+}

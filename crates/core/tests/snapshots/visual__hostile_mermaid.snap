@@ -1,0 +1,56 @@
+---
+source: crates/core/tests/visual.rs
+expression: "drawn.join(\"\\n\")"
+---
+---
+title: "HIT POLICY first"
+---
+flowchart LR
+  accTitle: HIT POLICY first
+  n0(["#96;we#quot;ird#lt;key#gt;#96;.#96;k#92;u000ay#96;"])
+  n1(["#96;é😀#96;"])
+  n2("1. #quot;a#92;#quot;b#lt;i#gt;#amp;amp;#35;quot;#96;x#96;#quot;<br>#96;we#quot;ird#lt;key#gt;#96;.#96;k#92;u000ay#96; = #quot;#lt;/script#gt;#lt;b#gt;x#lt;/b#gt;#92;n--#gt; n9;%% #35;35; #96;md#96;#quot; AND NOT #96;é😀#96; STARTS WITH #quot;#92;#92;N...")
+  n3[["#quot;label#92;#quot;#lt;#gt;#quot;"]]
+  n0 --> n2
+  n1 --> n2
+  n2 --> n3
+  classDef rule fill:#ffffff,stroke:#202124
+  classDef field fill:#ffffff,stroke:#5f6368
+  classDef output fill:#f3e8fd,stroke:#9334e6
+  class n2 rule
+  class n0,n1 field
+  class n3 output
+
+flowchart TD
+  n0("RULE #quot;a#92;#quot;b#lt;i#gt;#amp;amp;#35;quot;#96;x#96;#quot;")
+  n1(["all"])
+  n2["#96;we#quot;ird#lt;key#gt;#96;.#96;k#92;u000ay#96; = #quot;#lt;/script#gt;#lt;b#gt;x#lt;/b#gt;#92;n--#gt; n9;%% #35;35; #96;md#96;#quot;"]
+  n3(["not"])
+  n4["#96;é😀#96; STARTS WITH #quot;#92;#92;N#92;#92;l{|}#quot;"]
+  n5[["THEN #quot;label#92;#quot;#lt;#gt;#quot; = #quot;#amp;lt;#quot;"]]
+  n0 --> n1
+  n1 --> n2
+  n1 --> n3
+  n3 --> n4
+  n0 -.-> n5
+  classDef connective fill:#ffffff,stroke:#5f6368
+  classDef leaf fill:#f8f9fa,stroke:#5f6368
+  classDef rule fill:#ffffff,stroke:#202124
+  classDef output fill:#f3e8fd,stroke:#9334e6
+  class n1,n3 connective
+  class n2,n4 leaf
+  class n0 rule
+  class n5 output
+
+---
+title: "HIT POLICY first: selected no rule"
+---
+flowchart TD
+  accTitle: HIT POLICY first: selected no rule
+  n0("[ ] #quot;a#92;#quot;b#lt;i#gt;#amp;amp;#35;quot;#96;x#96;#quot; (not fired)<br>#96;we#quot;ird#lt;key#gt;#96;.#96;k#92;u000ay#96; = #quot;#lt;/script#gt;#lt;b#gt;x#lt;/b#gt;#92;n--#gt; n9;%% #35;35; #96;md#96;#quot; AND NOT #96;é😀#96; STARTS WITH #quot;#92;#92;N...")
+  n1["#96;we#quot;ird#lt;key#gt;#96;.#96;k#92;u000ay#96; = #quot;#lt;/script#gt;#lt;b#gt;x#lt;/b#gt;#92;n--#gt; n9;%% #35;35; #96;md#96;#quot;<br>false (#96;we#quot;ird#lt;key#gt;#96;.#96;k#92;u000ay#96; = #quot;#lt;img src=x onerror=alert(1)#gt;#92;#quot;#92;n#quot;)"]
+  n0 --> n1
+  classDef rule_not_fired fill:#ffffff,stroke:#5f6368
+  classDef truth_false fill:#fce8e6,stroke:#d93025
+  class n0 rule_not_fired
+  class n1 truth_false

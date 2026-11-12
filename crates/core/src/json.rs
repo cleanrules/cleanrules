@@ -99,8 +99,9 @@ impl JsonNumber {
     }
 }
 
-/// The reader's limits (`spec/json-format.md`, *Errors and limits*). Callers may
-/// raise them, never disable them.
+/// The limits of the readers (`spec/json-format.md`, *Errors and limits*), of
+/// native data (`max_values`) and of diagrams (`max_diagram_size`). Callers
+/// may raise them, never disable them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Limits {
@@ -126,6 +127,10 @@ pub struct Limits {
     /// native data, but carried with the other limits for the bindings that do
     /// ([`crate::value::ValueCount`]).
     pub max_values: usize,
+    /// The most elements a diagram may have: its nodes and edges, or, for a
+    /// decision table's grid, its header and cells (`spec/visual.md`,
+    /// *Limits*).
+    pub max_diagram_size: usize,
 }
 
 impl Limits {
@@ -152,6 +157,7 @@ impl Default for Limits {
             max_text_size: 4 * 1024 * 1024,
             max_table_size: 2 * 1024 * 1024,
             max_values: 1_000_000,
+            max_diagram_size: 20_000,
         }
     }
 }

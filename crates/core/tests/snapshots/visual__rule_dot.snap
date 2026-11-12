@@ -1,0 +1,22 @@
+---
+source: crates/core/tests/visual.rs
+expression: "draw_rule(&rule, DiagramFormat::Dot, &limits()).unwrap()"
+---
+digraph cleanrules {
+  graph [rankdir=TB, fontname="Helvetica"];
+  node [fontname="Helvetica", fontsize=11];
+  edge [color="#5f6368"];
+  n0 [label="RULE vip PRIORITY 10", class="rule", shape=box, style="rounded,filled", fillcolor="#ffffff", color="#202124"];
+  n1 [label="all", class="connective", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n2 [label="customer.years > 5", class="leaf", shape=box, style="filled", fillcolor="#f8f9fa", color="#5f6368"];
+  n3 [label="order.total > 1000", class="leaf", shape=box, style="filled", fillcolor="#f8f9fa", color="#5f6368"];
+  n4 [label="THEN discount = 0.15", class="output", shape=box, style="filled", fillcolor="#f3e8fd", color="#9334e6"];
+  n5 [label="THEN label = \"gold\"", class="output", shape=box, style="filled", fillcolor="#f3e8fd", color="#9334e6"];
+  n6 [label="DO notify", class="output", shape=box, style="filled", fillcolor="#f3e8fd", color="#9334e6"];
+  n0 -> n1;
+  n1 -> n2;
+  n1 -> n3;
+  n0 -> n4 [style=dashed];
+  n0 -> n5 [style=dashed];
+  n0 -> n6 [style=dashed];
+}

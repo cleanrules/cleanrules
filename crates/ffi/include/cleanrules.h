@@ -81,7 +81,7 @@ typedef struct cr_error cr_error;
 // A decision table being built, row by row.
 typedef struct cr_grid cr_grid;
 
-// Limits for reading documents and inputs. Functions that take a
+// Limits for reading documents and inputs, and for drawing diagrams. Functions that take a
 // `const cr_limits *` use the defaults for `NULL`. Unlike the other handles,
 // limits change: set them before sharing them between threads.
 typedef struct cr_limits cr_limits;
@@ -116,6 +116,9 @@ typedef int32_t cr_status;
 // and must not unwind or jump out of the call.
 typedef int32_t (*cr_action)(void *data,
                              struct cr_action_call *call);
+
+// A format diagrams are written in (`CR_DIAGRAM_*`).
+typedef int32_t cr_diagram;
 
 // A syntax documents are read from and written in (`CR_FORMAT_*`).
 typedef int32_t cr_format;
@@ -269,6 +272,11 @@ typedef int32_t cr_value_type;
 // does not count the values a program builds with `cr_value_new_*`.
 #define CR_LIMIT_MAX_VALUES 7
 
+// The most elements a diagram may have: its nodes and edges, or the header
+// and cells of a decision table's grid (`spec/visual.md`, *Limits*; 20,000
+// by default).
+#define CR_LIMIT_MAX_DIAGRAM_SIZE 8
+
 // A null, with its reason.
 #define CR_VALUE_NULL 1
 
@@ -316,6 +324,18 @@ typedef int32_t cr_value_type;
 
 // Reading the native value failed; the null keeps the message.
 #define CR_REASON_READ_ERROR 4
+
+// A Graphviz graph (DOT).
+#define CR_DIAGRAM_DOT 1
+
+// A Mermaid flowchart.
+#define CR_DIAGRAM_MERMAID 2
+
+// A standalone HTML document, with no script and no external resource.
+#define CR_DIAGRAM_HTML 3
+
+// The HTML document's style and content, to embed in a page or a notebook.
+#define CR_DIAGRAM_HTML_FRAGMENT 4
 
 #ifdef __cplusplus
 extern "C" {
@@ -427,6 +447,22 @@ size_t cr_batch_len(const struct cr_batch *batch);
 cr_status cr_decision_clone(const struct cr_decision *decision,
                             struct cr_decision **out,
                             struct cr_error **error);
+
+// The diagram of a decision's explanation (`spec/visual.md`,
+// *Explanations*), in `format` (`CR_DIAGRAM_*`).
+//
+// # Safety
+//
+// `decision` is `NULL` or a live `cr_decision`; `limits` is `NULL` or a live
+// `cr_limits`; `out` is `NULL` or points to a writable `char *`; `len` is
+// `NULL` or points to a writable `size_t`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_decision_draw(const struct cr_decision *decision,
+                           cr_diagram format,
+                           const struct cr_limits *limits,
+                           char **out,
+                           size_t *len,
+                           struct cr_error **error);
 
 // The decision's explanation (`spec/explain.md`) as a JSON or YAML document,
 // or as text (`CR_FORMAT_TEXT`).
@@ -643,6 +679,29 @@ cr_status cr_decision_write(const struct cr_decision *decision,
 cr_status cr_document_condition(const struct cr_document *document,
                                 struct cr_node **out,
                                 struct cr_error **error);
+
+// A document's diagram, in `format` (`CR_DIAGRAM_*`): a condition's, a
+// rule's, a rule set's (from its summary) or a decision table's grid, which
+// is HTML only (DOT and Mermaid are `CR_UNSUPPORTED`). `decision` is `NULL`,
+// or, for a decision table, a decision of the table's rule set
+// (`cr_ruleset_from_document`), whose statuses the grid shows; a decision of
+// another rule set is a `CR_DECISION_MISMATCH`, and a decision with any other
+// document `CR_UNSUPPORTED`.
+//
+// # Safety
+//
+// `document` is `NULL` or a live `cr_document`; `decision` is `NULL` or a
+// live `cr_decision`; `limits` is `NULL` or a live `cr_limits`; `out` is
+// `NULL` or points to a writable `char *`; `len` is `NULL` or points to a
+// writable `size_t`; `error` is `NULL` or points to a writable `cr_error *`
+// set to `NULL`.
+cr_status cr_document_draw(const struct cr_document *document,
+                           const struct cr_decision *decision,
+                           cr_diagram format,
+                           const struct cr_limits *limits,
+                           char **out,
+                           size_t *len,
+                           struct cr_error **error);
 
 // Free a document. `NULL` is ignored.
 //
@@ -1135,6 +1194,23 @@ cr_status cr_node_detail(const struct cr_node *node,
                          struct cr_value **out,
                          struct cr_error **error);
 
+// The tree of a condition, or of any node (`spec/visual.md`, *Conditions*),
+// in `format` (`CR_DIAGRAM_*`). A diagram of more elements than
+// `CR_LIMIT_MAX_DIAGRAM_SIZE` is a `CR_LIMIT_EXCEEDED`.
+//
+// # Safety
+//
+// `node` is `NULL` or a live `cr_node`; `limits` is `NULL` or a live
+// `cr_limits`; `out` is `NULL` or points to a writable `char *`; `len` is
+// `NULL` or points to a writable `size_t`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_node_draw(const struct cr_node *node,
+                       cr_diagram format,
+                       const struct cr_limits *limits,
+                       char **out,
+                       size_t *len,
+                       struct cr_error **error);
+
 // Evaluate a node as a condition on an input (`spec/ast.md`, *Evaluating one
 // node*: `evaluate_tree`), under a logic by name (`boolean` for `NULL`; an
 // unknown one is `CR_REGISTRY_ERROR`), strict or not: its result tree as JSON
@@ -1475,6 +1551,22 @@ cr_status cr_rule_description(const struct cr_rule *rule,
                               size_t *len,
                               struct cr_error **error);
 
+// A rule's diagram (`spec/visual.md`, *Rules*), in `format`
+// (`CR_DIAGRAM_*`).
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `limits` is `NULL` or a live
+// `cr_limits`; `out` is `NULL` or points to a writable `char *`; `len` is
+// `NULL` or points to a writable `size_t`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_rule_draw(const struct cr_rule *rule,
+                       cr_diagram format,
+                       const struct cr_limits *limits,
+                       char **out,
+                       size_t *len,
+                       struct cr_error **error);
+
 // Free a rule. `NULL` is ignored. Rule sets made with it keep their own copy.
 //
 // # Safety
@@ -1715,6 +1807,28 @@ const char *cr_ruleset_aggregate(const struct cr_ruleset *ruleset);
 cr_status cr_ruleset_check_actions(const struct cr_ruleset *ruleset,
                                    const struct cr_actions *actions,
                                    struct cr_error **error);
+
+// A rule set's diagram, from its summary (`spec/visual.md`, *Rule sets*), in
+// `format` (`CR_DIAGRAM_*`), with the rules whose action is code of the
+// program marked as `cr_ruleset_summary_actions` marks them: `actions` holds
+// one flag per rule, in rule order, or none (`actions_len` 0). Another number
+// of flags, or `NULL` with flags, is `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`; `actions` is `NULL` or points
+// to `actions_len` readable `bool`s; `limits` is `NULL` or a live
+// `cr_limits`; `out` is `NULL` or points to a writable `char *`; `len` is
+// `NULL` or points to a writable `size_t`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_ruleset_draw(const struct cr_ruleset *ruleset,
+                          const bool *actions,
+                          size_t actions_len,
+                          cr_diagram format,
+                          const struct cr_limits *limits,
+                          char **out,
+                          size_t *len,
+                          struct cr_error **error);
 
 // Evaluate the rule set on an input: a data value as JSON
 // (`spec/json-format.md`, *Values*), such as `{"customer": {"years": 7}}`. In
