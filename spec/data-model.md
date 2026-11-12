@@ -78,7 +78,8 @@ not know the name spelled exactly as it spells it (names are case-sensitive), or
 gives that zone a different offset at that instant, the value keeps the native
 offset as a fixed offset instead. Native UTC singletons
 (Python `timezone.utc`, Go `time.UTC`, Java `ZoneOffset.UTC`, JavaScript `Date`
-and `Temporal.Instant`) are the fixed offset `Z`, never the zone `UTC`.
+and `Temporal.Instant`, an Elixir `%DateTime{}` in `Etc/UTC` with offset 0)
+are the fixed offset `Z`, never the zone `UTC`.
 
 ### Lists and maps
 
@@ -96,7 +97,7 @@ missing elements: where a native sequence has none (a hole in a JavaScript
 array), the element is null.
 
 A binding that converts a native list, map or object whole, where a path
-ends (Java, JavaScript, Go), makes one that contains itself, met again while
+ends (Java, JavaScript, Go, Erlang), makes one that contains itself, met again while
 it is being converted, or one nested more than 256 containers deep, opaque
 at that place.
 
@@ -108,7 +109,7 @@ binding's tests check them.*
 A native value with no equivalent is **opaque**: bytes, a time of day without a
 date, a duration, a complex number, a set (it has no order), a string with a
 lone surrogate (possible in Python, JavaScript and Java) or that is not valid
-UTF-8 (possible in Go), and anything else the tables below do not list. An opaque value:
+UTF-8 (possible in Go and Erlang), and anything else the tables below do not list. An opaque value:
 
 - is not null, so `is_null` is `FALSE` for it;
 - belongs to the `other` group, so comparing it is a type mismatch;
@@ -258,7 +259,8 @@ Every binding follows the same rules, adapted to its language:
 - **Public data only.** A string segment reads a map key, a record's
   component, or an object's **public data attribute**. It never reads a private
   member (Python names starting with `_`, JavaScript `#` fields and symbols,
-  Java non-public members, Go unexported fields), a method, a class, a module or
+  Java non-public members, Go unexported fields, the fields of an Elixir struct
+  whose name starts with `__`), a method, a class, a module or
   a prototype, and never an attribute of a scalar (a string, a number, a date)
   or of the runtime's own objects that expose the program (Python frames,
   tracebacks, code objects, generators and coroutines, whose public attributes
@@ -270,7 +272,7 @@ Every binding follows the same rules, adapted to its language:
   attribute" (Python's `AttributeError`), which counts as missing.
 - **Integer segments** index sequences with a length (lists, tuples, arrays,
   slices, namedtuples, pandas rows) with `0 <= i < len`, never strings, bytes or
-  maps.
+  maps (in Erlang, proper lists only: never tuples, binaries or maps).
 - **Absent is not null.** An absent key or attribute is missing; a key holding
   the language's null is null.
 
@@ -529,6 +531,121 @@ back at their offset: one in a zone Go's database does not know, which comes
 back at its offset already, and one in a zone with a single offset for all
 time (`Etc/GMT+5`; the zone `UTC`, which comes back as `time.UTC`, reads back
 as `Z`).
+
+#### Erlang
+
+*Not checked by vectors yet: the Erlang binding arrives in phase N, and its
+conformance runner (task N.4) runs every vector with Erlang terms, as the
+other runners do with their languages' data.*
+
+The binding is a NIF on the core (`rustler`), so it reads terms inside the
+call, and Elixir and Gleam pass their terms to it as they are; the rows and
+items marked *(Elixir)* are terms that Elixir builds, its structs being maps
+with an atom key `__struct__` whose value is the module, such as
+`'Elixir.Date'`. Erlang has no type for text, decimals or datetimes, so
+binaries are text when they are valid UTF-8, the tuples of the `calendar`
+module are dates, and decimals and aware datetimes are tuples tagged by the
+binding (made by its functions, phase N.3).
+
+A string segment reads, on a map, the entry whose key is the **binary** of
+that text, or else the one whose key is the **atom** of that name; on an
+Elixir struct that the table below makes a map, a field other than those
+whose name starts with `__` (`__struct__`, Ecto's `__meta__`). On every other
+term it is missing: a struct that the table makes a value or opaque (so
+`d.year` on a `%Date{}` is missing, as on a date in every language), a tuple
+(records included), a list, a binary. An integer segment indexes a proper
+list, `0 <= i < length`, and nothing else: never a tuple, a binary or a map.
+A list of pairs (a `proplists` list, or an Elixir keyword list such as
+`[a: 1]`) is a list of opaque tuples, not a map: convert it with
+`maps:from_list/1` first.
+
+| Native | Value |
+|---|---|
+| the atoms `null`, `undefined` and `nil` (Elixir's nil) | null |
+| the atoms `true` and `false` | boolean |
+| any other atom | string: the atom's name |
+| integers, of any size | int, or null with `int_overflow` |
+| floats | float (`-0.0` kept; Erlang floats are never NaN nor infinite) |
+| `{cleanrules_float, <<"inf">>}`, `{cleanrules_float, <<"-inf">>}` | the float infinities |
+| binaries that are valid UTF-8 | string; any other binary, and a bitstring that is not a whole number of bytes, is opaque |
+| `{cleanrules_decimal, Text}`, `Text` a binary as `json-format.md` accepts in `{"$decimal": ...}` | decimal, or null with `decimal_overflow` |
+| `%Decimal{}` (Elixir, `'Elixir.Decimal'`): `sign` 1 or -1, `coef` a non-negative integer or one of the atoms `inf`, `NaN`, `qNaN` and `sNaN`, `exp` an integer | decimal `sign × coef × 10^exp`, or null with `decimal_overflow`; `coef` `inf` is an infinity, and a NaN `coef` is null |
+| `calendar:date()`: a tuple `{Y, Mo, D}` of integers that `calendar:valid_date/1` accepts, years 1 to 9999; `%Date{}` (Elixir, `'Elixir.Date'`) | date |
+| `calendar:datetime()`: a tuple `{{Y, Mo, D}, {H, Mi, S}}` with such a date, `0 <= H <= 23`, `0 <= Mi <= 59` and `0 <= S <= 59`, and the same with a time `{H, Mi, S, Micro}`, `0 <= Micro <= 999999`; `%NaiveDateTime{}` (Elixir, `'Elixir.NaiveDateTime'`) | naive datetime |
+| `{cleanrules_datetime, Local, Offset, Zone}`: `Local` a `calendar` tuple as in the row above, `Offset` the UTC offset in seconds, an integer, `Zone` an IANA name as a binary, or `undefined` for a fixed offset; `%DateTime{}` (Elixir, `'Elixir.DateTime'`), whose offset is `utc_offset` plus `std_offset` | aware datetime: the instant `Local` minus `Offset`, in that zone (*Time zones*) or with that offset; a `%DateTime{}` in `Etc/UTC` with offset 0 is `Z` |
+| proper lists, charlists (`"abc"`, a list of integers) included | list |
+| maps | map of the entries whose key is a binary that is valid UTF-8 or an atom (its name), sorted by key: Erlang's maps have no defined order. When a binary and an atom key have the same text, the binary's entry is kept. Entries with any other key (integers, tuples, charlists, other binaries) are left out |
+| structs (Elixir) other than those above and below | map of their fields except those whose name starts with `__`, sorted by key |
+| tuples other than those above (records included), improper lists, pids, ports, references, funs; `%MapSet{}`, `%Range{}`, `%Regex{}`, `%Time{}`, `%Duration{}` and exceptions, structs with `__exception__` set to `true` (Elixir) | opaque, never read through |
+
+The Elixir structs above are matched by module and, for dates and datetimes,
+in the calendar `'Elixir.Calendar.ISO'`; one in another calendar is opaque, and
+so is a recognised struct or tagged tuple whose fields do not have the shapes
+above (a `coef` that is not an integer or one of those atoms, an `Offset` that
+is not an integer, a `Zone` that is neither a binary nor `undefined`, a
+`Local` that is a struct). A `calendar` tuple outside those ranges
+(`{2026, 2, 30}`, `{{2026, 1, 1}, {24, 0, 0}}`, a leap second) is opaque, as is
+a `cleanrules_datetime` tuple whose offset is not within ±18 hours or whose
+instant falls outside years 1 to 9999 (*Datetimes*).
+
+A tuple of three integers is a date whenever it is a valid one, whatever it
+meant: a time of day from `calendar:time()` such as `{9, 5, 7}` reads as 7 May
+of year 9, and a timestamp from `erlang:timestamp()` such as `{1, 2, 3}` as a
+date too (most timestamps are not valid dates, and are opaque). Give a time
+of day as text or as seconds, and an instant as an integer or a
+`cleanrules_datetime` tuple. Charlists are lists of integers, never text:
+write text as a binary (`<<"gold">>`, or `~"gold"` from OTP 27; Elixir's
+strings are binaries). Gleam's own types compile to atoms and tagged tuples:
+its `None` is the atom `none`, read as the text `"none"`, and its `Some(x)`
+and custom types are opaque tuples, so Gleam programs pass a `dict` and `nil`
+for an absent value.
+
+Reading never creates an atom (the atom table is never collected): a segment
+is matched against the atoms the map already holds. Erlang has no getters, so
+reading never runs the program's code and never fails, and terms cannot
+contain themselves. Where a path ends, a list or map is converted whole, and
+*Lists and maps* says when it is opaque. Erlang terms have no identity, so two
+opaque values are the same object (*Equality*) when they are exactly equal
+(`=:=`).
+
+**Values given back.** Outputs, payloads, aggregates, metadata, constants (a
+constant node's value, a decision table's output values), the values of an
+action's call, the values in an explanation (the values a cause read, a
+counterfactual's target) and in a result tree come back to Erlang as follows:
+
+| Value | Erlang |
+|---|---|
+| null, whatever its reason | the atom `null` |
+| boolean | `true` or `false` |
+| int | integer |
+| float | float (`-0.0` included); the infinities as `{cleanrules_float, <<"inf">>}` and `{cleanrules_float, <<"-inf">>}` |
+| decimal | `{cleanrules_decimal, Text}`, `Text` the canonical text as a binary (`json-format.md`, *Numbers*), `<<"inf">>` and `<<"-inf">>` included |
+| string | UTF-8 binary |
+| date | `{Y, Mo, D}` |
+| naive datetime | `{{Y, Mo, D}, {H, Mi, S}}`, or `{{Y, Mo, D}, {H, Mi, S, Micro}}` when its microseconds are not 0 |
+| aware datetime | `{cleanrules_datetime, Local, Offset, Zone}`: its local date and time (as a naive datetime above), its offset in seconds at that instant, and its IANA zone name as a binary, or `undefined` for a fixed offset (`Z` is offset 0 and `undefined`) |
+| list | proper list |
+| map | map with binary keys, never atoms |
+| opaque | the term it was read from; `null` in a decision read from a document, which keeps only the type's name |
+
+A counterfactual's gap is an integer, float or `cleanrules_decimal` tuple,
+like the int, float or decimal above; between dates it is `{days, N}`, and
+between datetimes `{microseconds, N}`, each `N` an integer. Gaps are never
+read as data, so these two tuples carry no `cleanrules_` tag. Priorities in
+notes, summaries and a decision table's rows are integers (`null` where a note
+or a row may lack them). Each value reads back as the same value, except a
+map, whose order is lost (Erlang's maps have none) and which reads back
+sorted by key, and an opaque value of a decision read from a document, which
+comes back as `null`. Elixir terms come back as Erlang terms: a decimal or
+datetime as the tuples above, not as structs, and null as the atom `null`,
+not `nil`, which Elixir treats as true (`output || default` keeps it).
+
+**Errors.** Reading data never fails: what has no value above is opaque, and
+an integer or decimal out of range is a null with a reason. A native constant
+(in a condition or payload, or rule metadata) that would be opaque or such a
+null is an `expression_error` (*Constants*), and data or a constant beyond
+`max_values` is `limit_exceeded` (*Reading native data*, *Limits*), both as
+`{error, Error}` with the error's map (phase N.3).
 
 #### C, C++ and Rust
 

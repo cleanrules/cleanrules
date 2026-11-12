@@ -823,6 +823,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tree's `VERSION`, and runs the README's example, also vendored. The
   workflow "Go libraries" runs it on every platform and in Alpine, and
   pushes, tags and publishes nothing.
+- Data model (`spec/data-model.md`, *Erlang*; task N.1): how Erlang terms
+  become values and come back, ahead of the Erlang binding (phase N): maps
+  with binary or atom keys (never creating atoms), integers of any size,
+  floats, UTF-8 binaries as text, the atoms `true`, `false`, `null`,
+  `undefined` and `nil`, `calendar` dates and datetimes, decimals and aware
+  datetimes as tuples tagged by the binding, and Elixir's `Date`,
+  `NaiveDateTime`, `DateTime` and `Decimal` structs. No vectors: the Erlang
+  runner (task N.4) will run every vector with Erlang terms.
 - C ABI: `cr_grid_push_row_cells`, a grid row whose cells say what they are
   (`CR_CELL_TEXT`, `CR_CELL_VALUE`, `CR_CELL_NODE`), so that a string can be
   a value, such as a host language's enum constant, which the core reads by
