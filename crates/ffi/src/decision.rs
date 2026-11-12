@@ -774,7 +774,7 @@ pub(crate) fn check_input(input: &Value, limits: &Limits) -> Outcome {
                 limits.max_nesting
             ),
         )
-        .with_hint("raise CR_LIMIT_MAX_NESTING if the input is trusted")
+        .with_hint("raise max_nesting if the input is trusted")
         .into());
     }
     Ok(())

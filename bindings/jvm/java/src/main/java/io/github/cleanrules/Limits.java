@@ -9,7 +9,9 @@ import java.util.Arrays;
  * defaults ({@link #defaults()}) and changes one limit at a time
  * ({@link #withMaxSize(long)}...). A document or input beyond a limit is a
  * {@link FormatException} with the code {@code limit_exceeded}, also Java
- * data beyond {@link #maxValues()}, in every mode.
+ * data beyond {@link #maxValues()}, in every mode. Java (and Scala) data is
+ * bounded by {@link #maxValues()} only: the other limits bound documents and
+ * JSON input.
  *
  * <p>Limits hold no native memory and are safe to share between threads.
  */
@@ -68,8 +70,9 @@ public final class Limits {
     }
 
     /**
-     * The deepest nesting of JSON arrays and objects, also of the lists and
-     * maps of an input.
+     * The deepest nesting of JSON arrays and objects, in documents and in
+     * JSON input. It does not bound Java data, which {@link #maxValues()}
+     * does.
      *
      * @return the limit
      */

@@ -376,7 +376,8 @@ public final class RuleSet implements Iterable<Rule>, DocumentContent {
 
     /**
      * Evaluate the rule set on one input within limits: the Java data read is
-     * bounded by {@link Limits#maxValues()}.
+     * bounded by {@link Limits#maxValues()}, the only limit that applies to it
+     * (the others bound documents and JSON input).
      *
      * @param data the input
      * @param limits the limits, or null for the defaults
@@ -403,7 +404,8 @@ public final class RuleSet implements Iterable<Rule>, DocumentContent {
     }
 
     /**
-     * Evaluate the rule set on each input of a batch within limits.
+     * Evaluate the rule set on each input of a batch within limits: only
+     * {@link Limits#maxValues()} applies to Java data, to each input.
      *
      * @param rows the inputs
      * @param limits the limits, or null for the defaults
@@ -510,7 +512,8 @@ public final class RuleSet implements Iterable<Rule>, DocumentContent {
 
     /**
      * Evaluate within limits like {@link #evaluate(Object, Limits)}, then call
-     * the actions of the selected rules as {@link #run(Object)} does.
+     * the actions of the selected rules as {@link #run(Object)} does. Only
+     * {@link Limits#maxValues()} applies to Java data.
      *
      * @param data the input
      * @param limits the limits, or null for the defaults

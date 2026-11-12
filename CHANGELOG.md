@@ -1067,6 +1067,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- C ABI (task G.4): two hints that every binding on the ABI shows no longer
+  name a C constant or function: an input nested deeper than the nesting
+  limit (`cr_ruleset_evaluate_value`, `_many`, `cr_ruleset_run`) says "raise
+  max_nesting if the input is trusted" (was "raise CR_LIMIT_MAX_NESTING
+  ..."), and a failed action says "later actions did not
+  run; the error carries the decision", as the core does (was "...;
+  cr_error_decision gives the decision").
 - Go binding (task H.2b): the module path is
   `github.com/cleanrules/cleanrules-go`, the one Go users will import, in this
   repository too (it was `github.com/cleanrules/cleanrules/bindings/go`, never
@@ -1238,6 +1245,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already did (task D.5).
 ### Fixed
 
+- Java (task G.4): `maxNesting` and the other document limits given to an
+  evaluation bounded the Java (and Scala) data read for it, which only
+  `maxValues` should do, as in Python, JavaScript and Go
+  (`spec/json-format.md`, *Errors and limits*); a deep input was refused with
+  a hint that named the C constant `CR_LIMIT_MAX_NESTING`. `RuleSet.evaluate`,
+  `evaluateMany` and `run`, `DecisionTable`'s and those of `ffi.RuleSet` now
+  apply only `maxValues` to Java data; `evaluateJson` and `evaluateManyJson`
+  still bound JSON input with the other limits.
 - C ABI: the messages of argument errors (`CR_INVALID_ARGUMENT`, and core
   errors about an argument, such as a key that is not UTF-8) began with the C
   function's name (`cr_value_map_insert: key is not valid UTF-8`), in the

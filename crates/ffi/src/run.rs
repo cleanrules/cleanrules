@@ -354,7 +354,7 @@ unsafe fn run_actions(
                     rule.name()
                 ),
             )
-            .with_hint("later actions did not run; cr_error_decision gives the decision");
+            .with_hint("later actions did not run; the error carries the decision");
             if let Some(message) = call.failure {
                 failed = failed.caused_by(Cause(message));
             }

@@ -189,6 +189,12 @@ fn the_first_failing_action_stops_the_run() {
         assert!(json.contains(r#""cause":"the log is full""#), "{json}");
         assert!(json.contains(r#""rule":"loyal""#), "{json}");
         assert!(json.contains(r#""executed":["vip"]"#), "{json}");
+        // The core's hint, which names no C function: bindings show it as it is.
+        assert!(
+            json.contains(r#""hint":"later actions did not run; the error carries the decision""#),
+            "{json}"
+        );
+        assert!(!json.contains("cr_") && !json.contains("CR_"), "{json}");
         cr_error_free(error);
         assert!(cr_error_decision(ptr::null()).is_null());
     }

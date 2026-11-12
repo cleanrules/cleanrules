@@ -95,7 +95,8 @@ rules.bind(Map.of("notify_sales", context -> System.out.println(context.output()
   `bind(actions)`, `run(data[, limits])` and `summary()`. `evaluate`,
   `evaluateMany` and `run` read at most `limits.maxValues()` values of each
   input (1,000,000 by default), and refuse one beyond it with a
-  `FormatException` (`limit_exceeded`; *Data*).
+  `FormatException` (`limit_exceeded`; *Data*). Only `maxValues` bounds Java
+  data: the other limits bound documents and JSON input.
 - **Decisions** (`Decision`): `ruleSet()`, `hitPolicy()`, `results()` and
   `selected()` (`RuleResult`: `rule()`, `fired()`, `truth()`, `output()`),
   `fired()` (names), `outputs()`, `output()` and `aggregated()` (`Optional`
@@ -808,7 +809,7 @@ a 64-bit platform.
 | `RuleSet` (`ffi`) | `read(text, format[, limits])`, `fromDocument(document)`, `write([format])`, `summary([format])` (text by default), `size()`, `ruleName(i)`, `ruleNames()`, `hitPolicy()`, `logic()`, `aggregate()`, `isStrict()`, `fieldPaths()`, `evaluate(data[, limits])`, `evaluateJson(json[, limits])` (a `String` or bytes), `evaluateMany(inputs[, limits])` (any `Iterable`), `evaluateManyJson(json[, limits])`, `readDecision(text[, format[, limits]])`, `checkActions(names)`, `run(data, actions[, limits])` |
 | `Decision` (`ffi`) | `size()`, `ruleName(i)`, `firedAt(i)`, `truth(i)`, `selected()`, `output()`, `outputs()`, `ruleOutput(i)`, `outputJson()`, `outputsJson()`, `write([format])` (JSON by default), `explain([format])` (text by default) |
 | `Node` (`ffi`) | one condition or value: `read(text, format[, limits])`, `write([format])`, `fieldPaths()`, `evaluateTree(data[, logic, strict[, limits]])`, `evaluateValueTree(data[, strict[, limits]])` and their `...Json` forms, which give the result tree as JSON |
-| `Limits` | immutable limits: `Limits.defaults().withMaxSize(n)`, `withMaxNesting`, `withMaxDepth`, `withMaxTableSize`, `withMaxYamlSize`, `withMaxTextSize` |
+| `Limits` | immutable limits: `Limits.defaults().withMaxSize(n)`, `withMaxNesting`, `withMaxDepth`, `withMaxTableSize`, `withMaxYamlSize`, `withMaxTextSize` (documents and JSON input), `withMaxValues` (Java data) |
 | `Action`, `ActionCall` (`ffi`) | an action (`call -> ...`, which may throw) and its call: `ruleName()`, `position()`, `truth()`, `output()`, `data()`, `decision()` |
 | `Format`, `Truth`, `DocumentKind`, `HitPolicy`, `Aggregate` | enums; all but `Format` have `jsonName()` and `fromJsonName(name)` |
 | `CleanRules` | `FORMAT_VERSION`, `ABI_VERSION`, `version()`, `load()`, `libraryPath()` |
@@ -869,7 +870,10 @@ memory. An input beyond the limit is refused, not evaluated, in every mode: a
 in a batch, `row()` (`spec/data-model.md`, *Reading native data*, *Limits*).
 Constants and rule metadata are converted under the default limit too
 (`Rule.metadata` names the rule). Scala data goes through the same reader,
-with Java's `Limits`.
+with Java's `Limits`. It is the only limit on Java data, as in every binding
+(`spec/json-format.md`, *Errors and limits*): `maxNesting`, `maxSize` and the
+others bound documents and JSON input (`evaluateJson`, `evaluateManyJson`),
+not the data read from Java objects.
 
 ## Values given back
 

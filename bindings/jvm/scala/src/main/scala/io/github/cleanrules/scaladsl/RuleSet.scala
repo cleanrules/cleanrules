@@ -65,7 +65,7 @@ final class RuleSet private (val asJava: io.github.cleanrules.RuleSet):
    */
   def evaluate(data: Any): Decision = Decision.fromJava(asJava.evaluate(ToJava.convert(data)))
 
-  /** Evaluate the rules on `data` within `limits`. */
+  /** Evaluate the rules on `data` within `limits`: only `maxValues` applies to Scala data. */
   def evaluate(data: Any, limits: Limits): Decision =
     Decision.fromJava(asJava.evaluate(ToJava.convert(data), limits))
 
@@ -73,7 +73,7 @@ final class RuleSet private (val asJava: io.github.cleanrules.RuleSet):
   def evaluateMany(rows: Iterable[Any]): Seq[Decision] =
     asJava.evaluateMany(javaRows(rows)).asScala.iterator.map(Decision.fromJava).toVector
 
-  /** Evaluate the rules on each row within `limits`. */
+  /** Evaluate the rules on each row within `limits`: only `maxValues` applies, to each row. */
   def evaluateMany(rows: Iterable[Any], limits: Limits): Seq[Decision] =
     asJava.evaluateMany(javaRows(rows), limits).asScala.iterator.map(Decision.fromJava).toVector
 
@@ -109,7 +109,7 @@ final class RuleSet private (val asJava: io.github.cleanrules.RuleSet):
    */
   def run(data: Any): Decision = Decision.fromJava(asJava.run(ToJava.convert(data)))
 
-  /** [[run]] within `limits`. */
+  /** [[run]] within `limits`: only `maxValues` applies to Scala data. */
   def run(data: Any, limits: Limits): Decision = Decision.fromJava(asJava.run(ToJava.convert(data), limits))
 
   // ---- Describing.

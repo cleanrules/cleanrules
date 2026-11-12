@@ -723,7 +723,15 @@ fn an_input_nested_too_deep_is_refused() {
     let failure = common::handle(|o, e| unsafe {
         cr_ruleset_evaluate_value(ruleset.0, input.0, limits.0, o, e)
     });
-    assert_eq!(failure.err().unwrap().status, CR_LIMIT_EXCEEDED);
+    let failure = failure.err().unwrap();
+    assert_eq!(failure.status, CR_LIMIT_EXCEEDED);
+    // The hint names the limit, not a C constant: bindings show it as it is.
+    let json = cleanrules::json::to_string(&failure.json);
+    assert!(
+        json.contains(r#""hint":"raise max_nesting if the input is trusted""#),
+        "{json}"
+    );
+    assert!(!json.contains("CR_") && !json.contains("cr_"), "{json}");
 }
 
 #[test]

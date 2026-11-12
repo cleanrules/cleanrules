@@ -91,11 +91,11 @@ class RunTest {
                 fromName.getMessage());
         assertEquals(Optional.of("later actions did not run; the error carries the decision"), fromName.hint());
         assertTrue(fromName.json().contains("\"cause\":\"java.lang.IllegalStateException: full\""), fromName.json());
-        // Within limits: a too deeply nested input is a format error before any action.
+        // Within limits: an input of more values than maxValues is a format error before any action.
         List<String> calls = new ArrayList<>();
         RuleSet limited = RuleSet.of(Rule.named("l").when(field("a").isNull().not()).action(context -> calls.add("l")));
         assertThrows(io.github.cleanrules.FormatException.class, () -> limited.run(
-                Map.of("a", List.of(List.of(List.of(1)))), io.github.cleanrules.Limits.defaults().withMaxNesting(2)));
+                Map.of("a", List.of(List.of(List.of(1)))), io.github.cleanrules.Limits.defaults().withMaxValues(3)));
         assertTrue(calls.isEmpty());
         limited.run(Map.of("a", 1), io.github.cleanrules.Limits.defaults());
         assertEquals(List.of("l"), calls);

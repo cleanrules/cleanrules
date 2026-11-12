@@ -76,13 +76,13 @@ final class DecisionTable private (val asJava: io.github.cleanrules.DecisionTabl
    */
   def evaluate(data: Any): Decision = ruleSet.evaluate(data)
 
-  /** Evaluate the compiled rule set on `data` within `limits`. */
+  /** Evaluate the compiled rule set on `data` within `limits`: only `maxValues` applies to Scala data. */
   def evaluate(data: Any, limits: Limits): Decision = ruleSet.evaluate(data, limits)
 
   /** Evaluate the compiled rule set on each row: one decision per row, in order. */
   def evaluateMany(rows: Iterable[Any]): Seq[Decision] = ruleSet.evaluateMany(rows)
 
-  /** Evaluate the compiled rule set on each row within `limits`. */
+  /** Evaluate the compiled rule set on each row within `limits`: only `maxValues` applies, to each row. */
   def evaluateMany(rows: Iterable[Any], limits: Limits): Seq[Decision] = ruleSet.evaluateMany(rows, limits)
 
   /** What the compiled rule set reads and produces (`spec/explain.md`, *Summaries*). */

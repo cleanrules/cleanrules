@@ -839,7 +839,7 @@ stack (`CLAUDE.md`, invariant 9):
 
 - **document size**: at most **16 MiB** of JSON text;
 - **JSON nesting**: arrays and objects at most **1024** deep, counting the
-  top-level object as 1, checked while parsing, before any tree is built. This also bounds lists and maps in data;
+  top-level object as 1, checked while parsing, before any tree is built. This also bounds lists and maps in data given as JSON, and in values built through the C ABI; native data read by a binding is bounded by `max_values` instead (below);
 - **node depth**: a condition or payload value at most **256** nodes deep,
   counting the root as depth 1 and counting before `and`/`or` flattening. A
   result tree may be one level deeper, for the `between` halves.

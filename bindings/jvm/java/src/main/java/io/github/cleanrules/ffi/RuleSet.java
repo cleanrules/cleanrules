@@ -333,13 +333,14 @@ public final class RuleSet implements AutoCloseable {
     }
 
     /**
-     * Evaluate the rule set on Java data within limits: lists and maps nested
-     * deeper than the limits' JSON nesting, and data of more than
-     * {@link Limits#maxValues()} values, are a {@link FormatException}
-     * ({@code limit_exceeded}).
+     * Evaluate the rule set on Java data within limits: data of more than
+     * {@link Limits#maxValues()} values is a {@link FormatException}
+     * ({@code limit_exceeded}). Only {@code maxValues} bounds Java data; the
+     * other limits bound documents and JSON input ({@code spec/json-format.md},
+     * <i>Errors and limits</i>).
      *
      * @param data the input
-     * @param limits the limits, or null for the defaults
+     * @param limits the limits, or null for the defaults: only {@code maxValues} applies
      * @return the decision
      * @throws CleanRulesException if the evaluation fails
      */
@@ -350,8 +351,9 @@ public final class RuleSet implements AutoCloseable {
                 MemorySegment input = reader.read(data, tree());
                 scope.onClose(() -> Native.valueFree(input));
                 MemorySegment out = scope.pointer();
+                // Only maxValues bounds Java data, and the reader applied it.
                 scope.check(
-                        Native.rulesetEvaluateValue(pointer, input, scope.limits(limits), out, scope.error()),
+                        Native.rulesetEvaluateValue(pointer, input, MemorySegment.NULL, out, scope.error()),
                         reader.causes);
                 return new Decision(out.get(ADDRESS, 0), reader.causes.opaques);
             }
@@ -427,10 +429,13 @@ public final class RuleSet implements AutoCloseable {
     }
 
     /**
-     * Evaluate the rule set on each input of a list, in order, within limits.
+     * Evaluate the rule set on each input of a list, in order, within limits:
+     * an input of more than {@link Limits#maxValues()} values is a
+     * {@link FormatException} ({@code limit_exceeded}) with its row. Only
+     * {@code maxValues} bounds Java data.
      *
      * @param inputs the inputs, as Java data
-     * @param limits the limits, or null for the defaults
+     * @param limits the limits, or null for the defaults: only {@code maxValues} applies
      * @return one decision per input
      * @throws CleanRulesException for the first input that fails, with its row
      */
@@ -441,7 +446,8 @@ public final class RuleSet implements AutoCloseable {
                     DataReader reader = DataReader.within(limits)) {
                 MemorySegment list = reader.readMany(inputs, tree());
                 scope.onClose(() -> Native.valueFree(list));
-                return batch(pointer, list, scope.limits(limits), scope, reader.causes);
+                // Only maxValues bounds Java data, and the reader applied it.
+                return batch(pointer, list, MemorySegment.NULL, scope, reader.causes);
             }
         });
     }
@@ -626,11 +632,12 @@ public final class RuleSet implements AutoCloseable {
 
     /**
      * Evaluate the rule set on Java data within limits, then call the actions
-     * of the selected rules.
+     * of the selected rules. Only {@link Limits#maxValues()} bounds Java data,
+     * as in {@link #evaluate(Object, Limits)}.
      *
      * @param data the input
      * @param actions the actions, by the names the rules give them
-     * @param limits the limits, or null for the defaults
+     * @param limits the limits, or null for the defaults: only {@code maxValues} applies
      * @return the decision
      * @throws RegistryException if a rule names an action that is not there
      * @throws ActionException if an action throws
@@ -651,13 +658,13 @@ public final class RuleSet implements AutoCloseable {
                 scope.check(Native.rulesetCheckActions(pointer, registry, scope.error()));
                 MemorySegment input = reader.read(data, tree());
                 scope.onClose(() -> Native.valueFree(input));
-                MemorySegment limitsPointer = scope.limits(limits);
                 MemorySegment out = scope.pointer();
                 MemorySegment error = scope.error();
                 Actions.Frame frame = Actions.push(calls, data, reader.causes.opaques);
                 int status;
                 try {
-                    status = Native.rulesetRun(pointer, registry, input, limitsPointer, out, error);
+                    // Only maxValues bounds Java data, and the reader applied it.
+                    status = Native.rulesetRun(pointer, registry, input, MemorySegment.NULL, out, error);
                 } finally {
                     Actions.pop(frame);
                 }

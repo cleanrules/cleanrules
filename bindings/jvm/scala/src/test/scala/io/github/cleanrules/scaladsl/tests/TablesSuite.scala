@@ -63,11 +63,17 @@ class TablesSuite extends munit.FunSuite:
     val table = DecisionTable(Seq("RULE", "a.b.c", "THEN n"), Seq(Seq("deep", "> 1", 1)))
     val data = Map("a" -> Map("b" -> Map("c" -> 2)))
     assertEquals(table.evaluate(data).fired, Seq("deep"))
-    val tight = Limits.defaults().withMaxNesting(1)
-    assertEquals(intercept[FormatException](table.evaluate(data, tight)).code(), "limit_exceeded")
-    val batch = intercept[FormatException](table.evaluateMany(Seq(Map("a" -> 1), data), tight))
+    // A list and its two values are three: more than maxValues allows.
+    val tight = Limits.defaults().withMaxValues(2)
+    val big = Map("a" -> Map("b" -> Map("c" -> Seq(1, 2))))
+    assertEquals(intercept[FormatException](table.evaluate(big, tight)).code(), "limit_exceeded")
+    val batch = intercept[FormatException](table.evaluateMany(Seq(data, big), tight))
     assertEquals(batch.rowOption, Some(1))
-    assertEquals(table.evaluateMany(Seq(data), Limits.defaults()).map(_.fired), Seq(Seq("deep")))
+    assertEquals(table.evaluateMany(Seq(data), tight).map(_.fired), Seq(Seq("deep")))
+    // The other limits bound documents and JSON, not Scala data.
+    val others = Limits.defaults().withMaxNesting(1).withMaxSize(1).withMaxDepth(1)
+    assertEquals(table.evaluate(data, others).fired, Seq("deep"))
+    assertEquals(table.evaluateMany(Seq(data), others).map(_.fired), Seq(Seq("deep")))
 
   test("rows are the core's, with Scala types"):
     val table = DecisionTable(
