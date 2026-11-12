@@ -345,7 +345,7 @@ fn the_vectors_pass_through_the_c_abi() {
     // On a small stack, as a binding's thread may be (`spec/json-format.md`,
     // *Errors and limits*).
     on_small_stack(|| {
-        let (mut ran, mut skipped, mut failures) = (0, 0, Vec::new());
+        let (mut ran, mut skipped, mut graded, mut failures) = (0, 0, 0, Vec::new());
         for file in files() {
             let document = json(&fs::read_to_string(&file).unwrap());
             let Some(Json::Array(vectors)) = get(&document, "vectors") else {
@@ -358,6 +358,12 @@ fn the_vectors_pass_through_the_c_abi() {
                 if get(given, "limits").is_some() && string(get(given, "kind")) == Some("evaluate")
                 {
                     skipped += 1;
+                    continue;
+                }
+                // Conditions under a graded logic: the C ABI evaluates one
+                // node under `boolean` only until task J.1b.
+                if get(given, "logic").is_some_and(|l| string(Some(l)) != Some("boolean")) {
+                    graded += 1;
                     continue;
                 }
                 ran += 1;
@@ -374,5 +380,6 @@ fn the_vectors_pass_through_the_c_abi() {
         );
         assert!(ran >= 2508, "only {ran} vectors ran");
         assert!(skipped >= 14, "{skipped} native-only vectors skipped");
+        assert!(graded >= 96, "{graded} graded-logic vectors skipped");
     });
 }

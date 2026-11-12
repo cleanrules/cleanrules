@@ -3,6 +3,7 @@ package cleanrules
 import (
 	"errors"
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -108,7 +109,8 @@ func TestRuleErrors(t *testing.T) {
 	}
 	// An unknown logic names what exists.
 	_, err := NewRuleSet(nil, WithLogic("fuzzy"))
-	if e := err.(*Error); e.Name != "fuzzy" || !reflect.DeepEqual(e.Available, []string{"boolean"}) {
+	if e := err.(*Error); e.Name != "fuzzy" || !slices.IsSorted(e.Available) ||
+		!slices.Contains(e.Available, "boolean") || !slices.Contains(e.Available, "lukasiewicz") {
 		t.Errorf("registry error %+v", e)
 	}
 }

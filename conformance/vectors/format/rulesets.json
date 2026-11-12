@@ -316,6 +316,91 @@
       }
     },
     {
+      "id": "format/rulesets/graded-logic-unsupported",
+      "spec": [
+        "json-format.md#rule-sets",
+        "ast.md#logics"
+      ],
+      "description": "a rule set under a graded logic is unsupported until rules fire to degrees",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "logic": "lukasiewicz",
+            "rules": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/graded-alias-unsupported",
+      "spec": [
+        "json-format.md#rule-sets",
+        "ast.md#logics"
+      ],
+      "description": "fuzzytool's alias product names a graded logic, unsupported in a rule set",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "logic": "product",
+            "rules": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/graded-logic-after-rule-names",
+      "spec": [
+        "json-format.md#rule-sets",
+        "ast.md#logics"
+      ],
+      "description": "the logic is checked after the rule names",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "logic": "min",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "const",
+                  "value": true
+                }
+              },
+              {
+                "name": "a",
+                "when": {
+                  "op": "const",
+                  "value": true
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/ruleset/rules/1/name"
+        }
+      }
+    },
+    {
       "id": "format/rulesets/uppercase-policy",
       "spec": [
         "json-format.md#rule-sets"

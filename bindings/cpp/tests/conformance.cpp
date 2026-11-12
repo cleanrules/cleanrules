@@ -1068,6 +1068,7 @@ int main(int argc, char **argv) {
     const std::filesystem::path dir = argc > 1 ? argv[1] : CLEANRULES_VECTORS;
     std::size_t ran = 0;
     std::size_t skipped = 0;
+    std::size_t graded = 0;
     std::size_t passed_json = 0;
     std::size_t ran_native = 0;
     std::size_t passed_native = 0;
@@ -1088,6 +1089,13 @@ int main(int argc, char **argv) {
                 const json::value &given = need(vector, "given");
                 if (need(given, "kind").text == "evaluate" && given.get("limits") != nullptr) {
                     ++skipped;
+                    continue;
+                }
+                // Conditions under a graded logic: the C ABI evaluates one
+                // node under `boolean` only until task J.1b.
+                if (const json::value *logic = given.get("logic");
+                    logic != nullptr && !(logic->is(json::type::string) && logic->text == "boolean")) {
+                    ++graded;
                     continue;
                 }
                 ++ran;
@@ -1115,8 +1123,8 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "%s\n", failed.c_str());
     }
     std::printf("conformance: %zu vectors; json %zu of %zu passed, native %zu of %zu passed; %zu "
-                "native-only skipped\n",
-                ran, passed_json, ran, passed_native, ran_native, skipped);
+                "native-only skipped; %zu under a graded logic skipped (task J.1b)\n",
+                ran, passed_json, ran, passed_native, ran_native, skipped, graded);
     if (!failures.empty()) {
         std::fprintf(stderr, "conformance: %zu failures\n", failures.size());
         return EXIT_FAILURE;

@@ -117,12 +117,15 @@ func TestConformance(t *testing.T) {
 	}
 	// The only skips of the JSON route: grids, and evaluate vectors with
 	// limits (max_values bounds native data only).
-	var grids, limited, zero []string
+	var grids, limited, zero, graded []string
 	for _, file := range files {
 		for _, vector := range file.vectors {
 			given, id := vector.obj("given"), vector.str("id")
 			if given.has("table_grid") {
 				grids = append(grids, id)
+			}
+			if isGraded(given) {
+				graded = append(graded, id)
 			}
 			if given.str("kind") == "evaluate" && given.has("limits") {
 				limited = append(limited, id)
@@ -141,6 +144,12 @@ func TestConformance(t *testing.T) {
 	}
 	if !slices.Equal(counts["json"].skipped["native"], limited) {
 		t.Errorf("json skipped %v for max_values, the vectors with it are %v", counts["json"].skipped["native"], limited)
+	}
+	// Conditions under a graded logic run in neither route until task J.1b.
+	for _, route := range conformanceRoutes {
+		if !slices.Equal(counts[route].skipped["graded"], graded) {
+			t.Errorf("%s skipped %v as graded, the graded vectors are %v", route, counts[route].skipped["graded"], graded)
+		}
 	}
 	// A limit of 0 is the one vector Go cannot give.
 	if !slices.Equal(counts["native"].skipped["zero_limit"], zero) || len(zero) != 1 {

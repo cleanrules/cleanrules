@@ -343,7 +343,7 @@ pub(crate) fn read_table(json: &Json, pointer: &str, limits: &Limits) -> Result<
         rows.push(row);
     }
     config.logic = logic
-        .map(|text| LogicName::from_name(text).map_err(|e| e.at_pointer(at(pointer, "logic"))))
+        .map(|text| LogicName::for_rules(text).map_err(|e| e.at_pointer(at(pointer, "logic"))))
         .transpose()?;
     DecisionTable::new(config, inputs, outputs, rows).map_err(relocated)
 }

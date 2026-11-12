@@ -478,7 +478,19 @@ pub unsafe extern "C" fn cr_ruleset_hit_policy(ruleset: *const cr_ruleset) -> *c
 
 /// The names of the core's logics as static C strings: one for every
 /// `LogicName::ALL` (a test checks it).
-const LOGICS: [&CStr; 1] = [c"boolean"];
+const LOGICS: [&CStr; 11] = [
+    c"boolean",
+    c"dombi",
+    c"drastic",
+    c"einstein",
+    c"frank",
+    c"hamacher",
+    c"lukasiewicz",
+    c"min",
+    c"nilpotent",
+    c"prod",
+    c"yager",
+];
 
 /// The rule set's logic (`boolean`, `spec/rules.md`), a static string; `NULL`
 /// for `NULL`.
@@ -572,7 +584,7 @@ mod tests {
 
     #[test]
     fn every_logic_has_a_static_name() {
-        for logic in LogicName::ALL {
+        for &logic in LogicName::ALL {
             assert_eq!(
                 logic_name(logic).map(|name| name.to_str().ok()),
                 Some(Some(logic.as_str()))

@@ -393,8 +393,9 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// `rule_definition_error` for an unknown hit policy or aggregate, and
-    /// `registry_error` for an unknown logic.
+    /// `rule_definition_error` for an unknown hit policy or aggregate,
+    /// `registry_error` for an unknown logic, and `unsupported` for a graded
+    /// one.
     pub fn from_names(
         hit_policy: Option<&str>,
         aggregate: Option<&str>,
@@ -420,7 +421,7 @@ impl Config {
                         .ok_or_else(|| unknown_name("aggregate", name, "sum, min, max or count"))
                 })
                 .transpose()?,
-            logic: Some(logic.map_or(Ok(LogicName::Boolean), LogicName::from_name)?),
+            logic: Some(logic.map_or(Ok(LogicName::Boolean), LogicName::for_rules)?),
             strict,
         })
     }
@@ -494,7 +495,8 @@ impl RuleSet {
     /// # Errors
     ///
     /// `rule_definition_error` for a repeated rule name (naming it), or an
-    /// aggregate without the `collect` policy.
+    /// aggregate without the `collect` policy; then `unsupported` for a graded
+    /// logic.
     pub fn new(rules: Vec<Rule>, config: Config) -> Result<Self> {
         let mut names = std::collections::BTreeSet::new();
         for rule in &rules {
@@ -508,11 +510,15 @@ impl RuleSet {
         if config.aggregate.is_some() && config.hit_policy != HitPolicy::Collect {
             return Err(rule_error("", "an aggregate needs the collect hit policy"));
         }
+        let logic = config
+            .logic
+            .unwrap_or(LogicName::Boolean)
+            .check_for_rules()?;
         Ok(Self {
             rules,
             hit_policy: config.hit_policy,
             aggregate: config.aggregate,
-            logic: config.logic.unwrap_or(LogicName::Boolean),
+            logic,
             strict: config.strict,
         })
     }
@@ -610,9 +616,10 @@ impl RuleSet {
     /// In strict mode, the evaluation errors of conditions then payloads; and
     /// `hit_policy_error` when the policy cannot decide.
     pub fn evaluate<'a>(&'a self, input: &Value) -> Result<Decision<'a>> {
-        match self.logic {
-            LogicName::Boolean => self.decide(input, Kleene),
-        }
+        // `RuleSet::new` admits boolean logic only, until firing degrees are
+        // specified (task J.2).
+        self.logic.check_for_rules()?;
+        self.decide(input, Kleene)
     }
 
     /// Evaluate on a batch, one decision per input.

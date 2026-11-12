@@ -13,7 +13,7 @@ language-specific behaviour.
 
 | Document | Status | Defines |
 |---|---|---|
-| [`ast.md`](ast.md) | draft | Every condition node: operator tag, kind, construction rules, typing and null semantics |
+| [`ast.md`](ast.md) | draft | Every condition node: operator tag, kind, construction rules, typing and null semantics; truth values and the logics (Kleene and the fuzzy norms) |
 | [`rules.md`](rules.md) | draft | Rules, hit policies, payloads, outputs, aggregates and actions |
 | [`data-model.md`](data-model.md) | draft | Values (decimals of 38 digits, datetimes, opaque values, nulls with a reason) and how each language's data becomes values |
 | [`errors.md`](errors.md) | draft | Error codes, hierarchy and compared context fields |
@@ -21,16 +21,17 @@ language-specific behaviour.
 | [`text.md`](text.md) | draft | The text syntax of conditions, rules and rule sets (`IF … THEN …`), and their canonical printed form |
 | [`tables.md`](tables.md) | draft | Decision tables: inputs, outputs, cells in the text syntax, DMN policies and output priorities, compiling into a rule set, and their JSON and CSV forms |
 | [`json-format.md`](json-format.md) | draft, format version 1 | Documents, values, conditions, rules, rule sets, decisions, explanations, summaries and decision tables as JSON |
-| [`schemas/v1/`](schemas/v1/) | draft | JSON Schemas (draft 2020-12) for values and for every document (condition, rule, rule set, decision, explanation, summary, decision table), with valid and invalid examples checked by `schemas/check.py` |
+| [`schemas/v1/`](schemas/v1/) | draft | JSON Schemas (draft 2020-12) for values, logics and every document (condition, rule, rule set, decision, explanation, summary, decision table), with valid and invalid examples checked by `schemas/check.py` |
 
 ## Conventions that apply to every spec
 
 - **Truth values.** Crisp logic is Kleene three-valued: `TRUE`, `FALSE` and
   `UNKNOWN`. A missing field or a null makes a comparison `UNKNOWN`, and a rule
   fires only when its condition is `TRUE`. This matches SQL's null handling.
-  Fuzzy logic maps truth to degrees in `[0, 1]` using the connectives
-  configured in fuzzytool; unknown is the interval `[0, 1]` (proposed, see
-  `ast.md`).
+  The fuzzy logics combine degrees in `[0, 1]` with fuzzytool's t-norms,
+  s-norms and complements; a truth value is an interval of degrees, a known
+  degree `d` is `[d, d]` and unknown is `[0, 1]` (`ast.md`, *Truth values*,
+  *Logics*).
 - **Operator tags.** Each node has a stable lowercase tag, such as `"and"`,
   `"between"` or `"matches"`. The tag is used in serialized rules, in errors
   and in every language. It is never a class name.

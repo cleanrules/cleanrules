@@ -129,7 +129,9 @@ class Conformance {
             "a datetime in a zone that Java's zone database does not know, which no Java value holds",
             "native",
             "max_values bounds what is read from native data only, so evaluate vectors with limits run in the native"
-                    + " route");
+                    + " route",
+            "graded",
+            "conditions under a graded logic: the binding evaluates one node under boolean only until task J.1b");
 
     /** The exception class of each error code (spec/errors.md, Codes). */
     private static final Map<String, Class<? extends CleanRulesException>> CLASSES = Map.ofEntries(
@@ -167,6 +169,12 @@ class Conformance {
         }
     }
 
+    /** Whether {@code vector} evaluates a condition under a graded logic (task J.1b). */
+    static boolean isGraded(Map<?, ?> vector) {
+        Object logic = ((Map<?, ?>) vector.get("given")).get("logic");
+        return logic != null && !"boolean".equals(logic);
+    }
+
     /** A vector the runner cannot run as written, or an answer that breaks the API's promises. */
     static final class VectorError extends RuntimeException {
         private static final long serialVersionUID = 1L;
@@ -188,6 +196,9 @@ class Conformance {
     /** Run {@code vector} one way ({@code "json"} or {@code "native"}). */
     Outcome run(Map<?, ?> vector, String route) {
         current = route + ":" + vector.get("id");
+        if (isGraded(vector)) {
+            return new Outcome(null, "graded");
+        }
         try {
             String failure = switch (route) {
                 case "json" -> runJson(vector);

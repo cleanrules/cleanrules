@@ -831,6 +831,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   datetimes as tuples tagged by the binding, and Elixir's `Date`,
   `NaiveDateTime`, `DateTime` and `Decimal` structs. No vectors: the Erlang
   runner (task N.4) will run every vector with Erlang terms.
+- Fuzzy logics in the core (task J.1a): fuzzytool's t-norms, s-norms and
+  complements, selected by name, as logics with the capability `Graded`
+  (`spec/ast.md`, *Truth values*, *Logics*). The logics `min`, `prod`,
+  `lukasiewicz`, `einstein`, `hamacher` (parameter `gamma`, default 0),
+  `drastic`, `nilpotent`, `yager` and `dombi` (parameter `p`) and `frank`
+  (parameter `s`), each a t-norm with its dual s-norm; the complements
+  `standard`, `sugeno` (`lam`) and `yager` (`w`). A truth value is an
+  interval of degrees: a known degree `d` is `[d, d]` and unknown is
+  `[0, 1]`; connectives work on the bounds, so crisp values follow Kleene's
+  tables exactly, and the boundary conditions of norms hold exactly where
+  fuzzytool's floating-point formulas approximate them. Numbers in `[0, 1]`
+  in the data are degrees (`spec/data-model.md`, *Fuzzy degrees*). Result
+  trees write a degree as a float and an undetermined interval as
+  `[lo, hi]` (`spec/json-format.md`, *Result trees*), and a logic has a JSON
+  form, a name or `{"name": ..., "p": ..., "complement": ...}`
+  (*Logics*, JSON Schema `spec/schemas/v1/logic.schema.json`); fuzzytool's
+  aliases `product` and `zadeh` are read, and written back under the
+  canonical names. Core: `logic::{Fuzzy, Norm, Complement, Interval,
+  Graded, AnyLogic}` (`Norm::{hamacher, yager, dombi, frank,
+  with_parameter}` and `Complement::{sugeno, yager, from_name, registered}`
+  check parameters; `AnyLogic::{from_name, with_parameter, from_parts,
+  as_fuzzy, evaluate_tree}`; `Graded::firing_degree`; `Display` for
+  `Interval`), the new `LogicName` variants with `is_graded` and
+  `parameter_key`, `eval::AnyTree`, and `format::{read_logic, write_logic,
+  write_any_result, any_result_value, write_graded_result,
+  graded_result_value, write_graded_truth}`; graded logics evaluate one
+  condition (`AnyLogic::evaluate_tree`, or `evaluate_tree` with a `Fuzzy`). Rule sets and decision
+  tables still take `boolean` only: a graded logic there is `unsupported`
+  until firing degrees (task J.2). Checked against fuzzytool 0.7.0
+  (`crates/core/tests/data/fuzzytool_norms.json`, 7,168 values) and 98
+  conformance vectors in `ast/logics.json`, generated from fuzzytool by
+  `conformance/tools/fuzzy_vectors.py`, plus 6 read vectors. The bindings
+  select graded logics in J.1b; their runners skip the graded vectors and
+  count them. Example: `docs/examples/fuzzy.rs`. New core dependency:
+  `libm` 0.2.16 (pure Rust, musl's algorithms, MIT, without default
+  features), for every power and logarithm of the fuzzy logics, so every
+  platform and WebAssembly compute the same bits.
 - C ABI: `cr_grid_push_row_cells`, a grid row whose cells say what they are
   (`CR_CELL_TEXT`, `CR_CELL_VALUE`, `CR_CELL_NODE`), so that a string can be
   a value, such as a host language's enum constant, which the core reads by
@@ -1082,6 +1119,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ..."), and a failed action says "later actions did not
   run; the error carries the decision", as the core does (was "...;
   cr_error_decision gives the decision").
+- Core (task J.1a): an unknown logic's `registry_error` lists every logic
+  (`available` has eleven names, and the hint names them), and the C ABI's
+  `cr_ruleset_logic` knows every name. `LogicName` gains variants (it is
+  `#[non_exhaustive]`), and `LogicName::ALL` is a slice, `&'static
+  [LogicName]`.
 - Go binding (task H.2b): the module path is
   `github.com/cleanrules/cleanrules-go`, the one Go users will import, in this
   repository too (it was `github.com/cleanrules/cleanrules/bindings/go`, never

@@ -91,18 +91,28 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
     report(t, `native: ${ids.size} vectors whose input no native form holds exactly, ${why}; given as the ZonedDateTime the engine gives back for its text: ${[...ids].join(', ')}`)
   }
   // The only vectors a route skips: grids, and the limits of native data,
-  // have no JSON route.
+  // have no JSON route; conditions under a graded logic run in neither
+  // until task J.1b.
   const grids = [...vectors.values()].filter((v) => v.get('given').has('table_grid')).map((v) => v.get('id'))
   const limited = [...vectors.values()]
     .filter((v) => v.get('given').get('kind') === 'evaluate' && v.get('given').has('limits'))
     .map((v) => v.get('id'))
+  const graded = [...vectors.values()]
+    .filter((v) => v.get('given').has('logic') && v.get('given').get('logic') !== 'boolean')
+    .map((v) => v.get('id'))
   assert.deepEqual(
     [...counts.json.skipped.keys()].sort(),
-    [...(grids.length > 0 ? ['grid'] : []), ...(limited.length > 0 ? ['native'] : [])].sort(),
+    [
+      ...(grids.length > 0 ? ['grid'] : []),
+      ...(limited.length > 0 ? ['native'] : []),
+      ...(graded.length > 0 ? ['graded'] : []),
+    ].sort(),
   )
   assert.deepEqual(counts.json.skipped.get('grid') ?? [], grids)
   assert.deepEqual(counts.json.skipped.get('native') ?? [], limited)
-  assert.equal(counts.native.skipped.size, 0)
+  assert.deepEqual(counts.json.skipped.get('graded') ?? [], graded)
+  assert.deepEqual([...counts.native.skipped.keys()], graded.length > 0 ? ['graded'] : [])
+  assert.deepEqual(counts.native.skipped.get('graded') ?? [], graded)
 })
 
 /** `vector` with `from` replaced by `to` in its expected output only. */

@@ -116,6 +116,12 @@
       ],
       "additionalProperties": false
     },
+    "degree": {
+      "description": "A degree of a graded logic, written as a float.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
     "result": {
       "type": "object",
       "properties": {
@@ -126,9 +132,30 @@
           "$ref": "condition.schema.json#/$defs/field/properties/path"
         },
         "truth": {
-          "type": [
-            "boolean",
-            "null"
+          "description": "true, false or null (unknown) under Kleene logic; under a graded logic a degree, or an undetermined interval [lo, hi] (spec/json-format.md, Result trees).",
+          "oneOf": [
+            {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            {
+              "$ref": "#/$defs/degree"
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "$ref": "#/$defs/degree"
+                },
+                {
+                  "$ref": "#/$defs/degree"
+                }
+              ],
+              "minItems": 2,
+              "maxItems": 2
+            }
           ]
         },
         "value": {
@@ -184,13 +211,16 @@
           }
         },
         {
-          "description": "A reason exactly when truth is unknown (null) or value is null.",
+          "description": "A reason exactly when truth is unknown (null) or undetermined (an interval), or value is null.",
           "if": {
             "anyOf": [
               {
                 "properties": {
                   "truth": {
-                    "const": null
+                    "type": [
+                      "null",
+                      "array"
+                    ]
                   }
                 },
                 "required": [

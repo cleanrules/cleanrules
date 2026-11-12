@@ -5,6 +5,7 @@ mod decision;
 mod document;
 mod error;
 mod explain;
+mod logic;
 pub mod result;
 mod rules;
 pub(crate) mod table;
@@ -20,7 +21,11 @@ pub use document::{
 pub use document::{read_yaml_decision_document, read_yaml_document};
 pub use error::write_error;
 pub use explain::{explanation_value, write_explanation, write_summary};
-pub use result::{result_value, write_path, write_reason, write_result, write_truth};
+pub use logic::{read_logic, write_logic};
+pub use result::{
+    any_result_value, graded_result_value, result_value, write_any_result, write_graded_result,
+    write_graded_truth, write_path, write_reason, write_result, write_truth,
+};
 pub use rules::{write_decision, write_rule, write_ruleset};
 pub use table::write_table;
 pub use value::{ValueContext, read_value, write_value};

@@ -4930,6 +4930,56 @@
       }
     },
     {
+      "id": "format/tables/grid-graded-logic-unsupported",
+      "spec": [
+        "tables.md#grids",
+        "ast.md#logics"
+      ],
+      "description": "A table under a graded logic is unsupported",
+      "given": {
+        "kind": "read",
+        "table_grid": {
+          "logic": "einstein",
+          "header": [
+            "x"
+          ],
+          "rows": []
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
+      "id": "format/tables/json-graded-logic-unsupported",
+      "spec": [
+        "tables.md#json",
+        "ast.md#logics"
+      ],
+      "description": "A table under a graded logic is unsupported",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "inputs": [
+              "x"
+            ],
+            "outputs": [],
+            "rows": [],
+            "logic": "drastic"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
       "id": "format/tables/grid-size-limit",
       "spec": [
         "tables.md#grids",

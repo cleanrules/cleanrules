@@ -160,20 +160,31 @@ lists each unordered pair once.
 
 `not T = F`, `not F = T` and `not U = U`.
 
-Under fuzzy logic the connectives are the configured t-norm, s-norm and
-complement, and truth values are degrees in `[0, 1]`.
+Under a **graded** logic, one of the fuzzy logics of *Logics*, the
+connectives are the logic's t-norm `T`, s-norm `S` and complement `N`, and a
+truth value is an **interval** `[lo, hi]` of degrees, `0 ≤ lo ≤ hi ≤ 1`:
 
-**Unknown under fuzzy logic** (*proposed, pending the author's confirmation;
-needed by phase J*): a fuzzy truth value is an interval `[lo, hi]` of degrees.
-
-- A known degree `d` is `[d, d]`, and `UNKNOWN` is `[0, 1]`.
-- Each connective is applied to the endpoints: `[a, b] and [c, d] =
-  [T(a, c), T(b, d)]`, and the same with the s-norm for `or`. `not [a, b] =
-  [N(b), N(a)]`.
-- This works because norms and complements are monotone. It is associative for
-  every norm, reduces exactly to Kleene's tables on `{0, 1}`, and matches
-  fuzzytool's interval evaluation (`Antecedent.eval_interval`).
-- A rule fires to degree `lo`; an undetermined interval never fires fully.
+- A known degree `d` is `[d, d]`, and `UNKNOWN` is `[0, 1]`. `TRUE` is
+  `[1, 1]` and `FALSE` is `[0, 0]`: comparisons, `in`, `between`, `is_null`,
+  `matches` and the string tests are crisp, and give one of these three.
+- Each connective is applied to the bounds: `[a, b] and [c, d] =
+  [T(a, c), T(b, d)]`, and the same with `S` for `or`. `not [a, b] =
+  [N(b), N(a)]`. An `and` or `or` with more operands is a left fold from the
+  first one: `x and y and z` is `(x and y) and z`.
+- This works because norms are monotone and complements reverse the order. It
+  is associative for every norm, reduces exactly to Kleene's tables on
+  `[0, 0]`, `[0, 1]` and `[1, 1]` (*Logics* keeps the boundary conditions of
+  the norms exact), and matches fuzzytool's interval evaluation
+  (`Antecedent.eval_interval`).
+- An interval with `lo < hi` is **undetermined**, and carries a reason like
+  `UNKNOWN` under Kleene logic (*Results and reasons*). Where rounding would
+  put `hi` below `lo`, `hi` is `lo`.
+- A rule fires to degree `lo`, so an undetermined interval never fires fully.
+  How rules fire under a graded logic (firing degrees and the activation
+  threshold) is defined with them (phase J, task J.2); until then a rule set
+  or decision table whose logic is graded is `unsupported` (`json-format.md`,
+  *Rule sets*), and graded logics evaluate one condition at a time
+  (*Evaluating one node*).
 
 No single number works instead:
 
@@ -182,12 +193,93 @@ No single number works instead:
 - NaN breaks the laws;
 - a Kleene-style sentinel breaks associativity under Łukasiewicz.
 
-**Data values used as conditions** under a fuzzy logic: numbers in `[0, 1]` are
-degrees, and a number outside that range is a type mismatch.
+**Data values used as conditions** under a graded logic: `true` and `false`
+are `[1, 1]` and `[0, 0]`, null is `UNKNOWN`, and a number in `[0, 1]` is a
+degree (`data-model.md`, *Fuzzy degrees*). Any other value, a number outside
+`[0, 1]` included, is a type mismatch.
 
 Results never depend on evaluation order. An implementation may skip evaluating
 an operand only when that cannot change the result, and no operand can turn a
 result into an error that another order would not raise (see *Types*).
+
+### Logics
+
+A logic is chosen by its **name**, which fuzzy logics complete with a
+**parameter** and a **complement** (their JSON form is in `json-format.md`,
+*Logics*). Names, of logics and of complements, are lowercase and matched
+exactly. fuzzytool's aliases are read too, as the names they stand for:
+`product` for `prod`, and `zadeh` for the `standard` complement; they are
+never written. A name that is not registered is a `registry_error` with the
+name and the canonical names that exist (`errors.md`).
+
+`boolean` is Kleene's logic (*Truth values*). It takes no parameter. Every
+other logic is **fuzzy**, with the capability `Graded`: a t-norm `T` (`and`),
+its dual s-norm `S(a, b) = 1 − T(1 − a, 1 − b)` (`or`), and a complement `N`
+(`not`), all on degrees in `[0, 1]`. They are fuzzytool's (`fuzzytool.norms`),
+which is the reference for their values:
+
+| Name | `T(a, b)` | `S(a, b)` | Parameter |
+|---|---|---|---|
+| `min` | `min(a, b)` | `max(a, b)` | none |
+| `prod` | `a·b` | `a + b − a·b` | none |
+| `lukasiewicz` | `max(0, a + b − 1)` | `min(1, a + b)` | none |
+| `einstein` | `a·b / (2 − (a + b − a·b))` | `(a + b) / (1 + a·b)` | none |
+| `hamacher` | `a·b / (γ + (1 − γ)·(a + b − a·b))` | `(a + b − 2·a·b + γ·a·b) / ((1 − a·b) + γ·a·b)` | `gamma` ≥ 0, default 0 |
+| `drastic` | `b` if `a = 1`, `a` if `b = 1`, else 0 | `b` if `a = 0`, `a` if `b = 0`, else 1 | none |
+| `nilpotent` | `min(a, b)` if `a + b > 1`, else 0 | `max(a, b)` if `a + b < 1`, else 1 | none |
+| `yager` | `max(0, 1 − ((1 − a)^p + (1 − b)^p)^(1/p))` | `min(1, (a^p + b^p)^(1/p))` | `p` > 0, required |
+| `dombi` | `1 / (1 + ((1/a − 1)^p + (1/b − 1)^p)^(1/p))` | `1 / (1 + ((1/a − 1)^−p + (1/b − 1)^−p)^(−1/p))` | `p` > 0, required |
+| `frank` | `log_s(1 + (s^a − 1)·(s^b − 1) / (s − 1))` | `1 − T(1 − a, 1 − b)` | `s` > 0 and ≠ 1, required |
+
+`hamacher` with `gamma` 0 is fuzzytool's Hamacher product and sum; 1 gives
+`prod` and 2 `einstein`. The complement is the standard one unless the logic
+names another:
+
+| Complement | `N(a)` | Parameter |
+|---|---|---|
+| `standard` | `1 − a` | none |
+| `sugeno` | `(1 − a) / (1 + lam·a)` | `lam` > −1, required |
+| `yager` | `(1 − a^w)^(1/w)` | `w` > 0, required |
+
+Degrees are binary64 floats, and the formulas are evaluated as fuzzytool
+evaluates them:
+
+- in the order of operations of the tables (`a + b − a·b` is
+  `(a + b) − (a·b)`, and `S` of `frank` is computed from `T` of `1 − a` and
+  `1 − b`);
+- with fuzzytool's guards: a `hamacher` denominator of at most `1e-12` gives 0
+  for `T` and 1 for `S`; `dombi` reads a degree below `1e-12` as `1e-12` in
+  `T`, and clamps degrees to `[1e-12, 1 − 1e-12]` in `S`; `frank` reads an
+  argument of the logarithm below `1e-12` as `1e-12`;
+- with `x^1 = x`, `x^2 = x·x`, `x^0.5 = √x` and `x^−1 = 1/x`, as NumPy
+  computes them on arrays, and every other power and logarithm with the
+  algorithms of musl's libm (the core uses the `libm` crate), never the
+  platform's, so every platform computes the same bits. fuzzytool uses the
+  platform's, so the two may differ in the last places there.
+
+Two rules come before the formulas, so that crisp values combine exactly as
+in Kleene's tables. First, the **boundary conditions** of norms hold exactly:
+`T(a, b)` is 0 when `a` or `b` is 0, and otherwise `b` when `a` is 1 and `a`
+when `b` is 1; `S(a, b)` is 1 when `a` or `b` is 1, and otherwise `b` when `a`
+is 0 and `a` when `b` is 0. fuzzytool's formulas only approximate some of
+them in floating point (Łukasiewicz's `T(1, 0.1)` gives `0.10000000000000009`,
+`dombi`'s `S(0, 0)` about `2e-12`, and `frank`'s `T(1, 1)` may give
+`0.9999999999999998`). Second, every result is **clamped** to `[0, 1]`, and a
+negative zero is 0.
+
+A parameter is a finite number in its range. The logics without a parameter
+take none, `boolean` takes no complement either, and `yager`, `dombi` and
+`frank` cannot be named without theirs. A parameter or complement that breaks
+these rules is a `rule_definition_error` naming the logic (`logic "yager"`) or
+the complement and the parameter; the logic's parameter is checked before the
+complement's.
+
+Where logics are used:
+
+- `evaluate_tree` takes any logic (*Evaluating one node*);
+- a rule set or decision table takes `boolean` only, and a graded logic there
+  is `unsupported` until rules fire to degrees (task J.2; `json-format.md`,
+  *Rule sets*).
 
 ### Missing values
 
@@ -281,8 +373,9 @@ Rules:
 ## Results and reasons
 
 Every node evaluates to a truth value (conditions) or a value or null (values).
-When a truth value is `UNKNOWN` or a value is null, a **reason** says why, and
-only then: a `TRUE` or `FALSE` never carries one. Implementations are compared
+When a truth value is `UNKNOWN` (or undetermined, under a graded logic) or a
+value is null, a **reason** says why, and only then: a `TRUE`, a `FALSE` or a
+degree never carries one. Implementations are compared
 on the reason's **code**, the **field paths** involved and the type **groups**;
 the human-readable detail may differ.
 
@@ -319,7 +412,9 @@ part of the contract:
   - for a field or constant used as a condition, its group and `boolean`;
   - empty for every other code.
 
-A condition that is `UNKNOWN` takes the reason of its first `UNKNOWN` operand.
+A condition that is `UNKNOWN` takes the reason of its first `UNKNOWN` operand,
+and under a graded logic an undetermined one takes the reason of its first
+undetermined operand (*Truth values*).
 A `between` is reported as its two half comparisons, so explanations can say
 which bound failed.
 
@@ -337,7 +432,8 @@ result tree (`json-format.md`, *Result trees*): `evaluate_tree` for a condition,
 with the options `logic` and `strict`, and `evaluate_value_tree` for a value,
 with `strict` (Python names; `evaluateTree` and `evaluateValueTree` where
 camel case is the idiom). The conformance vectors of kinds `condition` and
-`value` use them.
+`value` use them. `logic` is any logic of *Logics*, graded ones included, by
+name or in its JSON form (`json-format.md`, *Logics*); `boolean` by default.
 
 ## Notes for the Arrow mode (phase I)
 

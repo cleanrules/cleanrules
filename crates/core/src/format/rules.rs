@@ -372,7 +372,7 @@ pub(crate) fn build_ruleset(raw: RawRuleSet) -> Result<RuleSet> {
         )
         .at_pointer(at(&pointer, "aggregate")));
     }
-    let logic = LogicName::from_name(&raw.logic)
+    let logic = LogicName::for_rules(&raw.logic)
         .map_err(|error| error.at_pointer(at(&pointer, "logic")))?;
     let config = Config {
         hit_policy: raw.hit_policy,

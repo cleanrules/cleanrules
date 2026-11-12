@@ -370,20 +370,19 @@ A rule set is an object with these keys (`rules.md`, *Evaluation*):
 
 - Policy and aggregate names are lowercase and matched exactly. Another string
   is a `format_error`.
-- `logic` names a logic of the core. This version defines `"boolean"`, Kleene's
-  three-valued logic (`ast.md`, *Truth values*), and the fuzzy logics add their
-  names in phase I. A name the format does not define is a `registry_error`. A
-  name it defines but this build of the core lacks (built without the fuzzy
-  feature, for example) is `unsupported`, and the message names the Cargo
-  feature.
+- `logic` names a logic of `ast.md` (*Logics*). A name that is not registered
+  is a `registry_error`. A rule set takes `"boolean"`, Kleene's three-valued
+  logic, only: a graded logic (any other name) is `unsupported` until rules
+  fire to degrees (phase J, task J.2). So is a name this build of the core
+  lacks, if a logic is ever built out by a Cargo feature; the message then
+  names the feature.
 - `rules` may be empty. Their order is the rule order of `rules.md`.
 
-**Reserved for later versions.** Fuzzy logics take parameters, and graded
-logics an activation threshold. Both will be added without changing the
-version (*Versioning*): `"logic": "boolean"` will remain the short form of an
-object `{"name": "boolean", ...parameters}`, and the threshold will be a
-separate optional key `alpha`. Readers of this version reject both with
-`format_error`.
+**Reserved for later versions.** Graded logics will take parameters here, in
+the object form of *Logics*, and an activation threshold. Both will be added
+without changing the version (*Versioning*): `"logic": "boolean"` remains the
+short form, and the threshold will be a separate optional key `alpha`. Readers
+of this version reject both with `format_error`.
 
 After reading every rule, the rule set's own construction rules give an error
 in this order:
@@ -392,13 +391,54 @@ in this order:
    the second rule with that name;
 2. `aggregate` is only given with `"collect"`: `rule_definition_error`,
    pointing to `/ruleset/aggregate`;
-3. `logic` is known: `registry_error` or `unsupported`, pointing to
-   `/ruleset/logic`.
+3. `logic` is a logic a rule set takes: `registry_error` for an unknown one,
+   or `unsupported` for a graded one, pointing to `/ruleset/logic`.
 
 Writers write the keys in the order of the table and omit `aggregate` when
 there is none and `strict` when it is `false`. They always write `hit_policy`
 and `logic`, although they have defaults, because together they say how the
 rule set decides, and a reader should not need to know the defaults.
+
+### Logics
+
+A logic (`ast.md`, *Logics*) is written as a string, its name, when every
+parameter is at its default and the complement is the standard one, and
+otherwise as an object:
+
+| Key | Required | JSON type |
+|---|---|---|
+| `name` | yes | string: the name of a logic |
+| `gamma`, `p` or `s` | as `ast.md` says | number: the logic's parameter, under its key in `ast.md` (*Logics*) |
+| `complement` | no, default `"standard"` | a complement: a string, its name, when it takes no parameter, and otherwise an object with `name` and its parameter (`lam` or `w`) |
+
+```json
+{ "name": "yager", "p": 2.0, "complement": { "name": "sugeno", "lam": 0.5 } }
+```
+
+This version writes the form in the `logic` of `evaluate_tree` (`ast.md`,
+*Evaluating one node*), in the conformance vectors, and wherever a language
+takes a logic as JSON; rule sets, decision tables and decisions take it with
+graded rule sets (*Rule sets*, *Reserved for later versions*). Readers check,
+in this order:
+
+1. the shape (`format_error`): a string or an object; `name` present and a
+   string; no keys but `name`, `complement` and at most one of `gamma`, `p`
+   and `s`, which is a number; and a complement that is a string, or an object
+   with a string `name` and at most one other key, `lam` or `w`, a number;
+2. the names (`registry_error`, with the name and the names that exist): the
+   logic's, then the complement's;
+3. the parameters (`rule_definition_error`), as `ast.md` (*Logics*) says,
+   the logic's and then the complement's: a parameter under the key of
+   another logic (`p` under `hamacher`) or of another complement, a missing
+   one, or one out of its range; and a complement under `boolean`.
+
+Each error points to the offending key, or to the logic itself for a string.
+
+Readers also take fuzzytool's aliases (`ast.md`, *Logics*). Writers write
+the canonical names, the string form when they can, and otherwise the keys in
+the order of the table, the parameter as a float, `gamma` only when it is not
+0, and `complement` only when it is not `"standard"`. The JSON Schema of the
+form is `$defs/logic` in [`schemas/v1/logic.schema.json`](schemas/v1/logic.schema.json).
 
 ## Decisions
 
@@ -532,8 +572,11 @@ The `between` halves let explanations say which bound failed (`ast.md`,
 *Results and reasons*). The operand's result appears in both halves.
 
 **Truth values.** Under Kleene logic, `truth` is `true`, `false`, or `null` for
-unknown. Graded logics will add a number in `[0, 1]` and an interval form in
-phase J, as new JSON forms of this key (*Versioning*).
+unknown. Under a graded logic (`ast.md`, *Truth values*), it is a degree `d`
+(the interval `[d, d]`) as a float, such as `0.25` or `1.0`, and an
+undetermined interval as an array of two floats, `[lo, hi]`: `UNKNOWN` is
+`[0.0, 1.0]`. Then `reason` appears exactly when the interval is
+undetermined.
 
 **Reasons.** A `reason` says why a truth value is unknown or a value is null,
 and appears only then (`ast.md`, *Results and reasons*):
@@ -559,7 +602,8 @@ Writers write every key in the order of its table, and omit `aggregate`,
 The C ABI also gives a result tree as a value (`cr_tree_value`), for bindings
 that build objects of it: the same structure and keys, with the values
 themselves instead of their JSON encoding (an opaque value keeps its token),
-an unknown truth as a plain null, and paths as lists of strings and ints.
+an unknown truth as a plain null, a graded truth as a float or a list of two
+floats, and paths as lists of strings and ints.
 Written as a JSON value, it is the result tree.
 
 ### Reading a decision
@@ -812,7 +856,7 @@ it would have (`/condition/right`), and an unknown or extra key by its own
 | `rule_definition_error` | the shape is valid, but a construction rule of a rule or rule set is broken |
 | `registry_error` | a name that should be registered (a logic) is not |
 | `decision_mismatch` | a decision does not belong to, or is not consistent with, the rule set it is read with |
-| `unsupported` | this build of the core, or this version of the format, cannot do the operation: a logic built out by a Cargo feature, a writer given an action, reading an output-only document, or explaining a decision made with a graded logic |
+| `unsupported` | this build of the core, or this version of the format, cannot do the operation: a logic built out by a Cargo feature, a rule set or decision table under a graded logic, a writer given an action, reading an output-only document, or explaining a decision made with a graded logic |
 | `limit_exceeded` | the document is larger, or nested deeper, than the reader allows; also native data beyond `max_values` (below) |
 
 A reader reports **one** error, the first it finds in this order:

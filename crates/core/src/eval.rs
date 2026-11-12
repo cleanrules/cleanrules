@@ -10,7 +10,7 @@ use std::cmp::Ordering;
 
 use crate::ast::{ArithOp, Closed, CompareOp, Expr, Kind, Node, StringOp};
 use crate::error::{Error, ErrorCode, Result, Segment};
-use crate::logic::Logic;
+use crate::logic::{AnyLogic, Interval, Logic, Truth};
 use crate::value::{Group, NullCause, Number, Value};
 use crate::walk::{Walk, post_order};
 
@@ -204,6 +204,40 @@ pub(crate) fn evaluate_tree_in<'a, L: Logic>(
         options,
     }
     .run(trees, node, Mode::Condition)
+}
+
+/// A result tree under a logic chosen at run time ([`AnyLogic`]).
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub enum AnyTree<'a> {
+    /// Under Kleene logic.
+    Crisp(Evaluated<'a, Truth>),
+    /// Under a graded logic: intervals of degrees.
+    Graded(Evaluated<'a, Interval>),
+}
+
+impl AnyLogic {
+    /// [`evaluate_tree`] under this logic, so callers that take a logic at
+    /// run time (a name, or its JSON form) need not dispatch themselves.
+    ///
+    /// # Errors
+    ///
+    /// As [`evaluate_tree`].
+    pub fn evaluate_tree<'a>(
+        &self,
+        node: &'a Node,
+        input: &Value,
+        options: Options<'_>,
+    ) -> Result<AnyTree<'a>> {
+        match self {
+            AnyLogic::Boolean(kleene) => {
+                evaluate_tree(node, input, kleene, options).map(AnyTree::Crisp)
+            }
+            AnyLogic::Fuzzy(fuzzy) => {
+                evaluate_tree(node, input, fuzzy, options).map(AnyTree::Graded)
+            }
+        }
+    }
 }
 
 /// Evaluate a value node (or a field) on `input`.

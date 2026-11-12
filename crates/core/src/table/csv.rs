@@ -376,7 +376,7 @@ fn settings<'f>(
             }
             "LOGIC" => {
                 config.logic = Some(
-                    LogicName::from_name(&value.to_ascii_lowercase())
+                    LogicName::for_rules(&value.to_ascii_lowercase())
                         .map_err(|e| e.at_position(place.line, place.column))?,
                 );
             }

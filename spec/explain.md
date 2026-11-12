@@ -10,8 +10,8 @@ and its rule set: nothing is evaluated again. A summary describes a rule set
 without evaluating it.
 
 Explanations support Kleene truth values only. Explaining a decision made with
-another logic is `unsupported` until graded explanations arrive with the fuzzy
-logics (phase J).
+another logic is `unsupported` until graded explanations arrive with firing
+degrees (phase J, task J.2).
 
 ## Rule status
 

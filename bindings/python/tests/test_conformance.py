@@ -523,6 +523,19 @@ def collect() -> list[Any]:
                 # `max_values` bounds native data only: no JSON run.
                 params.append(pytest.param(vector, "native", id=f"native:{vector['id']}"))
                 continue
+            if given.get("logic", "boolean") != "boolean":
+                # Conditions under a graded logic: the binding evaluates one node
+                # under `boolean` only until task J.1b.
+                for run in ("json", "native"):
+                    params.append(
+                        pytest.param(
+                            vector,
+                            run,
+                            id=f"{run}:{vector['id']}",
+                            marks=pytest.mark.skip(reason="graded logics in the binding: J.1b"),
+                        )
+                    )
+                continue
             params.append(pytest.param(vector, "json", id=f"json:{vector['id']}"))
             if vector["given"]["kind"] != "read":
                 params.append(pytest.param(vector, "native", id=f"native:{vector['id']}"))

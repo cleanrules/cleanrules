@@ -37,6 +37,7 @@ export const MINIMUM_VECTORS = 2508
 export const SKIPS = {
   grid: 'grids are native data: cleanrules/native reads documents only, so table_grid vectors run in the native route (DecisionTable)',
   native: 'max_values bounds what is read from native data only, so evaluate vectors with limits run in the native route',
+  graded: 'conditions under a graded logic: the binding evaluates one node under boolean only until task J.1b',
 }
 
 /** The class of each error code (`spec/errors.md`, *Codes*). */
@@ -1103,6 +1104,8 @@ export function conformance(R, N) {
    */
   function run(vector, route) {
     current = `${route}:${vector.get('id')}`
+    const logic = vector.get('given').get('logic')
+    if (logic !== undefined && logic !== 'boolean') return { skip: 'graded' }
     try {
       return route === 'json' ? runJson(vector) : runNative(vector)
     } catch (error) {

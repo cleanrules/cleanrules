@@ -29,8 +29,9 @@ A rule has:
 For one input, every rule's condition is evaluated in rule order with the rule
 set's logic and strictness (`ast.md`). A rule **fires** when its truth
 value passes the logic's **activation test**: `TRUE` under Kleene logic. Under a
-graded logic (phase 5) the test will be "degree ≥ the rule set's alpha"; the
-definition of *fires* does not change.
+graded logic the test will be "degree ≥ the rule set's alpha" (task J.2; until
+then a rule set's logic is `boolean`, `ast.md`, *Logics*); the definition of
+*fires* does not change.
 
 The **hit policy** then selects rules among those that fired:
 
