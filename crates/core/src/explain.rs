@@ -97,7 +97,7 @@ pub enum Gap {
     Microseconds(i64),
 }
 
-mod text;
+pub(crate) mod text;
 
 /// One elementary condition behind a rule's outcome.
 #[derive(Clone, Debug)]
@@ -220,24 +220,14 @@ pub struct Explanation<'d, 'a> {
 /// Explain a decision (`spec/explain.md`).
 #[must_use]
 pub fn explain<'d, 'a>(decision: &'d Decision<'a>) -> Explanation<'d, 'a> {
-    let selected: Vec<&str> = decision.selected().map(|r| r.rule.name()).collect();
     let winner = decision.selected().next();
     let policy = decision.ruleset().hit_policy();
     let mut walks = Walks::default();
     let rules = decision
         .results()
         .iter()
-        .map(|result| {
-            let truth = result.when.truth().unwrap_or(Truth::Unknown);
-            let status = if selected.contains(&result.rule.name()) {
-                Status::Selected
-            } else if result.fired {
-                Status::Fired
-            } else if truth == Truth::Unknown {
-                Status::Unknown
-            } else {
-                Status::NotFired
-            };
+        .zip(statuses(decision))
+        .map(|(result, status)| {
             let built = requirement(&mut walks.requirements, &result.when, false);
             let mut requirement = simplify(built);
             let mut achievable = None;
@@ -261,6 +251,29 @@ pub fn explain<'d, 'a>(decision: &'d Decision<'a>) -> Explanation<'d, 'a> {
         })
         .collect();
     Explanation { decision, rules }
+}
+
+/// The status of each rule of a decision, in rule order (`spec/explain.md`,
+/// *Rule status*).
+pub(crate) fn statuses(decision: &Decision<'_>) -> Vec<Status> {
+    // In rule order, so sorted.
+    let selected = decision.selected_positions();
+    decision
+        .results()
+        .iter()
+        .enumerate()
+        .map(|(i, result)| {
+            if selected.binary_search(&i).is_ok() {
+                Status::Selected
+            } else if result.fired {
+                Status::Fired
+            } else if result.when.truth().unwrap_or(Truth::Unknown) == Truth::Unknown {
+                Status::Unknown
+            } else {
+                Status::NotFired
+            }
+        })
+        .collect()
 }
 
 fn note(policy: HitPolicy, result: &RuleResult<'_>, winner: &RuleResult<'_>) -> Note {

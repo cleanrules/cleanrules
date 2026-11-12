@@ -1,0 +1,31 @@
+---
+source: crates/core/tests/visual.rs
+expression: "draw_ruleset(&overview, DiagramFormat::Mermaid, &limits()).unwrap()"
+---
+---
+title: "HIT POLICY priority"
+---
+flowchart LR
+  accTitle: HIT POLICY priority
+  n0(["customer.years"])
+  n1(["since"])
+  n2(["customer.name"])
+  n3("1. vip<br>PRIORITY 10<br>customer.years #gt; 5 AND since IS NULL")
+  n4("2. loyal<br>PRIORITY 5<br>customer.years #gt; 2<br>DO notify")
+  n5("3. rest<br>PRIORITY 0<br>TRUE<br>+action")
+  n6[["discount"]]
+  n7[["label"]]
+  n0 --> n3
+  n1 --> n3
+  n2 -.-> n3
+  n3 --> n6
+  n3 --> n7
+  n0 --> n4
+  n4 --> n6
+  n5 --> n6
+  classDef rule fill:#ffffff,stroke:#202124
+  classDef field fill:#ffffff,stroke:#5f6368
+  classDef output fill:#f3e8fd,stroke:#9334e6
+  class n3,n4,n5 rule
+  class n0,n1,n2 field
+  class n6,n7 output

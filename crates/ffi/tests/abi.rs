@@ -248,6 +248,7 @@ fn limits_are_set_and_read() {
         (CR_LIMIT_MAX_NESTING, 5),
         (CR_LIMIT_MAX_TABLE_SIZE, 3),
         (CR_LIMIT_MAX_VALUES, 12),
+        (CR_LIMIT_MAX_DIAGRAM_SIZE, 9),
     ]);
     for (which, wanted) in [
         (CR_LIMIT_MAX_SIZE, 10),
@@ -257,6 +258,7 @@ fn limits_are_set_and_read() {
         (CR_LIMIT_MAX_YAML_SIZE, 10),
         (CR_LIMIT_MAX_TEXT_SIZE, 10),
         (CR_LIMIT_MAX_VALUES, 12),
+        (CR_LIMIT_MAX_DIAGRAM_SIZE, 9),
     ] {
         let mut value = 0;
         // SAFETY: a live handle and a writable value.
@@ -281,7 +283,8 @@ fn limits_are_set_and_read() {
         .unwrap();
     assert_eq!(failure.status, CR_LIMIT_EXCEEDED);
     assert!(common::read_document(RULES.as_bytes(), CR_FORMAT_JSON, Some(&limits)).is_ok());
-    // max_values defaults to a million, and is the last limit.
+    // max_values defaults to a million, and max_diagram_size, the last limit,
+    // to 20,000.
     let mut value = 0;
     // SAFETY: a live handle and a writable value.
     let status = unsafe {
@@ -293,16 +296,26 @@ fn limits_are_set_and_read() {
         )
     };
     assert_eq!((status, value), (CR_OK, 1_000_000));
+    // SAFETY: a live handle and a writable value.
+    let status = unsafe {
+        cr_limits_get(
+            limits.0,
+            CR_LIMIT_MAX_DIAGRAM_SIZE,
+            &raw mut value,
+            ptr::null_mut(),
+        )
+    };
+    assert_eq!((status, value), (CR_OK, 20_000));
     let mut error = ptr::null_mut();
     // SAFETY: a live handle and a writable value and error.
-    let status = unsafe { cr_limits_get(limits.0, 8, &raw mut value, &raw mut error) };
+    let status = unsafe { cr_limits_get(limits.0, 9, &raw mut value, &raw mut error) };
     assert_eq!(status, CR_INVALID_ARGUMENT);
     let failure = common::take(error);
     let Json::Object(members) = &failure.json else {
         panic!()
     };
     assert!(members.iter().any(|(k, v)| k == "hint"
-        && matches!(v, Json::String(h) if h.contains("CR_LIMIT_MAX_VALUES (7)"))));
+        && matches!(v, Json::String(h) if h.contains("CR_LIMIT_MAX_DIAGRAM_SIZE (8)"))));
 }
 
 #[test]

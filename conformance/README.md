@@ -54,6 +54,7 @@ A vector file is a JSON document:
 | `evaluate` | `ruleset` (a rule set document's content), and `input` or `inputs` (a batch); optional `limits` (`max_values`, `spec/data-model.md`, *Reading native data*, *Limits*) | `evaluate`, or its batch form | `decision`, or `decisions` for a batch, or `error` |
 | `explain` | `ruleset`, `input` | `evaluate`, then `explain` | `decision` (which `at` pointers refer to) and `explanation`, optionally `text` (the exact text of `explain()`), or `error` |
 | `summary` | `ruleset` | `summary` | `summary`, and optionally `text` |
+| `draw` | `format` (`dot`, `mermaid`, `html` or `html_fragment`), `document` (a condition, rule, rule set or decision table document); optional `input`, with a rule set or a table; optional `limits` (`max_diagram_size`) | `draw_document` (`spec/visual.md`); with an `input`, the rule set (or the table's rule set) evaluates it, and the runner draws the decision's explanation for a rule set (`draw_explanation`), and the table with the decision for a table (`draw_document` with the decision) | `diagram`: the exact text, compared as a string, or `error` (`code` and `name`) |
 
 Optional flags such as `strict` are omitted when false. An `evaluate` vector
 with `limits` checks `max_values`, which bounds what is read from native data
@@ -91,13 +92,21 @@ output, never stopping at the first one.
 ## Runners
 
 - **Core**: `cargo test -p cleanrules --test conformance` reads the documents
-  and data with the core's own JSON reader.
+  and data with the core's own JSON reader, and runs the `draw` vectors.
 - **Python**: `cd bindings/python && uv run pytest tests/test_conformance.py`
   runs every vector through the binding's JSON entry points (`json:<id>`) and,
   except the `read` vectors, with native Python data and the Python API
   (`native:<id>`).
 - **C ABI**: `cargo test -p cleanrules-ffi --test conformance` runs every
-  vector through the C functions, from JSON and from native `cr_value`s.
+  vector through the C functions, from JSON and from native `cr_value`s;
+  `draw` vectors through `cr_document_draw` and the function of the
+  document's content (`cr_node_draw`, `cr_rule_draw`, `cr_ruleset_draw`,
+  `cr_decision_draw`).
+- **Diagrams in the bindings**: until each binding draws diagrams (phase V.2),
+  the Python, C++, JavaScript, Java, Scala and Go runners skip the `draw`
+  vectors, count them and state the reason (`diagram` in the JavaScript, Go
+  and JVM reports); the text they would give is the core's, which the core and
+  C ABI runners check.
 - **C++**: `ctest --test-dir build/cpp -R conformance`, after configuring
   `bindings/cpp` with CMake, runs every vector through `cleanrules.hpp` with
   the JSON entry points and the overloads that throw (`json:<id>`; `read`

@@ -52,8 +52,8 @@ its cause.
 |---|---|---|
 | `format_error` | a document's JSON or shape is invalid (`json-format.md`) | **`pointer`**, or **`line`** and **`column`** for a syntax error |
 | `unsupported_version` | a document's `version` is missing or unknown | **`pointer`** |
-| `limit_exceeded` | a document is too large or nested too deep; or an input's native data, or a native constant, holds more values than `max_values` (`data-model.md`, *Reading native data*, *Limits*) | for node depth, **`pointer`** to the first node too deep, or in text **`line`** and **`column`** where it starts; for JSON nesting, **`line`** and **`column`** of the bracket that exceeds it, and in text of the token that nests too deep (`text.md`); for size, none; for `max_values`, **`name`** (`max_values`), the **`row`** of the input in a batch, and `rule` for a rule's metadata or payload constant when the binding knows it |
-| `decision_mismatch` | a decision does not belong to the rule set it is read with | **`pointer`** |
+| `limit_exceeded` | a document is too large or nested too deep; or an input's native data, or a native constant, holds more values than `max_values` (`data-model.md`, *Reading native data*, *Limits*); or a diagram has more elements than `max_diagram_size` (`visual.md`, *Limits*) | for node depth, **`pointer`** to the first node too deep, or in text **`line`** and **`column`** where it starts; for JSON nesting, **`line`** and **`column`** of the bracket that exceeds it, and in text of the token that nests too deep (`text.md`); for size, none; for `max_diagram_size`, **`name`** (`max_diagram_size`); for `max_values`, **`name`** (`max_values`), the **`row`** of the input in a batch, and `rule` for a rule's metadata or payload constant when the binding knows it |
+| `decision_mismatch` | a decision does not belong to the rule set it is read with, or to the decision table whose grid is drawn with it (`visual.md`, *Decision tables*) | **`pointer`** when read |
 | `expression_error` | a condition node breaks a construction rule (`ast.md`) | `rule`, `node`; **`pointer`** when read from JSON; **`line`** and **`column`** when read from text (`text.md`) |
 | `rule_definition_error` | a rule or rule set breaks a construction rule (`rules.md`, `json-format.md`) | **`rule`** when known; **`pointer`** when read from JSON; **`line`** and **`column`** when read from text |
 | `rule_syntax_error` | a text in the rule syntax cannot be parsed (`text.md`) | **`line`**, **`column`** |
@@ -64,7 +64,7 @@ its cause.
 | `type_mismatch` | strict mode met values of incompatible groups or a value of the `other` group, ordered booleans, or a non-boolean used as a condition | **`rule`**, **`path`**, **`types`**, `node`, **`row`** |
 | `hit_policy_error` | the hit policy cannot decide (below) | **`rules`**, **`row`** |
 | `action_error` | an action raised during `run` | **`rule`**, **`executed`**, `decision` |
-| `unsupported` | this build, this logic or this version of the format cannot do the operation (`json-format.md`, `explain.md`) | `operation`, `reason` |
+| `unsupported` | this build, this logic or this version of the format cannot do the operation (`json-format.md`, `explain.md`; drawing a decision table in DOT or Mermaid, `visual.md`) | `operation`, `reason` |
 
 Context fields:
 
@@ -81,7 +81,7 @@ Context fields:
 - `node`: the failing node, as a condition node in JSON form, when it can be
   written (a NaN constant cannot);
 - `name`, `available`: the name looked up, and the names that exist, sorted;
-  for `limit_exceeded`, `name` is the limit's (`max_values`);
+  for `limit_exceeded`, `name` is the limit's (`max_values`, `max_diagram_size`);
 - `operation`, `reason`: what was not supported, and why, in words.
 
 **`hit_policy_error`** is raised when `UNIQUE` sees more than one rule fire

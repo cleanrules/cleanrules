@@ -13,8 +13,11 @@ use std::path::{Path, PathBuf};
 
 use cleanrules::json::{Json, same, to_string};
 use cleanrules_ffi::{
-    CR_FORMAT_CSV, CR_FORMAT_JSON, CR_FORMAT_TEXT, CR_FORMAT_YAML, CR_LIMIT_MAX_DEPTH,
-    CR_LIMIT_MAX_NESTING, CR_LIMIT_MAX_SIZE, CR_LIMIT_MAX_TABLE_SIZE,
+    CR_DIAGRAM_DOT, CR_DIAGRAM_HTML, CR_DIAGRAM_HTML_FRAGMENT, CR_DIAGRAM_MERMAID, CR_FORMAT_CSV,
+    CR_FORMAT_JSON, CR_FORMAT_TEXT, CR_FORMAT_YAML, CR_LIMIT_MAX_DEPTH, CR_LIMIT_MAX_DIAGRAM_SIZE,
+    CR_LIMIT_MAX_NESTING, CR_LIMIT_MAX_SIZE, CR_LIMIT_MAX_TABLE_SIZE, cr_decision_draw,
+    cr_document_condition, cr_document_draw, cr_document_rule, cr_node_draw, cr_rule_draw,
+    cr_ruleset_draw,
 };
 use common::{Failure, Limits_, json, on_small_stack};
 
@@ -162,6 +165,7 @@ fn limits_of(given: &Json) -> Option<Limits_> {
                 "max_nesting" => CR_LIMIT_MAX_NESTING,
                 "max_depth" => CR_LIMIT_MAX_DEPTH,
                 "max_table_size" => CR_LIMIT_MAX_TABLE_SIZE,
+                "max_diagram_size" => CR_LIMIT_MAX_DIAGRAM_SIZE,
                 other => panic!("unknown limit {other}"),
             };
             let Json::Number(n) = v else { panic!() };
@@ -321,6 +325,97 @@ fn run_evaluate(given: &Json, expect: &Json, explain: bool) -> Result<(), String
     Ok(())
 }
 
+/// The fields of a drawing error that are compared (`spec/errors.md`).
+const DRAW_FIELDS: [&str; 2] = ["code", "name"];
+
+/// Compare a diagram with the vector's, or its error.
+fn compare_diagram(actual: Result<String, Failure>, expect: &Json) -> Result<(), String> {
+    match (actual, get(expect, "error")) {
+        (Ok(diagram), None) => {
+            let wanted = string(get(expect, "diagram")).unwrap();
+            if diagram == wanted {
+                Ok(())
+            } else {
+                Err(format!("got\n{diagram}\nwant\n{wanted}"))
+            }
+        }
+        (Ok(diagram), Some(error)) => Err(format!("got\n{diagram}\nexpected {}", to_string(error))),
+        (Err(failure), None) => Err(format!("unexpected error {}", to_string(&failure.json))),
+        (Err(failure), Some(error)) => compare_error(&failure, error, &DRAW_FIELDS),
+    }
+}
+
+/// A diagram (`spec/visual.md`), through `cr_document_draw` and through the
+/// function of the document's content.
+fn run_draw(given: &Json, expect: &Json) -> Result<(), String> {
+    let format = match string(get(given, "format")).unwrap() {
+        "dot" => CR_DIAGRAM_DOT,
+        "mermaid" => CR_DIAGRAM_MERMAID,
+        "html" => CR_DIAGRAM_HTML,
+        "html_fragment" => CR_DIAGRAM_HTML_FRAGMENT,
+        other => panic!("unknown diagram format {other}"),
+    };
+    let limits = limits_of(given);
+    let raw = limits.as_ref().map_or(std::ptr::null(), |l| l.0);
+    let source = get(given, "document").unwrap();
+    let document = common::read_document(to_string(source).as_bytes(), CR_FORMAT_JSON, None)
+        .map_err(|f| to_string(&f.json))?;
+    let content = |key| get(source, key).is_some();
+    let Some(input) = get(given, "input") else {
+        // SAFETY: a live document; no decision; live or NULL limits.
+        let drawn = common::text(|out, len, error| unsafe {
+            cr_document_draw(document.0, std::ptr::null(), format, raw, out, len, error)
+        });
+        compare_diagram(drawn, expect)?;
+        let drawn = if content("condition") {
+            // SAFETY: a live document.
+            let node = common::handle(|out, error| unsafe {
+                cr_document_condition(document.0, out, error)
+            })
+            .map(common::Node)
+            .unwrap();
+            // SAFETY: a live node; live or NULL limits.
+            common::text(|out, len, error| unsafe {
+                cr_node_draw(node.0, format, raw, out, len, error)
+            })
+        } else if content("rule") {
+            // SAFETY: a live document.
+            let rule =
+                common::handle(|out, error| unsafe { cr_document_rule(document.0, out, error) })
+                    .map(common::Rule)
+                    .unwrap();
+            // SAFETY: a live rule; live or NULL limits.
+            common::text(|out, len, error| unsafe {
+                cr_rule_draw(rule.0, format, raw, out, len, error)
+            })
+        } else if content("ruleset") {
+            let ruleset = common::ruleset_of(&document).unwrap();
+            // SAFETY: a live rule set; no flags; live or NULL limits.
+            common::text(|out, len, error| unsafe {
+                cr_ruleset_draw(ruleset.0, std::ptr::null(), 0, format, raw, out, len, error)
+            })
+        } else {
+            return Ok(());
+        };
+        return compare_diagram(drawn, expect);
+    };
+    let ruleset = common::ruleset_of(&document).unwrap();
+    let decision =
+        common::evaluate(&ruleset, to_string(input).as_bytes()).map_err(|f| to_string(&f.json))?;
+    let drawn = if content("decision_table") {
+        // SAFETY: a live document and decision; live or NULL limits.
+        common::text(|out, len, error| unsafe {
+            cr_document_draw(document.0, decision.0, format, raw, out, len, error)
+        })
+    } else {
+        // SAFETY: a live decision; live or NULL limits.
+        common::text(|out, len, error| unsafe {
+            cr_decision_draw(decision.0, format, raw, out, len, error)
+        })
+    };
+    compare_diagram(drawn, expect)
+}
+
 fn run(vector: &Json) -> Result<(), String> {
     let given = get(vector, "given").unwrap();
     let expect = get(vector, "expect").unwrap();
@@ -331,6 +426,7 @@ fn run(vector: &Json) -> Result<(), String> {
         "evaluate" if get(given, "inputs").is_some() => run_batch(given, expect),
         "evaluate" => run_evaluate(given, expect, false),
         "explain" => run_evaluate(given, expect, true),
+        "draw" => run_draw(given, expect),
         "summary" => {
             let summary = common::summary(&ruleset(given), CR_FORMAT_JSON)
                 .map(|text| content(&text, "summary"));

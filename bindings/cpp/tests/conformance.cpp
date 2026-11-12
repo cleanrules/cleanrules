@@ -1068,6 +1068,7 @@ int main(int argc, char **argv) {
     const std::filesystem::path dir = argc > 1 ? argv[1] : CLEANRULES_VECTORS;
     std::size_t ran = 0;
     std::size_t skipped = 0;
+    std::size_t skipped_draw = 0;
     std::size_t passed_json = 0;
     std::size_t ran_native = 0;
     std::size_t passed_native = 0;
@@ -1086,6 +1087,12 @@ int main(int argc, char **argv) {
                 // `max_values` bounds native data: C++ builds its values
                 // itself, so only the bindings' native runs check these.
                 const json::value &given = need(vector, "given");
+                // Diagrams are drawn by the core and checked through the C ABI's
+                // runner; cleanrules.hpp draws them from phase V.2.
+                if (need(given, "kind").text == "draw") {
+                    ++skipped_draw;
+                    continue;
+                }
                 if (need(given, "kind").text == "evaluate" && given.get("limits") != nullptr) {
                     ++skipped;
                     continue;
@@ -1115,8 +1122,9 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "%s\n", failed.c_str());
     }
     std::printf("conformance: %zu vectors; json %zu of %zu passed, native %zu of %zu passed; %zu "
-                "native-only skipped\n",
-                ran, passed_json, ran, passed_native, ran_native, skipped);
+                "native-only skipped; %zu diagrams skipped (spec/visual.md: checked through the "
+                "C ABI until cleanrules.hpp draws them)\n",
+                ran, passed_json, ran, passed_native, ran_native, skipped, skipped_draw);
     if (!failures.empty()) {
         std::fprintf(stderr, "conformance: %zu failures\n", failures.size());
         return EXIT_FAILURE;

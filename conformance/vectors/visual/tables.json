@@ -1,0 +1,430 @@
+{
+  "version": 1,
+  "area": "visual",
+  "vectors": [
+    {
+      "id": "visual/tables/grid",
+      "spec": [
+        "visual.md#decision-tables",
+        "visual.md#html"
+      ],
+      "description": "A decision table's grid: the CSV's columns with the rule names",
+      "given": {
+        "kind": "draw",
+        "format": "html",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "priority",
+            "inputs": [
+              "customer.years",
+              "order.total"
+            ],
+            "outputs": [
+              {
+                "name": "discount"
+              }
+            ],
+            "rows": [
+              {
+                "name": "vip",
+                "priority": 10,
+                "description": "Best customers,\nwith <large> orders",
+                "inputs": [
+                  "> 5",
+                  "> 1000"
+                ],
+                "outputs": [
+                  "0.15"
+                ]
+              },
+              {
+                "inputs": [
+                  "-",
+                  "> 5000"
+                ],
+                "outputs": [
+                  "0.1"
+                ]
+              },
+              {
+                "name": "small",
+                "inputs": [
+                  "IN (1, 2)",
+                  "-"
+                ],
+                "outputs": [
+                  "0"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>cleanrules: decision table</title>\n<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n</head>\n<body>\n<div class=\"cleanrules cleanrules-decision-table\">\n<table class=\"grid\">\n<caption>HIT POLICY priority</caption>\n<thead><tr><th>RULE</th><th>PRIORITY</th><th>customer.years</th><th>order.total</th><th>THEN discount</th><th>DESCRIPTION</th></tr></thead>\n<tbody>\n<tr><th scope=\"row\">vip</th><td>10</td><td>&gt; 5</td><td>&gt; 1000</td><td>0.15</td><td class=\"description\">Best customers,\nwith &lt;large&gt; orders</td></tr>\n<tr><th scope=\"row\">row_2</th><td></td><td>-</td><td>&gt; 5000</td><td>0.1</td><td class=\"description\"></td></tr>\n<tr><th scope=\"row\">small</th><td></td><td>IN (1, 2)</td><td>-</td><td>0</td><td class=\"description\"></td></tr>\n</tbody>\n</table>\n</div>\n</body>\n</html>\n"
+      }
+    },
+    {
+      "id": "visual/tables/grid-with-decision",
+      "spec": [
+        "visual.md#decision-tables",
+        "visual.md#html"
+      ],
+      "description": "With a decision, a STATUS column and the rows' classes",
+      "given": {
+        "kind": "draw",
+        "format": "html_fragment",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "priority",
+            "inputs": [
+              "customer.years",
+              "order.total"
+            ],
+            "outputs": [
+              {
+                "name": "discount"
+              }
+            ],
+            "rows": [
+              {
+                "name": "vip",
+                "priority": 10,
+                "description": "Best customers,\nwith <large> orders",
+                "inputs": [
+                  "> 5",
+                  "> 1000"
+                ],
+                "outputs": [
+                  "0.15"
+                ]
+              },
+              {
+                "inputs": [
+                  "-",
+                  "> 5000"
+                ],
+                "outputs": [
+                  "0.1"
+                ]
+              },
+              {
+                "name": "small",
+                "inputs": [
+                  "IN (1, 2)",
+                  "-"
+                ],
+                "outputs": [
+                  "0"
+                ]
+              }
+            ]
+          }
+        },
+        "input": {
+          "customer": {
+            "years": 7
+          },
+          "order": {
+            "total": 6000
+          }
+        }
+      },
+      "expect": {
+        "diagram": "<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n<div class=\"cleanrules cleanrules-decision-table\">\n<table class=\"grid\">\n<caption>HIT POLICY priority</caption>\n<thead><tr><th>RULE</th><th>STATUS</th><th>PRIORITY</th><th>customer.years</th><th>order.total</th><th>THEN discount</th><th>DESCRIPTION</th></tr></thead>\n<tbody>\n<tr class=\"rule_selected\" style=\"background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px\"><th scope=\"row\">vip</th><td>selected</td><td>10</td><td>&gt; 5</td><td>&gt; 1000</td><td>0.15</td><td class=\"description\">Best customers,\nwith &lt;large&gt; orders</td></tr>\n<tr class=\"rule_fired\" style=\"background:#ffffff;border:1px solid #1a73e8;border-radius:8px\"><th scope=\"row\">row_2</th><td>fired, not selected</td><td></td><td>-</td><td>&gt; 5000</td><td>0.1</td><td class=\"description\"></td></tr>\n<tr class=\"rule_not_fired\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:8px\"><th scope=\"row\">small</th><td>not fired</td><td></td><td>IN (1, 2)</td><td>-</td><td>0</td><td class=\"description\"></td></tr>\n</tbody>\n</table>\n</div>\n"
+      }
+    },
+    {
+      "id": "visual/tables/grid-unknown",
+      "spec": [
+        "visual.md#decision-tables"
+      ],
+      "description": "A row whose condition is unknown",
+      "given": {
+        "kind": "draw",
+        "format": "html_fragment",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "priority",
+            "inputs": [
+              "customer.years",
+              "order.total"
+            ],
+            "outputs": [
+              {
+                "name": "discount"
+              }
+            ],
+            "rows": [
+              {
+                "name": "vip",
+                "priority": 10,
+                "description": "Best customers,\nwith <large> orders",
+                "inputs": [
+                  "> 5",
+                  "> 1000"
+                ],
+                "outputs": [
+                  "0.15"
+                ]
+              },
+              {
+                "inputs": [
+                  "-",
+                  "> 5000"
+                ],
+                "outputs": [
+                  "0.1"
+                ]
+              },
+              {
+                "name": "small",
+                "inputs": [
+                  "IN (1, 2)",
+                  "-"
+                ],
+                "outputs": [
+                  "0"
+                ]
+              }
+            ]
+          }
+        },
+        "input": {
+          "customer": {
+            "years": null
+          },
+          "order": {
+            "total": 10
+          }
+        }
+      },
+      "expect": {
+        "diagram": "<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n<div class=\"cleanrules cleanrules-decision-table\">\n<table class=\"grid\">\n<caption>HIT POLICY priority</caption>\n<thead><tr><th>RULE</th><th>STATUS</th><th>PRIORITY</th><th>customer.years</th><th>order.total</th><th>THEN discount</th><th>DESCRIPTION</th></tr></thead>\n<tbody>\n<tr class=\"rule_not_fired\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:8px\"><th scope=\"row\">vip</th><td>not fired</td><td>10</td><td>&gt; 5</td><td>&gt; 1000</td><td>0.15</td><td class=\"description\">Best customers,\nwith &lt;large&gt; orders</td></tr>\n<tr class=\"rule_not_fired\" style=\"background:#ffffff;border:1px solid #5f6368;border-radius:8px\"><th scope=\"row\">row_2</th><td>not fired</td><td></td><td>-</td><td>&gt; 5000</td><td>0.1</td><td class=\"description\"></td></tr>\n<tr class=\"rule_unknown\" style=\"background:#f1f3f4;border:1px dashed #80868b;border-radius:8px\"><th scope=\"row\">small</th><td>unknown</td><td></td><td>IN (1, 2)</td><td>-</td><td>0</td><td class=\"description\"></td></tr>\n</tbody>\n</table>\n</div>\n"
+      }
+    },
+    {
+      "id": "visual/tables/output-order",
+      "spec": [
+        "visual.md#decision-tables"
+      ],
+      "description": "Rows in row order under output_order, output values in the header",
+      "given": {
+        "kind": "draw",
+        "format": "html_fragment",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "output_order",
+            "inputs": [
+              "score"
+            ],
+            "outputs": [
+              {
+                "name": "risk",
+                "values": [
+                  "high",
+                  "low"
+                ]
+              }
+            ],
+            "rows": [
+              {
+                "inputs": [
+                  "< 50"
+                ],
+                "outputs": [
+                  "'low'"
+                ]
+              },
+              {
+                "inputs": [
+                  "< 20"
+                ],
+                "outputs": [
+                  "'high'"
+                ]
+              }
+            ]
+          }
+        },
+        "input": {
+          "score": 10
+        }
+      },
+      "expect": {
+        "diagram": "<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n<div class=\"cleanrules cleanrules-decision-table\">\n<table class=\"grid\">\n<caption>HIT POLICY output_order</caption>\n<thead><tr><th>RULE</th><th>STATUS</th><th>score</th><th>THEN risk IN (&#39;high&#39;, &#39;low&#39;)</th></tr></thead>\n<tbody>\n<tr class=\"rule_selected\" style=\"background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px\"><th scope=\"row\">row_1</th><td>selected</td><td>&lt; 50</td><td>&#39;low&#39;</td></tr>\n<tr class=\"rule_selected\" style=\"background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px\"><th scope=\"row\">row_2</th><td>selected</td><td>&lt; 20</td><td>&#39;high&#39;</td></tr>\n</tbody>\n</table>\n</div>\n"
+      }
+    },
+    {
+      "id": "visual/tables/collect-caption",
+      "spec": [
+        "visual.md#decision-tables"
+      ],
+      "description": "The caption names the aggregate",
+      "given": {
+        "kind": "draw",
+        "format": "html_fragment",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "collect",
+            "aggregate": "count",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": "n"
+              }
+            ],
+            "rows": [
+              {
+                "inputs": [
+                  "-"
+                ],
+                "outputs": [
+                  null
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "<style>\n.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}\n.cleanrules .title{font-weight:bold;margin:0 0 8px}\n.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}\n.cleanrules ul.tree{padding-left:0}\n.cleanrules ul.tree ul{border-left:1px solid #dadce0}\n.cleanrules li{margin:4px 0}\n.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}\n.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}\n.cleanrules .payload{font-style:italic}\n.cleanrules table{border-collapse:collapse}\n.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}\n.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}\n.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}\n.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}\n.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}\n.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}\n.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}\n.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}\n.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}\n.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}\n.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}\n.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}\n.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}\n</style>\n<div class=\"cleanrules cleanrules-decision-table\">\n<table class=\"grid\">\n<caption>HIT POLICY collect AGGREGATE count</caption>\n<thead><tr><th>RULE</th><th>x</th><th>THEN n</th></tr></thead>\n<tbody>\n<tr><th scope=\"row\">row_1</th><td>-</td><td></td></tr>\n</tbody>\n</table>\n</div>\n"
+      }
+    },
+    {
+      "id": "visual/tables/no-dot",
+      "spec": [
+        "visual.md#decision-tables"
+      ],
+      "description": "A decision table has no dot diagram",
+      "given": {
+        "kind": "draw",
+        "format": "dot",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "priority",
+            "inputs": [
+              "customer.years",
+              "order.total"
+            ],
+            "outputs": [
+              {
+                "name": "discount"
+              }
+            ],
+            "rows": [
+              {
+                "name": "vip",
+                "priority": 10,
+                "description": "Best customers,\nwith <large> orders",
+                "inputs": [
+                  "> 5",
+                  "> 1000"
+                ],
+                "outputs": [
+                  "0.15"
+                ]
+              },
+              {
+                "inputs": [
+                  "-",
+                  "> 5000"
+                ],
+                "outputs": [
+                  "0.1"
+                ]
+              },
+              {
+                "name": "small",
+                "inputs": [
+                  "IN (1, 2)",
+                  "-"
+                ],
+                "outputs": [
+                  "0"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
+      "id": "visual/tables/no-mermaid",
+      "spec": [
+        "visual.md#decision-tables"
+      ],
+      "description": "A decision table has no mermaid diagram",
+      "given": {
+        "kind": "draw",
+        "format": "mermaid",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "priority",
+            "inputs": [
+              "customer.years",
+              "order.total"
+            ],
+            "outputs": [
+              {
+                "name": "discount"
+              }
+            ],
+            "rows": [
+              {
+                "name": "vip",
+                "priority": 10,
+                "description": "Best customers,\nwith <large> orders",
+                "inputs": [
+                  "> 5",
+                  "> 1000"
+                ],
+                "outputs": [
+                  "0.15"
+                ]
+              },
+              {
+                "inputs": [
+                  "-",
+                  "> 5000"
+                ],
+                "outputs": [
+                  "0.1"
+                ]
+              },
+              {
+                "name": "small",
+                "inputs": [
+                  "IN (1, 2)",
+                  "-"
+                ],
+                "outputs": [
+                  "0"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    }
+  ]
+}

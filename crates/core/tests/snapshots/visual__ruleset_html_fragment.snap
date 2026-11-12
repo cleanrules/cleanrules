@@ -1,0 +1,42 @@
+---
+source: crates/core/tests/visual.rs
+expression: "draw_ruleset(&overview, DiagramFormat::HtmlFragment, &limits()).unwrap()"
+---
+<style>
+.cleanrules{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#202124}
+.cleanrules .title{font-weight:bold;margin:0 0 8px}
+.cleanrules ul.tree,.cleanrules ul.tree ul{list-style:none;margin:0;padding-left:24px}
+.cleanrules ul.tree{padding-left:0}
+.cleanrules ul.tree ul{border-left:1px solid #dadce0}
+.cleanrules li{margin:4px 0}
+.cleanrules .node{display:inline-block;border-radius:3px;padding:2px 6px}
+.cleanrules .description{white-space:pre-wrap;color:#5f6368;font-style:italic}
+.cleanrules .payload{font-style:italic}
+.cleanrules table{border-collapse:collapse}
+.cleanrules caption{font-weight:bold;text-align:left;margin-bottom:4px}
+.cleanrules th,.cleanrules td{border:1px solid #dadce0;padding:2px 6px;text-align:left;vertical-align:top}
+.cleanrules .connective{background:#ffffff;border:1px solid #5f6368;border-radius:12px}
+.cleanrules .leaf{background:#f8f9fa;border:1px solid #5f6368}
+.cleanrules .rule{background:#ffffff;border:1px solid #202124;border-radius:8px}
+.cleanrules .rule_selected{background:#e8f0fe;border:2px solid #1a73e8;border-radius:8px}
+.cleanrules .rule_fired{background:#ffffff;border:1px solid #1a73e8;border-radius:8px}
+.cleanrules .rule_not_fired{background:#ffffff;border:1px solid #5f6368;border-radius:8px}
+.cleanrules .rule_unknown{background:#f1f3f4;border:1px dashed #80868b;border-radius:8px}
+.cleanrules .truth_true{background:#e6f4ea;border:1px solid #1e8e3e}
+.cleanrules .truth_false{background:#fce8e6;border:1px solid #d93025}
+.cleanrules .truth_unknown{background:#f1f3f4;border:1px dashed #80868b}
+.cleanrules .truth_degree{background:#fef7e0;border:1px solid #f9ab00}
+.cleanrules .field{background:#ffffff;border:1px solid #5f6368;border-radius:12px}
+.cleanrules .output{background:#f3e8fd;border:1px solid #9334e6}
+</style>
+<div class="cleanrules cleanrules-rule-set">
+<p class="title">HIT POLICY priority</p>
+<table>
+<thead><tr><th>rule</th><th>reads</th><th>outputs</th></tr></thead>
+<tbody>
+<tr><td><div class="node rule" style="background:#ffffff;border:1px solid #202124;border-radius:8px"><div class="line">1. vip</div><div class="line">PRIORITY 10</div><div class="line">customer.years &gt; 5 AND since IS NULL</div><div class="description">Best customers</div></div></td><td><div class="line">customer.years</div><div class="line">since</div><div class="line payload">customer.name (payload)</div></td><td><div class="line">discount</div><div class="line">label</div></td></tr>
+<tr><td><div class="node rule" style="background:#ffffff;border:1px solid #202124;border-radius:8px"><div class="line">2. loyal</div><div class="line">PRIORITY 5</div><div class="line">customer.years &gt; 2</div><div class="line">DO notify</div></div></td><td><div class="line">customer.years</div></td><td><div class="line">discount</div></td></tr>
+<tr><td><div class="node rule" style="background:#ffffff;border:1px solid #202124;border-radius:8px"><div class="line">3. rest</div><div class="line">PRIORITY 0</div><div class="line">TRUE</div><div class="line">+action</div></div></td><td></td><td><div class="line">discount</div></td></tr>
+</tbody>
+</table>
+</div>

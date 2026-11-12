@@ -1,0 +1,42 @@
+---
+source: crates/core/tests/visual.rs
+expression: "drawn.join(\"\\n\")"
+---
+digraph cleanrules {
+  graph [rankdir=LR, fontname="Helvetica", label="HIT POLICY first", labelloc=t];
+  node [fontname="Helvetica", fontsize=11];
+  edge [color="#5f6368"];
+  n0 [label="`we\"ird<key>`.`k\\u000ay`", class="field", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n1 [label="`é😀`", class="field", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n2 [label="1. \"a\\\"b<i>&amp;#quot;`x`\"\n`we\"ird<key>`.`k\\u000ay` = \"</script><b>x</b>\\n--> n9;%% #35; `md`\" AND NOT `é😀` STARTS WITH \"\\\\N...", class="rule", shape=box, style="rounded,filled", fillcolor="#ffffff", color="#202124"];
+  n3 [label="\"label\\\"<>\"", class="output", shape=box, style="filled", fillcolor="#f3e8fd", color="#9334e6"];
+  n0 -> n2;
+  n1 -> n2;
+  n2 -> n3;
+}
+
+digraph cleanrules {
+  graph [rankdir=TB, fontname="Helvetica"];
+  node [fontname="Helvetica", fontsize=11];
+  edge [color="#5f6368"];
+  n0 [label="RULE \"a\\\"b<i>&amp;#quot;`x`\"", class="rule", shape=box, style="rounded,filled", fillcolor="#ffffff", color="#202124"];
+  n1 [label="all", class="connective", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n2 [label="`we\"ird<key>`.`k\\u000ay` = \"</script><b>x</b>\\n--> n9;%% #35; `md`\"", class="leaf", shape=box, style="filled", fillcolor="#f8f9fa", color="#5f6368"];
+  n3 [label="not", class="connective", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n4 [label="`é😀` STARTS WITH \"\\\\N\\\\l{|}\"", class="leaf", shape=box, style="filled", fillcolor="#f8f9fa", color="#5f6368"];
+  n5 [label="THEN \"label\\\"<>\" = \"&lt;\"", class="output", shape=box, style="filled", fillcolor="#f3e8fd", color="#9334e6"];
+  n0 -> n1;
+  n1 -> n2;
+  n1 -> n3;
+  n3 -> n4;
+  n0 -> n5 [style=dashed];
+}
+
+digraph cleanrules {
+  graph [rankdir=TB, fontname="Helvetica", label="HIT POLICY first: selected no rule", labelloc=t];
+  node [fontname="Helvetica", fontsize=11];
+  edge [color="#5f6368"];
+  n0 [label="[ ] \"a\\\"b<i>&amp;#quot;`x`\" (not fired)\n`we\"ird<key>`.`k\\u000ay` = \"</script><b>x</b>\\n--> n9;%% #35; `md`\" AND NOT `é😀` STARTS WITH \"\\\\N...", class="rule_not_fired", shape=box, style="rounded,filled", fillcolor="#ffffff", color="#5f6368"];
+  n1 [label="`we\"ird<key>`.`k\\u000ay` = \"</script><b>x</b>\\n--> n9;%% #35; `md`\"\nfalse (`we\"ird<key>`.`k\\u000ay` = \"<img src=x onerror=alert(1)>\\\"\\n\")", class="truth_false", shape=box, style="filled", fillcolor="#fce8e6", color="#d93025"];
+  n0 -> n1;
+}

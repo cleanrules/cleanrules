@@ -319,6 +319,50 @@
             "ruleset"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Draw a diagram (spec/visual.md): of the document, or, with an input, of the explanation of a rule set's decision or of a decision table's grid with the statuses of its rows.",
+          "properties": {
+            "kind": {
+              "const": "draw"
+            },
+            "format": {
+              "enum": [
+                "dot",
+                "mermaid",
+                "html",
+                "html_fragment"
+              ]
+            },
+            "document": {
+              "type": "object",
+              "description": "A condition, rule, rule set or decision table document (spec/json-format.md)."
+            },
+            "input": {
+              "$ref": "https://cleanrules.github.io/schemas/v1/value.schema.json#/$defs/value",
+              "description": "Only with a rule set or a decision table."
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "max_diagram_size": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "max_diagram_size"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "format",
+            "document"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -361,6 +405,10 @@
         "compiled": {
           "$ref": "https://cleanrules.github.io/schemas/v1/ruleset.schema.json#/$defs/ruleset",
           "description": "The rule set a decision table compiles into (spec/tables.md, Compiling)."
+        },
+        "diagram": {
+          "type": "string",
+          "description": "The exact text of a diagram (spec/visual.md)."
         },
         "error": {
           "type": "object",

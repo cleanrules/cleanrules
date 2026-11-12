@@ -79,7 +79,14 @@ The whole program, with explanations and errors, is
   refuse the input with the core's error, `cr_error_new_max_values(limit, row,
   rule, len, ...)` (`CR_LIMIT_EXCEEDED`, `name` `max_values`; `spec/data-model.md`,
   *Reading native data*, *Limits*). The ABI does not count the values a
-  program builds itself.
+  program builds itself. `CR_LIMIT_MAX_DIAGRAM_SIZE` (20,000 by default)
+  bounds the elements of a diagram.
+- **Diagrams.** `cr_node_draw`, `cr_rule_draw`, `cr_ruleset_draw`,
+  `cr_decision_draw` (its explanation) and `cr_document_draw` (any document;
+  a decision table's HTML grid, with an optional decision) write a diagram in
+  `CR_DIAGRAM_DOT`, `CR_DIAGRAM_MERMAID`, `CR_DIAGRAM_HTML` or
+  `CR_DIAGRAM_HTML_FRAGMENT` (`spec/visual.md`): a new text, freed with
+  `cr_string_free`.
 - **Stack.** At the default limits every call needs at most 128 KiB of stack
   in a release build of the library (512 KiB in a debug build), less than a
   JVM thread has (1 MiB on Linux and Windows). Freeing values or

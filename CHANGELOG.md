@@ -831,6 +831,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   datetimes as tuples tagged by the binding, and Elixir's `Date`,
   `NaiveDateTime`, `DateTime` and `Decimal` structs. No vectors: the Erlang
   runner (task N.4) will run every vector with Erlang terms.
+- Diagrams (task V.1, `spec/visual.md`): the core draws conditions, rules,
+  rule sets, explanations and decision tables as DOT (Graphviz), Mermaid and
+  standalone HTML (no script, no external resource), or an HTML fragment to
+  embed, with no graphics library. A condition is its tree (`all`, `any`,
+  `not`, and each other node a leaf in the canonical text); a rule adds its
+  outputs and action; a rule set shows, from its summary, the fields each
+  rule reads and its outputs, ranked by the policy; an explanation shows each
+  rule's causes marked with their truth values (classes and words, so colour
+  is never the only mark) and counterfactuals, the selected rules
+  highlighted; a decision table is its HTML grid, with the status of each row
+  when given a decision of its rule set. Labels are escaped for each format
+  (DOT strings, Mermaid entity codes, HTML; HTML elements also carry their
+  colours in `style` attributes, for sanitizers that remove `<style>`) and
+  cut at 100 characters, and a
+  diagram has at most `max_diagram_size` elements (20,000 by default;
+  `limit_exceeded` with `name`). Rust: `cleanrules::visual` (`DiagramFormat`,
+  `draw_condition`, `draw_rule`, `draw_ruleset`, `draw_explanation`,
+  `draw_table`, `draw_document` with an optional decision for a table's
+  grid; `Mark`, `TruthClass` and the sealed `ToMark` trait, which the graded
+  truth values of phase J implement in the core with `Mark::degree`)
+  and `Limits::max_diagram_size`. C ABI: `cr_node_draw`, `cr_rule_draw`,
+  `cr_ruleset_draw` (with the flags of actions given as code),
+  `cr_decision_draw` and `cr_document_draw` (a table with an optional
+  decision), the formats `CR_DIAGRAM_DOT`, `CR_DIAGRAM_MERMAID`,
+  `CR_DIAGRAM_HTML` and `CR_DIAGRAM_HTML_FRAGMENT`, and the limit
+  `CR_LIMIT_MAX_DIAGRAM_SIZE`; each text is the caller's, freed with
+  `cr_string_free`. 42 conformance vectors of the new kind `draw`
+  (`conformance/vectors/visual/`), run by the core and the C ABI and skipped,
+  counted and explained by the other runners until the bindings draw (V.2).
+  Example in `docs/examples/diagrams.md`.
 - C ABI: `cr_grid_push_row_cells`, a grid row whose cells say what they are
   (`CR_CELL_TEXT`, `CR_CELL_VALUE`, `CR_CELL_NODE`), so that a string can be
   a value, such as a host language's enum constant, which the core reads by

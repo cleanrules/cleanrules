@@ -19,6 +19,7 @@ use cleanrules::logic::{Kleene, Truth};
 use cleanrules::rules::{Aggregate, Config, HitPolicy, Rule, RuleSet};
 use cleanrules::table::DecisionTable;
 use cleanrules::value::{Decimal, Map, NullCause, Value};
+use cleanrules::visual::{DiagramFormat, draw_explanation, draw_rule, draw_ruleset};
 use cleanrules::{ErrorCode, Segment};
 use proptest::prelude::*;
 
@@ -582,6 +583,49 @@ fn alternative_decision(decision: &Json) -> Json {
 
 // --- Properties ------------------------------------------------------------------------------
 
+/// Whether every label of a diagram stays a label: its quotes, markup and line
+/// breaks escaped (`spec/visual.md`, *Formats*).
+fn labels_are_escaped(format: DiagramFormat, text: &str) -> Result<(), String> {
+    for line in text.lines() {
+        let fine = match format {
+            DiagramFormat::Dot if line.contains("[label=") => {
+                line.replace("\\\\", "")
+                    .replace("\\\"", "")
+                    .matches('"')
+                    .count()
+                    == 10
+            }
+            DiagramFormat::Mermaid if line.starts_with("  n") && line.contains('"') => {
+                line.matches('"').count() == 2
+                    && line.matches('<').count() == line.matches("<br>").count()
+                    && !line.contains(['`', '&', '\\'])
+            }
+            DiagramFormat::Html | DiagramFormat::HtmlFragment => {
+                // Outside tags, no markup character is left unescaped.
+                let mut rest = line;
+                let mut ok = true;
+                while let Some(open) = rest.find('<') {
+                    ok &= !rest[..open].contains(['>', '"', '\'']);
+                    let Some(close) = rest[open..].find('>') else {
+                        return Err(format!("unclosed tag in {line}"));
+                    };
+                    let tag = &rest[open + 1..open + close];
+                    ok &= tag
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || " =\"-_/!:;#".contains(c));
+                    rest = &rest[open + close + 1..];
+                }
+                ok && !rest.contains(['>', '"', '\''])
+            }
+            _ => true,
+        };
+        if !fine {
+            return Err(format!("{} line not escaped: {line}", format.as_str()));
+        }
+    }
+    Ok(())
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(512))]
 
@@ -708,6 +752,27 @@ proptest! {
             panic!("not a table")
         };
         prop_assert!(same(&write_document(&Document::DecisionTable(from_json)), &written));
+    }
+
+    #[test]
+    fn diagrams_escape_every_label(rules in odd_ruleset(), data in input()) {
+        let limits = Limits::default();
+        let decision = rules.evaluate(&data);
+        for format in [DiagramFormat::Dot, DiagramFormat::Mermaid, DiagramFormat::Html, DiagramFormat::HtmlFragment] {
+            let mut drawn = vec![draw_ruleset(&cleanrules::explain::summary(&rules), format, &limits).unwrap()];
+            for rule in rules.rules() {
+                drawn.push(draw_rule(rule, format, &limits).unwrap());
+            }
+            if let Ok(decision) = &decision {
+                drawn.push(draw_explanation(&explain(decision), format, &limits).unwrap());
+            }
+            for text in &drawn {
+                prop_assert!(text.ends_with('\n'));
+                if let Err(problem) = labels_are_escaped(format, text) {
+                    prop_assert!(false, "{problem}\n{text}");
+                }
+            }
+        }
     }
 
     #[test]

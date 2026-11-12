@@ -16,8 +16,8 @@ import scala.jdk.CollectionConverters.*
  * Java route run in the Java project's `ConformanceTest`.
  */
 class ScalaConformanceSuite extends munit.FunSuite:
-  /** The skips the Scala route may have, as the Java route's: values no JVM value holds. Any other is a failure. */
-  private val allowedSkips = Set("decimal_infinity", "zone_unknown_to_java")
+  /** The skips the Scala route may have, as the Java route's: values no JVM value holds, and diagrams (V.2). Any other is a failure. */
+  private val allowedSkips = Set("decimal_infinity", "zone_unknown_to_java", "diagram")
 
   private val files = Conformance.files().asScala.toVector
   private val runner = ScalaConformance()

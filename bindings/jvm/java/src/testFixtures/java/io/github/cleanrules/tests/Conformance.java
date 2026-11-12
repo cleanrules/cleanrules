@@ -129,7 +129,10 @@ class Conformance {
             "a datetime in a zone that Java's zone database does not know, which no Java value holds",
             "native",
             "max_values bounds what is read from native data only, so evaluate vectors with limits run in the native"
-                    + " route");
+                    + " route",
+            "diagram",
+            "diagrams (spec/visual.md) are drawn by the core and checked through the C ABI's runner; the Java and"
+                    + " Scala APIs draw them from phase V.2");
 
     /** The exception class of each error code (spec/errors.md, Codes). */
     private static final Map<String, Class<? extends CleanRulesException>> CLASSES = Map.ofEntries(
@@ -188,6 +191,9 @@ class Conformance {
     /** Run {@code vector} one way ({@code "json"} or {@code "native"}). */
     Outcome run(Map<?, ?> vector, String route) {
         current = route + ":" + vector.get("id");
+        if (vector.get("given") instanceof Map<?, ?> given && "draw".equals(given.get("kind"))) {
+            return new Outcome(null, "diagram");
+        }
         try {
             String failure = switch (route) {
                 case "json" -> runJson(vector);

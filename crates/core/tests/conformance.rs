@@ -16,12 +16,15 @@ use cleanrules::Error;
 use cleanrules::eval::{Options, evaluate_tree, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
+    Document, read_decision_document, read_parsed_document, write_explanation, write_summary,
+};
+use cleanrules::format::{
     ValueContext, read_node, read_ruleset, read_value, write_decision, write_path, write_result,
 };
-use cleanrules::format::{read_decision_document, write_explanation, write_summary};
 use cleanrules::json::{Json, Limits, parse, to_string};
 use cleanrules::logic::Kleene;
-use common::{get, on_small_stack, same, text, vector_files};
+use cleanrules::visual::{DiagramFormat, draw_document, draw_explanation};
+use common::{get, on_small_stack, path, same, text, vector_files};
 
 /// Remove `detail` from reasons, which is never compared.
 fn strip_detail(json: &Json) -> Json {
@@ -66,6 +69,9 @@ fn error_json(error: &Error) -> Json {
             .map(|r| Json::String(r.clone()))
             .collect();
         members.push(("rules".into(), Json::Array(rules)));
+    }
+    if let Some(name) = &context.name {
+        members.push(("name".into(), Json::String(name.clone())));
     }
     if let Some(row) = context.row {
         members.push((
@@ -214,9 +220,68 @@ fn run_explain(vector: &Json) -> Result<(), String> {
     compare(explanation_json, expect, "explanation")
 }
 
+/// A diagram (`spec/visual.md`): of the document, or, with an input, of the
+/// explanation of a rule set's decision or of a table's grid with its statuses.
+fn run_draw(vector: &Json) -> Result<(), String> {
+    let given = get(vector, "given").unwrap();
+    let mut limits = Limits::default();
+    if let Some(Json::Number(n)) = path(given, &["limits", "max_diagram_size"]) {
+        limits.max_diagram_size = usize::try_from(n.as_i128().unwrap()).unwrap();
+    }
+    let format = DiagramFormat::from_name(text(get(given, "format")).unwrap()).unwrap();
+    let document = read_parsed_document(get(given, "document").unwrap(), &Limits::default())
+        .map_err(|e| format!("reading the document: {e}"))?;
+    let drawn = match (get(given, "input"), &document) {
+        (None, document) => draw_document(document, None, format, &limits),
+        (Some(input), Document::RuleSet(ruleset)) => {
+            let input = read_value(input, "/input", ValueContext::Data)
+                .map_err(|e| format!("reading the input: {e}"))?;
+            let decision = ruleset.evaluate(&input).map_err(|e| e.to_string())?;
+            draw_explanation(&explain(&decision), format, &limits)
+        }
+        (Some(input), Document::DecisionTable(table)) => {
+            let input = read_value(input, "/input", ValueContext::Data)
+                .map_err(|e| format!("reading the input: {e}"))?;
+            let decision = table
+                .ruleset()
+                .evaluate(&input)
+                .map_err(|e| e.to_string())?;
+            draw_document(&document, Some(&decision), format, &limits)
+        }
+        (Some(_), _) => return Err("an input is given with a rule set or a table only".into()),
+    };
+    let expect = get(vector, "expect").unwrap();
+    match (drawn, get(expect, "error")) {
+        (Ok(diagram), None) => {
+            let wanted = text(get(expect, "diagram")).unwrap();
+            if diagram == wanted {
+                Ok(())
+            } else {
+                Err(format!("got\n{diagram}\nwant\n{wanted}"))
+            }
+        }
+        (Ok(diagram), Some(error)) => Err(format!(
+            "got\n{diagram}\nexpected the error {}",
+            to_string(error)
+        )),
+        (Err(error), wanted) => compare(
+            Err(error),
+            &Json::Object(
+                wanted
+                    .map(|w| vec![("error".to_owned(), w.clone())])
+                    .unwrap_or_default(),
+            ),
+            "diagram",
+        ),
+    }
+}
+
 fn run(vector: &Json) -> Result<(), String> {
     let given = get(vector, "given").unwrap();
     let kind = text(get(given, "kind")).unwrap();
+    if kind == "draw" {
+        return run_draw(vector);
+    }
     if kind == "evaluate" {
         return run_evaluate(vector);
     }
@@ -305,7 +370,7 @@ fn conformance_vectors() {
                 }
                 if !matches!(
                     kind,
-                    "condition" | "value" | "evaluate" | "explain" | "summary"
+                    "condition" | "value" | "evaluate" | "explain" | "summary" | "draw"
                 ) {
                     *pending.entry(kind.to_owned()).or_default() += 1;
                     continue;

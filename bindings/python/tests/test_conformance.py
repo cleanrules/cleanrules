@@ -514,11 +514,29 @@ def run_native(vector: dict[str, Any]) -> None:
         )
 
 
+DRAW_SKIP = (
+    "diagrams (spec/visual.md) are drawn by the core and checked by its runner and the C ABI's;"
+    " the binding draws them from phase V.2"
+)
+
+
 def collect() -> list[Any]:
     params: list[Any] = []
     for path in sorted(VECTORS.rglob("*.json")):
         for vector in load(path.read_text(encoding="utf-8"))["vectors"]:
             given = vector["given"]
+            if given["kind"] == "draw":
+                # Diagrams are written by the core and checked through the C ABI;
+                # the Python API to draw them comes with V.2.
+                params.append(
+                    pytest.param(
+                        vector,
+                        "json",
+                        id=f"json:{vector['id']}",
+                        marks=pytest.mark.skip(reason=DRAW_SKIP),
+                    )
+                )
+                continue
             if given["kind"] == "evaluate" and "limits" in given:
                 # `max_values` bounds native data only: no JSON run.
                 params.append(pytest.param(vector, "native", id=f"native:{vector['id']}"))

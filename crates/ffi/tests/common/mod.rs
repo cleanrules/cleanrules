@@ -383,6 +383,7 @@ pub fn evaluate_value(ruleset: &RuleSet, input: &Value) -> Result<Decision, Fail
 }
 
 owned!(Node, cr_node, cr_node_free);
+owned!(Rule, cr_rule, cr_rule_free);
 owned!(Batch, cr_batch, cr_batch_free);
 owned!(Actions, cr_actions, cr_actions_free);
 owned!(Grid, cr_grid, cr_grid_free);

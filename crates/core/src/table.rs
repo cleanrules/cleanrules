@@ -17,7 +17,7 @@
 //! # Ok::<(), cleanrules::Error>(())
 //! ```
 
-mod csv;
+pub(crate) mod csv;
 mod grid;
 
 use std::cmp::Ordering;
@@ -336,7 +336,7 @@ impl<'a> ValueIndex<'a> {
 }
 
 /// A row as messages name it: its name, or `row_<n>`.
-fn label(r: usize, row: &TableRow) -> String {
+pub(crate) fn label(r: usize, row: &TableRow) -> String {
     row.name.clone().unwrap_or_else(|| format!("row_{}", r + 1))
 }
 

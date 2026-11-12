@@ -30,7 +30,7 @@ const MAX_NESTING: usize = 2;
 const MAX_CONDITION: usize = 60;
 
 /// A rule name, tag or payload key: as is when it is a name, quoted otherwise.
-fn name(text: &str) -> String {
+pub(crate) fn name(text: &str) -> String {
     key(text, '"')
 }
 
@@ -39,7 +39,7 @@ fn names<'s>(items: impl IntoIterator<Item = &'s str>) -> String {
 }
 
 /// A field path; the empty path is the input itself.
-fn field(segments: &[Segment]) -> String {
+pub(crate) fn field(segments: &[Segment]) -> String {
     if segments.is_empty() {
         "the input".into()
     } else {
@@ -71,7 +71,7 @@ fn plain(text: &str) -> String {
 }
 
 /// A data value, as a constant of the text syntax when it is a scalar.
-fn value(value: &Value) -> String {
+pub(crate) fn value(value: &Value) -> String {
     let mut out = String::new();
     write_value(value, 0, &mut out);
     out
@@ -145,7 +145,7 @@ fn plural(count: u64, unit: &str) -> String {
 
 /// A float gap, to 12 significant digits so float noise does not show
 /// (`0.05`, not `0.05000000000000004`).
-fn float_gap(gap: f64) -> String {
+pub(crate) fn float_gap(gap: f64) -> String {
     let rounded: f64 = format!("{gap:.11e}").parse().unwrap_or(gap);
     positional(rounded).unwrap_or_else(|| format!("{rounded:e}"))
 }
@@ -200,7 +200,8 @@ fn is_zero(gap: &Gap) -> bool {
     }
 }
 
-fn reason(reason: &Reason) -> String {
+/// A reason, as a cause's text gives it (`missing field x`).
+pub(crate) fn reason(reason: &Reason) -> String {
     let at = reason
         .paths
         .iter()
@@ -238,6 +239,35 @@ fn reason(reason: &Reason) -> String {
     }
 }
 
+/// A cause's counterfactual, as its text gives it after the semicolon:
+/// `short by 2`, `at the limit (needs x >= 5)`, `needs y > 3 (short by 1)`.
+pub(crate) fn counterfactual(cause: &Cause<'_, '_>) -> Option<String> {
+    let counterfactual = cause.counterfactual.as_ref()?;
+    let needs = format!(
+        "needs {} {} {}",
+        field(&counterfactual.path),
+        symbol(counterfactual.op),
+        value(&counterfactual.target)
+    );
+    Some(match &counterfactual.gap {
+        None => needs,
+        Some(g) if is_zero(g) => format!("at the limit ({needs})"),
+        Some(g) => {
+            let side = if matches!(counterfactual.op, CompareOp::Gt | CompareOp::Ge) {
+                "short"
+            } else {
+                "over"
+            };
+            let distance = format!("{side} by {}", gap(g));
+            if cause.negated {
+                format!("{needs} ({distance})")
+            } else {
+                distance
+            }
+        }
+    })
+}
+
 /// `x > 10 is false (x = 8); short by 2`.
 impl fmt::Display for Cause<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -261,30 +291,8 @@ impl fmt::Display for Cause<'_, '_> {
         } else if !self.holds() && self.negated {
             f.write_str(", but the rule needs it false")?;
         }
-        if let Some(counterfactual) = &self.counterfactual {
-            let needs = format!(
-                "needs {} {} {}",
-                field(&counterfactual.path),
-                symbol(counterfactual.op),
-                value(&counterfactual.target)
-            );
-            match &counterfactual.gap {
-                None => write!(f, "; {needs}")?,
-                Some(g) if is_zero(g) => write!(f, "; at the limit ({needs})")?,
-                Some(g) => {
-                    let side = if matches!(counterfactual.op, CompareOp::Gt | CompareOp::Ge) {
-                        "short"
-                    } else {
-                        "over"
-                    };
-                    let distance = format!("{side} by {}", gap(g));
-                    if self.negated {
-                        write!(f, "; {needs} ({distance})")?;
-                    } else {
-                        write!(f, "; {distance}")?;
-                    }
-                }
-            }
+        if let Some(change) = counterfactual(self) {
+            write!(f, "; {change}")?;
         }
         Ok(())
     }
@@ -327,7 +335,8 @@ fn requirement(
     }
 }
 
-fn note(note: &Note) -> String {
+/// A note, as a rule's text gives it.
+pub(crate) fn note(note: &Note) -> String {
     let winner = name(&note.winner);
     match (note.kind, note.priorities) {
         (NoteKind::LowerPriority, Some((mine, theirs))) => {
@@ -343,16 +352,22 @@ fn note(note: &Note) -> String {
     }
 }
 
+/// A status's mark and words, as a rule's text gives them: `[x]` and
+/// `selected`.
+pub(crate) fn status(status: Status) -> (&'static str, &'static str) {
+    match status {
+        Status::Selected => ("[x]", "selected"),
+        Status::Fired => ("[x]", "fired, not selected"),
+        Status::NotFired => ("[ ]", "not fired"),
+        Status::Unknown => ("[?]", "unknown"),
+    }
+}
+
 /// One rule: its mark, name, status and condition, then its description, note
 /// and requirement, each on its own line.
 impl fmt::Display for RuleExplanation<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (mark, label) = match self.status {
-            Status::Selected => ("[x]", "selected"),
-            Status::Fired => ("[x]", "fired, not selected"),
-            Status::NotFired => ("[ ]", "not fired"),
-            Status::Unknown => ("[?]", "unknown"),
-        };
+        let (mark, label) = status(self.status);
         let mut lines = vec![format!(
             "{mark} {} ({label}): {}",
             name(self.rule.name()),
@@ -379,22 +394,41 @@ impl fmt::Display for RuleExplanation<'_, '_> {
     }
 }
 
+/// The policy (and aggregate) of a rule set: `HIT POLICY collect AGGREGATE sum`.
+pub(crate) fn policy(ruleset: &crate::rules::RuleSet) -> String {
+    match ruleset.aggregate() {
+        Some(aggregate) => format!(
+            "HIT POLICY {} AGGREGATE {}",
+            ruleset.hit_policy().as_str(),
+            aggregate.as_str()
+        ),
+        None => format!("HIT POLICY {}", ruleset.hit_policy().as_str()),
+    }
+}
+
+/// An explanation's header: `HIT POLICY priority: selected e`.
+pub(crate) fn header(explanation: &Explanation<'_, '_>) -> String {
+    let selected: Vec<&str> = explanation
+        .decision
+        .selected()
+        .map(|r| r.rule.name())
+        .collect();
+    let chosen = if selected.is_empty() {
+        "no rule".to_owned()
+    } else {
+        names(selected)
+    };
+    format!(
+        "{}: selected {chosen}",
+        policy(explanation.decision.ruleset())
+    )
+}
+
 /// The header (`HIT POLICY priority: selected e`, with `AGGREGATE` when there
 /// is one), then every rule in order.
 impl fmt::Display for Explanation<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let selected: Vec<&str> = self.decision.selected().map(|r| r.rule.name()).collect();
-        let chosen = if selected.is_empty() {
-            "no rule".to_owned()
-        } else {
-            names(selected)
-        };
-        let ruleset = self.decision.ruleset();
-        write!(f, "HIT POLICY {}", ruleset.hit_policy().as_str())?;
-        if let Some(aggregate) = ruleset.aggregate() {
-            write!(f, " AGGREGATE {}", aggregate.as_str())?;
-        }
-        write!(f, ": selected {chosen}")?;
+        f.write_str(&header(self))?;
         for rule in &self.rules {
             write!(f, "\n{rule}")?;
         }
