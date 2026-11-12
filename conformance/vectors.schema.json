@@ -198,7 +198,8 @@
               "$ref": "https://cleanrules.github.io/schemas/v1/value.schema.json#/$defs/value"
             },
             "logic": {
-              "type": "string"
+              "description": "A logic in its JSON form (spec/json-format.md, Logics).",
+              "$ref": "https://cleanrules.github.io/schemas/v1/logic.schema.json#/$defs/logic"
             },
             "strict": {
               "const": true

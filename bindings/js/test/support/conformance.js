@@ -40,6 +40,7 @@ export const SKIPS = {
   native: 'max_values bounds what is read from native data only, so evaluate vectors with limits run in the native route',
   diagram:
     "diagrams (spec/visual.md) are drawn by the core and checked through the C ABI's runner; the JavaScript API draws them from phase V.2",
+  graded: 'conditions under a graded logic: the binding evaluates one node under boolean only until task J.1b',
 }
 
 /** The class of each error code (`spec/errors.md`, *Codes*). */
@@ -1110,6 +1111,8 @@ export function conformance(R, N) {
   function run(vector, route) {
     current = `${route}:${vector.get('id')}`
     if (vector.get('given').get('kind') === 'tool') return { skip: 'agents' }
+    const logic = vector.get('given').get('logic')
+    if (logic !== undefined && logic !== 'boolean') return { skip: 'graded' }
     try {
       return route === 'json' ? runJson(vector) : runNative(vector)
     } catch (error) {

@@ -14,7 +14,7 @@ use std::fs;
 
 use cleanrules::Error;
 use cleanrules::agents::Catalog;
-use cleanrules::eval::{Options, evaluate_tree, evaluate_value_tree};
+use cleanrules::eval::{Options, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
     Document, read_decision_document, read_parsed_document, write_explanation, write_summary,
@@ -22,8 +22,9 @@ use cleanrules::format::{
 use cleanrules::format::{
     ValueContext, read_node, read_ruleset, read_value, write_decision, write_path, write_result,
 };
+use cleanrules::format::{read_logic, write_any_result};
 use cleanrules::json::{Json, Limits, parse, to_string};
-use cleanrules::logic::Kleene;
+use cleanrules::logic::{AnyLogic, Kleene};
 use cleanrules::visual::{DiagramFormat, draw_document, draw_explanation};
 use common::{get, on_small_stack, path, same, text, vector_files};
 
@@ -397,48 +398,20 @@ fn run(vector: &Json) -> Result<(), String> {
         strict: matches!(get(given, "strict"), Some(Json::Bool(true))),
         rule: None,
     };
-    let result = if kind == "condition" {
-        evaluate_tree(&node, &input, &Kleene, options)
-    } else {
-        evaluate_value_tree(&node, &input, &Kleene, options)
-    };
     let expect = get(vector, "expect").unwrap();
-    match (result, get(expect, "error")) {
-        (Ok(tree), None) => {
-            let actual = strip_detail(&write_result(&tree));
-            let wanted = strip_detail(get(expect, "result").unwrap());
-            if same(&actual, &wanted) {
-                Ok(())
-            } else {
-                Err(format!(
-                    "got {}\nwant {}",
-                    to_string(&actual),
-                    to_string(&wanted)
-                ))
-            }
-        }
-        (Ok(tree), Some(error)) => Err(format!(
-            "got {}, expected the error {}",
-            to_string(&write_result(&tree)),
-            to_string(error)
-        )),
-        (Err(error), None) => Err(format!(
-            "unexpected error {}: {error}",
-            to_string(&error_json(&error))
-        )),
-        (Err(error), Some(wanted)) => {
-            let actual = error_json(&error);
-            if same_error(&actual, wanted) {
-                Ok(())
-            } else {
-                Err(format!(
-                    "got the error {}, expected {}",
-                    to_string(&actual),
-                    to_string(wanted)
-                ))
-            }
-        }
+    if kind == "value" {
+        let result = evaluate_value_tree(&node, &input, &Kleene, options);
+        return compare(result.map(|tree| write_result(&tree)), expect, "result");
     }
+    // The logic in its JSON form (`spec/json-format.md`, *Logics*), boolean
+    // when absent; an error reading it is the vector's result.
+    let logic = get(given, "logic").map_or(Ok(AnyLogic::Boolean(Kleene)), |json| {
+        read_logic(json, "/logic")
+    });
+    let result = logic
+        .and_then(|logic| logic.evaluate_tree(&node, &input, options))
+        .map(|tree| write_any_result(&tree));
+    compare(result, expect, "result")
 }
 
 #[test]

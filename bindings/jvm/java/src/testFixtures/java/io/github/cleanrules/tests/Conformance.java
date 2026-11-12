@@ -135,7 +135,9 @@ class Conformance {
                     + " route",
             "diagram",
             "diagrams (spec/visual.md) are drawn by the core and checked through the C ABI's runner; the Java and"
-                    + " Scala APIs draw them from phase V.2");
+                    + " Scala APIs draw them from phase V.2",
+            "graded",
+            "conditions under a graded logic: the binding evaluates one node under boolean only until task J.1b");
 
     /** The exception class of each error code (spec/errors.md, Codes). */
     private static final Map<String, Class<? extends CleanRulesException>> CLASSES = Map.ofEntries(
@@ -173,6 +175,12 @@ class Conformance {
         }
     }
 
+    /** Whether {@code vector} evaluates a condition under a graded logic (task J.1b). */
+    static boolean isGraded(Map<?, ?> vector) {
+        Object logic = ((Map<?, ?>) vector.get("given")).get("logic");
+        return logic != null && !"boolean".equals(logic);
+    }
+
     /** A vector the runner cannot run as written, or an answer that breaks the API's promises. */
     static final class VectorError extends RuntimeException {
         private static final long serialVersionUID = 1L;
@@ -200,6 +208,9 @@ class Conformance {
         }
         if ("draw".equals(kind)) {
             return new Outcome(null, "diagram");
+        }
+        if (isGraded(vector)) {
+            return new Outcome(null, "graded");
         }
         try {
             String failure = switch (route) {

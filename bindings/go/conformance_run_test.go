@@ -116,8 +116,9 @@ func TestConformance(t *testing.T) {
 		t.Errorf("only %d vectors, expected at least %d", total, minimumVectors)
 	}
 	// The only skips of the JSON route: grids, evaluate vectors with limits
-	// (max_values bounds native data only), tools for agents and diagrams.
-	var grids, limited, zero, tools, drawn []string
+	// (max_values bounds native data only), tools for agents, diagrams and
+	// conditions under a graded logic.
+	var grids, limited, zero, tools, drawn, graded []string
 	for _, file := range files {
 		for _, vector := range file.vectors {
 			given, id := vector.obj("given"), vector.str("id")
@@ -129,6 +130,9 @@ func TestConformance(t *testing.T) {
 			}
 			if given.has("table_grid") {
 				grids = append(grids, id)
+			}
+			if isGraded(given) {
+				graded = append(graded, id)
 			}
 			if given.str("kind") == "evaluate" && given.has("limits") {
 				limited = append(limited, id)
@@ -158,6 +162,12 @@ func TestConformance(t *testing.T) {
 	for _, route := range conformanceRoutes {
 		if !slices.Equal(counts[route].skipped["diagram"], drawn) {
 			t.Errorf("%s skipped %v as diagrams, the draw vectors are %v", route, counts[route].skipped["diagram"], drawn)
+		}
+	}
+	// Conditions under a graded logic run in neither route until task J.1b.
+	for _, route := range conformanceRoutes {
+		if !slices.Equal(counts[route].skipped["graded"], graded) {
+			t.Errorf("%s skipped %v as graded, the graded vectors are %v", route, counts[route].skipped["graded"], graded)
 		}
 	}
 	// A limit of 0 is the one vector Go cannot give.

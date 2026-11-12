@@ -1,0 +1,8 @@
+{
+  "name": "min",
+  "complement": {
+    "name": "sugeno",
+    "lam": 1,
+    "w": 2
+  }
+}

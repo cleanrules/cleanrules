@@ -16,8 +16,11 @@ import scala.jdk.CollectionConverters.*
  * Java route run in the Java project's `ConformanceTest`.
  */
 class ScalaConformanceSuite extends munit.FunSuite:
-  /** The skips the Scala route may have, as the Java route's: values no JVM value holds, the tools for agents (O.1) and diagrams (V.2). Any other is a failure. */
-  private val allowedSkips = Set("decimal_infinity", "zone_unknown_to_java", "agents", "diagram")
+  /**
+   * The skips the Scala route may have, as the Java route's: values no JVM value holds, the tools for agents (O.1),
+   * diagrams (V.2) and conditions under a graded logic until task J.1b. Any other is a failure.
+   */
+  private val allowedSkips = Set("decimal_infinity", "zone_unknown_to_java", "agents", "diagram", "graded")
 
   private val files = Conformance.files().asScala.toVector
   private val runner = ScalaConformance()
@@ -85,11 +88,12 @@ class ScalaConformanceSuite extends munit.FunSuite:
     val grids = vectors.collect { case (id, vector) if vector.get("given").asInstanceOf[java.util.Map[?, ?]].containsKey("table_grid") => id }
     assert(grids.nonEmpty)
     assert(grids.forall(id => !skipped.values.exists(_.contains(id))), "a grid was skipped")
-    // The tools for agents and the diagrams are skipped, each with its reason.
+    // The tools for agents, the diagrams and the conditions under a graded logic are skipped, each with its reason.
     def ofKind(kind: String) =
       vectors.collect { case (id, vector) if vector.get("given").asInstanceOf[java.util.Map[?, ?]].get("kind") == kind => id }.toVector
     assertEquals(skipped.getOrElse("agents", Vector()), ofKind("tool"))
     assertEquals(skipped.getOrElse("diagram", Vector()), ofKind("draw"))
+    assertEquals(skipped.getOrElse("graded", Vector()), vectors.collect { case (id, vector) if Conformance.isGraded(vector) => id }.toVector)
 
   test("a wrong expected output fails the Scala way"):
     val all = mutable.LinkedHashMap[String, java.util.Map[?, ?]]()

@@ -1380,7 +1380,7 @@ impl<'a> Parser<'a> {
         if self.accept_keyword("LOGIC") {
             let (name, token) = self.header_name("a logic")?;
             config.logic =
-                Some(LogicName::from_name(&name).map_err(|error| locate(error, &token))?);
+                Some(LogicName::for_rules(&name).map_err(|error| locate(error, &token))?);
         }
         if self.accept_keyword("STRICT") {
             config.strict = true;

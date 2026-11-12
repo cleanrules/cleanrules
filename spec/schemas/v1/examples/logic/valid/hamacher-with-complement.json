@@ -1,0 +1,8 @@
+{
+  "name": "hamacher",
+  "gamma": 1,
+  "complement": {
+    "name": "sugeno",
+    "lam": 0.5
+  }
+}

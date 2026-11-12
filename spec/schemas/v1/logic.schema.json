@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanrules.github.io/schemas/v1/logic.schema.json",
+  "title": "cleanrules logics, format version 1",
+  "description": "The JSON form of a logic: its name, or an object with the name, at most one parameter and a complement. See spec/json-format.md, section Logics, and spec/ast.md, section Logics, which are normative. A schema cannot check that a name is registered, that the parameter is the logic's own, or its range: those rules are in the spec.",
+  "$ref": "#/$defs/logic",
+  "$defs": {
+    "logic": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "A logic's name, with every parameter at its default and the standard complement."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "gamma": {
+              "type": "number"
+            },
+            "p": {
+              "type": "number"
+            },
+            "s": {
+              "type": "number"
+            },
+            "complement": {
+              "$ref": "#/$defs/complement"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false,
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "gamma",
+                  "p"
+                ]
+              },
+              {
+                "required": [
+                  "gamma",
+                  "s"
+                ]
+              },
+              {
+                "required": [
+                  "p",
+                  "s"
+                ]
+              }
+            ]
+          },
+          "description": "At most one of gamma, p and s."
+        }
+      ]
+    },
+    "complement": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "A complement's name, for one without a parameter."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "lam": {
+              "type": "number"
+            },
+            "w": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false,
+          "not": {
+            "required": [
+              "lam",
+              "w"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

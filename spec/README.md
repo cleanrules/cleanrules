@@ -13,7 +13,7 @@ language-specific behaviour.
 
 | Document | Status | Defines |
 |---|---|---|
-| [`ast.md`](ast.md) | draft | Every condition node: operator tag, kind, construction rules, typing and null semantics |
+| [`ast.md`](ast.md) | draft | Every condition node: operator tag, kind, construction rules, typing and null semantics; truth values and the logics (Kleene and the fuzzy norms) |
 | [`rules.md`](rules.md) | draft | Rules, hit policies, payloads, outputs, aggregates and actions |
 | [`data-model.md`](data-model.md) | draft | Values (decimals of 38 digits, datetimes, opaque values, nulls with a reason) and how each language's data becomes values |
 | [`errors.md`](errors.md) | draft | Error codes, hierarchy and compared context fields |
@@ -23,16 +23,17 @@ language-specific behaviour.
 | [`agents.md`](agents.md) | draft | The tools for AI agents (`list_rulesets`, `summary`, `evaluate`, `explain`, `validate`): arguments, results, agent errors with pointers and hints, input schemas generated from summaries, and compact explanations within a size budget |
 | [`visual.md`](visual.md) | draft | Diagrams of conditions, rules, rule sets, explanations and decision tables in DOT, Mermaid and standalone HTML: content, escaping and limits |
 | [`json-format.md`](json-format.md) | draft, format version 1 | Documents, values, conditions, rules, rule sets, decisions, explanations, summaries and decision tables as JSON |
-| [`schemas/v1/`](schemas/v1/) | draft | JSON Schemas (draft 2020-12) for values and for every document (condition, rule, rule set, decision, explanation, summary, decision table) and for the tools for agents, with valid and invalid examples checked by `schemas/check.py` |
+| [`schemas/v1/`](schemas/v1/) | draft | JSON Schemas (draft 2020-12) for values, logics and every document (condition, rule, rule set, decision, explanation, summary, decision table) and for the tools for agents, with valid and invalid examples checked by `schemas/check.py` |
 
 ## Conventions that apply to every spec
 
 - **Truth values.** Crisp logic is Kleene three-valued: `TRUE`, `FALSE` and
   `UNKNOWN`. A missing field or a null makes a comparison `UNKNOWN`, and a rule
   fires only when its condition is `TRUE`. This matches SQL's null handling.
-  Fuzzy logic maps truth to degrees in `[0, 1]` using the connectives
-  configured in fuzzytool; unknown is the interval `[0, 1]` (proposed, see
-  `ast.md`).
+  The fuzzy logics combine degrees in `[0, 1]` with fuzzytool's t-norms,
+  s-norms and complements; a truth value is an interval of degrees, a known
+  degree `d` is `[d, d]` and unknown is `[0, 1]` (`ast.md`, *Truth values*,
+  *Logics*).
 - **Operator tags.** Each node has a stable lowercase tag, such as `"and"`,
   `"between"` or `"matches"`. The tag is used in serialized rules, in errors
   and in every language. It is never a class name.

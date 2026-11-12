@@ -26,7 +26,7 @@ use crate::error::{Error, ErrorCode, Result};
 use crate::explain::{Explanation, Summary, summary};
 use crate::format::Document;
 use crate::json::Limits;
-use crate::logic::Truth;
+use crate::logic::{Interval, Truth};
 use crate::rules::{Decision, Rule};
 use crate::table::DecisionTable;
 
@@ -156,6 +156,7 @@ impl Mark {
 mod sealed {
     pub trait Sealed {}
     impl Sealed for crate::logic::Truth {}
+    impl Sealed for crate::logic::Interval {}
 }
 
 /// A truth value that can be drawn as a cause's mark (`spec/visual.md`, *Truth
@@ -178,6 +179,14 @@ impl ToMark for Truth {
             class,
             label: label.to_owned(),
         }
+    }
+}
+
+/// A graded logic's truth value, the interval `[lo, hi]` of degrees, drawn
+/// with [`Mark::degree`]: `0.7`, `[0.2, 0.9]`, or `[0, 1]` for unknown.
+impl ToMark for Interval {
+    fn to_mark(&self) -> Mark {
+        Mark::degree(self.lo(), self.hi())
     }
 }
 
@@ -358,6 +367,31 @@ mod tests {
             ("truth_degree", "[0.2, 0.9]".to_owned())
         );
         assert_eq!(mark(1e-7, 1e-7), ("truth_degree", "1e-7".to_owned()));
+    }
+
+    #[test]
+    fn graded_truth_values_are_marked_by_their_interval() {
+        let mark = |interval: Option<Interval>| {
+            let m = interval.unwrap().to_mark();
+            (m.class.as_str(), m.label)
+        };
+        assert_eq!(mark(Interval::degree(1.0)), ("truth_true", "1".to_owned()));
+        assert_eq!(mark(Interval::degree(0.0)), ("truth_false", "0".to_owned()));
+        assert_eq!(
+            mark(Some(Interval::UNKNOWN)),
+            ("truth_unknown", "[0, 1]".to_owned())
+        );
+        assert_eq!(
+            mark(Interval::degree(0.7)),
+            ("truth_degree", "0.7".to_owned())
+        );
+        assert_eq!(
+            mark(Interval::new(0.2, 0.9)),
+            ("truth_degree", "[0.2, 0.9]".to_owned())
+        );
+        // The same mark as `Mark::degree` on the interval's ends.
+        let interval = Interval::new(0.25, 0.5).unwrap();
+        assert_eq!(interval.to_mark(), Mark::degree(0.25, 0.5));
     }
 
     #[test]

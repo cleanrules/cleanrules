@@ -91,7 +91,8 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
     report(t, `native: ${ids.size} vectors whose input no native form holds exactly, ${why}; given as the ZonedDateTime the engine gives back for its text: ${[...ids].join(', ')}`)
   }
   // The only vectors a route skips: grids, and the limits of native data,
-  // have no JSON route; diagrams, none yet.
+  // have no JSON route; diagrams, none yet; conditions under a graded logic
+  // run in neither until task J.1b.
   const drawn = [...vectors.values()].filter((v) => v.get('given').get('kind') === 'draw').map((v) => v.get('id'))
   const grids = [...vectors.values()].filter((v) => v.get('given').has('table_grid')).map((v) => v.get('id'))
   const limited = [...vectors.values()]
@@ -99,8 +100,12 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
     .map((v) => v.get('id'))
   // And both routes skip the tools for agents, which this binding lacks.
   const tools = [...vectors.values()].filter((v) => v.get('given').get('kind') === 'tool').map((v) => v.get('id'))
+  const graded = [...vectors.values()]
+    .filter((v) => v.get('given').has('logic') && v.get('given').get('logic') !== 'boolean')
+    .map((v) => v.get('id'))
   const agents = tools.length > 0 ? ['agents'] : []
   const diagrams = drawn.length > 0 ? ['diagram'] : []
+  const grades = graded.length > 0 ? ['graded'] : []
   assert.deepEqual(
     [...counts.json.skipped.keys()].sort(),
     [
@@ -108,15 +113,18 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
       ...(limited.length > 0 ? ['native'] : []),
       ...diagrams,
       ...agents,
+      ...grades,
     ].sort(),
   )
   assert.deepEqual(counts.json.skipped.get('grid') ?? [], grids)
   assert.deepEqual(counts.json.skipped.get('native') ?? [], limited)
   assert.deepEqual(counts.json.skipped.get('diagram') ?? [], drawn)
   assert.deepEqual(counts.json.skipped.get('agents') ?? [], tools)
-  assert.deepEqual([...counts.native.skipped.keys()].sort(), [...diagrams, ...agents].sort())
+  assert.deepEqual(counts.json.skipped.get('graded') ?? [], graded)
+  assert.deepEqual([...counts.native.skipped.keys()].sort(), [...diagrams, ...agents, ...grades].sort())
   assert.deepEqual(counts.native.skipped.get('diagram') ?? [], drawn)
   assert.deepEqual(counts.native.skipped.get('agents') ?? [], tools)
+  assert.deepEqual(counts.native.skipped.get('graded') ?? [], graded)
 })
 
 /** `vector` with `from` replaced by `to` in its expected output only. */

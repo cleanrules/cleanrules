@@ -126,8 +126,9 @@ impl TableConfig {
     ///
     /// # Errors
     ///
-    /// `rule_definition_error` for an unknown hit policy or aggregate, and
-    /// `registry_error` for an unknown logic; none has a pointer.
+    /// `rule_definition_error` for an unknown hit policy or aggregate,
+    /// `registry_error` for an unknown logic and `unsupported` for a graded
+    /// one; none has a pointer.
     pub fn from_names(
         hit_policy: &str,
         aggregate: Option<&str>,
@@ -148,7 +149,7 @@ impl TableConfig {
                         .ok_or_else(|| unknown_name("aggregate", name, "sum, min, max or count"))
                 })
                 .transpose()?,
-            logic: logic.map(LogicName::from_name).transpose()?,
+            logic: logic.map(LogicName::for_rules).transpose()?,
             strict,
         })
     }

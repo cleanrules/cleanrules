@@ -1,0 +1,6805 @@
+{
+  "version": 1,
+  "area": "ast",
+  "vectors": [
+    {
+      "id": "ast/logics/min-and-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 and 0.6 under \"min\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": "min"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.3,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/min-or-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 or 0.6 under \"min\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": "min"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.6,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/min-and-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 and 0.9 under \"min\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": "min"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.75,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/min-or-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 or 0.9 under \"min\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": "min"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.9,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/prod-and-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 and 0.6 under \"prod\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": "prod"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.18,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/prod-or-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 or 0.6 under \"prod\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": "prod"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.72,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/prod-and-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 and 0.9 under \"prod\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": "prod"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.675,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/prod-or-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 or 0.9 under \"prod\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": "prod"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.9749999999999999,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/lukasiewicz-and-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 and 0.6 under \"lukasiewicz\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": "lukasiewicz"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/lukasiewicz-or-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 or 0.6 under \"lukasiewicz\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": "lukasiewicz"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.8999999999999999,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/lukasiewicz-and-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 and 0.9 under \"lukasiewicz\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": "lukasiewicz"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.6499999999999999,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/lukasiewicz-or-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 or 0.9 under \"lukasiewicz\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": "lukasiewicz"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 1.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/einstein-and-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 and 0.6 under \"einstein\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": "einstein"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.140625,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/einstein-or-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 or 0.6 under \"einstein\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": "einstein"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.7627118644067796,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/einstein-and-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 and 0.9 under \"einstein\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": "einstein"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.6585365853658536,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/einstein-or-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 or 0.9 under \"einstein\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": "einstein"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.9850746268656716,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/hamacher-and-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 and 0.6 under \"hamacher\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": "hamacher"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.25,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/hamacher-or-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 or 0.6 under \"hamacher\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": "hamacher"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.6585365853658535,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/hamacher-and-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 and 0.9 under \"hamacher\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": "hamacher"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.6923076923076924,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/hamacher-or-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 or 0.9 under \"hamacher\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": "hamacher"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.9230769230769227,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/drastic-and-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 and 0.6 under \"drastic\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": "drastic"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/drastic-or-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 or 0.6 under \"drastic\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": "drastic"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 1.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/drastic-and-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 and 0.9 under \"drastic\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": "drastic"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/drastic-or-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 or 0.9 under \"drastic\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": "drastic"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 1.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/nilpotent-and-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 and 0.6 under \"nilpotent\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": "nilpotent"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/nilpotent-or-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 or 0.6 under \"nilpotent\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": "nilpotent"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.6,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/nilpotent-and-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 and 0.9 under \"nilpotent\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": "nilpotent"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.75,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/nilpotent-or-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 or 0.9 under \"nilpotent\"",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": "nilpotent"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 1.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/yager-p-2-and-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 and 0.6 under {\"name\": \"yager\", \"p\": 2.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": {
+          "name": "yager",
+          "p": 2.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.1937742251701451,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/yager-p-2-or-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 or 0.6 under {\"name\": \"yager\", \"p\": 2.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": {
+          "name": "yager",
+          "p": 2.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.6708203932499369,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/yager-p-2-and-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 and 0.9 under {\"name\": \"yager\", \"p\": 2.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": {
+          "name": "yager",
+          "p": 2.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.7307417596432748,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/yager-p-2-or-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 or 0.9 under {\"name\": \"yager\", \"p\": 2.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": {
+          "name": "yager",
+          "p": 2.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 1.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/yager-p-3-and-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 and 0.6 under {\"name\": \"yager\", \"p\": 3.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": {
+          "name": "yager",
+          "p": 3.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.2589204944579381,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/yager-p-3-or-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 or 0.6 under {\"name\": \"yager\", \"p\": 3.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": {
+          "name": "yager",
+          "p": 3.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.6240251469155712,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/yager-p-3-and-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 and 0.9 under {\"name\": \"yager\", \"p\": 3.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": {
+          "name": "yager",
+          "p": 3.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.7447765638999269,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/yager-p-3-or-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 or 0.9 under {\"name\": \"yager\", \"p\": 3.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": {
+          "name": "yager",
+          "p": 3.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 1.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/dombi-p-1-and-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 and 0.6 under {\"name\": \"dombi\", \"p\": 1.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": {
+          "name": "dombi",
+          "p": 1.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.25,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/dombi-p-1-or-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 or 0.6 under {\"name\": \"dombi\", \"p\": 1.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": {
+          "name": "dombi",
+          "p": 1.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.6585365853658536,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/dombi-p-1-and-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 and 0.9 under {\"name\": \"dombi\", \"p\": 1.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": {
+          "name": "dombi",
+          "p": 1.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.6923076923076923,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/dombi-p-1-or-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 or 0.9 under {\"name\": \"dombi\", \"p\": 1.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": {
+          "name": "dombi",
+          "p": 1.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.9230769230769231,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/dombi-p-2-and-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 and 0.6 under {\"name\": \"dombi\", \"p\": 2.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": {
+          "name": "dombi",
+          "p": 2.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.2918256742691262,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/dombi-p-2-or-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 or 0.6 under {\"name\": \"dombi\", \"p\": 2.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": {
+          "name": "dombi",
+          "p": 2.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.6093785930612748,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/dombi-p-2-and-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 and 0.9 under {\"name\": \"dombi\", \"p\": 2.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": {
+          "name": "dombi",
+          "p": 2.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.7399929726547125,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/dombi-p-2-or-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 or 0.9 under {\"name\": \"dombi\", \"p\": 2.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": {
+          "name": "dombi",
+          "p": 2.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.90464232606174,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/frank-s-2-and-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 and 0.6 under {\"name\": \"frank\", \"s\": 2.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": {
+          "name": "frank",
+          "s": 2.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.162474316955991,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/frank-s-2-or-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 or 0.6 under {\"name\": \"frank\", \"s\": 2.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": {
+          "name": "frank",
+          "s": 2.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.7375256830440093,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/frank-s-2-and-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 and 0.9 under {\"name\": \"frank\", \"s\": 2.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": {
+          "name": "frank",
+          "s": 2.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.6694600334130285,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/frank-s-2-or-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 or 0.9 under {\"name\": \"frank\", \"s\": 2.0}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": {
+          "name": "frank",
+          "s": 2.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.9805399665869716,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/frank-s-0p5-and-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 and 0.6 under {\"name\": \"frank\", \"s\": 0.5}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": {
+          "name": "frank",
+          "s": 0.5
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.19720419796802743,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/frank-s-0p5-or-0p3-0p6",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.3 or 0.6 under {\"name\": \"frank\", \"s\": 0.5}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.3,
+          "b": 0.6
+        },
+        "logic": {
+          "name": "frank",
+          "s": 0.5
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.7027958020319723,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/frank-s-0p5-and-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 and 0.9 under {\"name\": \"frank\", \"s\": 0.5}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": {
+          "name": "frank",
+          "s": 0.5
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.6810752255844865,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/frank-s-0p5-or-0p75-0p9",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.75 or 0.9 under {\"name\": \"frank\", \"s\": 0.5}",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.75,
+          "b": 0.9
+        },
+        "logic": {
+          "name": "frank",
+          "s": 0.5
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 0.9689247744155135,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/complement-standard-0p3",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "not 0.3 under the standard complement",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": 0.3
+        },
+        "logic": "prod"
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": 0.7,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/complement-standard-0p75",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "not 0.75 under the standard complement",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": 0.75
+        },
+        "logic": "prod"
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": 0.25,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/complement-sugeno-2-0p3",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "not 0.3 under the sugeno complement",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": 0.3
+        },
+        "logic": {
+          "name": "prod",
+          "complement": {
+            "name": "sugeno",
+            "lam": 2.0
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": 0.43749999999999994,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/complement-sugeno-2-0p75",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "not 0.75 under the sugeno complement",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": 0.75
+        },
+        "logic": {
+          "name": "prod",
+          "complement": {
+            "name": "sugeno",
+            "lam": 2.0
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": 0.1,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/complement-sugeno-minus-0p5-0p3",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "not 0.3 under the sugeno complement",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": 0.3
+        },
+        "logic": {
+          "name": "prod",
+          "complement": {
+            "name": "sugeno",
+            "lam": -0.5
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": 0.8235294117647058,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/complement-sugeno-minus-0p5-0p75",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "not 0.75 under the sugeno complement",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": 0.75
+        },
+        "logic": {
+          "name": "prod",
+          "complement": {
+            "name": "sugeno",
+            "lam": -0.5
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": 0.4,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/complement-yager-2-0p3",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "not 0.3 under the yager complement",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": 0.3
+        },
+        "logic": {
+          "name": "prod",
+          "complement": {
+            "name": "yager",
+            "w": 2.0
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": 0.9539392014169457,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/complement-yager-2-0p75",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "not 0.75 under the yager complement",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": 0.75
+        },
+        "logic": {
+          "name": "prod",
+          "complement": {
+            "name": "yager",
+            "w": 2.0
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": 0.6614378277661477,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/complement-yager-3-0p3",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "not 0.3 under the yager complement",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": 0.3
+        },
+        "logic": {
+          "name": "prod",
+          "complement": {
+            "name": "yager",
+            "w": 3.0
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": 0.9909177626876771,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.3,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.3
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/complement-yager-3-0p75",
+      "spec": [
+        "ast.md#logics",
+        "ast.md#truth-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "not 0.75 under the yager complement",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": 0.75
+        },
+        "logic": {
+          "name": "prod",
+          "complement": {
+            "name": "yager",
+            "w": 3.0
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": 0.8330554629114884,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.75,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.75
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/prod-and-unknown",
+      "spec": [
+        "ast.md#truth-values",
+        "ast.md#results-and-reasons",
+        "json-format.md#result-trees"
+      ],
+      "description": "a degree and unknown is [T(d, 0), T(d, 1)], with the missing field's reason",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "m"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.4
+        },
+        "logic": "prod"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": [
+            0.0,
+            0.4
+          ],
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "m"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.4,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.4
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "m"
+              ],
+              "truth": [
+                0.0,
+                1.0
+              ],
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "m"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "m"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "m"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/prod-or-unknown",
+      "spec": [
+        "ast.md#truth-values",
+        "ast.md#results-and-reasons",
+        "json-format.md#result-trees"
+      ],
+      "description": "a degree or unknown is the interval [S(d, 0), S(d, 1)]",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "m"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.4
+        },
+        "logic": "prod"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": [
+            0.4,
+            1.0
+          ],
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "m"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.4,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.4
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "m"
+              ],
+              "truth": [
+                0.0,
+                1.0
+              ],
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "m"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "m"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "m"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/lukasiewicz-and-unknown",
+      "spec": [
+        "ast.md#truth-values",
+        "ast.md#results-and-reasons",
+        "json-format.md#result-trees"
+      ],
+      "description": "a degree and unknown is [T(d, 0), T(d, 1)], with the missing field's reason",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "m"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.4
+        },
+        "logic": "lukasiewicz"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": [
+            0.0,
+            0.4
+          ],
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "m"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.4,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.4
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "m"
+              ],
+              "truth": [
+                0.0,
+                1.0
+              ],
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "m"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "m"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "m"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/lukasiewicz-or-unknown",
+      "spec": [
+        "ast.md#truth-values",
+        "ast.md#results-and-reasons",
+        "json-format.md#result-trees"
+      ],
+      "description": "a degree or unknown is the interval [S(d, 0), S(d, 1)]",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "m"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.4
+        },
+        "logic": "lukasiewicz"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": [
+            0.4,
+            1.0
+          ],
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "m"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.4,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.4
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "m"
+              ],
+              "truth": [
+                0.0,
+                1.0
+              ],
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "m"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "m"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "m"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/not-unknown",
+      "spec": [
+        "ast.md#truth-values",
+        "ast.md#results-and-reasons",
+        "json-format.md#result-trees"
+      ],
+      "description": "not unknown is unknown, with its reason",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "m"
+            ]
+          }
+        },
+        "input": {},
+        "logic": "min"
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": [
+            0.0,
+            1.0
+          ],
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "m"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "m"
+              ],
+              "truth": [
+                0.0,
+                1.0
+              ],
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "m"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "m"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "m"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/not-swaps-the-bounds",
+      "spec": [
+        "ast.md#truth-values",
+        "ast.md#results-and-reasons",
+        "json-format.md#result-trees"
+      ],
+      "description": "not [lo, hi] is [N(hi), N(lo)]",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              {
+                "op": "field",
+                "path": [
+                  "m"
+                ]
+              }
+            ]
+          }
+        },
+        "input": {
+          "a": 0.4
+        },
+        "logic": {
+          "name": "prod",
+          "complement": {
+            "name": "sugeno",
+            "lam": 2.0
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": [
+            0.3333333333333333,
+            1.0
+          ],
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "m"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "and",
+              "truth": [
+                0.0,
+                0.4
+              ],
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "m"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "truth": 0.4,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "a"
+                      ],
+                      "value": 0.4
+                    }
+                  ]
+                },
+                {
+                  "op": "field",
+                  "path": [
+                    "m"
+                  ],
+                  "truth": [
+                    0.0,
+                    1.0
+                  ],
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "m"
+                      ]
+                    ]
+                  },
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "m"
+                      ],
+                      "value": null,
+                      "reason": {
+                        "code": "missing_field",
+                        "paths": [
+                          [
+                            "m"
+                          ]
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/and-false-unknown-is-determined",
+      "spec": [
+        "ast.md#truth-values",
+        "ast.md#results-and-reasons",
+        "json-format.md#result-trees"
+      ],
+      "description": "false and unknown is false, without a reason",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "m"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": false
+        },
+        "logic": "lukasiewicz"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.0,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": false
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "m"
+              ],
+              "truth": [
+                0.0,
+                1.0
+              ],
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "m"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "m"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "m"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/or-true-unknown-is-determined",
+      "spec": [
+        "ast.md#truth-values",
+        "ast.md#results-and-reasons",
+        "json-format.md#result-trees"
+      ],
+      "description": "true or unknown is true, without a reason",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "m"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": true
+        },
+        "logic": "lukasiewicz"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": 1.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 1.0,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": true
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "m"
+              ],
+              "truth": [
+                0.0,
+                1.0
+              ],
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "m"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "m"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "m"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/lukasiewicz-and-folds-left",
+      "spec": [
+        "ast.md#truth-values",
+        "ast.md#results-and-reasons",
+        "json-format.md#result-trees"
+      ],
+      "description": "a and b and c is (a and b) and c",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "c"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.7,
+          "b": 0.6,
+          "c": 0.9
+        },
+        "logic": "lukasiewicz"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.19999999999999973,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.7,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.7
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.6,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.6
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "c"
+              ],
+              "truth": 0.9,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "c"
+                  ],
+                  "value": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/crisp-and-degree-is-exact",
+      "spec": [
+        "ast.md#truth-values",
+        "ast.md#results-and-reasons",
+        "json-format.md#result-trees",
+        "ast.md#logics"
+      ],
+      "description": "a true comparison and a degree d is exactly d",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "x": 2,
+          "a": 0.1
+        },
+        "logic": "lukasiewicz"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.1,
+          "children": [
+            {
+              "op": "gt",
+              "truth": 1.0,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ],
+                  "value": 2
+                },
+                {
+                  "op": "const",
+                  "value": 1
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.1,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.1
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/comparison-with-null-is-unknown",
+      "spec": [
+        "ast.md#truth-values",
+        "ast.md#results-and-reasons",
+        "json-format.md#result-trees"
+      ],
+      "description": "a comparison with a missing field is [0, 1]",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "or",
+          "operands": [
+            {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.25
+        },
+        "logic": "min"
+      },
+      "expect": {
+        "result": {
+          "op": "or",
+          "truth": [
+            0.25,
+            1.0
+          ],
+          "reason": {
+            "code": "missing_field",
+            "paths": [
+              [
+                "x"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "gt",
+              "truth": [
+                0.0,
+                1.0
+              ],
+              "reason": {
+                "code": "missing_field",
+                "paths": [
+                  [
+                    "x"
+                  ]
+                ]
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ],
+                  "value": null,
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "x"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "op": "const",
+                  "value": 1
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.25,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.25
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/degree-float",
+      "spec": [
+        "data-model.md#fuzzy-degrees",
+        "ast.md#missing-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.25 used as a condition under a graded logic",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "a"
+          ]
+        },
+        "input": {
+          "a": 0.25
+        },
+        "logic": "min"
+      },
+      "expect": {
+        "result": {
+          "op": "field",
+          "path": [
+            "a"
+          ],
+          "truth": 0.25,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 0.25
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/degree-int-one",
+      "spec": [
+        "data-model.md#fuzzy-degrees",
+        "ast.md#missing-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "1 used as a condition under a graded logic",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "a"
+          ]
+        },
+        "input": {
+          "a": 1
+        },
+        "logic": "min"
+      },
+      "expect": {
+        "result": {
+          "op": "field",
+          "path": [
+            "a"
+          ],
+          "truth": 1.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/degree-int-zero",
+      "spec": [
+        "data-model.md#fuzzy-degrees",
+        "ast.md#missing-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "0 used as a condition under a graded logic",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "a"
+          ]
+        },
+        "input": {
+          "a": 0
+        },
+        "logic": "min"
+      },
+      "expect": {
+        "result": {
+          "op": "field",
+          "path": [
+            "a"
+          ],
+          "truth": 0.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/degree-decimal",
+      "spec": [
+        "data-model.md#fuzzy-degrees",
+        "ast.md#missing-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "{\"$decimal\": \"0.10\"} used as a condition under a graded logic",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "a"
+          ]
+        },
+        "input": {
+          "a": {
+            "$decimal": "0.10"
+          }
+        },
+        "logic": "min"
+      },
+      "expect": {
+        "result": {
+          "op": "field",
+          "path": [
+            "a"
+          ],
+          "truth": 0.1,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "0.10"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/degree-negative-zero",
+      "spec": [
+        "data-model.md#fuzzy-degrees",
+        "ast.md#missing-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "-0.0 used as a condition under a graded logic",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "a"
+          ]
+        },
+        "input": {
+          "a": -0.0
+        },
+        "logic": "min"
+      },
+      "expect": {
+        "result": {
+          "op": "field",
+          "path": [
+            "a"
+          ],
+          "truth": 0.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": -0.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/degree-boolean",
+      "spec": [
+        "data-model.md#fuzzy-degrees",
+        "ast.md#missing-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "true used as a condition under a graded logic",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "a"
+          ]
+        },
+        "input": {
+          "a": true
+        },
+        "logic": "min"
+      },
+      "expect": {
+        "result": {
+          "op": "field",
+          "path": [
+            "a"
+          ],
+          "truth": 1.0,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/degree-null",
+      "spec": [
+        "data-model.md#fuzzy-degrees",
+        "ast.md#missing-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "null used as a condition under a graded logic",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "a"
+          ]
+        },
+        "input": {
+          "a": null
+        },
+        "logic": "min"
+      },
+      "expect": {
+        "result": {
+          "op": "field",
+          "path": [
+            "a"
+          ],
+          "truth": [
+            0.0,
+            1.0
+          ],
+          "reason": {
+            "code": "null",
+            "paths": [
+              [
+                "a"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "a"
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/degree-mismatch-above-one",
+      "spec": [
+        "data-model.md#fuzzy-degrees",
+        "ast.md#missing-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "1.5 is not a degree: a type mismatch",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "a"
+          ]
+        },
+        "input": {
+          "a": 1.5
+        },
+        "logic": "prod"
+      },
+      "expect": {
+        "result": {
+          "op": "field",
+          "path": [
+            "a"
+          ],
+          "truth": [
+            0.0,
+            1.0
+          ],
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "a"
+              ]
+            ],
+            "types": [
+              "number",
+              "boolean"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 1.5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/degree-mismatch-int-two",
+      "spec": [
+        "data-model.md#fuzzy-degrees",
+        "ast.md#missing-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "2 is not a degree: a type mismatch",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "a"
+          ]
+        },
+        "input": {
+          "a": 2
+        },
+        "logic": "prod"
+      },
+      "expect": {
+        "result": {
+          "op": "field",
+          "path": [
+            "a"
+          ],
+          "truth": [
+            0.0,
+            1.0
+          ],
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "a"
+              ]
+            ],
+            "types": [
+              "number",
+              "boolean"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/degree-mismatch-negative",
+      "spec": [
+        "data-model.md#fuzzy-degrees",
+        "ast.md#missing-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "-0.25 is not a degree: a type mismatch",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "a"
+          ]
+        },
+        "input": {
+          "a": -0.25
+        },
+        "logic": "prod"
+      },
+      "expect": {
+        "result": {
+          "op": "field",
+          "path": [
+            "a"
+          ],
+          "truth": [
+            0.0,
+            1.0
+          ],
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "a"
+              ]
+            ],
+            "types": [
+              "number",
+              "boolean"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": -0.25
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/degree-mismatch-decimal-above-one",
+      "spec": [
+        "data-model.md#fuzzy-degrees",
+        "ast.md#missing-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "{\"$decimal\": \"1.0000000000000000001\"} is not a degree: a type mismatch",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "a"
+          ]
+        },
+        "input": {
+          "a": {
+            "$decimal": "1.0000000000000000001"
+          }
+        },
+        "logic": "prod"
+      },
+      "expect": {
+        "result": {
+          "op": "field",
+          "path": [
+            "a"
+          ],
+          "truth": [
+            0.0,
+            1.0
+          ],
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "a"
+              ]
+            ],
+            "types": [
+              "number",
+              "boolean"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "1.0000000000000000001"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/degree-mismatch-infinity",
+      "spec": [
+        "data-model.md#fuzzy-degrees",
+        "ast.md#missing-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "{\"$float\": \"inf\"} is not a degree: a type mismatch",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "a"
+          ]
+        },
+        "input": {
+          "a": {
+            "$float": "inf"
+          }
+        },
+        "logic": "prod"
+      },
+      "expect": {
+        "result": {
+          "op": "field",
+          "path": [
+            "a"
+          ],
+          "truth": [
+            0.0,
+            1.0
+          ],
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "a"
+              ]
+            ],
+            "types": [
+              "number",
+              "boolean"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$float": "inf"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/degree-mismatch-string",
+      "spec": [
+        "data-model.md#fuzzy-degrees",
+        "ast.md#missing-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "\"0.5\" is not a degree: a type mismatch",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "a"
+          ]
+        },
+        "input": {
+          "a": "0.5"
+        },
+        "logic": "prod"
+      },
+      "expect": {
+        "result": {
+          "op": "field",
+          "path": [
+            "a"
+          ],
+          "truth": [
+            0.0,
+            1.0
+          ],
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "a"
+              ]
+            ],
+            "types": [
+              "string",
+              "boolean"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": "0.5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/degree-mismatch-strict",
+      "spec": [
+        "data-model.md#fuzzy-degrees",
+        "ast.md#missing-values",
+        "json-format.md#result-trees"
+      ],
+      "description": "in strict mode a number outside [0, 1] used as a condition raises",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "field",
+          "path": [
+            "a"
+          ]
+        },
+        "input": {
+          "a": 1.5
+        },
+        "logic": "prod",
+        "strict": true
+      },
+      "expect": {
+        "error": {
+          "code": "type_mismatch",
+          "path": [
+            "a"
+          ],
+          "types": [
+            "number",
+            "boolean"
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/hamacher-gamma-1-is-prod",
+      "spec": [
+        "json-format.md#logics",
+        "ast.md#logics",
+        "ast.md#evaluating-one-node"
+      ],
+      "description": "hamacher with gamma 1 is the product",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.5,
+          "b": 0.5
+        },
+        "logic": {
+          "name": "hamacher",
+          "gamma": 1.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.25,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.5,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.5
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.5,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.5
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/object-form-of-a-name",
+      "spec": [
+        "json-format.md#logics",
+        "ast.md#logics",
+        "ast.md#evaluating-one-node"
+      ],
+      "description": "a logic without parameters may be written as an object",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.5,
+          "b": 0.5
+        },
+        "logic": {
+          "name": "prod"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.25,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.5,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.5
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.5,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.5
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/alias-product",
+      "spec": [
+        "json-format.md#logics",
+        "ast.md#logics",
+        "ast.md#evaluating-one-node"
+      ],
+      "description": "fuzzytool's alias product is prod",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.5,
+          "b": 0.5
+        },
+        "logic": "product"
+      },
+      "expect": {
+        "result": {
+          "op": "and",
+          "truth": 0.25,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.5,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.5
+                }
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "truth": 0.5,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": 0.5
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/alias-zadeh",
+      "spec": [
+        "json-format.md#logics",
+        "ast.md#logics",
+        "ast.md#evaluating-one-node"
+      ],
+      "description": "fuzzytool's alias zadeh is the standard complement",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "not",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": 0.25
+        },
+        "logic": {
+          "name": "min",
+          "complement": "zadeh"
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "not",
+          "truth": 0.75,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "truth": 0.25,
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": 0.25
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/logics/error-unknown-logic",
+      "spec": [
+        "json-format.md#logics",
+        "ast.md#logics",
+        "ast.md#evaluating-one-node"
+      ],
+      "description": "the logic \"fuzzy\" is refused",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.5,
+          "b": 0.5
+        },
+        "logic": "fuzzy"
+      },
+      "expect": {
+        "error": {
+          "code": "registry_error",
+          "name": "fuzzy"
+        }
+      }
+    },
+    {
+      "id": "ast/logics/error-unknown-complement",
+      "spec": [
+        "json-format.md#logics",
+        "ast.md#logics",
+        "ast.md#evaluating-one-node"
+      ],
+      "description": "the logic {\"name\": \"min\", \"complement\": \"nope\"} is refused",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.5,
+          "b": 0.5
+        },
+        "logic": {
+          "name": "min",
+          "complement": "nope"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "registry_error",
+          "name": "nope"
+        }
+      }
+    },
+    {
+      "id": "ast/logics/error-missing-parameter",
+      "spec": [
+        "json-format.md#logics",
+        "ast.md#logics",
+        "ast.md#evaluating-one-node"
+      ],
+      "description": "the logic \"yager\" is refused",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.5,
+          "b": 0.5
+        },
+        "logic": "yager"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error"
+        }
+      }
+    },
+    {
+      "id": "ast/logics/error-parameter-out-of-range",
+      "spec": [
+        "json-format.md#logics",
+        "ast.md#logics",
+        "ast.md#evaluating-one-node"
+      ],
+      "description": "the logic {\"name\": \"frank\", \"s\": 1} is refused",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.5,
+          "b": 0.5
+        },
+        "logic": {
+          "name": "frank",
+          "s": 1
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error"
+        }
+      }
+    },
+    {
+      "id": "ast/logics/error-parameter-of-another-logic",
+      "spec": [
+        "json-format.md#logics",
+        "ast.md#logics",
+        "ast.md#evaluating-one-node"
+      ],
+      "description": "the logic {\"name\": \"hamacher\", \"p\": 1} is refused",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.5,
+          "b": 0.5
+        },
+        "logic": {
+          "name": "hamacher",
+          "p": 1
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error"
+        }
+      }
+    },
+    {
+      "id": "ast/logics/error-parameter-of-no-logic",
+      "spec": [
+        "json-format.md#logics",
+        "ast.md#logics",
+        "ast.md#evaluating-one-node"
+      ],
+      "description": "the logic {\"name\": \"min\", \"s\": 2} is refused",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.5,
+          "b": 0.5
+        },
+        "logic": {
+          "name": "min",
+          "s": 2
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error"
+        }
+      }
+    },
+    {
+      "id": "ast/logics/error-complement-out-of-range",
+      "spec": [
+        "json-format.md#logics",
+        "ast.md#logics",
+        "ast.md#evaluating-one-node"
+      ],
+      "description": "the logic {\"name\": \"min\", \"complement\": {\"name\": \"sugeno\", \"lam\": -1}} is refused",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "and",
+          "operands": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          ]
+        },
+        "input": {
+          "a": 0.5,
+          "b": 0.5
+        },
+        "logic": {
+          "name": "min",
+          "complement": {
+            "name": "sugeno",
+            "lam": -1
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error"
+        }
+      }
+    }
+  ]
+}

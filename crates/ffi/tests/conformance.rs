@@ -441,7 +441,7 @@ fn the_vectors_pass_through_the_c_abi() {
     // On a small stack, as a binding's thread may be (`spec/json-format.md`,
     // *Errors and limits*).
     on_small_stack(|| {
-        let (mut ran, mut skipped, mut failures) = (0, 0, Vec::new());
+        let (mut ran, mut skipped, mut graded, mut failures) = (0, 0, 0, Vec::new());
         // The tools for agents (`spec/agents.md`) are not in the C ABI yet
         // (`docs/PLAN.md`, O.1): their vectors are counted and skipped.
         let mut tools = 0;
@@ -463,6 +463,12 @@ fn the_vectors_pass_through_the_c_abi() {
                     tools += 1;
                     continue;
                 }
+                // Conditions under a graded logic: the C ABI evaluates one
+                // node under `boolean` only until task J.1b.
+                if get(given, "logic").is_some_and(|l| string(Some(l)) != Some("boolean")) {
+                    graded += 1;
+                    continue;
+                }
                 ran += 1;
                 if let Err(problem) = run(vector) {
                     failures.push(format!("{}: {problem}", string(get(vector, "id")).unwrap()));
@@ -477,6 +483,9 @@ fn the_vectors_pass_through_the_c_abi() {
         );
         assert!(ran >= 2508, "only {ran} vectors ran");
         assert!(skipped >= 14, "{skipped} native-only vectors skipped");
-        println!("{ran} ran, {skipped} native-only and {tools} tool vectors (agents) skipped");
+        assert!(graded >= 96, "{graded} graded-logic vectors skipped");
+        println!(
+            "{ran} ran, {skipped} native-only, {tools} tool vectors (agents) and {graded} graded-logic vectors skipped"
+        );
     });
 }

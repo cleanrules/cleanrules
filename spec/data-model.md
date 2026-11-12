@@ -155,11 +155,19 @@ a `limit_exceeded` (*Reading native data*, *Limits*).
 
 ### Fuzzy degrees
 
-*Not checked by vectors yet: graded logics arrive in phase J.*
+Under a graded logic (`ast.md`, *Truth values*, *Logics*), a value used
+directly as a condition is read as a degree:
 
-Under a graded logic (phase J), a number in `[0, 1]` (int, float or decimal) in
-the data is a degree (`ast.md`, *Truth values*). Data never carries intervals;
-if it ever must, that will be a new kind of value.
+- a number (int, float or decimal) in `[0, 1]`, compared exactly, is the
+  degree of its nearest binary64 float, so the int `1`, the float `1.0` and the
+  decimal `1.00` are all `[1, 1]`, a decimal `0.1` is the float `0.1`, and
+  `-0.0` is 0;
+- `true` and `false` are the degrees 1 and 0, and null is `UNKNOWN`;
+- anything else is a type mismatch: a number outside `[0, 1]` (infinities
+  included), a string such as `"0.5"`, a date, a list or a map.
+
+Data never carries intervals; if it ever must, that will be a new kind of
+value.
 
 ## Reading native data
 

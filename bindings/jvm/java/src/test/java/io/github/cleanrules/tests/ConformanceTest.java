@@ -33,8 +33,8 @@ class ConformanceTest {
 
     /** The skips each route may have; any other is a failure. */
     private static final Map<String, Set<String>> ALLOWED_SKIPS =
-            Map.of("json", Set.of("grid", "native", "agents", "diagram"), "native",
-                    Set.of("decimal_infinity", "zone_unknown_to_java", "agents", "diagram"));
+            Map.of("json", Set.of("grid", "native", "agents", "diagram", "graded"), "native",
+                    Set.of("decimal_infinity", "zone_unknown_to_java", "agents", "diagram", "graded"));
 
     /** What a route did with the vectors. */
     private static final class Counts {
@@ -141,6 +141,14 @@ class ConformanceTest {
                     .toList();
             for (String route : ROUTES) {
                 assertEquals(drawn, counts.get(route).skipped.getOrDefault("diagram", List.of()), route);
+            }
+            // And conditions under a graded logic, both ways, until task J.1b.
+            List<String> graded = vectors.entrySet().stream()
+                    .filter(v -> Conformance.isGraded(v.getValue()))
+                    .map(Map.Entry::getKey)
+                    .toList();
+            for (String route : ROUTES) {
+                assertEquals(graded, counts.get(route).skipped.getOrDefault("graded", List.of()), route);
             }
         }));
         return tests;

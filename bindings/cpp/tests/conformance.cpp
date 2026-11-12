@@ -1072,6 +1072,7 @@ int main(int argc, char **argv) {
     // (docs/PLAN.md, O.1): their vectors are counted and skipped.
     std::size_t tools = 0;
     std::size_t skipped_draw = 0;
+    std::size_t graded = 0;
     std::size_t passed_json = 0;
     std::size_t ran_native = 0;
     std::size_t passed_native = 0;
@@ -1104,6 +1105,13 @@ int main(int argc, char **argv) {
                     ++tools;
                     continue;
                 }
+                // Conditions under a graded logic: the C ABI evaluates one
+                // node under `boolean` only until task J.1b.
+                if (const json::value *logic = given.get("logic");
+                    logic != nullptr && !(logic->is(json::type::string) && logic->text == "boolean")) {
+                    ++graded;
+                    continue;
+                }
                 ++ran;
                 if (std::string issue = run(vector, false); issue.empty()) {
                     ++passed_json;
@@ -1129,10 +1137,11 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "%s\n", failed.c_str());
     }
     std::printf("conformance: %zu vectors; json %zu of %zu passed, native %zu of %zu passed; %zu "
-                "native-only, %zu tool vectors (agents, not in C++ yet) and %zu diagrams "
+                "native-only, %zu tool vectors (agents, not in C++ yet), %zu diagrams "
                 "(spec/visual.md: checked through the C ABI until cleanrules.hpp draws them) "
-                "skipped\n",
-                ran, passed_json, ran, passed_native, ran_native, skipped, tools, skipped_draw);
+                "and %zu under a graded logic (task J.1b) skipped\n",
+                ran, passed_json, ran, passed_native, ran_native, skipped, tools, skipped_draw,
+                graded);
     if (!failures.empty()) {
         std::fprintf(stderr, "conformance: %zu failures\n", failures.size());
         return EXIT_FAILURE;

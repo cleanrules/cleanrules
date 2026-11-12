@@ -2437,6 +2437,23 @@
       }
     },
     {
+      "id": "format/text/graded-logic-unsupported",
+      "spec": [
+        "text.md#errors-and-limits",
+        "ast.md#logics"
+      ],
+      "description": "A rule set under a graded logic is unsupported",
+      "given": {
+        "kind": "read",
+        "rules_text": "LOGIC prod\nIF a"
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
       "id": "format/text/float-too-large",
       "spec": [
         "text.md#errors-and-limits"
