@@ -1,0 +1,10 @@
+# rebar3's build directory and the NIF library that scripts/nif.escript puts
+# in priv/ (built with cargo, or downloaded and verified in a package).
+/_build/
+/priv/
+/rebar3.crashdump
+/erl_crash.dump
+# Written by the CI that builds the prebuilt libraries (erlang-nifs.yml).
+/nif-checksums.config
+# Coverage profiles of an instrumented NIF (README.md, "Building and testing").
+*.profraw

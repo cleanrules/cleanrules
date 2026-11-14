@@ -1,0 +1,172 @@
+name: Erlang NIFs
+
+# Builds the prebuilt NIF library of every platform of the Erlang binding,
+# writes their checksums, and uses them as a package does, without publishing
+# anything (task N.4 attaches the archives to the GitHub release v<vsn> and
+# publishes the Hex package with nif-checksums.config; nothing here uploads to
+# a release, pushes, tags or publishes):
+#
+# 1. The library of each platform, release profile (bindings/erlang/scripts/
+#    package-nif.sh), packed as libcleanrules_nif-v<vsn>-nif-2.17-<target>.
+#    <so|dll>.tar.gz: natively on macOS (11.0 or later) and Windows (MSVC, as
+#    Erlang/OTP's own builds); the glibc ones in manylinux_2_28 containers
+#    (glibc 2.28 or later) and the musl ones in Alpine.
+# 2. nif-checksums.config, the SHA-256 of each archive, all eight there
+#    (bindings/erlang/scripts/checksums.py). With the archives, the artifact
+#    erlang-nifs.
+# 3. On every platform there is a runner and an Erlang/OTP for: the
+#    application without its Rust sources, as a package holds it, downloads
+#    its platform's archive from the artifact (CLEANRULES_NIF_BASE_URL=
+#    file://...), checks it against nif-checksums.config, loads it and runs the
+#    Common Test suites; an archive whose checksum differs is refused
+#    (bindings/erlang/scripts/smoke.sh). No cargo there.
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "bindings/erlang/**"
+      - "crates/core/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/erlang-nifs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: erlang-nifs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: NIF (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-15-intel, target: x86_64-apple-darwin }
+          - { runner: macos-latest, target: aarch64-apple-darwin }
+          - { runner: windows-latest, target: x86_64-pc-windows-msvc }
+          - { runner: windows-11-arm, target: aarch64-pc-windows-msvc }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - run: bash bindings/erlang/scripts/package-nif.sh ${{ matrix.target }} nifs
+      - uses: actions/upload-artifact@v7
+        with:
+          name: erlang-nif-${{ matrix.target }}
+          path: nifs/
+          if-no-files-found: error
+
+  linux:
+    name: NIF (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, image: quay.io/pypa/manylinux_2_28_x86_64, target: x86_64-unknown-linux-gnu }
+          - { runner: ubuntu-24.04-arm, image: quay.io/pypa/manylinux_2_28_aarch64, target: aarch64-unknown-linux-gnu }
+          - { runner: ubuntu-latest, image: alpine:3.22, target: x86_64-unknown-linux-musl }
+          - { runner: ubuntu-24.04-arm, image: alpine:3.22, target: aarch64-unknown-linux-musl }
+    steps:
+      - uses: actions/checkout@v7
+      # Built natively in the oldest environment each library supports
+      # (manylinux_2_28 is AlmaLinux 8, glibc 2.28), as in go-libs.yml.
+      - env:
+          IMAGE: ${{ matrix.image }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work -e TARGET "$IMAGE" sh -euxc '
+            if command -v apk; then apk add --no-cache bash build-base curl; fi
+            curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --target "$TARGET"
+            . "$HOME/.cargo/env"
+            ldd --version 2>&1 | head -n 1 || true
+            bash bindings/erlang/scripts/package-nif.sh "$TARGET" nifs
+          '
+      - uses: actions/upload-artifact@v7
+        with:
+          name: erlang-nif-${{ matrix.target }}
+          path: nifs/
+          if-no-files-found: error
+
+  checksums:
+    name: Checksums
+    needs: [native, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: erlang-nif-*
+          merge-multiple: true
+          path: nifs
+      - run: python3 bindings/erlang/scripts/checksums.py nifs --expect-all
+      - uses: actions/upload-artifact@v7
+        with:
+          name: erlang-nifs
+          path: nifs/
+          if-no-files-found: error
+
+  smoke:
+    name: Smoke (${{ matrix.os }})
+    needs: checksums
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-15-intel, otp: brew }
+          - { os: macos-latest, otp: brew }
+          - { os: windows-latest, otp: "29", rebar3: "3.28.0" }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - if: matrix.otp != 'brew'
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          otp-version: ${{ matrix.otp }}
+          rebar3-version: ${{ matrix.rebar3 }}
+      - if: matrix.otp == 'brew'
+        run: brew install erlang rebar3
+      - uses: actions/download-artifact@v8
+        with:
+          name: erlang-nifs
+          path: ${{ runner.temp }}/nifs
+      - run: bash bindings/erlang/scripts/smoke.sh "$RUNNER_TEMP/nifs" "$RUNNER_TEMP/smoke"
+
+  smoke-linux:
+    name: Smoke (${{ matrix.image }}, ${{ matrix.runner }})
+    needs: checksums
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+        # The official images (Debian, glibc; Alpine, musl), rebar3 included;
+        # OTP 26 is the oldest the NIF loads in.
+        image: ["erlang:26", "erlang:29", "erlang:29-alpine"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: erlang-nifs
+          path: nifs
+      - env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work "$IMAGE" sh -euxc '
+            if command -v apk; then apk add --no-cache bash; fi
+            bash bindings/erlang/scripts/smoke.sh /work/nifs /tmp/smoke
+          '

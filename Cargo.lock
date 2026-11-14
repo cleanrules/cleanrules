@@ -217,6 +217,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cleanrules-erlang"
+version = "0.0.0"
+dependencies = [
+ "cleanrules",
+ "rustler",
+]
+
+[[package]]
 name = "cleanrules-ffi"
 version = "0.0.0"
 dependencies = [
@@ -543,6 +551,15 @@ dependencies = [
  "once_cell",
  "similar",
  "tempfile",
+]
+
+[[package]]
+name = "inventory"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6928282826c822ad91bf1c9a1cb90a30ba1c26770749929b4656cd6be829cd7c"
+dependencies = [
+ "rustversion",
 ]
 
 [[package]]
@@ -958,6 +975,30 @@ dependencies = [
  "libc",
  "linux-raw-sys",
  "windows-sys",
+]
+
+[[package]]
+name = "rustler"
+version = "0.39.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5256cd1465ad8c5450ee3392263375108cb70382be09dac76ae7da521446bdde"
+dependencies = [
+ "inventory",
+ "libc",
+ "libloading",
+ "rustler_codegen",
+]
+
+[[package]]
+name = "rustler_codegen"
+version = "0.39.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "976aaa45a28908eb2433b1afc70bf8c39eabd0ee45e8de24b2ae53dfb8876b84"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.9",
 ]
 
 [[package]]

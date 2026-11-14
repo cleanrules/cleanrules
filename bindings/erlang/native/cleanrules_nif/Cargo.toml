@@ -1,0 +1,49 @@
+[package]
+name = "cleanrules-erlang"
+description = "Erlang binding of cleanrules: the NIF (rustler) of the OTP application `cleanrules`"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+# The NIF library that `erlang:load_nif/2` loads: `cleanrules_nif.so` (or
+# `.dll`) in the application's `priv` directory (`scripts/nif.escript`).
+name = "cleanrules_nif"
+crate-type = ["cdylib"]
+# No test harness of the library: an executable that links the NIF needs the
+# `enif_*` functions, which only the BEAM provides (Linux's linker refuses
+# them undefined; macOS's looks them up at run time). The modules that need no
+# VM (big integers, paths, panics) have their unit tests in `tests/pure.rs`,
+# which compiles them without the NIF; the NIF itself is tested from Erlang
+# (`rebar3 ct`), since it runs inside the BEAM.
+test = false
+doctest = false
+
+# The workspace's lints, except that `unsafe_code` is `deny` instead of
+# `forbid`: rustler's macros generate `unsafe` blocks under
+# `#[allow(unsafe_code)]`, which `forbid` would reject. Code written here has
+# no `unsafe` (CLAUDE.md, invariant 10): `deny` still rejects it.
+[lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+unreachable_pub = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+dbg_macro = "warn"
+
+[dependencies]
+cleanrules = { workspace = true, features = ["yaml"] }
+# NIF version 2.17 (Erlang/OTP 26 and later): UTF-8 atoms, so that atom keys
+# and atoms read as text are never limited to Latin-1.
+rustler = { version = "0.39.0", default-features = false, features = ["nif_version_2_17"] }

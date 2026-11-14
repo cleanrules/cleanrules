@@ -452,6 +452,49 @@ jobs:
       - if: matrix.goos != 'windows'
         run: GOEXPERIMENT=cgocheck2 go test -count=1 -short ./...
 
+  erlang:
+    name: Erlang (${{ matrix.os }}, OTP ${{ matrix.otp }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest Erlang/OTP the NIF loads in (NIF 2.17) and the newest.
+          - { os: ubuntu-latest, otp: "26", rebar3: "3.24.0" }
+          - { os: ubuntu-latest, otp: "29", rebar3: "3.28.0", dialyzer: true }
+          - { os: windows-latest, otp: "29", rebar3: "3.28.0" }
+          # setup-beam does not install on macOS: Homebrew's Erlang/OTP.
+          - { os: macos-latest, otp: brew }
+    defaults:
+      run:
+        working-directory: bindings/erlang
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - if: matrix.otp != 'brew'
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          otp-version: ${{ matrix.otp }}
+          rebar3-version: ${{ matrix.rebar3 }}
+      - if: matrix.otp == 'brew'
+        run: brew install erlang rebar3
+      # rebar3 builds the NIF with cargo first (scripts/nif.escript, release
+      # profile), then compiles with warnings as errors and every function
+      # specified.
+      - run: rebar3 compile
+      - run: rebar3 xref
+      - if: matrix.dialyzer
+        run: rebar3 dialyzer
+      # The suites of the NIF (task N.2): conversion, max_values, resources,
+      # schedulers, panics and errors.
+      - run: rebar3 ct
+      # The measured time of the largest input the normal scheduler takes.
+      - name: Normal scheduler times
+        if: always()
+        run: grep -rh -A4 "median times" _build/test/logs --include='*normal_call_time.html' | tail -5 || true
+
   conformance:
     name: Spec schemas and conformance vectors
     runs-on: ubuntu-latest

@@ -851,6 +851,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tree's `VERSION`, and runs the README's example, also vendored. The
   workflow "Go libraries" runs it on every platform and in Alpine, and
   pushes, tags and publishes nothing.
+- Erlang binding (task N.2): the OTP application `cleanrules` in
+  `bindings/erlang` (rebar3, Erlang/OTP 26 or later), with a NIF written with
+  rustler 0.39.0 on the core (crate `cleanrules-erlang`, a workspace member)
+  and its internal module `cleanrules_nif`: rule sets read from documents as
+  immutable resources shared by processes, evaluation of one input (on the
+  normal scheduler within a measured budget, else on a dirty CPU scheduler),
+  batches, explanations, summaries and conversions on dirty CPU schedulers,
+  Erlang terms read and given back as `spec/data-model.md` (*Erlang*) says,
+  `max_values` counted, panics caught as `{error, #{code => internal_error}}`
+  and the core's errors as `{error, Map}`. Prebuilt libraries for eight
+  platforms, downloaded and checked against `nif-checksums.config` when a
+  package is compiled (`scripts/nif.escript`); the workflow "Erlang NIFs"
+  builds and uses them, and publishes nothing. Common Test suites, and an
+  `erlang` job in CI (Linux with OTP 26 and 29, Windows, macOS). After the API
+  review: decisions as maps with `results`, `selected`, `output` and
+  `aggregated`; `decision_write/4` and `decision_read/4` for decision
+  documents; summaries also as terms; `error_parent/1`; an error's `node` as
+  its JSON form as a term; a rule set whose call on the normal scheduler took
+  over a millisecond goes to a dirty scheduler from then on; and caller
+  limits `max_depth` and `max_nesting` above 2,048 refused with `badarg`
+  (deeper documents overflow a dirty scheduler's stack). The errors of
+  Erlang are described in `spec/errors.md` (*In each language*). The
+  idiomatic module `cleanrules` is task N.3.
+- Core: `Value::drop_iteratively`, which drops a value with an explicit stack.
+  The sparse value tree of an input is as deep as the longest field path a
+  rule set reads, and dropping it recursively overflowed a BEAM scheduler's
+  stack (a path of 20,000 segments crashed the VM); bindings drop such values
+  with it.
 - Data model (`spec/data-model.md`, *Erlang*; task N.1): how Erlang terms
   become values and come back, ahead of the Erlang binding (phase N): maps
   with binary or atom keys (never creating atoms), integers of any size,

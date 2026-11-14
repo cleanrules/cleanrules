@@ -24,9 +24,9 @@ required_conan_version = ">=2.0"
 _ROOT = os.path.join("..", "..", "..")
 
 # What cargo needs to build `-p cleanrules-ffi --locked`: the workspace, whose
-# members include the Python and JavaScript bindings' crates (their manifests, build
-# scripts and sources, for cargo to load the workspace), and the two crates
-# themselves.
+# members include the Python, JavaScript and Erlang bindings' crates (their
+# manifests, build scripts and sources, for cargo to load the workspace), and
+# the two crates themselves.
 _SOURCES = [
     "Cargo.toml",
     "Cargo.lock",
@@ -39,6 +39,8 @@ _SOURCES = [
     "bindings/js/Cargo.toml",
     "bindings/js/build.rs",
     "bindings/js/src/*",
+    "bindings/erlang/native/cleanrules_nif/Cargo.toml",
+    "bindings/erlang/native/cleanrules_nif/src/*",
     "bindings/cpp/CMakeLists.txt",
     "bindings/cpp/cmake/*",
     "bindings/cpp/include/*",

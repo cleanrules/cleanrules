@@ -410,6 +410,35 @@ impl Value {
         true
     }
 
+    /// Drop the value with an explicit stack instead of recursion.
+    ///
+    /// A value is dropped recursively, one stack frame per level, which a value
+    /// nested deep enough overflows on a small stack: the sparse value tree
+    /// a binding builds along a long field path through native data
+    /// (`spec/data-model.md`, *Reading native data*) is as deep as the path, and
+    /// a NIF runs on a BEAM scheduler, whose stack is a few hundred KiB. Bindings
+    /// drop such values with this.
+    ///
+    /// ```
+    /// use cleanrules::Value;
+    ///
+    /// let mut deep = Value::Int(1);
+    /// for _ in 0..1_000_000 {
+    ///     deep = Value::List(vec![deep]);
+    /// }
+    /// deep.drop_iteratively();
+    /// ```
+    pub fn drop_iteratively(self) {
+        let mut pending = vec![self];
+        while let Some(value) = pending.pop() {
+            match value {
+                Value::List(items) => pending.extend(items),
+                Value::Map(map) => pending.extend(map.entries.into_iter().map(|(_, v)| v)),
+                _ => {}
+            }
+        }
+    }
+
     /// The `index`-th item of a list, or the value of a map's `index`-th entry:
     /// the step of the walks over nested data.
     pub(crate) fn item(&self, index: usize) -> Option<&Value> {
@@ -517,6 +546,24 @@ mod tests {
         };
         assert!(opaque(7).any_equal(&opaque(7)));
         assert!(!opaque(7).any_equal(&opaque(8)));
+    }
+
+    #[test]
+    fn deep_values_drop_on_a_small_stack() {
+        let mut deep = Value::Int(1);
+        for i in 0..200_000 {
+            deep = if i % 2 == 0 {
+                Value::List(vec![Value::Null(NullCause::Null), deep])
+            } else {
+                Value::Map([("k".to_string(), deep)].into_iter().collect())
+            };
+        }
+        let dropped = std::thread::Builder::new()
+            .stack_size(64 * 1024)
+            .spawn(move || deep.drop_iteratively())
+            .unwrap()
+            .join();
+        assert!(dropped.is_ok());
     }
 
     #[test]
