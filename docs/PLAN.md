@@ -67,6 +67,7 @@ Lo que nos diferencia es la combinación: **condiciones como AST serializable** 
 - [x] Erlang: cómo se distribuye el NIF (binarios precompilados por plataforma frente a compilarlo con Rust al instalar) y si hay además una capa Elixir. Propuesto: precompilados; Elixir y Gleam usan el módulo Erlang directamente, y una capa propia solo si se pide. Decidido el 2026-11-11: lo propuesto (NIF con `rustler`, binarios precompilados por plataforma, sin capa Elixir).
 - [x] Agentes: SDK de MCP en Rust (propuesto: `rmcp`, el oficial) y frameworks con adaptador propio. Propuesto: Claude Agent SDK, OpenAI Agents SDK, LangChain/LangGraph y Pydantic AI en Python; Vercel AI SDK en JavaScript; LangChain4j y Spring AI en la JVM; los demás, por MCP. Decidido el 2026-11-11: lo propuesto (`rmcp` solo en `crates/mcp`; adaptadores como extras opcionales de carga perezosa, probados contra versiones fijadas).
 - [x] Organización de GitHub: `cleanrules` (la crea el autor el 2026-10-31). La necesitan el groupId de Maven y la ruta del módulo Go.
+- [x] Lanzamiento acotado (decidido el 2026-11-15; sección 4bis): interfaces con soporte Rust, Python, JavaScript/wasm y la CLI; Java, Go y C++ en beta con su conformidad; Erlang congelado tras N.2. Antes de publicar, el contrato 1.0 (fase R): objetos JSON sin orden significativo manteniendo `"version": 1`, aritmética decimal, identidad de reglas, bytes canónicos y huella. Identidad, huellas, ejecutor, comparador e informe en el núcleo abierto.
 
 ## 2. Estructura objetivo del repositorio
 
@@ -1103,13 +1104,17 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
 
 ### Fase I. Validación de datos vectorizada · tamaño L
 
-- [ ] I.1 Evaluación sobre lotes Arrow en el núcleo (en paralelo con rayon), con los mismos nulos, tipos y motivos que el evaluador por filas.
-- [ ] I.2 Severidad, reglas de conjunto de datos (unicidad, claves foráneas, agregados) e informe de validación con explicación por fila.
-- [ ] I.3 Integración por lenguaje: polars y pandas (Python), apache-arrow (JS), Arrow Java.
+**Estado (2026-11-15)**: sujeta a demanda (sección 4bis); no bloquea el lanzamiento.
+
+- [-] I.1 Evaluación sobre lotes Arrow en el núcleo (en paralelo con rayon), con los mismos nulos, tipos y motivos que el evaluador por filas.
+- [-] I.2 Severidad, reglas de conjunto de datos (unicidad, claves foráneas, agregados) e informe de validación con explicación por fila.
+- [-] I.3 Integración por lenguaje: polars y pandas (Python), apache-arrow (JS), Arrow Java.
 
 ---
 
 ### Fase J. Lógica difusa y auditoría estática · tamaño L
+
+**Estado (2026-11-15)**: J.1a hecha; J.1b–J.4 sujetas a demanda (sección 4bis), salvo lo esencial de J.4, que pasa a T.7 sin lógica difusa.
 
 - [ ] J.1 Lógica difusa en el núcleo: t-normas, s-normas y complementos de fuzzytool (`min`, `prod`, `lukasiewicz`, `einstein`, `hamacher`, `drastic`, `nilpotent`, familias Yager, Dombi y Frank), con tests contra fuzzytool como referencia; UNKNOWN como intervalo si se confirma.
   - Se divide en dos: los bindings tienen hoy los valores de verdad de Kleene en sus árboles de resultados (Python, JS, la C ABI y, sobre ella, Java, Go y C++) y rechazan con `unsupported` cualquier otra lógica al evaluar un nodo, así que aceptar las lógicas difusas no es un cambio fino en cada binding.
@@ -1122,33 +1127,39 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
     - Puntos abiertos: (1) la lógica difusa no admite constantes numéricas como grados (`0.5` no es un operando de `and`); decisión del autor del 2026-11-12: ahora no, se revisa en J.2. (2) Para J.1b: los errores de la forma de una lógica en un vector no comparan `pointer`. (3) Para J.2: `Logic::fires` de `Fuzzy` es provisionalmente `lo ≥ 1`. (4) Un complemento desconocido es `registry_error`, como una lógica.
     - Revisión de API aplicada (2026-11-12): `AnyLogic::evaluate_tree` con `eval::AnyTree` (`Crisp`/`Graded`) y `format::{write_any_result, any_result_value}`, para que ningún binding repita el reparto por lógica (lo usan el runner del núcleo y el ejemplo); `AnyLogic::as_fuzzy`. Las claves de los parámetros y la búsqueda de complementos pasan a `logic` (`LogicName::parameter_key`, `Complement::{from_name, registered}`, `AnyLogic::from_parts`) y `read_logic` solo añade los punteros; `with_parameters` pasa a `with_parameter`. `LogicName::ALL` y `Complement::NAMES` son slices; `for_rules` y `check_for_rules` son `pub(crate)`; `LogicName` deja de derivar `PartialOrd`/`Ord`. Constructores que comprueban el parámetro (`Norm::{hamacher, yager, dombi, frank, with_parameter}`, `Complement::{sugeno, yager}`), las variantes con parámetro son `#[non_exhaustive]` y `Fuzzy::new` ya no falla. Mensajes `logic "yager"` y `complement "sugeno"`, pistas derivadas de `ALL` y `parameter_key`, el parámetro de la lógica antes que el del complemento (código y especificación), `Graded::firing_degree` y `Display` para `Interval`. Alias de fuzzytool al leer (`product` y `zadeh`), escritos con el nombre canónico: especificación, 2 vectores de condición y 1 de lectura. JSON Schema `$defs/logic` en `spec/schemas/v1/logic.schema.json`, con ejemplos, al que apunta `vectors.schema.json`.
     - Integración con V.1 (al rebasar J.1a sobre V.1, 2026-11-15): `impl ToMark for logic::Interval` (y su `Sealed`) en `crates/core/src/visual.rs`, con `Mark::degree(lo, hi)`: un grado se dibuja como `0.7`, un intervalo como `[0.2, 0.9]` y UNKNOWN como `[0, 1]` (clase `truth_unknown`); test unitario `graded_truth_values_are_marked_by_their_interval`. Los runners de los bindings, de la C ABI y de C++ saltan y cuentan por separado los vectores `tool` (O.1, motivo `agents`), `draw` (V.1, motivo `diagram`) y los graduados (motivo `graded`), y los que comprueban listas exactas por ruta (Go, JavaScript, Java y Scala) lo hacen para los tres; Python los marca como `skip` con su motivo.
-  - [ ] J.1b Bindings: evaluar un nodo con una lógica graduada por nombre o en su forma JSON (C ABI, Python, JavaScript, Java/Scala, Go, C++), con los grados e intervalos en los árboles de resultados de cada lenguaje; quitar los saltos de los runners.
+  - [-] J.1b Bindings: evaluar un nodo con una lógica graduada por nombre o en su forma JSON (C ABI, Python, JavaScript, Java/Scala, Go, C++), con los grados e intervalos en los árboles de resultados de cada lenguaje; quitar los saltos de los runners.
     - Decidido en la revisión de API de J.1a: la C ABI añade una sola función que recibe la forma JSON de la lógica como texto (por ejemplo `cr_node_evaluate_tree_with_logic_json`), sobre `read_logic` y `AnyLogic::evaluate_tree`, y deja sin cambios el parámetro de nombre de `cr_node_evaluate_tree`.
-- [ ] J.2 Grados de disparo, umbral α, políticas `MAX_DEGREE` y `WEIGHTED`, comparaciones suaves, explicaciones con grados.
+- [-] J.2 Grados de disparo, umbral α, políticas `MAX_DEGREE` y `WEIGHTED`, comparaciones suaves, explicaciones con grados.
   - Pendiente de J.1a: constantes numéricas como grados en las condiciones (decidir si se admiten); `Fuzzy::fires` provisional (`lo ≥ 1`) hasta definir α; rule sets, tablas y decisiones con la forma JSON de una lógica con parámetros.
-- [ ] J.3 En Python: interoperabilidad con fuzzytool (términos como condiciones, sistemas Mamdani/TSK como acciones); el cambio de `Antecedent.__and__` en fuzzytool 0.8.
-- [ ] J.4 Auditoría estática en el núcleo: intervalos por campo, condiciones insatisfacibles, reglas ensombrecidas, solapamientos, contradicciones y huecos; z3 opcional.
+- [-] J.3 En Python: interoperabilidad con fuzzytool (términos como condiciones, sistemas Mamdani/TSK como acciones); el cambio de `Antecedent.__and__` en fuzzytool 0.8.
+- [-] J.4 Auditoría estática en el núcleo: intervalos por campo, condiciones insatisfacibles, reglas ensombrecidas, solapamientos, contradicciones y huecos; z3 opcional.
   - Idea de la revisión de D.3b: avisar de una celda de tabla que compara con un campo de primer nivel que ninguna columna lee (`country = ES` por `'ES'`), el error más probable al escribir una tabla.
 
 ---
 
 ### Fase K. Sistema experto · tamaño XL
 
-- [ ] K.1 Hechos tipados y memoria de trabajo; patrones con variables y joins; negación.
-- [ ] K.2 Rete incremental en Rust; agenda con estrategias deterministas; mantenimiento de verdad.
-- [ ] K.3 Acciones declarativas (`assert`, `modify`, `retract`, `Set`, `Emit`) ejecutadas en el núcleo; acciones del anfitrión como ruta lenta documentada.
-- [ ] K.4 Explicación por árbol de derivación; encadenamiento hacia atrás básico; benchmarks Miss Manners y Waltz contra Drools y CLIPS.
+**Estado (2026-11-15)**: sujeta a demanda (sección 4bis); no bloquea el lanzamiento.
+
+- [-] K.1 Hechos tipados y memoria de trabajo; patrones con variables y joins; negación.
+- [-] K.2 Rete incremental en Rust; agenda con estrategias deterministas; mantenimiento de verdad.
+- [-] K.3 Acciones declarativas (`assert`, `modify`, `retract`, `Set`, `Emit`) ejecutadas en el núcleo; acciones del anfitrión como ruta lenta documentada.
+- [-] K.4 Explicación por árbol de derivación; encadenamiento hacia atrás básico; benchmarks Miss Manners y Waltz contra Drools y CLIPS.
 
 ---
 
 ### Fase L. Explicaciones de ML (binding Python) · tamaño L
 
-- [ ] L.1 Extracción de reglas desde scikit-learn, árbol sustituto, RuleFit (imodels) y extracción difusa con fuzzytool; las reglas se exportan en JSON y se ejecutan en cualquier lenguaje.
-- [ ] L.2 Métricas (fidelidad, cobertura, complejidad) y `Guarded(estimator, ruleset)` compatible con scikit-learn.
+**Estado (2026-11-15)**: sujeta a demanda (sección 4bis); no bloquea el lanzamiento.
+
+- [-] L.1 Extracción de reglas desde scikit-learn, árbol sustituto, RuleFit (imodels) y extracción difusa con fuzzytool; las reglas se exportan en JSON y se ejecutan en cualquier lenguaje.
+- [-] L.2 Métricas (fidelidad, cobertura, complejidad) y `Guarded(estimator, ruleset)` compatible con scikit-learn.
 
 ---
 
 ### Fase N. Erlang · tamaño M
+
+**Estado (2026-11-15)**: congelada tras N.2 (decisión del autor); N.3 y N.4 sujetas a demanda.
 
 **Objetivo**: usar cleanrules desde Erlang (y, por la BEAM, desde Elixir y Gleam) con la misma semántica y sin poner en riesgo la VM (D12).
 
@@ -1172,17 +1183,19 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
   - Tests: suite de Common Test `test/cleanrules_nif_SUITE.erl` (32 casos: conversión en las dos direcciones, átomos que no se crean, *structs*, opacos y su igualdad, profundidad, `max_values` en entradas, lotes y constantes, recursos compartidos entre procesos y que sobreviven a quien los creó, documentos, planificadores y tiempos, *panics*, errores y `badarg`) y tests unitarios de Rust (rutas, enteros grandes del formato externo, *panics*). Cobertura del Rust del NIF por la suite y los tests unitarios (`cargo llvm-cov` con `show-env`): 97 % de líneas.
   - Puntos abiertos de N.1, aceptados tal cual al implementar (sin problemas): `nil` como nulo, nulo de vuelta como `null`, nombres de las tuplas etiquetadas, *structs* de Elixir reconocidos en el NIF, demás átomos como texto y tuplas de tres enteros como fechas (con test). Nuevos: (1) un `%Decimal{}` con coeficiente de más de 1024 bytes (2466 cifras) es nulo con `decimal_overflow` sin buscar ceros finales; (2) la explicación como término es la estructura del documento (claves binarias, *gaps* como mapas), y N.3 la convierte a su forma idiomática (`{days, N}`, `{microseconds, N}`); (3) el riesgo de pila de `Value` en los demás *bindings*, o un `Drop` iterativo en el núcleo.
   - Revisión de API aplicada (2026-11-15): la decisión usa `results` (no `rules`) y `ruleset_info` da `field_paths` (no `fields`); NIFs nuevos `decision_write/4` (evalúa y escribe la decisión en JSON o YAML), `decision_read/4` (lee una decisión registrada con su rule set; opacos como `null`) y `error_parent/1` (el padre del código, del núcleo; `undefined` para las raíces e `internal_error`); `ruleset_summary/2` acepta `term`, y el `node` de un error llega como su forma JSON en términos; fila de Erlang en `spec/errors.md` (*In each language*). Planificador normal: guardia adaptativa (un `AtomicBool` `prefer_dirty` en el recurso, que se activa cuando una llamada normal pasa de 1 ms y manda las siguientes a *dirty*), el texto cuesta más (una unidad por 16 bytes), las listas se recorren solo hasta el presupuesto restante (no `list_length()`), las claves se cobran antes de copiarlas y un `%Decimal{}` con partes de más de 64 bits va a *dirty*. Límites del llamador: `max_depth` y `max_nesting` por encima de 2048 son `badarg` (medido en *release* en aarch64 macOS con la pila de 320 KiB: leer, evaluar, explicar, escribir y liberar fallan a partir de unos 5500 niveles; en *debug*, unos 1700; anotado en el README, *Schedulers*). Menores: `not_data` con una sola ruta que crece y decrece y que también rechaza `read_error` (se queda en el binding: el núcleo no tiene una comprobación común pequeña); el lote suelta sus valores con pila explícita también si hay un *panic*; zona horaria desconocida al devolver un valor → `internal_error` (antes, UTC en silencio); `nif.escript` con `wordsize` (solo VM de 64 bits), `PROCESSOR_ARCHITECTURE` (la arquitectura del proceso), error claro sin almacén de CA, `NO_PROXY`, proxy con credenciales rechazado (documentado) y comentario sobre las redirecciones; `erlef/setup-beam` fijado al commit de v1.24.1 (aprobado por el autor el 2026-11-14, con las imágenes `erlang:26`, `erlang:29` y `erlang:29-alpine`). Medido de nuevo con la máquina tranquila (carga ~4, un rule set nuevo por llamada, 301 llamadas): la lista de 4900 enteros, 0,37 ms de mediana (0,40 ms p90); un rule set de 61 KiB, 0,11 ms. Tests: 40 casos (resúmenes como término, documentos de decisión, `error_parent`, `node` como término, guardia adaptativa, presupuesto antes del trabajo, límites de profundidad y una ruta de 10⁵ segmentos en `evaluate_dirty`, `evaluate` y lotes). Fuera de N.2: el límite de segmentos de ruta pasa a B.12.
-- [ ] N.3 API Erlang idiomática (módulo `cleanrules`).
+- [-] N.3 API Erlang idiomática (módulo `cleanrules`).
   - Notas de N.2: la `Decision` de N.3 guarda `{RuleSet, Data, MaxValues}` y vuelve a evaluar para explicarla o escribirla (`explain/4`, `decision_write/4`), con el coste de una segunda evaluación; normaliza a átomos las claves de la explicación y del resumen como términos, y los *gaps* a `{days, N}` y `{microseconds, N}`.
   - Reglas construidas con términos y leídas de JSON (D.1); `explain/1` y `summary/1`.
   - Resultados `{ok, Decision} | {error, #{code := atom(), message := binary(), ...}}`.
   - Acciones como funs registradas por nombre (D.4), que ejecuta el proceso que llama. Especificaciones para Dialyzer.
-- [ ] N.4 Runner de conformidad (Common Test), documentación con ex_doc y paquete en Hex con rebar3.
+- [-] N.4 Runner de conformidad (Common Test), documentación con ex_doc y paquete en Hex con rebar3.
   - Nota de N.2: el paquete de Hex debe incluir en `files` `scripts/` (el gancho `nif.escript`) y `nif-checksums.config`, y no `native/`; los archivos de los binarios se adjuntan al *release* `v<vsn>`.
 
 ---
 
 ### Fase O. IA agéntica y frameworks de agentes · tamaño L
+
+**Estado (2026-11-15)**: O.1 hecha; O.1b–O.8 sujetas a demanda (sección 4bis).
 
 **Objetivo**: que los agentes de IA usen cleanrules como herramienta de decisión, como *guardrail* determinista y explicable de sus propias acciones, y como destino verificable de las reglas que proponen. El motor sigue sin ningún modelo dentro (D13).
 
@@ -1197,31 +1210,31 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
   - Python: `cleanrules.call_tool`, `ToolResult`, `TOOLS`, `RuleSet.input_schema()` y `Explanation.compact(budget=2000)` (`CompactExplanation`), con el GIL liberado; su runner pasa los vectores `tool` por JSON y con datos de Python. Ejemplo en `docs/examples/agent_tools.py`.
   - Pendiente: la tarea O.1b (el catálogo en la C ABI, C++, Go, la JVM y JavaScript/wasm); hasta entonces sus runners saltan los vectores `tool`, contados y con el motivo. Para O.2: definiciones MCP autocontenidas a partir de los `$defs` de `agents.schema.json` (sin `$ref` externos), `serde_json` con `preserve_order` o el texto de los argumentos con `call_text` (el orden de los mapas importa y las claves repetidas se rechazan), un error de herramienta como resultado con `isError` y el JSON de `{"error": ...}`, y una herramienta desconocida como error de protocolo. Para O.3: decidir si `evaluate` devuelve también el documento de decisión para la auditoría, y la explicación completa con contrafactuales estructurados. Abierto: una descripción por rule set (clave opcional en el formato).
   - Revisión de API aplicada el 2026-11-12 (sobre 83e5307, ya con G.4 y N.1): (1) el catálogo sabe qué reglas tienen una acción dada como código (`Catalog::insert_with_actions`, que aplica `Summary::with_actions` en `summary`, `list_rulesets` y el esquema de entrada; Python pasa las marcas), con tests en Rust y Python (un vector no puede llevar código); (2) en Python los argumentos son cualquier `Mapping` (claves `str`, si no `TypeError`) o texto JSON; lo que no es JSON (`Decimal`, `date`, `datetime`, escalares de numpy, `float` infinito) se escribe con el conversor de datos del binding en la codificación del formato, y NaN y los ciclos son `ValueError`; (3) `compact_explanation` devuelve `Result` y rechaza el presupuesto fuera de rango con el `format_error` en `/budget` de la herramienta, que Python lanza tal cual (`TypeError` si no es un `int`); (4) el módulo nativo exporta `TOOLS` (de `Tool::ALL`) y las constantes del presupuesto, y Python tiene `class Tool(enum.StrEnum)`; (5) el presupuesto admite cualquier número entero en valor (`2000.0` es `2000`): especificación, esquema y vectores (`budget-float` se retira, sin reutilizar su id, y entran `budget-fraction` y `budget-integral-float`; 59 vectores); (6) Python expone `cleanrules.Catalog` (de un `Mapping[str, RuleSet]`, con `call`, `names` y `tools`), como en Rust, y desaparece `call_tool` (no publicado); (7) sección *Versioning* en `spec/agents.md`; (8) tarea O.1b. Detalles: `Tool::ALL` es `&'static [Tool]`; `Catalog` con `insert(impl Into<Arc<RuleSet>>)`, `remove`, `len`, `is_empty`, `FromIterator`, `Extend`, `with_tools` y `tools`, y una aserción estática de `Send + Sync`; la correspondencia de `ToolResult` con MCP (`content` como `structuredContent` y su JSON como texto) en `spec/agents.md`; `Display` de `CompactExplanation`; ejemplos en la documentación; CHANGELOG con la entrada *Changed* de `registry_error`. No se cambia `LogicName::ALL` a *slice*: lo usa la C ABI (`for logic in LogicName::ALL`) y J.1 lo modifica a la vez; queda para J.1 o después.
-- [ ] O.2 Servidor MCP `cleanrules-mcp` (`crates/mcp`, binario).
+- [-] O.2 Servidor MCP `cleanrules-mcp` (`crates/mcp`, binario).
   - Las herramientas de O.1 sobre rule sets cargados de un directorio configurado, que también se ofrecen como recursos MCP.
   - Transportes stdio y HTTP *streamable*.
   - Solo lectura por defecto, nunca ejecuta acciones, y con límites de tamaño y de tiempo.
   - Tests: la salida de cada herramienta coincide con la del núcleo.
-- [ ] O.3 *Guardrails* para agentes.
+- [-] O.3 *Guardrails* para agentes.
   - Un rule set decide `allow`, `deny` o `ask` sobre una llamada a herramienta (nombre, argumentos y contexto) o sobre una salida, y devuelve al modelo la explicación y los contrafactuales.
   - El documento de decisión es el registro de auditoría: se relee y se verifica con las 8 comprobaciones.
   - Integración con los *hooks* del Claude Agent SDK (`PreToolUse`), los *guardrails* del OpenAI Agents SDK y los nodos e interrupciones de LangGraph.
-- [ ] O.1b Las herramientas de O.1 en todos los bindings, para que sus runners dejen de saltar los vectores `tool`.
+- [-] O.1b Las herramientas de O.1 en todos los bindings, para que sus runners dejen de saltar los vectores `tool`.
   - C ABI: un catálogo opaco (`cr_catalog_new`, `cr_catalog_insert` con las marcas de acciones dadas como código, `cr_catalog_with_tools`, `cr_catalog_call` con el texto JSON de los argumentos y el resultado como texto JSON y si es un error de herramienta, `cr_catalog_free`), con la propiedad documentada en la cabecera, tests y `miri`; y `cr_compact_explanation` y `cr_input_schema` si los bindings los necesitan.
   - `Catalog` idiomático en C++, Go (`error` como valor solo para los usos indebidos), Java y Scala, y JavaScript y wasm, con la forma de Python (`call(tool, arguments)` con texto JSON o datos del lenguaje escritos en la codificación del formato, `names`, `tools`), más `input_schema` y la explicación compacta.
   - Los runners de C ABI, C++, JavaScript (Node, wasm y Deno), Java, Scala y Go ejecutan los vectores `tool` por JSON y con datos nativos.
-- [ ] O.4 Adaptadores finos y opcionales (extras de carga perezosa) que convierten un `RuleSet` en herramienta de cada framework, probados contra versiones fijadas.
+- [-] O.4 Adaptadores finos y opcionales (extras de carga perezosa) que convierten un `RuleSet` en herramienta de cada framework, probados contra versiones fijadas.
   - Python: Claude Agent SDK, OpenAI Agents SDK, LangChain/LangGraph, LlamaIndex, Pydantic AI y CrewAI.
   - JavaScript: Vercel AI SDK, LangChain.js y Mastra.
   - JVM: LangChain4j y Spring AI.
   - Go y Erlang, por MCP.
-- [ ] O.5 Reglas escritas por agentes.
+- [-] O.5 Reglas escritas por agentes.
   - Ciclo proponer → validar (esquema y construcción, con errores corregibles) → auditar (J.4) → probar con casos → aprobación humana → desplegar, como herramientas MCP y como API.
   - Nunca `eval`: las reglas propuestas son datos (invariante 9).
   - Conjunto de evaluación (políticas en lenguaje natural → reglas) con métricas de validez y de acierto sobre casos reservados.
-- [ ] O.6 Sistema experto para agentes (tras K): hechos que aportan las herramientas del agente, encadenamiento hacia delante y el árbol de derivación como explicación.
-- [ ] O.7 Seguridad y documentación: modelo de amenazas (inyección de *prompts* a través de los datos, rule sets de origen no confiable, abuso de recursos), una guía por framework y ejemplos en `docs/`.
-- [ ] O.8 Integración con swarmstate (backend de estado y *checkpoints* para agentes, con núcleo en Rust, del mismo autor; [swarmstate.github.io](https://swarmstate.github.io)), como extra opcional `cleanrules[swarmstate]` de carga perezosa. Nada de esto entra en el núcleo (invariantes 11 y 12). Revisado el 2026-11-02 sobre swarmstate 0.12.0.
+- [-] O.6 Sistema experto para agentes (tras K): hechos que aportan las herramientas del agente, encadenamiento hacia delante y el árbol de derivación como explicación.
+- [-] O.7 Seguridad y documentación: modelo de amenazas (inyección de *prompts* a través de los datos, rule sets de origen no confiable, abuso de recursos), una guía por framework y ejemplos en `docs/`.
+- [-] O.8 Integración con swarmstate (backend de estado y *checkpoints* para agentes, con núcleo en Rust, del mismo autor; [swarmstate.github.io](https://swarmstate.github.io)), como extra opcional `cleanrules[swarmstate]` de carga perezosa. Nada de esto entra en el núcleo (invariantes 11 y 12). Revisado el 2026-11-02 sobre swarmstate 0.12.0.
   - Enrutado explicable. swarmstate enruta con `HandoffGraph` y condiciones en un minilenguaje propio, de dos valores (un tipo incompatible es `false`) y sin explicación. Un `RuleSet` (política `first`, payload con el destino) hace de router de `HandoffGraph` y de los `add_conditional_edges` de LangGraph, y devuelve por qué se eligió un destino y por qué no los demás. Incluye un conversor de las condiciones de `HandoffGraph` (`category in ['billing'] and user.tier == 'gold'`) a la sintaxis de texto, con la diferencia semántica documentada y probada: en cleanrules un tipo incompatible es `UNKNOWN`, también bajo `not`, y la regla no se dispara.
   - Registro de auditoría duradero: los documentos de decisión y de explicación de O.3 se guardan en un `Store` de swarmstate por hilo y paso, de modo que la vuelta atrás de swarmstate (instantáneas en O(1)) muestra también qué decidió el *guardrail* y por qué.
   - Validación del estado: un rule set en modo estricto comprueba el estado antes de que el *checkpointer* de swarmstate lo guarde, o comprueba el `diff` entre dos instantáneas, y rechaza el paso con la explicación y los contrafactuales.
@@ -1231,6 +1244,8 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
 ---
 
 ### Fase V. Visualización · tamaño M
+
+**Estado (2026-11-15)**: V.1 hecha; V.3 pasa a T.10 (sin Arrow) y V.4 a W.1; V.2 sujeta a demanda.
 
 **Objetivo**: ver condiciones, reglas, tablas, decisiones y explicaciones como diagramas, con el mismo resultado en todos los lenguajes (D14). Propuesta aceptada por el autor el 2026-11-02; V.1 y V.2 pueden empezar en cuanto termine D.3b.
 
@@ -1256,17 +1271,49 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
     - Especificación de *Limits*: caracteres = valores escalares Unicode, corte antes de escapar, sustitución de los caracteres de control (categoría `Cc`) por U+FFFD, y la cota en bytes (menos de 64 MB con el límite por defecto, salvo descripciones) en lugar de una frase vaga.
     - Menores: documentación de `Limits` y `cr_limits` (lectores, datos nativos y diagramas); `Mark::degree` compara los extremos ya escritos, con su precondición documentada y `debug_assert!`; el mensaje del límite nombra el tipo de diagrama; `decision_mismatch` con pista neutral y la primera fila sin regla; sin celda vacía silenciosa en la rejilla (texto completo como respaldo, inalcanzable y comentado); `draw_ruleset(&Summary)` documentado; *doctests* de `draw_explanation`, `draw_table` y `Mark::degree`.
     - Vectores `draw` y *snapshots* regenerados y revisados (cambian estilos, `accTitle` y clases de tipo).
-- [ ] V.2 Python: un `draw(format)` genérico que refleja el núcleo (`draw("mermaid")`, con los nombres de `DiagramFormat`: `dot`, `mermaid`, `html`, `html_fragment`) en condiciones, reglas, rule sets, decisiones, explicaciones, resúmenes y tablas (con decisión opcional), más el azúcar `to_dot()`, `to_mermaid()` y `to_html(fragment=False)`; `_repr_html_` es `draw("html_fragment")`; `to_graphviz()` con el paquete `graphviz` como extra opcional `cleanrules[viz]` de carga perezosa. Los demás bindings exponen lo mismo a medida que existen, sobre `cr_*_draw`: JavaScript `draw("mermaid")`, Java `draw(DiagramFormat.MERMAID)` (y Scala), Go `Draw(DiagramMermaid)`, C++ `draw(cr::diagram::mermaid)`, con el mismo azúcar `toDot`/`toMermaid`/`toHtml` en su estilo; sus runners dejan entonces de omitir los vectores `draw`.
-- [ ] V.3 Estadísticas de un lote (tras I): cuántas veces se dispara cada regla y cuántas falla o queda desconocida cada condición, y la cobertura de un rule set o una tabla sobre un conjunto de datos. Las calcula el núcleo; se dibujan en HTML y, en Python, con matplotlib o plotly opcionales.
-- [ ] V.4 *Playground* en la web (tras F): cleanrules compilado a wasm evalúa y dibuja reglas, tablas y explicaciones en el navegador, sin servidor.
+- [-] V.2 Python: un `draw(format)` genérico que refleja el núcleo (`draw("mermaid")`, con los nombres de `DiagramFormat`: `dot`, `mermaid`, `html`, `html_fragment`) en condiciones, reglas, rule sets, decisiones, explicaciones, resúmenes y tablas (con decisión opcional), más el azúcar `to_dot()`, `to_mermaid()` y `to_html(fragment=False)`; `_repr_html_` es `draw("html_fragment")`; `to_graphviz()` con el paquete `graphviz` como extra opcional `cleanrules[viz]` de carga perezosa. Los demás bindings exponen lo mismo a medida que existen, sobre `cr_*_draw`: JavaScript `draw("mermaid")`, Java `draw(DiagramFormat.MERMAID)` (y Scala), Go `Draw(DiagramMermaid)`, C++ `draw(cr::diagram::mermaid)`, con el mismo azúcar `toDot`/`toMermaid`/`toHtml` en su estilo; sus runners dejan entonces de omitir los vectores `draw`.
+- [-] V.3 Estadísticas de un lote (tras I): cuántas veces se dispara cada regla y cuántas falla o queda desconocida cada condición, y la cobertura de un rule set o una tabla sobre un conjunto de datos. Las calcula el núcleo; se dibujan en HTML y, en Python, con matplotlib o plotly opcionales.
+- [-] V.4 *Playground* en la web (tras F): cleanrules compilado a wasm evalúa y dibuja reglas, tablas y explicaciones en el navegador, sin servidor.
+
+---
+
+### Fase R. Contrato 1.0 · tamaño M
+
+**Objetivo**: cerrar el contrato que verán los usuarios antes de publicar, para no romperlo después. Cada tarea empieza por la especificación y los vectores (invariante 5); el formato sigue en `"version": 1` porque no se ha publicado, y cada cambio incompatible con el borrador anterior se anota en `CHANGELOG.md` (decisión del autor, 2026-11-15).
+
+- [ ] R.1 Objetos JSON sin orden significativo. Los objetos son asociaciones: el orden de sus miembros no cambia ningún resultado. Las salidas de un *payload* (`then`) y el primer error entre claves siguen el orden de las claves por punto de código; los mapas de datos se comparan sin orden y se devuelven ordenados. Los arrays y el orden de las reglas conservan su significado. Toca `spec/json-format.md`, `spec/data-model.md`, `spec/rules.md`, los vectores (por ejemplo `rules/payloads/map-order-kept`, que se invierte), el núcleo y los bindings que conservaban el orden (estructuras de Go, `SequencedMap` de Java, mapas de JS y Python).
+- [ ] R.2 Bytes canónicos y huella. Especificar los bytes exactos de la forma canónica: UTF-8, escapes, representación de cada número y de cada tipo de cleanrules (int, float, decimal, fechas, opacos), orden de claves (R.1). Definir `ruleset_digest` (hoy reservado en `json-format.md`): qué bytes se resumen, con qué función y cómo se escribe. La huella identifica un artefacto canónico concreto; no promete equivalencia entre reglas escritas de formas distintas. En el núcleo, con vectores; los bindings la exponen.
+- [ ] R.3 Identidad de reglas. `id` opcional en cada regla, con respaldo en `name` cuando falta, y unicidad efectiva comprobada (dos reglas no pueden tener el mismo `id` efectivo). La documentación explica que, para que una regla renombrada siga siendo la misma al comparar versiones, hay que darle un `id` explícito. Aditivo en el formato.
+- [ ] R.4 Aritmética decimal. Decimal con decimal, o con entero, da decimal; con un float de por medio, float. La escala y el redondeo se aplican durante la división decimal (no después: `round(a / b, …)` no recupera lo que la división ya perdió); especificar división por cero, desbordamiento, promoción de tipos y agregados (`sum`, `avg`…). Un nodo `round(x, escala, modo)` si hace falta, con `/add-operator`. Sustituye la conversión a float64 de `spec/ast.md` (*Arithmetic*).
+- [ ] R.5 Paquete reproducible (`bundle`). Especificación abierta de un paquete de reglas: identificador estable del conjunto, revisión inmutable, huella (R.2), versión y configuración exactas del motor, contrato de entrada y salida (el esquema de entrada de O.1) y referencia a sus casos de prueba (T.1). Distingue dos comparaciones: las mismas reglas con otro motor y otras reglas con el mismo motor.
+- [ ] R.6 Guía de migración del borrador al contrato 1.0 en `docs/` y revisión de API (`api-reviewer`) de R.1–R.5 en todos los lenguajes con soporte.
+
+### Fase T. Pruebas, comparación y CLI · tamaño L
+
+**Objetivo**: ejecutar casos de prueba sobre un rule set, comparar dos versiones y explicar los cambios, con la misma implementación en la CLI, en wasm y en los bindings con soporte. Las pruebas usan `evaluate`, nunca ejecutan acciones.
+
+- [ ] T.1 Formato de casos y expectativas (`spec/tests.md`, JSON Schema y vectores): casos identificados, entradas, y expectativas sobre salidas, reglas seleccionadas, desconocidos y errores.
+- [ ] T.2 Lotes incrementales: un iterador con un resultado por caso, que registra los errores de cada caso y sigue; distingue un error de un caso de la interrupción del trabajo entero (límite, cancelación), y un informe parcial se marca como parcial.
+- [ ] T.3 Ejecutor de casos en el núcleo: resultado por caso (pasa, falla con la diferencia, error), resumen y explicación de los fallos.
+- [ ] T.4 Comparador de dos versiones sobre los mismos casos: cambios esperados e inesperados, salidas distintas con la misma regla seleccionada, reglas distintas con la misma salida, casos sin resultado, con desconocidos o con errores. Las dos comparaciones de R.5 por separado.
+- [ ] T.5 Informe en texto, JSON (con esquema) y HTML autónomo (con los diagramas de V.1), con pocos ejemplos detallados y el resto resumido.
+- [ ] T.6 Modo compacto: una primera pasada sin árboles de resultados y explicaciones completas solo para los casos seleccionados, sobre el mismo paquete y la misma entrada. Vectores que comprueban la misma selección, las mismas salidas y los mismos errores que el modo completo; benchmark de memoria máxima y de velocidad (`/bench`).
+- [ ] T.7 Auditoría estática acotada (lo esencial de J.4, sin lógica difusa): condiciones insatisfacibles, tipos incompatibles, solapamientos y huecos en los tipos admitidos, con diagnósticos que tienen en cuenta la política (un solapamiento puede ser intencionado bajo `first` o `priority`) y el informe de qué se ha comprobado.
+- [ ] T.8 CLI `cleanrules` (`crates/cli`): `test`, `diff`, `report`, `audit` y `draw`, con códigos de salida para CI, binarios precompilados por plataforma y una acción de CI de ejemplo.
+- [ ] T.9 Ejecutor, comparador, informe y auditoría en Python y JavaScript/wasm (interfaces con soporte).
+- [ ] T.10 Estadísticas de un lote recorriendo los casos (antes V.3, sin Arrow): cuántas veces se dispara cada regla, cuántas falla o queda desconocida cada condición, y la cobertura de un rule set o una tabla.
+
+### Fase W. Demostración en el navegador · tamaño S
+
+- [ ] W.1 *Playground* con wasm (antes V.4), sin servidor ni instalación: abrir dos versiones de una tabla de ejemplo, modificar una condición, comparar sus resultados sobre casos reproducibles y ver el motivo de cada cambio (T.4, T.5 y V.1).
 
 ---
 
 ### Fase M. Documentación y publicación 1.0 · tamaño M
 
 - [ ] M.0 Documentación con Zensical (Material for MkDocs termina su soporte el 5 de mayo de 2027).
-- [ ] M.1 Guías por lenguaje (Erlang incluido) y por framework de agentes con los mismos ejemplos, referencia de la especificación, matriz de funcionalidades y benchmarks reproducibles.
-- [ ] M.2 Publicación sincronizada (crates.io, PyPI, npm, Maven Central, módulo Go, Hex, Conan y vcpkg, y el servidor MCP en el registro de MCP) con *trusted publishing* donde exista; política de estabilidad de la API y de la ABI.
+- [ ] M.1 Guías de las interfaces con soporte (Rust, Python, JavaScript/wasm y la CLI) con los mismos ejemplos, una página por binding beta (Java, Go, C++), referencia de la especificación, matriz de funcionalidades y benchmarks reproducibles. (Antes: todos los lenguajes y frameworks de agentes; replanteado el 2026-11-15.)
+- [ ] M.2 Publicación: crates.io (núcleo y CLI), PyPI y npm con soporte; Maven Central, módulo Go, Conan y vcpkg como beta; binarios de la CLI; *trusted publishing* donde exista; política de estabilidad de la API y de la ABI. Hex queda fuera mientras Erlang esté congelado. La hace el autor cuando resuelva la titularidad y la marca, y no depende de nada externo a este repositorio (replanteado el 2026-11-15).
 - [ ] M.3 Paper en JOSS, DOI en Zenodo y `CITATION.cff`.
   - `CITATION.cff` añadido por adelantado el 2026-10-31, sin `version` ni `doi`. Falta añadirlos con la primera *release*, junto con el DOI de Zenodo y el paper.
 
@@ -1281,19 +1328,28 @@ Cumplida el 2026-11-01: pasan los 2.135 vectores (1.948 en el runner y 187 de le
 | Rendimiento | Nadie afirma una mejora sin benchmark (`/bench`), con mediana y rango intercuartílico |
 | Versionado | SemVer común a todos los paquetes; la versión del formato JSON es independiente |
 
-## 4bis. Plan de cierre (2026-11-11)
+## 4bis. Hoja de ruta hacia el lanzamiento (2026-11-15)
 
-El autor quiere terminar el plan cuanto antes. Cuatro pistas en paralelo, cada tarea en su *worktree* con `/plan-task`, sus puertas, CI en la rama y *fast-forward* a `main` (las tareas de una pista van en serie; entre pistas, *rebase* sobre `main` antes de fusionar):
+Sustituye al «Plan de cierre» del 2026-11-11. El lanzamiento ya no espera a completar todas las fases: se publica un motor instalable con un conjunto pequeño de interfaces con soporte, un ejecutor de casos de prueba, un comparador entre versiones con su informe y una demostración en el navegador. Lo demás pasa a «sujeto a demanda».
 
-| Ola | Núcleo y semántica | Agentes | Bindings | Visualización |
-|---|---|---|---|---|
-| 1 | J.1 | O.1 | G.4, N.1 | V.1 |
-| 2 | J.2, J.4 | O.1b, O.2, O.3 | N.2, N.3 | V.2 |
-| 3 | I.1, I.2 | O.4, O.5 | N.4, I.3 | V.3, V.4 |
-| 4 | K.1, K.2 | O.7, O.8 | J.3, L.1 | L.2 |
-| 5 | K.3, K.4 | O.6 | — | M.0, M.1 |
+Punto de partida: `2d3dee8` (O.1, V.1, J.1a y N.2 fusionados, CI en verde).
 
-Al final, M.3 (paper) y M.2: la publicación la hace el autor (los comandos de publicación están denegados), con lo preparado en F.3b, G.3b y H.2b.
+**Decisiones del autor (2026-11-15)**:
+
+- Interfaces con soporte: Rust, Python, JavaScript/wasm y la CLI `cleanrules`. Java, Go y C++ se publican como beta y mantienen su conformidad. Erlang queda congelado tras N.2.
+- Contrato 1.0 antes de publicar (fase R): objetos JSON sin orden significativo, aritmética decimal, identidad de reglas, bytes canónicos y huella, y el límite de segmentos de ruta (B.12). Se especifica antes de implementar.
+- Identidad, huellas, ejecutor de casos, comparador e informe viven en el núcleo abierto, para que la CLI, wasm y cualquier otro cliente compartan implementación y resultados (invariante 2).
+- Publicar el motor, la CLI y la demostración no depende de nada externo a este repositorio. M.2 se hace cuando el autor resuelva la titularidad y la marca; eso no detiene el trabajo técnico.
+
+| Etapa | Tareas |
+|---|---|
+| 0. Cerrar lo empezado | O.1, V.1, J.1a, N.2 (hecho) |
+| 1. Contrato 1.0 | R.1–R.6, B.12 |
+| 2. Probar y comparar | T.1–T.10 |
+| 3. Demostración | W.1 |
+| 4. Publicación | M.0, M.1, M.2, M.3 |
+
+**Sujeto a demanda** (no bloquea el lanzamiento; se retoma si lo piden usuarios; sus casillas se marcan `- [-]` y `scripts/progress.py` las cuenta aparte): I (Arrow), J.1b–J.4 (J.4 en su versión acotada pasa a T.7), K, L, N.3–N.4, O.1b–O.8, V.2 y G.2-posteriores de los bindings beta. V.3 pasa a T.10 (sin Arrow) y V.4 a W.1.
 
 ## 5. Dependencias entre fases
 
@@ -1305,7 +1361,11 @@ P (hecha) → 0' → A → B → C ─┬→ D → E → F → G → H → N
                             ├→ L (necesita C)
                             ├→ O (necesita B, C y D; los adaptadores llegan a cada binding cuando existe)
                             └→ V (V.1 y V.2 tras D.3b; V.3 tras I; V.4 tras F)
-todas → M
+todas → M   (hasta el 2026-11-15)
+
+Desde el 2026-11-15 (sección 4bis):
+O.1, V.1, J.1a, N.2 → R (contrato 1.0, con B.12) → T (pruebas, comparación y CLI) → W (demostración) → M
+I, J.1b–J.4, K, L, N.3–N.4, O.1b–O.8, V.2: sujetas a demanda
 ```
 
 Los bindings E–H y N siguen el orden decidido (C/C++ → JS → JVM → Go → Erlang); N necesita el núcleo y D.4, no la C ABI. O.1–O.3 pueden empezar en cuanto termine D, porque el servidor MCP solo necesita el núcleo y la carga de reglas; O.5 usa la auditoría de J.4, y O.6, el sistema experto de K. Las letras N y O se añadieron en la v3 del plan, y V el 2026-11-02; todas van antes de M. Las fases de funcionalidad I–K se implementan en el núcleo y llegan a todos los bindings existentes.

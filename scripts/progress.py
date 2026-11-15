@@ -1,8 +1,10 @@
 """Print a progress bar per phase of the roadmap, from the checkboxes in docs/PLAN.md.
 
 A phase's tasks are its `- [ ]` / `- [x]` items whose label is a task id such as
-`B.3` or `A.1c`. When a task is split into subtasks (`A.1` into `A.1a`...), only
-the subtasks count. A phase whose heading says it is completed counts as done.
+`B.3` or `A.1c`; a task marked `- [-]` is deferred (on demand, docs/PLAN.md
+section 4bis) and is counted apart, not as pending. When a task is split into
+subtasks (`A.1` into `A.1a`...), only the subtasks count, unless every subtask
+is deferred. A phase whose heading says it is completed counts as done.
 
     python3 scripts/progress.py [--width N] [--line] [--watch]
 
@@ -20,7 +22,7 @@ from pathlib import Path
 
 PLAN = Path(__file__).resolve().parents[1] / "docs" / "PLAN.md"
 PHASE = re.compile(r"^### Fase (?P<id>[^.\s]+)\. (?P<title>.+)$")
-TASK = re.compile(r"^\s*- \[(?P<mark>[ xX])\] (?P<id>[A-Z0-9']+\.\d+[a-z]?)\b")
+TASK = re.compile(r"^\s*- \[(?P<mark>[ xX-])\] (?P<id>[A-Z0-9']+\.\d+[a-z]?)\b")
 
 
 @dataclass
@@ -31,14 +33,19 @@ class Phase:
     title: str
     completed: bool
     tasks: dict[str, bool] = field(default_factory=dict[str, bool])
+    deferred: set[str] = field(default_factory=set[str])
 
     def leaves(self) -> dict[str, bool]:
-        """The tasks without subtasks: `A.1` is dropped when `A.1a` exists."""
+        """The tasks without pending or done subtasks: `A.1` is dropped when `A.1a` exists."""
         return {
             task: done
             for task, done in self.tasks.items()
-            if not any(
-                other != task and other.startswith(task) and other[len(task) :].isalpha()
+            if task not in self.deferred
+            and not any(
+                other != task
+                and other not in self.deferred
+                and other.startswith(task)
+                and other[len(task) :].isalpha()
                 for other in self.tasks
             )
         }
@@ -56,24 +63,31 @@ def read_plan(path: Path) -> list[Phase]:
         elif line.startswith("## "):
             current = None
         elif current is not None and (task := TASK.match(line)):
-            current.tasks[task["id"]] = task["mark"] != " "
+            if task["mark"] == "-":
+                current.deferred.add(task["id"])
+            current.tasks[task["id"]] = task["mark"] in "xX"
     return phases
 
 
 def render(phases: list[Phase], width: int) -> str:
     """Draw one bar per phase, mark the current phase and add the total."""
     lines: list[str] = []
-    done_total = count_total = 0
+    done_total = count_total = deferred_total = 0
     current_seen = False
     title_width = max(len(phase.title) for phase in phases)
     for phase in phases:
         leaves = phase.leaves()
         done, count = sum(leaves.values()), len(leaves)
-        if phase.completed and not count:
+        deferred_total += len(phase.deferred)
+        if not count and phase.deferred:
+            bar, status = "·" * width, f"{len(phase.deferred)} on demand"
+        elif phase.completed and not count:
             bar, status = "█" * width, "done"
         else:
             filled = round(width * done / count) if count else 0
             bar, status = "█" * filled + "░" * (width - filled), f"{done}/{count}"
+            if phase.deferred:
+                status += f" (+{len(phase.deferred)} on demand)"
             done_total += done
             count_total += count
         marker = ""
@@ -81,7 +95,8 @@ def render(phases: list[Phase], width: int) -> str:
             marker, current_seen = "  ← now", True
         lines.append(f"{phase.id:<3} {phase.title:<{title_width}}  {bar} {status}{marker}")
     percent = 100 * done_total / count_total if count_total else 100.0
-    lines.append(f"\nTotal: {done_total}/{count_total} tasks ({percent:.0f} %)")
+    later = f"; {deferred_total} on demand" if deferred_total else ""
+    lines.append(f"\nTotal: {done_total}/{count_total} tasks ({percent:.0f} %){later}")
     return "\n".join(lines)
 
 
