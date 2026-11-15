@@ -503,3 +503,6 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - run: uv run --no-project --with jsonschema python spec/schemas/check.py
       - run: uv run --no-project --with jsonschema python conformance/tools/check.py
+      # The decimal oracle: generated files up to date, and every arithmetic
+      # node and aggregate of every vector recomputed.
+      - run: python3 conformance/tools/decimal_vectors.py --check

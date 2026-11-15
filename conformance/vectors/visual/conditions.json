@@ -694,6 +694,71 @@
       "expect": {
         "diagram": "flowchart TD\n  n0[\"x IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 2...\"]\n  classDef leaf fill:#f8f9fa,stroke:#5f6368\n  class n0 leaf\n"
       }
+    },
+    {
+      "id": "visual/conditions/round-is-a-leaf",
+      "spec": [
+        "visual.md#conditions",
+        "visual.md#mermaid"
+      ],
+      "description": "a comparison with round is a leaf with its canonical text",
+      "given": {
+        "kind": "draw",
+        "format": "mermaid",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "le",
+                "left": {
+                  "op": "round",
+                  "operand": {
+                    "op": "mul",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "price"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": {
+                        "$decimal": "0.85"
+                      }
+                    }
+                  },
+                  "scale": 2,
+                  "mode": "half_up"
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "100.00"
+                  }
+                }
+              },
+              {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "qty"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 0
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "diagram": "flowchart TD\n  n0([\"all\"])\n  n1[\"ROUND(price * 0.85, 2, HALF_UP) #lt;= 100.00\"]\n  n2[\"qty #gt; 0\"]\n  n0 --> n1\n  n0 --> n2\n  classDef connective fill:#ffffff,stroke:#5f6368\n  classDef leaf fill:#f8f9fa,stroke:#5f6368\n  class n0 connective\n  class n1,n2 leaf\n"
+      }
     }
   ]
 }

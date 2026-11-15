@@ -12,7 +12,7 @@ from cleanrules import errors
 from cleanrules._agents import TOOLS, Catalog, Tool, ToolResult
 from cleanrules._cleanrules import FORMAT_VERSION, __version__
 from cleanrules._documents import Format, dump, dumps, load, loads, rule_from_text
-from cleanrules._expr import Closed, Const, Expr, F, Field, Kind, StructuralKey
+from cleanrules._expr import Closed, Const, Expr, F, Field, Kind, RoundingMode, StructuralKey
 from cleanrules._rules import (
     DEFAULT_BUDGET,
     MAX_BUDGET,
@@ -95,6 +95,7 @@ __all__ = [
     "Reason",
     "RegistryError",
     "ResultTree",
+    "RoundingMode",
     "Rule",
     "RuleDefinitionError",
     "RuleExplanation",

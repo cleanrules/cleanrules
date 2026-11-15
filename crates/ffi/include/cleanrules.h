@@ -1201,8 +1201,9 @@ size_t cr_node_children_len(const struct cr_node *node);
 // The node's own data, as a new value freed with `cr_value_free`: a field's
 // path (a list of strings and ints), a constant's value, the values of an
 // `in` (a list, sorted), `between`'s `closed` (`both`, `left`, `right` or
-// `none`), the pattern of `matches` and the text of a string test (strings);
-// a null for every other node.
+// `none`), the pattern of `matches` and the text of a string test (strings),
+// `round`'s scale and mode (a list of an int and a string, such as
+// `[2, "half_even"]`); a null for every other node.
 //
 // # Safety
 //
@@ -1483,6 +1484,26 @@ cr_status cr_node_new_or(const struct cr_node *const *operands,
                          size_t len,
                          struct cr_node **out,
                          struct cr_error **error);
+
+// `operand`, an int or a decimal, as a decimal with exactly `scale` digits
+// after the point, from 0 to 38 (`spec/ast.md`, *Rounding*); `mode` names how
+// digits are dropped: `half_even` (also for `NULL`), `half_up`, `half_down`,
+// `up`, `down`, `ceiling` or `floor` (`CR_INVALID_ARGUMENT` otherwise). A
+// scale below 0 or above 38, or a constant operand that is a float, is a
+// `CR_EXPRESSION_ERROR`.
+//
+// # Safety
+//
+// `operand` is `NULL` or a live `cr_node`; `mode` is `NULL` or points to
+// `mode_len` readable bytes; `out` is `NULL` or points to a writable
+// `cr_node *`; `error` is `NULL` or points to a writable `cr_error *` set to
+// `NULL`.
+cr_status cr_node_new_round(const struct cr_node *operand,
+                            int64_t scale,
+                            const char *mode,
+                            size_t mode_len,
+                            struct cr_node **out,
+                            struct cr_error **error);
 
 // A literal string test, `op` one of `starts_with`, `ends_with` and
 // `contains` (`CR_INVALID_ARGUMENT` otherwise).

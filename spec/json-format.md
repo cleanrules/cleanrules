@@ -249,6 +249,7 @@ is a `format_error`.
 | `starts_with` `ends_with` `contains` | `operand`, `text` | node; string |
 | `add` `sub` `mul` `div` | `left`, `right` | nodes |
 | `abs` `neg` | `operand` | node |
+| `round` | `operand`, `scale`, `mode` (optional) | node; an integer literal; one of the strings `"half_even"`, `"half_up"`, `"half_down"`, `"up"`, `"down"`, `"ceiling"` and `"floor"`, `"half_even"` when omitted |
 
 A path segment that is a string looks up a key, and one that is an integer
 indexes a list, as described in `ast.md` (*Reading data*). `["items", 0,
@@ -277,7 +278,9 @@ a tree that the API could not build. Breaking any of these rules is an
 - `in` values are non-empty, non-null and from one type group. They are then
   normalized, sorted and deduplicated;
 - `between` bounds, when both are constants, belong to one orderable group;
-- a `matches` pattern is a valid regular expression (`ast.md`, *`matches`*).
+- a `matches` pattern is a valid regular expression (`ast.md`, *`matches`*);
+- a `round` scale is from 0 to 38, and its operand, when a constant, is an int
+  or a decimal (`ast.md`, *Rounding*).
 
 The error points to the node whose construction fails: for a wrong operand,
 the node that takes it (`{"op": "eq", ...}` with a condition as `left` points
@@ -293,7 +296,8 @@ Writers produce the **canonical form**:
 
 - keys in the order of the table above, `op` first; payload keys, metadata
   and maps sorted by key, by Unicode code point (*Objects*);
-- `closed` always written, even when it is `"both"`;
+- `closed` always written, even when it is `"both"`, and so is `mode`, even
+  when it is `"half_even"`;
 - `and` and `or` flattened;
 - `in` values in normalized order: ascending, numbers by exact value, strings by
   Unicode code point, `false` before `true`, dates and datetimes in time order
@@ -561,8 +565,8 @@ rule's output maps each key of `then` to the `value` at the root of its tree;
 `outputs` are the outputs of the `selected` rules in order; and `output` is the
 winner's output for single-hit policies, or `aggregated` (`rules.md`,
 *Outputs*). `fired` and `aggregated` could also be recomputed, but are stored
-for consumers outside cleanrules: the aggregate's arithmetic (float
-conversion, overflow) is not trivial. Readers recompute both and reject a
+for consumers outside cleanrules: the aggregate's arithmetic (exact decimals,
+conversion to float, overflow) is not trivial. Readers recompute both and reject a
 mismatch.
 
 ### Result trees

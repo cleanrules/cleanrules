@@ -42,6 +42,18 @@ describe('operators and their text', () => {
     assert.equal(F.a.add(1).kind, 'value')
   })
 
+  test('round', () => {
+    assert.equal(text(F.price.mul(decimal('0.85')).round(2)), 'ROUND(price * 0.85, 2)')
+    assert.equal(text(F.price.round(0, { mode: 'half_up' })), 'ROUND(price, 0, HALF_UP)')
+    assert.equal(F.price.round(2).toJSON().mode, 'half_even')
+    assert.throws(() => F.price.round(39), /not 39/)
+    assert.throws(() => F.price.round(-1), /not -1/)
+    assert.throws(() => F.price.round(1.5), /integer scale/)
+    assert.throws(() => F.price.round(2, { mode: 'half_odd' }), /mode must be/)
+    assert.throws(() => F.price.round(2, { rounding: 'up' }), TypeError)
+    assert.throws(() => constant(float(2.5)).round(0), /float/)
+  })
+
   test('predicates', () => {
     assert.equal(text(F.country.isIn(['PT', 'ES', 'ES'])), 'country IN ("ES", "PT")')
     assert.equal(text(F.country.isIn(new Set([1, 2]))), 'country IN (1, 2)')

@@ -81,7 +81,8 @@ class NodeTest {
     void aValueGivesItsResultTree() {
         try (Node node = Node.read("total * 0.9", Format.TEXT)) {
             String tree = node.evaluateValueTree(new Order());
-            assertTrue(tree.contains("\"value\":900.0"), tree);
+            // 0.9 is a decimal in the text format, so the product is exact (spec/ast.md).
+            assertTrue(tree.contains("\"value\":{\"$decimal\":\"900.0\"}"), tree);
             assertEquals(tree, node.evaluateValueTreeJson("{\"total\": 1000}", false, null));
             assertEquals(tree, node.evaluateValueTreeJson("{\"total\": 1000}"));
             assertThrows(ExpressionException.class, () -> node.evaluateTree(new Order()));

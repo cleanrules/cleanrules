@@ -7,7 +7,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::error::{Error, ErrorCode, Result, Segment};
 use crate::json::Limits;
-use crate::value::{Group, NullCause, Value};
+use crate::value::{Group, MAX_DIGITS, NullCause, RoundingMode, Value};
 use crate::walk::post_order;
 
 /// Where a node may appear (`spec/ast.md`, *Node kinds*).
@@ -270,6 +270,15 @@ pub enum Expr {
     Abs(Box<Node>),
     /// Negation of a number.
     Neg(Box<Node>),
+    /// A number rounded to a number of places (`spec/ast.md`, *Rounding*).
+    Round {
+        /// The int or decimal rounded.
+        operand: Box<Node>,
+        /// The digits after the point, from 0 to 38.
+        scale: u32,
+        /// How digits are dropped.
+        mode: RoundingMode,
+    },
 }
 
 /// A node of a condition tree, valid by construction.
@@ -342,6 +351,7 @@ impl Node {
             Expr::Arith { op, .. } => op.tag(),
             Expr::Abs(_) => "abs",
             Expr::Neg(_) => "neg",
+            Expr::Round { .. } => "round",
         }
     }
 
@@ -350,7 +360,11 @@ impl Node {
     pub fn kind(&self) -> Kind {
         match &self.expr {
             Expr::Field(_) | Expr::Const(Value::Bool(_)) => Kind::Any,
-            Expr::Const(_) | Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_) => Kind::Value,
+            Expr::Const(_)
+            | Expr::Arith { .. }
+            | Expr::Abs(_)
+            | Expr::Neg(_)
+            | Expr::Round { .. } => Kind::Value,
             _ => Kind::Condition,
         }
     }
@@ -667,6 +681,33 @@ impl Node {
         })
     }
 
+    /// `operand` rounded to `scale` digits after the point, as `mode` says
+    /// (`spec/ast.md`, *Rounding*).
+    ///
+    /// # Errors
+    ///
+    /// `expression_error` when `scale` is above 38, or the operand is a
+    /// condition, the null constant or a constant that is not an int or a
+    /// decimal (checked in that order).
+    pub fn round(operand: Node, scale: u32, mode: RoundingMode) -> Result<Self> {
+        let scale = check_round_scale(i128::from(scale))?;
+        numeric_operand(&operand, "round")?;
+        if let Expr::Const(Value::Float(_)) = &operand.expr {
+            return Err(invalid(
+                "'round' takes an int or a decimal; a float constant would never be rounded",
+            )
+            .with_hint("write the constant as a decimal")
+            .with_node(&operand));
+        }
+        Ok(Self {
+            expr: Expr::Round {
+                operand: Box::new(operand),
+                scale,
+                mode,
+            },
+        })
+    }
+
     /// The `index`-th direct child, in the order of [`Node::children`], without
     /// collecting them: the step of the core's iterative walks.
     pub(crate) fn child(&self, index: usize) -> Option<&Node> {
@@ -679,6 +720,7 @@ impl Node {
                 | Expr::IsNull(left)
                 | Expr::Abs(left)
                 | Expr::Neg(left)
+                | Expr::Round { operand: left, .. }
                 | Expr::In { operand: left, .. }
                 | Expr::Matches { operand: left, .. }
                 | Expr::StringTest { operand: left, .. }
@@ -745,6 +787,15 @@ impl Node {
             },
             Expr::Abs(operand) => Expr::Abs(take(operand)),
             Expr::Neg(operand) => Expr::Neg(take(operand)),
+            Expr::Round {
+                operand,
+                scale,
+                mode,
+            } => Expr::Round {
+                operand: take(operand),
+                scale: *scale,
+                mode: *mode,
+            },
         };
         Node { expr }
     }
@@ -759,6 +810,14 @@ impl Node {
                 va.len() == vb.len() && va.iter().zip(vb).all(|(x, y)| same_constant(x, y))
             }
             (Expr::Between { closed: a, .. }, Expr::Between { closed: b, .. }) => a == b,
+            (
+                Expr::Round {
+                    scale: a, mode: m, ..
+                },
+                Expr::Round {
+                    scale: b, mode: n, ..
+                },
+            ) => a == b && m == n,
             (Expr::Matches { pattern: a, .. }, Expr::Matches { pattern: b, .. }) => {
                 a.source == b.source
             }
@@ -782,6 +841,7 @@ impl Node {
             | Expr::IsNull(operand)
             | Expr::Abs(operand)
             | Expr::Neg(operand)
+            | Expr::Round { operand, .. }
             | Expr::In { operand, .. }
             | Expr::Matches { operand, .. }
             | Expr::StringTest { operand, .. } => vec![operand],
@@ -825,6 +885,31 @@ fn value_operand(node: &Node, of: &str) -> Result<()> {
         .with_node(node));
     }
     Ok(())
+}
+
+/// A `round` scale as written, checked: from 0 to 38 (`spec/ast.md`,
+/// *Rounding*). For readers and bindings whose integers may be negative or
+/// wide, so that every language reports the same error.
+///
+/// # Errors
+///
+/// `expression_error` for a scale below 0 or above 38.
+pub fn check_round_scale(scale: i128) -> Result<u32> {
+    u32::try_from(scale)
+        .ok()
+        .filter(|&s| s <= MAX_DIGITS)
+        .ok_or_else(|| {
+            // A reader saturates a scale too large for its integers: such a
+            // number is not the one written, so it is not shown.
+            let shown = if i64::try_from(scale).is_ok() {
+                format!(", not {scale}")
+            } else {
+                String::new()
+            };
+            invalid(format!(
+                "a 'round' scale is from 0 to 38 digits after the point{shown}"
+            ))
+        })
 }
 
 fn numeric_operand(node: &Node, of: &str) -> Result<()> {
@@ -991,6 +1076,7 @@ impl Hash for Node {
                 Expr::Const(value) => hash_constant(value, state),
                 Expr::In { values, .. } => values.iter().for_each(|v| hash_constant(v, state)),
                 Expr::Between { closed, .. } => closed.hash(state),
+                Expr::Round { scale, mode, .. } => (scale, mode).hash(state),
                 Expr::Matches { pattern, .. } => pattern.source.hash(state),
                 Expr::StringTest { text, .. } => text.hash(state),
                 _ => {}
@@ -1026,6 +1112,37 @@ mod tests {
     }
     fn code<T>(result: crate::Result<T>) -> ErrorCode {
         result.err().unwrap().code()
+    }
+
+    #[test]
+    fn round_takes_ints_and_decimals_with_a_scale_to_38() {
+        use crate::value::RoundingMode;
+        let x = f("x");
+        let node = Node::round(x.clone(), 2, RoundingMode::HalfUp).unwrap();
+        assert_eq!(node.tag(), "round");
+        assert_eq!(node.kind(), Kind::Value);
+        assert_eq!(node.children().len(), 1);
+        assert_eq!(node, node.clone());
+        assert_ne!(
+            node,
+            Node::round(x.clone(), 2, RoundingMode::HalfEven).unwrap()
+        );
+        assert_ne!(
+            node,
+            Node::round(x.clone(), 3, RoundingMode::HalfUp).unwrap()
+        );
+        let message = |e: crate::error::Error| e.message().to_owned();
+        assert!(
+            message(Node::round(x.clone(), 39, RoundingMode::HalfEven).unwrap_err())
+                .contains("not 39")
+        );
+        let float = Node::round(c(Value::Float(2.5)), 0, RoundingMode::HalfEven).unwrap_err();
+        assert_eq!(float.code(), ErrorCode::ExpressionError);
+        assert!(Node::round(c(Value::String("a".into())), 0, RoundingMode::HalfEven).is_err());
+        assert!(Node::round(c(Value::Null(NullCause::Null)), 0, RoundingMode::HalfEven).is_err());
+        assert!(Node::round(Node::is_null(x).unwrap(), 0, RoundingMode::HalfEven).is_err());
+        assert!(Node::round(c(Value::Int(5)), 38, RoundingMode::Floor).is_ok());
+        assert!(super::check_round_scale(-1).is_err());
     }
 
     #[test]

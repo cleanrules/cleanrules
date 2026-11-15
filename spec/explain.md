@@ -236,8 +236,10 @@ HIT POLICY priority: selected e
   cause is `negated` (`needs y > 3 (short by 1)`).
 - A reason reads `missing field <path>`, `<path> is null` (`null value` without
   a path), `type mismatch: <detail>` or `type mismatch: <group> vs <group>`,
-  `cannot order booleans`, `division by zero`, `integer overflow in <path>`,
-  `decimal out of range in <path>`, `NaN result` or `cannot read <path>:
+  `cannot order booleans`, `division by zero`, `integer overflow in <paths>`,
+  `decimal overflow in <paths>` (for a decimal in the data that does not fit,
+  or a decimal result that does not fit; the paths joined with `, `, and
+  without `in <paths>` when there are none), `NaN result` or `cannot read <path>:
   <detail>`.
 
 Conditions, field paths, rule names, tags, output keys and constants are written

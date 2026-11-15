@@ -16123,6 +16123,560 @@
           }
         }
       }
+    },
+    {
+      "id": "format/decisions/round-payload",
+      "spec": [
+        "json-format.md#reading-a-decision",
+        "ast.md#rounding"
+      ],
+      "description": "a decision with a rounded payload reads back",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "r",
+                "fired": true,
+                "when": {
+                  "op": "const",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "const",
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "price": {
+                    "op": "round",
+                    "value": {
+                      "$decimal": "16.99"
+                    },
+                    "children": [
+                      {
+                        "op": "mul",
+                        "value": {
+                          "$decimal": "16.9915"
+                        },
+                        "children": [
+                          {
+                            "op": "field",
+                            "path": [
+                              "price"
+                            ],
+                            "value": {
+                              "$decimal": "19.99"
+                            }
+                          },
+                          {
+                            "op": "const",
+                            "value": {
+                              "$decimal": "0.85"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "r"
+            ]
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "price": {
+                  "op": "round",
+                  "operand": {
+                    "op": "mul",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "price"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": {
+                        "$decimal": "0.85"
+                      }
+                    }
+                  },
+                  "scale": 2,
+                  "mode": "half_even"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "r",
+                "fired": true,
+                "when": {
+                  "op": "const",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "const",
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "price": {
+                    "op": "round",
+                    "value": {
+                      "$decimal": "16.99"
+                    },
+                    "children": [
+                      {
+                        "op": "mul",
+                        "value": {
+                          "$decimal": "16.9915"
+                        },
+                        "children": [
+                          {
+                            "op": "field",
+                            "path": [
+                              "price"
+                            ],
+                            "value": {
+                              "$decimal": "19.99"
+                            }
+                          },
+                          {
+                            "op": "const",
+                            "value": {
+                              "$decimal": "0.85"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "r"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/decisions/round-payload-tampered",
+      "spec": [
+        "json-format.md#reading-a-decision",
+        "ast.md#rounding"
+      ],
+      "description": "a rounded payload with another scale than round gives is a mismatch at its value",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "r",
+                "fired": true,
+                "when": {
+                  "op": "const",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "const",
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "price": {
+                    "op": "round",
+                    "value": {
+                      "$decimal": "16.990"
+                    },
+                    "children": [
+                      {
+                        "op": "mul",
+                        "value": {
+                          "$decimal": "16.9915"
+                        },
+                        "children": [
+                          {
+                            "op": "field",
+                            "path": [
+                              "price"
+                            ],
+                            "value": {
+                              "$decimal": "19.99"
+                            }
+                          },
+                          {
+                            "op": "const",
+                            "value": {
+                              "$decimal": "0.85"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "r"
+            ]
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "price": {
+                  "op": "round",
+                  "operand": {
+                    "op": "mul",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "price"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": {
+                        "$decimal": "0.85"
+                      }
+                    }
+                  },
+                  "scale": 2,
+                  "mode": "half_even"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/results/0/then/price/value"
+        }
+      }
+    },
+    {
+      "id": "format/decisions/exact-sum-float-and-decimal",
+      "spec": [
+        "json-format.md#reading-a-decision",
+        "rules.md#collect-aggregates"
+      ],
+      "description": "a recorded sum of a float and a decimal is the exact total rounded once to a float",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "const",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "const",
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "n": {
+                    "op": "const",
+                    "value": 0.1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": true,
+                "when": {
+                  "op": "const",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "const",
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "n": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.2"
+                    }
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "a",
+              "b"
+            ],
+            "aggregated": {
+              "n": 0.3
+            }
+          }
+        },
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 0.1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.2"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "const",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "const",
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "n": {
+                    "op": "const",
+                    "value": 0.1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": true,
+                "when": {
+                  "op": "const",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "const",
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "n": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.2"
+                    }
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "a",
+              "b"
+            ],
+            "aggregated": {
+              "n": 0.3
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/decisions/exact-sum-chained",
+      "spec": [
+        "json-format.md#reading-a-decision",
+        "rules.md#collect-aggregates"
+      ],
+      "description": "a sum recorded as added in turn, 0.30000000000000004, is a mismatch",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "const",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "const",
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "n": {
+                    "op": "const",
+                    "value": 0.1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": true,
+                "when": {
+                  "op": "const",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "const",
+                      "value": true
+                    }
+                  ]
+                },
+                "then": {
+                  "n": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.2"
+                    }
+                  }
+                }
+              }
+            ],
+            "selected": [
+              "a",
+              "b"
+            ],
+            "aggregated": {
+              "n": 0.30000000000000004
+            }
+          }
+        },
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 0.1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.2"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/aggregated"
+        }
+      }
     }
   ]
 }

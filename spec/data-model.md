@@ -46,11 +46,25 @@ rounded**:
 - in a constant, it is an `ExpressionError` (`format_error` in JSON);
 - in data, it reads as null with reason `decimal_overflow` (`ast.md`).
 
-Converting a decimal to float, for arithmetic and aggregates (`ast.md`), is
-**correctly rounded**: to the nearest binary64, ties to even, as Python's
-`float(Decimal)` does. Exact differences (counterfactual gaps, `explain.md`)
-that do not fit give no gap. The core implements this type itself: it needs
-only exact comparison, exact subtraction, conversion to float and display.
+Arithmetic on decimals and ints gives decimals, exact when they fit and
+rounded half to even to 38 significant digits otherwise (`ast.md`, *Decimal
+arithmetic*); a result that does not fit at any scale is null with reason
+`decimal_overflow`. `round` gives a decimal an exact number of places
+(`ast.md`, *Rounding*). Converting a decimal to float, when arithmetic meets a
+float (`ast.md`, *Arithmetic*), or the exact total of a `sum` with a float
+(`rules.md`, *`COLLECT` aggregates*), is **correctly rounded**: to the nearest
+binary64, ties to even, as Python's `float(Decimal)` does. Exact differences
+(counterfactual gaps, `explain.md`) that do not fit give no gap. The core
+implements this type itself: it needs exact comparison, the arithmetic of
+`ast.md`, conversion to float and display.
+
+*Informative.* Arithmetic results keep the kind the operands give them, so a
+host language gets a decimal back where its own arithmetic might have given a
+float: `F.price * Decimal("0.85")` gives a Python `Decimal`, a JavaScript
+`cr.Decimal` (not a `number`), a Java `BigDecimal` and a Go `cr.Decimal`. A
+native float constant, such as `0.85` in Python, JavaScript, Java or Go, is a
+float, and makes the result a float; in the rule syntax and in decision
+tables, `0.85` is a decimal.
 
 ### Floats
 

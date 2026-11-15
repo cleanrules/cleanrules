@@ -9,8 +9,9 @@ use std::cmp::Ordering;
 use std::fmt;
 
 pub use datetime::{AwareDateTime, DateTimeError, Zone, check_date, check_naive};
-pub use decimal::{Decimal, DecimalError, MAX_DIGITS};
+pub use decimal::{ArithmeticError, Decimal, DecimalError, MAX_DIGITS, RoundingMode};
 use jiff::civil::{Date, DateTime};
+pub(crate) use number::ExactSum;
 pub use number::Number;
 
 use crate::error::{Error, ErrorCode};

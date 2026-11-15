@@ -19,18 +19,36 @@ import difflib
 import keyword
 import math
 import operator
+import typing
 from collections.abc import Iterable, Iterator, Mapping
 from typing import Any, ClassVar, Literal, NoReturn, TypeAlias
 
 from cleanrules import _cleanrules as _native
 from cleanrules.errors import ExpressionError
 
-__all__ = ["Closed", "Const", "Expr", "F", "Field", "Kind"]
+__all__ = ["Closed", "Const", "Expr", "F", "Field", "Kind", "RoundingMode"]
 
 Kind: TypeAlias = Literal["condition", "value", "any"]
 """Where a node may appear: as a `condition`, as a `value`, or as either (`any`)."""
 
 Closed: TypeAlias = Literal["both", "left", "right", "none"]
+"""The ends `Expr.between` includes: `"both"` (the default), `"left"`, `"right"` or `"none"`."""
+
+RoundingMode: TypeAlias = Literal[
+    "half_even", "half_up", "half_down", "up", "down", "ceiling", "floor"
+]
+"""How `Expr.round` drops digits, as Java's `RoundingMode` (`spec/ast.md`, *Rounding*).
+
+`"half_even"` (the default) and `"half_up"`, `"half_down"` go to the nearest
+neighbour and differ on ties; `"up"` and `"down"` go away from and toward zero;
+`"ceiling"` and `"floor"` toward positive and negative infinity. The constants of
+the `decimal` module (`decimal.ROUND_HALF_UP`...) are accepted too, except
+`ROUND_05UP`.
+"""
+
+_ROUNDING_MODES: tuple[str, ...] = typing.get_args(RoundingMode)
+# The constants of the `decimal` module, by their values.
+_DECIMAL_MODES = {f"ROUND_{mode.upper()}": mode for mode in _ROUNDING_MODES}
 """Which ends of `between` are included (the same names as polars)."""
 
 
@@ -219,6 +237,9 @@ class Expr:
     def __abs__(self) -> Expr:
         return _Node(_native.abs_(self._node))
 
+    def __round__(self, ndigits: int | None = None) -> Expr:
+        return self.round(0 if ndigits is None else ndigits)
+
     # --- Predicates and functions --------------------------------------------------
 
     def is_in(self, values: Iterable[object]) -> Expr:
@@ -340,6 +361,42 @@ class Expr:
             An `abs` node.
         """
         return _Node(_native.abs_(self._node))
+
+    def round(self, scale: int, mode: RoundingMode | str = "half_even") -> Expr:
+        """Round an int or a decimal to `scale` digits after the point, as a decimal.
+
+        `(F.price * Decimal("0.85")).round(2)` gives a price in cents;
+        `round(node, 2)` is the same with the default mode. A float operand gives
+        null with a type mismatch (strict mode raises): floats are never rounded
+        implicitly, so pass prices as `Decimal`.
+
+        Args:
+            scale: The digits after the point, from 0 to 38.
+            mode: How digits are dropped, as Java's `RoundingMode`: `"half_even"`
+                (default), `"half_up"`, `"half_down"`, `"up"`, `"down"`,
+                `"ceiling"` or `"floor"`, or the same constant of the `decimal`
+                module (`decimal.ROUND_HALF_UP`); `ROUND_05UP` has no equivalent.
+
+        Returns:
+            A `round` node.
+
+        Raises:
+            ExpressionError: If `scale` is not an int from 0 to 38, `mode` is
+                unknown, or the operand is a float constant or not a number.
+        """
+        if isinstance(scale, bool) or not isinstance(scale, int):  # pyright: ignore[reportUnnecessaryIsInstance]
+            raise ExpressionError(f"the scale of round must be an int, got {scale!r}")
+        mode = _DECIMAL_MODES.get(mode, mode)
+        if mode not in _ROUNDING_MODES:
+            raise ExpressionError(
+                "mode must be 'half_even', 'half_up', 'half_down', 'up', 'down', "
+                f"'ceiling' or 'floor' (or a decimal.ROUND_* constant but ROUND_05UP), "
+                f"got {mode!r}"
+            )
+        # Python ints have no bound: past the range of the core's integers, any
+        # scale is as far out of range, and the core does not show it.
+        bounded = max(min(scale, 2**100), -(2**100))
+        return _Node(_native.round_(self._node, bounded, mode))
 
 
 class _Node(Expr):
@@ -626,6 +683,9 @@ def _render(node: Expr) -> str:
         return f"abs({_operand(children[0])})"
     if tag == "neg":
         return f"-{_operand(children[0], parens=_ARITHMETIC)}"
+    if tag == "round":
+        mode = "" if details["mode"] == "half_even" else f", {details['mode']!r}"
+        return f"{_receiver(children[0])}.round({details['scale']}{mode})"
     return f"<node {tag}>"  # pragma: no cover - a tag added to the core later
 
 

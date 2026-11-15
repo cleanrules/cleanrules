@@ -90,6 +90,12 @@ sealed abstract class Expr private[scaladsl] (val asJava: io.github.cleanrules.E
   /** The absolute value. */
   def abs: Expr = Expr(asJava.abs())
 
+  /** This int or decimal rounded to `scale` digits after the point (0 to 38), as a decimal:
+    * `(F.price * BigDecimal("0.85")).round(2)`. A float operand is unknown with a type mismatch.
+    */
+  def round(scale: Int, mode: java.math.RoundingMode = java.math.RoundingMode.HALF_EVEN): Expr =
+    Expr(asJava.round(scale, mode))
+
   // ---- Tests.
 
   /** Membership in constants, such as `F.country.isIn("ES", "PT")`, kept sorted and without repeats. */

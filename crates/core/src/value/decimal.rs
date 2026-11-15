@@ -30,6 +30,7 @@ enum Repr {
 
 /// Why a decimal could not be built.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum DecimalError {
     /// The text is not a decimal literal.
     #[error("not a decimal literal")]
@@ -187,9 +188,10 @@ impl Decimal {
 
     /// The exact difference `self − other`, with the larger of the two scales, or
     /// `None` when it does not fit in 38 digits or an operand is infinite
-    /// (`spec/explain.md`, *Counterfactuals*).
+    /// (`spec/explain.md`, *Counterfactuals*). It never rounds, unlike
+    /// [`Decimal::try_sub`], which rounds a difference that does not fit.
     #[must_use]
-    pub fn checked_sub(self, other: Self) -> Option<Self> {
+    pub fn exact_sub(self, other: Self) -> Option<Self> {
         let ((a, sa), (b, sb)) = (self.parts()?, other.parts()?);
         let scale = sa.max(sb);
         let a = a.checked_mul(10_i128.checked_pow(scale - sa)?)?;
@@ -201,6 +203,487 @@ impl Decimal {
     fn exact(self) -> Option<(bool, u128, u32)> {
         self.parts().map(|(c, s)| (c < 0, c.unsigned_abs(), s))
     }
+
+    /// The sign: -1, 0 or 1.
+    fn signum(self) -> i8 {
+        match self.repr {
+            Repr::Infinite { negative } => {
+                if negative {
+                    -1
+                } else {
+                    1
+                }
+            }
+            Repr::Finite { coefficient, .. } => match coefficient.cmp(&0) {
+                Ordering::Less => -1,
+                Ordering::Equal => 0,
+                Ordering::Greater => 1,
+            },
+        }
+    }
+
+    /// The infinity of a sign.
+    fn infinity(negative: bool) -> Self {
+        Self {
+            repr: Repr::Infinite { negative },
+        }
+    }
+
+    /// `self + other`, exact when it fits and otherwise **rounded** half to even
+    /// to 38 significant digits (`spec/ast.md`, *Decimal arithmetic*): the
+    /// `try_` methods may round, and fail only when no decimal can hold the
+    /// result. For a difference that must be exact, see [`Decimal::exact_sub`].
+    ///
+    /// # Errors
+    ///
+    /// [`ArithmeticError::Overflow`] when the result does not fit at any
+    /// scale, and [`ArithmeticError::InvalidOperation`] for `inf + -inf`.
+    pub fn try_add(self, other: Self) -> Result<Self, ArithmeticError> {
+        self.add_signed(other, false)
+    }
+
+    /// `self − other`, as [`Decimal::try_add`] rounds it.
+    ///
+    /// # Errors
+    ///
+    /// [`ArithmeticError::Overflow`] when the result does not fit at any
+    /// scale, and [`ArithmeticError::InvalidOperation`] for `inf - inf`.
+    pub fn try_sub(self, other: Self) -> Result<Self, ArithmeticError> {
+        self.add_signed(other, true)
+    }
+
+    fn add_signed(self, other: Self, subtract: bool) -> Result<Self, ArithmeticError> {
+        let flip = |negative: bool| negative != subtract;
+        let ((a, sa), (b, sb)) = match (self.repr, other.repr) {
+            (Repr::Infinite { negative: x }, Repr::Infinite { negative: y }) => {
+                return if x == flip(y) {
+                    Ok(Self::infinity(x))
+                } else {
+                    Err(ArithmeticError::InvalidOperation)
+                };
+            }
+            (Repr::Infinite { negative }, Repr::Finite { .. }) => {
+                return Ok(Self::infinity(negative));
+            }
+            (Repr::Finite { .. }, Repr::Infinite { negative }) => {
+                return Ok(Self::infinity(flip(negative)));
+            }
+            (
+                Repr::Finite {
+                    coefficient: a,
+                    scale: sa,
+                },
+                Repr::Finite {
+                    coefficient: b,
+                    scale: sb,
+                },
+            ) => ((a, u32::from(sa)), (b, u32::from(sb))),
+        };
+        // |b| < 10^38, so its negation fits.
+        let b = if subtract { -b } else { b };
+        let scale = sa.max(sb);
+        // The common case: the aligned sum fits in 128 bits and in 38 digits.
+        let aligned = |c: i128, s: u32| c.checked_mul(10_i128.pow(scale - s));
+        if let Some(sum) = aligned(a, sa)
+            .zip(aligned(b, sb))
+            .and_then(|(x, y)| x.checked_add(y))
+            && let Ok(result) = Self::new(sum, scale)
+        {
+            return Ok(result);
+        }
+        let x = BigUint::from(a.unsigned_abs()).mul_pow10(scale - sa);
+        let y = BigUint::from(b.unsigned_abs()).mul_pow10(scale - sb);
+        let (magnitude, negative) = match (a < 0, b < 0) {
+            (false, false) => (x.add(&y), false),
+            (true, true) => (x.add(&y), true),
+            (false, true) => x.abs_diff(&y),
+            (true, false) => {
+                let (magnitude, negative) = x.abs_diff(&y);
+                (magnitude, !negative)
+            }
+        };
+        fit(negative, magnitude.digits(), scale, false, scale)
+    }
+
+    /// `self × other`, as [`Decimal::try_add`] rounds it.
+    ///
+    /// # Errors
+    ///
+    /// [`ArithmeticError::Overflow`] when the result does not fit at any
+    /// scale, and [`ArithmeticError::InvalidOperation`] for an infinity times zero.
+    pub fn try_mul(self, other: Self) -> Result<Self, ArithmeticError> {
+        let (Some((a, sa)), Some((b, sb))) = (self.parts(), other.parts()) else {
+            let sign = self.signum() * other.signum();
+            return if sign == 0 {
+                Err(ArithmeticError::InvalidOperation)
+            } else {
+                Ok(Self::infinity(sign < 0))
+            };
+        };
+        let scale = sa + sb;
+        if let Some(product) = a.checked_mul(b)
+            && let Ok(result) = Self::new(product, scale)
+        {
+            return Ok(result);
+        }
+        let magnitude = BigUint::from(a.unsigned_abs()).mul(&BigUint::from(b.unsigned_abs()));
+        fit((a < 0) != (b < 0), magnitude.digits(), scale, false, scale)
+    }
+
+    /// `self ÷ other`: the exact quotient when it fits, with the scale closest
+    /// to `max(a − b, 0)` for operand scales `a` and `b`, and otherwise the
+    /// quotient rounded half to even to 38 significant digits, at most 38 after
+    /// the point (`spec/ast.md`, *Decimal arithmetic*).
+    ///
+    /// ```
+    /// use cleanrules::value::Decimal;
+    ///
+    /// let d = |text| Decimal::parse(text).unwrap();
+    /// // Exact: the scale closest to max(2 − 0, 0) that writes it.
+    /// assert_eq!(d("1.00").try_div(d("4")).unwrap().to_string(), "0.25");
+    /// // Repeating: rounded half to even to 38 significant digits.
+    /// assert_eq!(
+    ///     d("1").try_div(d("3")).unwrap().to_string(),
+    ///     format!("0.{}", "3".repeat(38))
+    /// );
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// [`ArithmeticError::DivisionByZero`] when `other` is zero, even if `self`
+    /// is infinite; [`ArithmeticError::Overflow`] when the quotient does not
+    /// fit at any scale; [`ArithmeticError::InvalidOperation`] for an infinity
+    /// divided by an infinity.
+    pub fn try_div(self, other: Self) -> Result<Self, ArithmeticError> {
+        if other.signum() == 0 {
+            return Err(ArithmeticError::DivisionByZero);
+        }
+        let ((a, sa), (b, sb)) = match (self.parts(), other.parts()) {
+            (None, None) => return Err(ArithmeticError::InvalidOperation),
+            (None, Some(_)) => return Ok(Self::infinity(self.signum() * other.signum() < 0)),
+            // A finite decimal divided by an infinity: zero with the ideal scale,
+            // in which the infinity counts as scale 0.
+            (Some((_, sa)), None) => return fit(false, Vec::new(), sa, false, sa),
+            (Some(a), Some(b)) => (a, b),
+        };
+        let ideal = sa.saturating_sub(sb);
+        // a / b × 10^(sb − sa): the digits of a / b, with enough fraction digits
+        // that the result reaches scale 39, one guard digit past the largest.
+        let wanted = (MAX_DIGITS + 1 + sb).saturating_sub(sa);
+        let (digits, fraction, inexact) = long_division(a.unsigned_abs(), b.unsigned_abs(), wanted);
+        let negative = (a < 0) != (b < 0);
+        // The quotient's scale is fraction + sa − sb; a negative one appends zeros.
+        let scale = i64::from(fraction) + i64::from(sa) - i64::from(sb);
+        let (digits, scale) = if scale < 0 {
+            let mut digits = digits;
+            if !digits.is_empty() {
+                // −scale ≤ 38 here, because sb ≤ 38.
+                digits.extend(std::iter::repeat_n(0, usize::try_from(-scale).unwrap_or(0)));
+            }
+            (digits, 0)
+        } else {
+            (
+                digits,
+                u32::try_from(scale).map_err(|_| ArithmeticError::Overflow)?,
+            )
+        };
+        fit(negative, digits, scale, inexact, ideal)
+    }
+
+    /// `|self|`.
+    #[must_use]
+    pub fn abs(self) -> Self {
+        if self.signum() < 0 { -self } else { self }
+    }
+}
+
+/// `-self`. A zero has no sign, so `-(0.00)` is `0.00`.
+impl std::ops::Neg for Decimal {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        match self.repr {
+            Repr::Infinite { negative } => Self::infinity(!negative),
+            // |coefficient| < 10^38, so its negation fits.
+            Repr::Finite { coefficient, scale } => Self {
+                repr: Repr::Finite {
+                    coefficient: -coefficient,
+                    scale,
+                },
+            },
+        }
+    }
+}
+
+/// Why decimal arithmetic gave no decimal (`spec/ast.md`, *Arithmetic*). The
+/// names follow Python's `decimal` signals.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum ArithmeticError {
+    /// A division by zero.
+    #[error("division by zero")]
+    DivisionByZero,
+    /// The result does not fit in 38 digits at any scale.
+    #[error("the decimal result does not fit in 38 digits")]
+    Overflow,
+    /// The result is not a number: `inf - inf`, `inf * 0` or `inf / inf`.
+    #[error("the result is not a number")]
+    InvalidOperation,
+}
+
+impl ArithmeticError {
+    /// The reason code of the null that evaluation gives instead
+    /// (`spec/ast.md`, *Results and reasons*): `division_by_zero`,
+    /// `decimal_overflow` or `nan_result`.
+    #[must_use]
+    pub fn code(self) -> &'static str {
+        match self {
+            ArithmeticError::DivisionByZero => "division_by_zero",
+            ArithmeticError::Overflow => "decimal_overflow",
+            ArithmeticError::InvalidOperation => "nan_result",
+        }
+    }
+}
+
+/// How [`Decimal::round`] drops digits (`spec/ast.md`, *Rounding*): the modes
+/// of Java's `RoundingMode`, without `UNNECESSARY`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum RoundingMode {
+    /// The nearest neighbour; a tie goes to the even one.
+    #[default]
+    HalfEven,
+    /// The nearest neighbour; a tie goes away from zero.
+    HalfUp,
+    /// The nearest neighbour; a tie goes toward zero.
+    HalfDown,
+    /// Away from zero.
+    Up,
+    /// Toward zero.
+    Down,
+    /// Toward positive infinity.
+    Ceiling,
+    /// Toward negative infinity.
+    Floor,
+}
+
+impl RoundingMode {
+    /// Every mode, in the order of the spec.
+    pub const ALL: [RoundingMode; 7] = [
+        RoundingMode::HalfEven,
+        RoundingMode::HalfUp,
+        RoundingMode::HalfDown,
+        RoundingMode::Up,
+        RoundingMode::Down,
+        RoundingMode::Ceiling,
+        RoundingMode::Floor,
+    ];
+
+    /// The name in the format: `half_even`, `half_up`, `half_down`, `up`,
+    /// `down`, `ceiling` or `floor`.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RoundingMode::HalfEven => "half_even",
+            RoundingMode::HalfUp => "half_up",
+            RoundingMode::HalfDown => "half_down",
+            RoundingMode::Up => "up",
+            RoundingMode::Down => "down",
+            RoundingMode::Ceiling => "ceiling",
+            RoundingMode::Floor => "floor",
+        }
+    }
+
+    /// The mode for a name, exactly as the format writes it.
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|mode| mode.as_str() == name)
+    }
+
+    /// Whether to round the magnitude up, away from zero, given the value's
+    /// sign, whether the dropped part is below, at or above half a step, and
+    /// whether it is zero, and whether the kept last digit is odd.
+    fn away(self, negative: bool, dropped: Ordering, exact: bool, odd: bool) -> bool {
+        if exact {
+            return false;
+        }
+        match self {
+            RoundingMode::HalfEven => dropped.is_gt() || (dropped.is_eq() && odd),
+            RoundingMode::HalfUp => dropped.is_ge(),
+            RoundingMode::HalfDown => dropped.is_gt(),
+            RoundingMode::Up => true,
+            RoundingMode::Down => false,
+            RoundingMode::Ceiling => !negative,
+            RoundingMode::Floor => negative,
+        }
+    }
+}
+
+impl Decimal {
+    /// The decimal with exactly `scale` digits after the point, digits dropped
+    /// as `mode` says (`spec/ast.md`, *Rounding*). An infinity is kept.
+    ///
+    /// ```
+    /// use cleanrules::value::{Decimal, RoundingMode};
+    ///
+    /// let price = Decimal::parse("16.9915").unwrap();
+    /// assert_eq!(price.round(2, RoundingMode::HalfEven).unwrap().to_string(), "16.99");
+    /// assert_eq!(price.round(2, RoundingMode::Up).unwrap().to_string(), "17.00");
+    /// assert_eq!(Decimal::from(5).round(2, RoundingMode::Down).unwrap().to_string(), "5.00");
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// [`ArithmeticError::Overflow`] when the result's coefficient is 10^38 or
+    /// more in absolute value, or `scale` is above 38.
+    pub fn round(self, scale: u32, mode: RoundingMode) -> Result<Self, ArithmeticError> {
+        let Some((coefficient, current)) = self.parts() else {
+            return Ok(self);
+        };
+        if scale > MAX_DIGITS {
+            return Err(ArithmeticError::Overflow);
+        }
+        if scale >= current {
+            // Exact: pad with zeros.
+            let padded = 10_i128
+                .checked_pow(scale - current)
+                .and_then(|factor| coefficient.checked_mul(factor))
+                .ok_or(ArithmeticError::Overflow)?;
+            return Self::new(padded, scale).map_err(|_| ArithmeticError::Overflow);
+        }
+        // 1 ≤ dropped places ≤ 38: the step 10^dropped fits in an i128.
+        let step = 10_i128.pow(current - scale);
+        let (kept, rest) = (coefficient / step, (coefficient % step).abs());
+        let half = step / 2;
+        let away = mode.away(coefficient < 0, rest.cmp(&half), rest == 0, kept % 2 != 0);
+        // |kept| < 10^37, so one more fits.
+        let rounded = if away {
+            kept + coefficient.signum()
+        } else {
+            kept
+        };
+        Self::new(rounded, scale).map_err(|_| ArithmeticError::Overflow)
+    }
+}
+
+/// The digits of `a / b` (`b > 0`): the integer part's, then up to `wanted`
+/// fraction digits, stopping early when the division is exact. Returns the
+/// digits without leading zeros, how many of them are fraction digits, and
+/// whether a non-zero remainder was left (the quotient goes on).
+fn long_division(a: u128, b: u128, wanted: u32) -> (Vec<u8>, u32, bool) {
+    let quotient = a / b;
+    let mut digits: Vec<u8> = if quotient == 0 {
+        Vec::new()
+    } else {
+        quotient.to_string().bytes().map(|d| d - b'0').collect()
+    };
+    let mut remainder = a % b;
+    let mut fraction = 0;
+    while remainder != 0 && fraction < wanted {
+        // The next digit is ⌊10 r / b⌋, and the new remainder 10 r mod b. 10 r
+        // can exceed 128 bits when b is above 3.4 × 10^37, so r is added ten
+        // times modulo b instead, counting the wraps: each sum is below 2 b.
+        let mut digit = 0_u8;
+        let mut accumulated = 0_u128;
+        for _ in 0..10 {
+            let room = b - accumulated;
+            if remainder >= room {
+                accumulated = remainder - room;
+                digit += 1;
+            } else {
+                accumulated += remainder;
+            }
+        }
+        remainder = accumulated;
+        if !(digits.is_empty() && digit == 0) {
+            digits.push(digit);
+        }
+        fraction += 1;
+    }
+    (digits, fraction, remainder != 0)
+}
+
+/// Write an exact result, or a truncated one, as a decimal (`spec/ast.md`,
+/// *Decimal arithmetic*, steps 3 to 5).
+///
+/// `digits` are the coefficient's, without leading zeros, at `scale`; `inexact`
+/// says that non-zero digits follow them, which only a division leaves, and
+/// then always past scale 38. An exact result keeps the scale closest to
+/// `ideal` that writes it and fits; any other is rounded half to even to the
+/// largest scale that fits.
+pub(super) fn fit(
+    negative: bool,
+    mut digits: Vec<u8>,
+    mut scale: u32,
+    inexact: bool,
+    ideal: u32,
+) -> Result<Decimal, ArithmeticError> {
+    if !inexact {
+        if digits.is_empty() {
+            return Decimal::new(0, ideal.min(MAX_DIGITS)).map_err(|_| ArithmeticError::Overflow);
+        }
+        while scale > ideal && digits.last() == Some(&0) {
+            digits.pop();
+            scale -= 1;
+        }
+    }
+    let length = u32::try_from(digits.len()).map_err(|_| ArithmeticError::Overflow)?;
+    let drop = scale
+        .saturating_sub(MAX_DIGITS)
+        .max(length.saturating_sub(MAX_DIGITS));
+    if drop > scale {
+        // The integer part alone has more than 38 digits.
+        return Err(ArithmeticError::Overflow);
+    }
+    if drop > 0 {
+        let drop = drop as usize;
+        if drop > digits.len() {
+            // The dropped digits start with zeros the coefficient does not show.
+            digits.splice(0..0, std::iter::repeat_n(0, drop - digits.len()));
+        }
+        let kept = digits.len() - drop;
+        let first = digits[kept];
+        let rest = inexact || digits[kept + 1..].iter().any(|&d| d != 0);
+        let odd = kept > 0 && digits[kept - 1] % 2 == 1;
+        digits.truncate(kept);
+        scale -= u32::try_from(drop).map_err(|_| ArithmeticError::Overflow)?;
+        if first > 5 || (first == 5 && (rest || odd)) {
+            increment(&mut digits);
+        }
+        let first_non_zero = digits.iter().position(|&d| d != 0).unwrap_or(digits.len());
+        digits.drain(..first_non_zero);
+        if digits.len() > MAX_DIGITS as usize {
+            // Rounding carried into a 39th digit: the coefficient is 10^38, whose
+            // last digit is a zero that one less place drops exactly.
+            if scale == 0 {
+                return Err(ArithmeticError::Overflow);
+            }
+            digits.pop();
+            scale -= 1;
+        }
+    }
+    let mut coefficient: i128 = 0;
+    for d in digits {
+        // At most 38 digits: below 10^38, which fits.
+        coefficient = coefficient * 10 + i128::from(d);
+    }
+    if negative {
+        coefficient = -coefficient;
+    }
+    Decimal::new(coefficient, scale).map_err(|_| ArithmeticError::Overflow)
+}
+
+/// Add one to the number that `digits` spell, most significant first.
+fn increment(digits: &mut Vec<u8>) {
+    for d in digits.iter_mut().rev() {
+        if *d == 9 {
+            *d = 0;
+        } else {
+            *d += 1;
+            return;
+        }
+    }
+    digits.insert(0, 1);
 }
 
 fn parse_exponent(text: &str) -> Result<i64, DecimalError> {
@@ -349,7 +832,7 @@ pub(super) fn compare_scaled(a: (bool, u128, u32), b: (bool, u128, u32)) -> Orde
 // Exact float equality is what these tests check.
 #[allow(clippy::float_cmp)]
 mod tests {
-    use super::{Decimal, DecimalError};
+    use super::{ArithmeticError, Decimal, DecimalError};
 
     fn d(text: &str) -> Decimal {
         Decimal::parse(text).unwrap()
@@ -434,13 +917,176 @@ mod tests {
 
     #[test]
     fn exact_differences() {
+        assert_eq!(d("10.05").exact_sub(d("9.9")).unwrap().to_string(), "0.15");
+        assert_eq!(d("1").exact_sub(d("0.001")).unwrap().to_string(), "0.999");
+        assert!(d(&"9".repeat(38)).exact_sub(d("-1")).is_none());
+        assert!(d("inf").exact_sub(d("1")).is_none());
+    }
+
+    fn op(f: fn(Decimal, Decimal) -> Result<Decimal, ArithmeticError>, a: &str, b: &str) -> String {
+        f(d(a), d(b)).map_or_else(|e| format!("{e:?}"), |r| r.to_string())
+    }
+
+    #[test]
+    fn exact_results_keep_the_ideal_scale() {
+        assert_eq!(op(Decimal::try_add, "1.10", "2.205"), "3.305");
+        assert_eq!(op(Decimal::try_add, "1.5", "1.5"), "3.0");
+        assert_eq!(op(Decimal::try_sub, "1.50", "1.5"), "0.00");
+        assert_eq!(op(Decimal::try_sub, "-1", "-1.5"), "0.5");
+        assert_eq!(op(Decimal::try_mul, "19.99", "0.15"), "2.9985");
+        assert_eq!(op(Decimal::try_mul, "-1.5", "0"), "0.0");
+        assert_eq!(op(Decimal::try_div, "1.00", "4"), "0.25");
+        assert_eq!(op(Decimal::try_div, "1.000", "4"), "0.250");
+        assert_eq!(op(Decimal::try_div, "1", "0.25"), "4");
+        assert_eq!(op(Decimal::try_div, "7.5", "2.5"), "3");
+        assert_eq!(op(Decimal::try_div, "0.00", "3.0"), "0.0");
+        assert_eq!(op(Decimal::try_div, "-6", "0.2"), "-30");
+        assert_eq!(op(Decimal::try_div, "1", "0.0001"), "10000");
+    }
+
+    #[test]
+    fn inexact_results_are_rounded_half_to_even() {
         assert_eq!(
-            d("10.05").checked_sub(d("9.9")).unwrap().to_string(),
-            "0.15"
+            op(Decimal::try_div, "1", "3"),
+            format!("0.{}", "3".repeat(38))
         );
-        assert_eq!(d("1").checked_sub(d("0.001")).unwrap().to_string(), "0.999");
-        assert!(d(&"9".repeat(38)).checked_sub(d("-1")).is_none());
-        assert!(d("inf").checked_sub(d("1")).is_none());
+        assert_eq!(
+            op(Decimal::try_div, "-2", "3"),
+            format!("-0.{}7", "6".repeat(37))
+        );
+        assert_eq!(
+            op(Decimal::try_div, "10", "3"),
+            format!("3.{}", "3".repeat(37))
+        );
+        // Ties go to the even neighbour, in both directions.
+        assert_eq!(
+            op(Decimal::try_div, &"9".repeat(38), "2"),
+            format!("5{}", "0".repeat(37))
+        );
+        assert_eq!(
+            op(Decimal::try_div, &format!("{}7", "9".repeat(37)), "2"),
+            format!("4{}8", "9".repeat(36))
+        );
+        let e37 = format!("1{}", "0".repeat(37));
+        assert_eq!(op(Decimal::try_add, &e37, "0.5"), e37);
+        assert_eq!(
+            op(Decimal::try_add, &e37, "-0.5"),
+            format!("{}.5", "9".repeat(37))
+        );
+        assert_eq!(
+            op(Decimal::try_sub, &e37, "0.06"),
+            format!("{}.9", "9".repeat(37))
+        );
+        assert_eq!(
+            op(Decimal::try_add, &format!("-{e37}"), "-0.51"),
+            format!("-1{}1", "0".repeat(36))
+        );
+        // A divisor above 3.4 × 10^37: ten times the remainder needs 129 bits.
+        let big = format!("9{}", "8".repeat(37));
+        assert_eq!(
+            op(Decimal::try_div, &format!("9{}7", "8".repeat(36)), &big),
+            "0.99999999999999999999999999999999999999"
+        );
+        // Below 38 places: zero with scale 38, or the smallest step.
+        let tiny = format!("0.{}1", "0".repeat(19));
+        assert_eq!(
+            op(Decimal::try_mul, &tiny, &tiny),
+            format!("0.{}", "0".repeat(38))
+        );
+        assert_eq!(
+            op(
+                Decimal::try_mul,
+                &format!("0.{}6", "0".repeat(19)),
+                &format!("0.{}1", "0".repeat(18))
+            ),
+            format!("0.{}1", "0".repeat(37))
+        );
+        // Rounding carries into a 39th digit: one place fewer, exactly.
+        assert_eq!(
+            op(
+                Decimal::try_add,
+                &format!("9.{}", "9".repeat(37)),
+                &format!("0.{}5", "0".repeat(37))
+            ),
+            format!("10.{}", "0".repeat(36))
+        );
+    }
+
+    #[test]
+    fn results_that_do_not_fit_overflow() {
+        let max = "9".repeat(38);
+        assert_eq!(op(Decimal::try_add, &max, "1"), "Overflow");
+        assert_eq!(op(Decimal::try_sub, &format!("-{max}"), "0.5"), "Overflow");
+        assert_eq!(op(Decimal::try_add, &max, "0.4"), max);
+        let e20 = format!("1{}", "0".repeat(20));
+        assert_eq!(op(Decimal::try_mul, &e20, &e20), "Overflow");
+        assert_eq!(
+            op(Decimal::try_div, &format!("1{}", "0".repeat(37)), "0.01"),
+            "Overflow"
+        );
+        // Rounding up the last integer digit carries past 38 digits.
+        assert_eq!(op(Decimal::try_add, &max, "0.5"), "Overflow");
+    }
+
+    #[test]
+    fn zero_and_infinities() {
+        assert_eq!(op(Decimal::try_div, "1", "0.00"), "DivisionByZero");
+        assert_eq!(op(Decimal::try_div, "inf", "0"), "DivisionByZero");
+        assert_eq!(op(Decimal::try_div, "inf", "-inf"), "InvalidOperation");
+        assert_eq!(op(Decimal::try_div, "-inf", "2"), "-inf");
+        assert_eq!(op(Decimal::try_div, "1.50", "-inf"), "0.00");
+        assert_eq!(op(Decimal::try_add, "inf", "-inf"), "InvalidOperation");
+        assert_eq!(op(Decimal::try_sub, "inf", "-inf"), "inf");
+        assert_eq!(op(Decimal::try_sub, "1", "inf"), "-inf");
+        assert_eq!(op(Decimal::try_add, "-inf", "5"), "-inf");
+        assert_eq!(op(Decimal::try_mul, "inf", "0.0"), "InvalidOperation");
+        assert_eq!(op(Decimal::try_mul, "-inf", "-inf"), "inf");
+        assert_eq!((-d("0.00")).to_string(), "0.00");
+        assert_eq!(d("-1.50").abs().to_string(), "1.50");
+        assert_eq!(d("1.5").abs().to_string(), "1.5");
+        assert_eq!(-d("-inf"), d("inf"));
+        assert_eq!(d("-inf").abs(), d("inf"));
+    }
+
+    #[test]
+    fn rounding_modes() {
+        use super::RoundingMode::{Ceiling, Down, Floor, HalfDown, HalfEven, HalfUp, Up};
+        let r = |text: &str, scale, mode| {
+            d(text)
+                .round(scale, mode)
+                .map_or_else(|e| format!("{e:?}"), |r| r.to_string())
+        };
+        for (mode, positive, negative) in [
+            (HalfEven, "2.34", "-2.34"),
+            (HalfUp, "2.35", "-2.35"),
+            (HalfDown, "2.34", "-2.34"),
+            (Up, "2.35", "-2.35"),
+            (Down, "2.34", "-2.34"),
+            (Ceiling, "2.35", "-2.34"),
+            (Floor, "2.34", "-2.35"),
+        ] {
+            assert_eq!(r("2.345", 2, mode), positive, "{mode:?}");
+            assert_eq!(r("-2.345", 2, mode), negative, "{mode:?}");
+            assert_eq!(r("2.340", 2, mode), "2.34", "{mode:?}");
+            assert_eq!(
+                mode.as_str()
+                    .parse::<String>()
+                    .ok()
+                    .and_then(|n| super::RoundingMode::from_name(&n)),
+                Some(mode)
+            );
+        }
+        assert_eq!(r("2.355", 2, HalfEven), "2.36");
+        assert_eq!(r("-0.001", 2, HalfEven), "0.00");
+        assert_eq!(r("1.5", 3, HalfEven), "1.500");
+        assert_eq!(r("inf", 2, Up), "inf");
+        assert_eq!(r(&format!("1{}", "0".repeat(37)), 1, HalfEven), "Overflow");
+        assert_eq!(r("1", 39, HalfEven), "Overflow");
+        assert_eq!(super::RoundingMode::from_name("HALF_UP"), None);
+        assert_eq!(super::RoundingMode::default(), HalfEven);
+        assert_eq!(ArithmeticError::DivisionByZero.code(), "division_by_zero");
+        assert_eq!(ArithmeticError::Overflow.code(), "decimal_overflow");
+        assert_eq!(ArithmeticError::InvalidOperation.code(), "nan_result");
     }
 
     #[test]

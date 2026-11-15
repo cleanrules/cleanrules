@@ -1,0 +1,11 @@
+---
+source: crates/core/tests/explain_text.rs
+expression: text
+---
+HIT POLICY first: selected no rule
+[?] overflow (unknown): price * 10 > 0
+    - price * 10 > 0 is unknown (price = DECIMAL "99999999999999999999999999999999999999"): decimal overflow in price
+[?] rounded (unknown): ROUND(rate, 2) > 0
+    - ROUND(rate, 2) > 0 is unknown (rate = 0.5e0): type mismatch: round takes ints and decimals, not floats
+[?] cents (unknown): ROUND(price / 3, 2, HALF_UP) > 0
+    - ROUND(price / 3, 2, HALF_UP) > 0 is unknown (price = DECIMAL "99999999999999999999999999999999999999"): decimal overflow

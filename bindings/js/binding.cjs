@@ -870,6 +870,7 @@ module.exports.nodeDetails = nativeBinding.nodeDetails
 module.exports.nodeField = nativeBinding.nodeField
 module.exports.nodeIsIn = nativeBinding.nodeIsIn
 module.exports.nodeMatches = nativeBinding.nodeMatches
+module.exports.nodeRound = nativeBinding.nodeRound
 module.exports.nodeSameAs = nativeBinding.nodeSameAs
 module.exports.nodeStringTest = nativeBinding.nodeStringTest
 module.exports.nodeTree = nativeBinding.nodeTree

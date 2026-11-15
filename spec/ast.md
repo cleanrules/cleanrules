@@ -44,6 +44,7 @@ errors and in every language.
 | `starts_with` `ends_with` `contains` | `operand`, `text`: a string | condition |
 | `add` `sub` `mul` `div` | `left`, `right` | value |
 | `abs`, `neg` | `operand` | value |
+| `round` | `operand`, `scale`: an int from 0 to 38, `mode`: a rounding mode | value |
 
 ### Construction rules
 
@@ -72,15 +73,20 @@ errors and in every language.
 - **Value operands.** These operands must be value or `any` nodes, never
   conditions:
   - both sides of a comparison and of `add` … `div`;
-  - the operand of `in`, `is_null`, `matches`, the string tests, `abs` and
-    `neg`;
+  - the operand of `in`, `is_null`, `matches`, the string tests, `abs`,
+    `neg` and `round`;
   - all three nodes of `between`.
 
   A null constant is rejected everywhere except as the operand of `is_null`,
   including as an operand of `and`, `or` and `not`. Under Kleene logic,
   `x == null` or `x + null` would be null for every input; use `is_null` to test
   for missing values.
-- **Arithmetic** (`add` … `div`, `abs`, `neg`) also rejects constants that are
+- **`round`**: `scale` is an int from 0 to 38, the number of digits after the
+  point, and `mode` one of `half_even` (the default), `half_up`, `half_down`,
+  `up`, `down`, `ceiling` and `floor` (*Rounding*). A constant operand must be
+  an int or a decimal: a float constant would be a type mismatch for every
+  input.
+- **Arithmetic** (`add` … `div`, `abs`, `neg`, `round`) also rejects constants that are
   not numbers (booleans included), such as `"a" + 1`.
 - **`in`** takes any collection of values the language offers (a list, a set…),
   but a string, bytes or a map is not a collection of values here. The values
@@ -364,16 +370,122 @@ Rules:
 - **`starts_with`, `ends_with`, `contains`** take **literal** text, never a
   pattern.
 - **Arithmetic** (`add`, `sub`, `mul`, `div`, `abs`, `neg`) is defined on
-  numbers:
-  - `div` converts both operands to float64 **first**, then divides, so it
-    always returns a float;
-  - decimal operands are converted to float64 (correctly rounded,
-    `data-model.md`) for every operation;
-  - **division by zero yields null**, for int and float alike;
-  - an integer result outside the signed 64-bit range yields null;
-  - a NaN result is null, while `inf` and `-inf` results are kept;
-  - an operand that is not a number makes the result null with reason
-    `type_mismatch` (strict mode raises `TypeMismatchError`).
+  numbers, as *Arithmetic* says.
+
+### Arithmetic
+
+`add`, `sub`, `mul`, `div`, `abs` and `neg` take numbers. The kind of the
+result follows from the kinds of the operands:
+
+| Operands | Result |
+|---|---|
+| two ints, with `add`, `sub` or `mul`; an int, with `abs` or `neg` | int |
+| two ints, with `div` | float |
+| two decimals, or a decimal and an int in either order; a decimal, with `abs` or `neg` | decimal (*Decimal arithmetic*) |
+| a float among the operands | float |
+
+When the result is a float, int and decimal operands are converted to float64
+**first** (an int to the nearest float, ties to even; a decimal correctly
+rounded, `data-model.md`, *Decimals*), and the operation is IEEE 754's. So
+`7 / 2` is the float `3.5`, the decimal `0.1` plus the float `0.2` is the float
+`0.30000000000000004`, and the decimal `0.1` plus the decimal `0.2` is the
+decimal `0.3`.
+
+For every kind of result:
+
+- **division by zero yields null** with reason `division_by_zero`, whatever
+  the kind of the zero (the int `0`, the float `0.0` or `-0.0`, a decimal zero
+  of any scale), even when the dividend is infinite;
+- an int result outside the signed 64-bit range is null with reason
+  `int_overflow`;
+- a decimal result that does not fit is null with reason `decimal_overflow`
+  (*Decimal arithmetic*);
+- a NaN result is null with reason `nan_result` (`inf - inf`, `0 * inf` and
+  `inf / inf`, of floats and of decimals), while infinite results are kept;
+- an operand that is not a number makes the result null with reason
+  `type_mismatch` (strict mode raises `TypeMismatchError`).
+
+Comparisons do not change: numbers of any kinds compare exactly (*Types*).
+
+### Decimal arithmetic
+
+A decimal result is **exact whenever it fits** in a decimal of
+`data-model.md` (*Decimals*: a coefficient below 10³⁸ in absolute value and a
+scale from 0 to 38), and it is rounded only when it does not fit. Rounding is
+part of the operation, `div` included: the exact quotient is rounded once, and
+nothing rounded is ever rounded again within the operation.
+
+1. **Operands.** An int operand is the decimal with its value and scale 0.
+   Every int fits, because a signed 64-bit integer has at most 19 digits, so
+   this promotion is always exact.
+2. **Ideal scale.** Each operation has an ideal scale, from the scales `a` and
+   `b` of its operands: `max(a, b)` for `add` and `sub`, `a + b` for `mul`,
+   `max(a − b, 0)` for `div`, and `a` for `abs` and `neg`.
+3. **Exact results.** When the exact result can be written as a decimal, it
+   is, with the scale closest to the ideal scale among the scales that write it
+   exactly and fit. So `1.10 + 2.205` is `3.305`, `1.5 + 1.5` is `3.0`,
+   `2 * 0.10` is `0.20`, `19.99 * 0.15` is `2.9985`, `1.00 / 4` is `0.25`,
+   `1.000 / 4` is `0.250`, `1 / 0.25` is `4` and `7.5 / 2.5` is `3`. The scale
+   is kept for display and JSON, and never changes equality.
+4. **Rounding.** Otherwise the exact result is rounded **half to even** to the
+   largest scale, at most 38, at which its coefficient **after rounding** is
+   below 10³⁸ in absolute value: to 38 significant digits, but never more than
+   38 digits after the point. Rounding can carry into a new digit, and then
+   the result keeps one place fewer: `9.9…9` (37 nines after the point) plus
+   `0.0…05` (a 5 at the 38th place) is `10.0…0`, with 36 zeros after the
+   point. So `1 / 3.0` (an int and a decimal) is
+   `0.33333333333333333333333333333333333333` (38 digits after the point),
+   `2 / 3.0` ends in `7`, `100 / 7.0` is
+   `14.285714285714285714285714285714285714` (38 significant digits), and the
+   product of two decimals 10⁻²⁰ is a zero with scale 38. A result whose
+   integer part leaves no room for all of its fraction keeps fewer places:
+   10³⁷ `+ 0.5` is 10³⁷ (half to even, scale 0).
+5. **Overflow.** When no scale fits, because the result rounded to an integer
+   still has more than 38 digits, the result is null with reason
+   `decimal_overflow`: (10³⁸ − 1) `+ 1`, or 10²⁰ `*` 10²⁰ with decimal
+   operands.
+6. **Infinities.** Decimal infinities follow IEEE 754, with decimal results.
+   An infinity plus or minus a finite decimal, `inf + inf`, an infinity times
+   a non-zero decimal or an infinity (signs multiply), and an infinity divided
+   by a non-zero finite decimal are infinities. A finite decimal divided by an
+   infinity is a zero with the ideal scale, in which an infinity counts as
+   scale 0. `inf - inf`, an infinity times zero, and an infinity divided by an
+   infinity are NaN: null with reason `nan_result`.
+7. **Zero.** A decimal zero has no sign (`data-model.md`, *Decimals*):
+   `-(0.00)` is `0.00`, and `-1.5 * 0` is `0.0`.
+
+### Rounding
+
+`round` gives its operand, an int or a decimal, as a decimal with exactly
+`scale` digits after the point, rounded with `mode` when digits are dropped.
+It is how a rule controls the scale of a result, such as a price in cents:
+`round(price * 0.85, 2)`.
+
+- The modes are those of Java's `RoundingMode`, toward the neighbours at
+  `scale` places above and below the exact value:
+  - `half_even` (the default): the nearest neighbour, and on a tie the one
+    whose last digit is even;
+  - `half_up`: the nearest, and on a tie the one away from zero;
+  - `half_down`: the nearest, and on a tie the one toward zero;
+  - `up`: away from zero, so `round(-2.341, 2, up)` is `-2.35`;
+  - `down`: toward zero (truncation), so `round(-2.349, 2, down)` is `-2.34`;
+  - `ceiling`: toward positive infinity, so `round(-2.349, 2, ceiling)` is
+    `-2.34`;
+  - `floor`: toward negative infinity, so `round(-2.341, 2, floor)` is
+    `-2.35`.
+
+  So `round(2.345, 2)` is `2.34`, with `half_up` `2.35`; `round(-2.345, 2,
+  floor)` is `-2.35`, and with `ceiling` `-2.34`; and `round(2.5, 0)` is `2`.
+  A value that already has `scale` places or fewer is exact, padded with
+  zeros: `round(5, 2)` is `5.00`, and `round(1.5, 3)` is `1.500`.
+- A result whose coefficient is 10³⁸ or more in absolute value, after
+  rounding, is null with reason `decimal_overflow`: `round(x, 2)` needs the
+  integer part of `x` to have at most 36 digits.
+- A decimal infinity is kept. A zero has no sign: `round(-0.001, 2)` is `0.00`.
+- A float operand is a type mismatch: null with reason `type_mismatch`, and
+  `TypeMismatchError` in strict mode. Floats are never rounded implicitly, so
+  a float error in a price is never hidden; convert the data to decimals.
+- Null and every other type follow *Arithmetic*.
 
 ## Results and reasons
 
@@ -392,7 +504,7 @@ the human-readable detail may differ.
 | `unorderable` | booleans were ordered with `<`, `<=`, `>` or `>=` |
 | `division_by_zero` | a division by zero |
 | `int_overflow` | an integer outside the signed 64-bit range |
-| `decimal_overflow` | a decimal in the data that does not fit (`data-model.md`, *Decimals*) |
+| `decimal_overflow` | a decimal in the data that does not fit (`data-model.md`, *Decimals*), or a decimal result that does not fit (*Decimal arithmetic*) |
 | `nan_result` | an arithmetic result is NaN |
 | `read_error` | reading the data raised an error |
 
@@ -411,7 +523,8 @@ part of the contract:
   - for comparisons and arithmetic, the groups of the left and right values,
     in that order, duplicates kept (`unorderable` is always `boolean`,
     `boolean`);
-  - for `abs` and `neg`, the operand's group and `number`;
+  - for `abs`, `neg` and `round`, the operand's group and `number` (for
+    `round` of a float, `number` and `number`);
   - for `in`, the operand's group and the values' group;
   - for `matches` and the string tests, the operand's group and `string`;
   - for a field or constant used as a condition, its group and `boolean`;
@@ -449,7 +562,8 @@ the vectorised mode must be **schema-aware**:
   ints with floats exactly, not as floats (they differ above 2⁵³);
 - turn NaN into null in float columns only;
 - widen `Float32` columns to `Float64`, and never narrow constants;
-- compare decimal columns exactly with constants, and convert them to float for
-  arithmetic;
+- compare decimal columns exactly with constants, and do their arithmetic as
+  *Decimal arithmetic* says, not with the precision and scale rules of the
+  columnar engine, converting to float only when a float is involved;
 - map division by zero, which columnar engines turn into `inf` or NaN, to null;
 - turn type mismatches into `UNKNOWN` per row, with the reason recorded.

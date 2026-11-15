@@ -745,6 +745,15 @@ export declare function nodeIsIn(operand: Node, wire: string): Node
  */
 export declare function nodeMatches(operand: Node, pattern: string): Node
 
+/**
+ * An int or a decimal rounded to `scale` digits after the point.
+ *
+ * # Errors
+ *
+ * `ExpressionError`, as the core reports it.
+ */
+export declare function nodeRound(operand: Node, scale: number, mode: string): Node
+
 /** Whether two nodes are structurally identical (`spec/ast.md`). */
 export declare function nodeSameAs(left: Node, right: Node): boolean
 

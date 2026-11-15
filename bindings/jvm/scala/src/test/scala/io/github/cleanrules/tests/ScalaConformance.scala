@@ -303,6 +303,12 @@ final class ScalaConformance extends Conformance:
       case "contains" => operand0.contains(text(node, "text"))
       case "abs" => operand0.abs
       case "neg" => -operand0
+      case "round" =>
+        val scale = need(node, "scale").asInstanceOf[Num].text.toInt
+        node.get("mode") match
+          case mode: String =>
+            operand0.round(scale, java.math.RoundingMode.valueOf(mode.toUpperCase(java.util.Locale.ROOT)))
+          case _ => operand0.round(scale)
       case _ => throw VectorError(s"unknown op $op")
 
   /** A payload's map: in turn an ordered Scala map or a plain `Map` (a payload has no order). */

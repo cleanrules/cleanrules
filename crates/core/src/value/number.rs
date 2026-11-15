@@ -3,7 +3,7 @@
 use std::cmp::Ordering;
 
 use super::bignum::BigUint;
-use super::decimal::Decimal;
+use super::decimal::{Decimal, fit};
 
 /// An int, a float (never NaN) or a decimal.
 #[derive(Clone, Copy, Debug)]
@@ -127,6 +127,171 @@ impl Number {
     }
 }
 
+/// The exact sum of numbers of any kinds, with no limit on its size or digits,
+/// rounded once (`spec/rules.md`, *`COLLECT` aggregates*): a float is the exact
+/// binary fraction it holds, which is also a decimal fraction, since
+/// `2^-k = 5^k × 10^-k`.
+#[derive(Debug)]
+pub(crate) struct ExactSum {
+    /// The largest scale among the terms, decimal or binary.
+    scale: u32,
+    /// The positive and the negative terms, each at `scale`.
+    positive: BigUint,
+    negative: BigUint,
+    /// The infinities met, positive and negative.
+    infinities: (bool, bool),
+    /// The widest kind among the terms, which the total takes.
+    kind: SumKind,
+}
+
+/// The kind of a sum: int until a decimal is met, decimal until a float is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum SumKind {
+    Int,
+    Decimal,
+    Float,
+}
+
+/// A finite float as `(negative, mantissa, exponent)`, its value
+/// `mantissa × 2^exponent`.
+fn binary(f: f64) -> (bool, u128, i32) {
+    let bits = f.to_bits();
+    let biased = (bits >> 52) & 0x7ff;
+    let fraction = bits & ((1 << 52) - 1);
+    let (mantissa, exponent) = if biased == 0 {
+        (fraction, -1074)
+    } else {
+        // biased ≤ 0x7fe for a finite float, so this fits an i32.
+        (
+            fraction | (1 << 52),
+            i32::try_from(biased).unwrap_or(0) - 1075,
+        )
+    };
+    (f.is_sign_negative(), u128::from(mantissa), exponent)
+}
+
+impl ExactSum {
+    /// The sum of `terms`.
+    pub(crate) fn of(terms: &[Number]) -> Self {
+        let scale = terms
+            .iter()
+            .filter_map(|n| match n {
+                Number::Decimal(d) => d.parts().map(|(_, s)| s),
+                Number::Float(f) if f.is_finite() => Some(binary(*f).2.min(0).unsigned_abs()),
+                _ => None,
+            })
+            .max()
+            .unwrap_or(0);
+        let mut sum = Self {
+            scale,
+            positive: BigUint::from(0),
+            negative: BigUint::from(0),
+            infinities: (false, false),
+            kind: SumKind::Int,
+        };
+        for term in terms {
+            let (negative, magnitude) = match *term {
+                Number::Int(i) => (
+                    i < 0,
+                    BigUint::from(u128::from(i.unsigned_abs())).mul_pow10(scale),
+                ),
+                Number::Decimal(d) => {
+                    sum.kind = sum.kind.max(SumKind::Decimal);
+                    let Some((c, s)) = d.parts() else {
+                        sum.infinity(d < Decimal::from(0));
+                        continue;
+                    };
+                    (c < 0, BigUint::from(c.unsigned_abs()).mul_pow10(scale - s))
+                }
+                Number::Float(f) => {
+                    sum.kind = SumKind::Float;
+                    if f.is_infinite() {
+                        sum.infinity(f < 0.0);
+                        continue;
+                    }
+                    let (negative, mantissa, exponent) = binary(f);
+                    let magnitude = BigUint::from(mantissa);
+                    let magnitude = if exponent >= 0 {
+                        magnitude.shl(exponent.unsigned_abs()).mul_pow10(scale)
+                    } else {
+                        // m × 2^e × 10^scale = m × 5^-e × 10^(scale + e), and
+                        // scale ≥ -e.
+                        let k = exponent.unsigned_abs();
+                        magnitude.mul_pow5(k).mul_pow10(scale - k)
+                    };
+                    (negative, magnitude)
+                }
+            };
+            if negative {
+                sum.negative = sum.negative.add(&magnitude);
+            } else {
+                sum.positive = sum.positive.add(&magnitude);
+            }
+        }
+        sum
+    }
+
+    fn infinity(&mut self, negative: bool) {
+        if negative {
+            self.infinities.1 = true;
+        } else {
+            self.infinities.0 = true;
+        }
+    }
+
+    /// The total, rounded once: a float when a float was among the terms, a
+    /// decimal when a decimal was, and an int otherwise; `None` for a null
+    /// (both infinities, an int outside 64 bits, a decimal that does not fit).
+    pub(crate) fn total(&self) -> Option<Number> {
+        match self.infinities {
+            (true, true) => return None,
+            (true, false) | (false, true) => {
+                let negative = self.infinities.1;
+                return Some(if self.kind == SumKind::Float {
+                    Number::Float(if negative {
+                        f64::NEG_INFINITY
+                    } else {
+                        f64::INFINITY
+                    })
+                } else if negative {
+                    Number::Decimal(Decimal::NEG_INFINITY)
+                } else {
+                    Number::Decimal(Decimal::INFINITY)
+                });
+            }
+            (false, false) => {}
+        }
+        let (magnitude, negative) = self.positive.abs_diff(&self.negative);
+        let digits = magnitude.digits();
+        if self.kind == SumKind::Float {
+            if digits.is_empty() {
+                return Some(Number::Float(0.0));
+            }
+            let digits: String = digits.iter().map(|&d| char::from(b'0' + d)).collect();
+            let sign = if negative { "-" } else { "" };
+            // Rust's float parsing is correctly rounded for any number of digits,
+            // and this text is always a valid literal; beyond the largest float
+            // it gives an infinity.
+            return format!("{sign}{digits}e-{}", self.scale)
+                .parse()
+                .ok()
+                .map(Number::Float);
+        }
+        if self.kind == SumKind::Decimal {
+            return fit(negative, digits, self.scale, false, self.scale)
+                .ok()
+                .map(Number::Decimal);
+        }
+        // Only ints: scale 0.
+        let mut total: i128 = 0;
+        for d in digits {
+            total = total.checked_mul(10)?.checked_add(i128::from(d))?;
+        }
+        let total = if negative { -total } else { total };
+        i64::try_from(total).ok().map(Number::Int)
+    }
+}
+
 fn sign_of(zero: bool, negative: bool) -> i8 {
     if zero {
         0
@@ -181,6 +346,55 @@ mod tests {
             Greater
         );
         assert_eq!(dec("0").compare(Float(-0.0)), Equal);
+    }
+
+    fn sum(terms: &[Number]) -> String {
+        match super::ExactSum::of(terms).total() {
+            None => "null".into(),
+            Some(Int(i)) => format!("int {i}"),
+            Some(Float(f)) => format!("float {f:?}"),
+            Some(D(d)) => format!("decimal {d}"),
+        }
+    }
+
+    #[test]
+    fn exact_sums_round_once() {
+        assert_eq!(sum(&[dec("0.1"), dec("0.2")]), "decimal 0.3");
+        assert_eq!(sum(&[]), "int 0");
+        assert_eq!(
+            sum(&[Int(i64::MAX), Int(1), Int(-1)]),
+            format!("int {}", i64::MAX)
+        );
+        assert_eq!(sum(&[Int(i64::MAX), Int(1)]), "null");
+        let max = "9".repeat(38);
+        assert_eq!(sum(&[dec(&max), Int(1), Int(-1)]), format!("decimal {max}"));
+        assert_eq!(sum(&[dec(&max), dec("1")]), "null");
+        assert_eq!(sum(&[dec("-1.5"), dec("0.25")]), "decimal -1.25");
+        // Floats are exact too, and the order never matters.
+        assert_eq!(
+            sum(&[Int(1), Int(1), Float(1e16)]),
+            "float 1.0000000000000002e16"
+        );
+        assert_eq!(
+            sum(&[Float(1e16), Int(1), Int(1)]),
+            "float 1.0000000000000002e16"
+        );
+        assert_eq!(sum(&[Float(0.1), Float(0.2)]), "float 0.30000000000000004");
+        assert_eq!(sum(&[Float(0.1), dec("0.2"), Float(-0.1)]), "float 0.2");
+        assert_eq!(
+            sum(&[Float(1e308), Float(1e308), Float(-1e308)]),
+            "float 1e308"
+        );
+        assert_eq!(sum(&[Float(1e308), Float(1e308)]), "float inf");
+        assert_eq!(sum(&[Float(5e-324), Float(-5e-324)]), "float 0.0");
+        assert_eq!(sum(&[Float(5e-324), dec("1")]), "float 1.0");
+        assert_eq!(sum(&[dec(&max), Int(1), Float(0.0)]), "float 1e38");
+        // Infinities.
+        assert_eq!(sum(&[dec("inf"), Int(1)]), "decimal inf");
+        assert_eq!(sum(&[dec("-inf"), Int(1)]), "decimal -inf");
+        assert_eq!(sum(&[dec("inf"), Float(1.0)]), "float inf");
+        assert_eq!(sum(&[Float(f64::NEG_INFINITY)]), "float -inf");
+        assert_eq!(sum(&[dec("inf"), Float(f64::NEG_INFINITY)]), "null");
     }
 
     #[test]

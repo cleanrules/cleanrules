@@ -11,6 +11,7 @@ use crate::ast::{ArithOp, Closed, CompareOp, Expr, Node, READ_PATH_HINT, StringO
 use crate::error::{Error, ErrorCode, Result, Segment};
 use crate::format::value::{ValueContext, read_value, write_value};
 use crate::json::{Json, JsonNumber, Limits, by_key, pointer_token};
+use crate::value::RoundingMode;
 use crate::value::Value;
 use crate::walk::{Walk, post_order};
 
@@ -47,6 +48,8 @@ enum Shape {
     Arith(ArithOp),
     Abs,
     Neg,
+    /// The scale, read as an int (a construction rule bounds it), and the mode.
+    Round(i128, RoundingMode),
 }
 
 fn format_error(pointer: &str, message: impl Into<String>) -> Error {
@@ -225,6 +228,10 @@ fn open<'j>(
         "matches" => (Shape::Matches(String::new()), Children::Keys(OPERAND)),
         "abs" => (Shape::Abs, Children::Keys(OPERAND)),
         "neg" => (Shape::Neg, Children::Keys(OPERAND)),
+        "round" => (
+            Shape::Round(0, RoundingMode::HalfEven),
+            Children::Keys(OPERAND),
+        ),
         tag => {
             if let Some(op) = CompareOp::from_tag(tag) {
                 (Shape::Compare(op), Children::Keys(SIDES))
@@ -288,6 +295,28 @@ fn close(checking: Checking<'_>, children: Drain<'_, Raw>) -> Result<Raw> {
                     return Err(format_error(
                         &child(&object.pointer, "closed"),
                         "\"closed\" must be a string",
+                    ));
+                }
+            };
+        }
+        Shape::Round(scale, mode) => {
+            let at = child(&object.pointer, "scale");
+            *scale = match object.required("scale")? {
+                Json::Number(n) if n.is_integer_literal() => n.as_i128().unwrap_or(i128::MAX),
+                _ => return Err(format_error(&at, "\"scale\" must be an integer literal")),
+            };
+            *mode = match object.optional("mode") {
+                None => RoundingMode::HalfEven,
+                Some(Json::String(name)) => RoundingMode::from_name(name).ok_or_else(|| {
+                    format_error(
+                        &child(&object.pointer, "mode"),
+                        r#""mode" is "half_even", "half_up", "half_down", "up", "down", "ceiling" or "floor""#,
+                    )
+                })?,
+                Some(_) => {
+                    return Err(format_error(
+                        &child(&object.pointer, "mode"),
+                        "\"mode\" must be a string",
                     ));
                 }
             };
@@ -401,6 +430,11 @@ fn construct(pointer: &str, shape: Shape, mut nodes: Drain<'_, Node>) -> Result<
         }
         Shape::Abs => Node::abs(next()?).map_err(at),
         Shape::Neg => Node::neg(next()?).map_err(at),
+        Shape::Round(scale, mode) => {
+            let operand = next()?;
+            let scale = crate::ast::check_round_scale(scale).map_err(at)?;
+            Node::round(operand, scale, mode).map_err(at)
+        }
     }
 }
 
@@ -474,6 +508,14 @@ fn write_one(node: &Node, mut children: impl Iterator<Item = Json>) -> Json {
         Expr::Matches { pattern, .. } => {
             put("operand", child());
             put("pattern", Json::String(pattern.source().into()));
+        }
+        Expr::Round { scale, mode, .. } => {
+            put("operand", child());
+            put(
+                "scale",
+                Json::Number(JsonNumber::from_literal(scale.to_string())),
+            );
+            put("mode", Json::String(mode.as_str().into()));
         }
         Expr::StringTest { text, .. } => {
             put("operand", child());

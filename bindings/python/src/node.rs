@@ -8,6 +8,7 @@ use cleanrules::Segment;
 use cleanrules::ast::{ArithOp, Closed, CompareOp, Expr, Kind, Node, StringOp};
 use cleanrules::format::{read_node, write_node};
 use cleanrules::json::{Limits, parse, to_string};
+use cleanrules::value::RoundingMode;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
@@ -97,6 +98,10 @@ impl PyNode {
             Expr::Between { closed, .. } => details.set_item("closed", closed.as_str())?,
             Expr::Matches { pattern, .. } => details.set_item("pattern", pattern.source())?,
             Expr::StringTest { text, .. } => details.set_item("text", text)?,
+            Expr::Round { scale, mode, .. } => {
+                details.set_item("scale", scale)?;
+                details.set_item("mode", mode.as_str())?;
+            }
             _ => {}
         }
         Ok(details)
@@ -258,6 +263,22 @@ pub(crate) fn arith(
 #[pyfunction]
 pub(crate) fn abs_(py: Python<'_>, operand: &Bound<'_, PyNode>) -> PyResult<PyNode> {
     Node::abs(node(operand)).or_raise(py).map(wrap)
+}
+
+/// An int or a decimal rounded to `scale` digits after the point
+/// (`spec/ast.md`, *Rounding*); the scale and mode are checked by the core.
+#[pyfunction]
+pub(crate) fn round_(
+    py: Python<'_>,
+    operand: &Bound<'_, PyNode>,
+    scale: i128,
+    mode: &str,
+) -> PyResult<PyNode> {
+    let mode = RoundingMode::from_name(mode).ok_or_else(|| unknown("rounding mode", mode))?;
+    cleanrules::ast::check_round_scale(scale)
+        .and_then(|scale| Node::round(node(operand), scale, mode))
+        .or_raise(py)
+        .map(wrap)
 }
 
 /// The negation of a number.

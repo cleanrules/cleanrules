@@ -360,6 +360,7 @@ or(F.vip, F.total.gt(1000))
 | `eq`, `ne`, `lt`, `le`, `gt`, `ge` | comparison with a node or a constant |
 | `and(...)`, `or(...)`, `not()`; `and(...)`, `or(...)`, `not(x)` as functions | connectives (at least two operands) |
 | `add`, `sub`, `mul`, `div`, `neg()`, `abs()` | arithmetic |
+| `round(scale, { mode })` | an int or a decimal rounded to `scale` places (0 to 38), as a `Decimal`; `mode` is `'half_even'` (default), `'half_up'`, `'half_down'`, `'up'`, `'down'`, `'ceiling'` or `'floor'` |
 | `isIn(values)` | membership in constants of one type group |
 | `between(low, high, { closed })` | a range |
 | `isNull()` | missing or null; never unknown |
@@ -383,7 +384,7 @@ Three rules keep the proxy safe:
 - `then` is never a field, so `await` and promises never take a field for a
   promise; symbols, `toJSON`, Node's and Deno's inspection and the methods are
   the real members.
-- A key named like a method (`and`, `path`, `tag`...) or like a member of
+- A key named like a method (`and`, `path`, `tag`, `round`...) or like a member of
   `Object.prototype` (`constructor`, `valueOf`, `toString`, `hasOwnProperty`...)
   is reached with `F.x.at('and')`, or `field('x', 'and')`.
 - An index is ambiguous as a property (JavaScript property names are strings,
@@ -593,6 +594,15 @@ Deno and browsers:
 | list | `Array` |
 | map | a plain object, its keys added by Unicode code point; a key such as `__proto__` is an own property |
 | opaque | the very object read from the input; `null` in a decision read from a document (`readDecision`), which keeps only the type's name |
+
+Arithmetic keeps the kind its operands give it (`spec/ast.md`,
+*Arithmetic*): with a `decimal(...)` operand and no float, the result is a
+`Decimal`, not a `number`, so `F.price.mul(decimal('0.85'))` on
+`decimal('19.99')` gives `Decimal` `16.9915`, and `.round(2)` gives `16.99`.
+A plain JavaScript number with a fraction, such as `0.85`, is a float, and
+makes the result a `number`; `round` on a float is unknown with a type
+mismatch. Read a `Decimal` with `String(d)` or `d.toJSON()`, never with
+`Number(d)` where cents matter.
 
 `ZonedDateTime` holds the local `year`, `month`, `day`, `hour`, `minute`,
 `second` and `microsecond`, `offsetSeconds`, `timeZone` (an IANA name, or

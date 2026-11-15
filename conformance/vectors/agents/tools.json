@@ -1039,7 +1039,9 @@
               "zone": "domestic"
             },
             {
-              "surcharge": 15.0
+              "surcharge": {
+                "$decimal": "15.0"
+              }
             }
           ]
         }

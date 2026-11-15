@@ -10,6 +10,7 @@ use cleanrules::ast::{ArithOp, Closed, CompareOp, Expr, Kind, Node, StringOp};
 use cleanrules::json::{Json, to_string};
 use cleanrules::logic::LogicName;
 use cleanrules::rules::{Aggregate, Config, HitPolicy, Rule, RuleSet};
+use cleanrules::value::RoundingMode;
 use cleanrules::{Error, ErrorCode, NullCause, Segment, Value};
 
 use super::wire::decode;
@@ -113,6 +114,17 @@ pub(crate) fn unary(tag: &str, operand: &Node) -> Outcome<Node> {
         "neg" => Node::neg(operand)?,
         other => return Err(internal("node", other)),
     })
+}
+
+/// `operand` rounded to `scale` digits after the point; `scale` is a
+/// JavaScript integer, checked by the core (`spec/ast.md`, *Rounding*).
+pub(crate) fn round(operand: &Node, scale: f64, mode: &str) -> Outcome<Node> {
+    let mode = RoundingMode::from_name(mode).ok_or_else(|| internal("rounding mode", mode))?;
+    // An integer, checked by the JavaScript half; a saturating conversion keeps
+    // one out of range out of range.
+    #[allow(clippy::cast_possible_truncation)]
+    let scale = cleanrules::ast::check_round_scale(scale as i128)?;
+    Ok(Node::round(operand.clone(), scale, mode)?)
 }
 
 /// Membership in constants, given as a list in the reader's encoding.

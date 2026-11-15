@@ -845,6 +845,11 @@ export function conformance(R, N) {
         return operand.abs()
       case 'neg':
         return operand.neg()
+      case 'round': {
+        const mode = node.get('mode')
+        const scale = Number(nativeOf(need(node, 'scale')))
+        return mode === undefined ? operand.round(scale) : operand.round(scale, { mode })
+      }
       default:
         if (STRING_TESTS[op] !== undefined) return operand[STRING_TESTS[op]](need(node, 'text'))
         throw new VectorError(`unknown op ${op}`)

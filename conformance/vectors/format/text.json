@@ -4077,6 +4077,224 @@
           "column": 29
         }
       }
+    },
+    {
+      "id": "format/text/round",
+      "spec": [
+        "text.md#conditions-and-values",
+        "text.md#printing"
+      ],
+      "description": "ROUND takes a sum, a scale and an optional mode; HALF_EVEN is not printed",
+      "given": {
+        "kind": "read",
+        "rules_text": "round(price * 0.85, 2) <= 100.00 AND ROUND(x, 0, half_up) > ROUND(5, 3, FLOOR)"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "le",
+                "left": {
+                  "op": "round",
+                  "operand": {
+                    "op": "mul",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "price"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": {
+                        "$decimal": "0.85"
+                      }
+                    }
+                  },
+                  "scale": 2,
+                  "mode": "half_even"
+                },
+                "right": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "100.00"
+                  }
+                }
+              },
+              {
+                "op": "gt",
+                "left": {
+                  "op": "round",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "scale": 0,
+                  "mode": "half_up"
+                },
+                "right": {
+                  "op": "round",
+                  "operand": {
+                    "op": "const",
+                    "value": 5
+                  },
+                  "scale": 3,
+                  "mode": "floor"
+                }
+              }
+            ]
+          }
+        },
+        "printed": "ROUND(price * 0.85, 2) <= 100.00 AND ROUND(x, 0, HALF_UP) > ROUND(5, 3, FLOOR)"
+      }
+    },
+    {
+      "id": "format/text/round-is-a-keyword",
+      "spec": [
+        "text.md#lexical-structure",
+        "text.md#printing"
+      ],
+      "description": "ROUND is a keyword: a field named round is written between backticks",
+      "given": {
+        "kind": "read",
+        "rules_text": "`round` > 1 AND order.round > 2"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "and",
+            "operands": [
+              {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "round"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "order",
+                    "round"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            ]
+          }
+        },
+        "printed": "`round` > 1 AND order.round > 2"
+      }
+    },
+    {
+      "id": "format/text/round-scale-too-large",
+      "spec": [
+        "text.md#conditions-and-values",
+        "ast.md#rounding"
+      ],
+      "description": "a ROUND scale above 38 is an expression error where ROUND starts",
+      "given": {
+        "kind": "read",
+        "rules_text": "x > 1 AND ROUND(x, 39) > 1"
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "line": 1,
+          "column": 11
+        }
+      }
+    },
+    {
+      "id": "format/text/round-scale-not-int",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "a ROUND scale is an int",
+      "given": {
+        "kind": "read",
+        "rules_text": "ROUND(x, 2.5) > 1"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 10
+        }
+      }
+    },
+    {
+      "id": "format/text/round-unknown-mode",
+      "spec": [
+        "text.md#conditions-and-values"
+      ],
+      "description": "an unknown rounding mode is a syntax error at the mode",
+      "given": {
+        "kind": "read",
+        "rules_text": "ROUND(x, 2, HALF_ODD) > 1"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 13
+        }
+      }
+    },
+    {
+      "id": "format/text/round-negative-scale",
+      "spec": [
+        "text.md#conditions-and-values",
+        "ast.md#rounding"
+      ],
+      "description": "a negative ROUND scale reads, and is the expression error of the construction rule, as in JSON",
+      "given": {
+        "kind": "read",
+        "rules_text": "x > 1 AND ROUND(x, -1) > 1"
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "line": 1,
+          "column": 11
+        }
+      }
+    },
+    {
+      "id": "format/text/round-huge-scale",
+      "spec": [
+        "text.md#conditions-and-values",
+        "ast.md#rounding"
+      ],
+      "description": "a ROUND scale too large for any integer is out of range, not a syntax error",
+      "given": {
+        "kind": "read",
+        "rules_text": "ROUND(x, 99999999999999999999999999999999999999999) > 1"
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "line": 1,
+          "column": 1
+        }
+      }
     }
   ]
 }

@@ -229,17 +229,23 @@ around it:
 |---|---|
 | a condition: a rule's `when`, or an operand of `and`, `or` or `not` | `boolean`; under a graded logic also `number` |
 | a side of a comparison (`eq` … `ge`) whose other side is a constant | the constant's type |
-| a side of a comparison whose other side is arithmetic (`add` … `neg`) | `number` |
+| a side of a comparison whose other side is arithmetic (`add` … `neg`) | `number`, `decimal` |
+| a side of a comparison whose other side is `round` | `decimal` |
 | the operand of `between`, compared with each bound; or a bound, compared with the operand | as for comparisons, each half on its own (`ast.md`, *Node semantics*) |
 | the operand of `in` | the types of its values, in their order |
 | the operand of `matches`, `starts_with`, `ends_with` or `contains` | `string` |
-| an operand of `add`, `sub`, `mul`, `div`, `abs` or `neg` | `number` |
+| an operand of `add`, `sub`, `mul`, `div`, `abs` or `neg` | `number`, `decimal` |
+| the operand of `round` | `decimal` |
 | anywhere else: the operand of `is_null`, a payload value, a side of a comparison with another field | none |
 
 A constant's type is `boolean`, `number` (an int or a float), `decimal`,
 `string`, `date`, `naive_datetime` or `aware_datetime`. Decimals have their own
 type because an agent that sends `0.1` sends a float, which never equals the
-decimal `0.1` (`ast.md`, *Types*).
+decimal `0.1` (`ast.md`, *Types*), and arithmetic on decimals stays exact
+where a float makes it a float (`ast.md`, *Arithmetic*); so arithmetic takes
+both, and the decimal is the exact choice. `round` takes ints and decimals,
+and a float there is a type mismatch; `number` cannot tell an int from a
+float, so its operand takes `decimal` only.
 
 A field's types are those of every place that reads it, in the order the
 summary visits them (rules in rule order; the condition, then the payload

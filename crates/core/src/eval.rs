@@ -11,7 +11,7 @@ use std::cmp::Ordering;
 use crate::ast::{ArithOp, Closed, CompareOp, Expr, Kind, Node, StringOp};
 use crate::error::{Error, ErrorCode, Result, Segment};
 use crate::logic::{AnyLogic, Interval, Logic, Truth};
-use crate::value::{Group, NullCause, Number, Value};
+use crate::value::{ArithmeticError, Decimal, Group, NullCause, Number, Value};
 use crate::walk::{Walk, post_order};
 
 /// Why a truth value is unknown or a value is null.
@@ -30,7 +30,7 @@ pub enum ReasonCode {
     DivisionByZero,
     /// An integer outside the signed 64-bit range.
     IntOverflow,
-    /// A decimal in the data that does not fit.
+    /// A decimal that does not fit: in the data, or as an arithmetic result.
     DecimalOverflow,
     /// An arithmetic result is NaN.
     NanResult,
@@ -52,6 +52,18 @@ impl ReasonCode {
             ReasonCode::DecimalOverflow => "decimal_overflow",
             ReasonCode::NanResult => "nan_result",
             ReasonCode::ReadError => "read_error",
+        }
+    }
+}
+
+/// The reason of the null that a failed decimal operation gives
+/// (`spec/ast.md`, *Arithmetic*).
+impl From<ArithmeticError> for ReasonCode {
+    fn from(error: ArithmeticError) -> Self {
+        match error {
+            ArithmeticError::DivisionByZero => ReasonCode::DivisionByZero,
+            ArithmeticError::Overflow => ReasonCode::DecimalOverflow,
+            ArithmeticError::InvalidOperation => ReasonCode::NanResult,
         }
     }
 }
@@ -374,7 +386,10 @@ impl<L: Logic> Evaluator<'_, '_, L> {
     fn next(step: Step<'_>, done: usize) -> Result<Option<Step<'_>>> {
         let node = step.node;
         let mode = match (step.mode, node.expr()) {
-            (Mode::Condition, Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_)) => {
+            (
+                Mode::Condition,
+                Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_) | Expr::Round { .. },
+            ) => {
                 return Err(Error::new(
                     ErrorCode::ExpressionError,
                     format!("'{}' is not a condition", node.tag()),
@@ -389,7 +404,10 @@ impl<L: Logic> Evaluator<'_, '_, L> {
             }
             (Mode::Condition, Expr::And(_) | Expr::Or(_) | Expr::Not(_)) => Mode::Condition,
             (Mode::Condition, _)
-            | (Mode::Value, Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_)) => Mode::Value,
+            | (
+                Mode::Value,
+                Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_) | Expr::Round { .. },
+            ) => Mode::Value,
             (Mode::Value, Expr::Field(_) | Expr::Const(_)) => return Ok(None),
             (Mode::Value, _) => {
                 return Err(Error::new(
@@ -475,10 +493,12 @@ impl<L: Logic> Evaluator<'_, '_, L> {
                     children,
                 })
             }
-            Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_) => Err(Error::new(
-                ErrorCode::ExpressionError,
-                format!("'{}' is not a condition", n.tag()),
-            )),
+            Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_) | Expr::Round { .. } => {
+                Err(Error::new(
+                    ErrorCode::ExpressionError,
+                    format!("'{}' is not a condition", n.tag()),
+                ))
+            }
         }
     }
 
@@ -732,7 +752,7 @@ impl<L: Logic> Evaluator<'_, '_, L> {
                     children,
                 })
             }
-            Expr::Abs(_) | Expr::Neg(_) => {
+            Expr::Abs(_) | Expr::Neg(_) | Expr::Round { .. } => {
                 let operand = only(&children)?;
                 let (value, reason) = self.unary(n, operand)?;
                 Ok(Evaluated {
@@ -857,33 +877,39 @@ impl<L: Logic> Evaluator<'_, '_, L> {
             return Ok((null, reason));
         };
         let paths = || child_paths(node);
-        if op == ArithOp::Div {
-            let (x, y) = (x.to_f64(), y.to_f64());
-            if y == 0.0 {
-                return Ok((null, Some(Reason::new(ReasonCode::DivisionByZero, paths()))));
+        // The kind of the result (`spec/ast.md`, *Arithmetic*): int for two ints
+        // (but `div`), decimal for decimals and ints, float with a float.
+        match (x, y) {
+            (Number::Int(x), Number::Int(y)) if op != ArithOp::Div => {
+                let result = match op {
+                    ArithOp::Add => x.checked_add(y),
+                    ArithOp::Sub => x.checked_sub(y),
+                    ArithOp::Mul => x.checked_mul(y),
+                    ArithOp::Div => None,
+                };
+                Ok(match result {
+                    Some(r) => (Value::Int(r), None),
+                    None => (null, Some(Reason::new(ReasonCode::IntOverflow, paths()))),
+                })
             }
-            return Ok(float_result(x / y, paths));
+            (Number::Decimal(a), Number::Decimal(b)) => Ok(decimal_result(op, a, b, paths)),
+            // Every int fits in a decimal (`spec/ast.md`, *Decimal arithmetic*).
+            (Number::Decimal(a), Number::Int(b)) => Ok(decimal_result(op, a, b.into(), paths)),
+            (Number::Int(a), Number::Decimal(b)) => Ok(decimal_result(op, a.into(), b, paths)),
+            _ => {
+                let (x, y) = (x.to_f64(), y.to_f64());
+                let result = match op {
+                    ArithOp::Add => x + y,
+                    ArithOp::Sub => x - y,
+                    ArithOp::Mul => x * y,
+                    ArithOp::Div if y == 0.0 => {
+                        return Ok((null, Some(Reason::new(ReasonCode::DivisionByZero, paths()))));
+                    }
+                    ArithOp::Div => x / y,
+                };
+                Ok(float_result(result, paths))
+            }
         }
-        if let (Number::Int(x), Number::Int(y)) = (x, y) {
-            let result = match op {
-                ArithOp::Add => x.checked_add(y),
-                ArithOp::Sub => x.checked_sub(y),
-                ArithOp::Mul => x.checked_mul(y),
-                ArithOp::Div => None,
-            };
-            return Ok(match result {
-                Some(r) => (Value::Int(r), None),
-                None => (null, Some(Reason::new(ReasonCode::IntOverflow, paths()))),
-            });
-        }
-        let (x, y) = (x.to_f64(), y.to_f64());
-        let result = match op {
-            ArithOp::Add => x + y,
-            ArithOp::Sub => x - y,
-            ArithOp::Mul => x * y,
-            ArithOp::Div => x / y,
-        };
-        Ok(float_result(result, paths))
     }
 
     fn unary(
@@ -902,6 +928,33 @@ impl<L: Logic> Evaluator<'_, '_, L> {
             let (_, reason) = self.mismatch(reason)?;
             return Ok((null, reason));
         };
+        if let Expr::Round { scale, mode, .. } = node.expr() {
+            // `spec/ast.md`, *Rounding*: ints and decimals only.
+            let decimal = match number {
+                Number::Int(i) => Decimal::from(i),
+                Number::Decimal(d) => d,
+                Number::Float(_) => {
+                    let mut reason = Reason::new(ReasonCode::TypeMismatch, child_paths(node));
+                    reason.types = vec![Group::Number, Group::Number];
+                    reason.detail = Some(ROUND_FLOAT.to_owned());
+                    if self.options.strict {
+                        let mut error = self.error(
+                            ErrorCode::TypeMismatch,
+                            format!("type mismatch: {ROUND_FLOAT}"),
+                            reason.paths.first().cloned(),
+                        );
+                        error.context_mut().types.clone_from(&reason.types);
+                        return Err(error.with_hint(
+                            "pass the value as a decimal (Decimal, BigDecimal, cr.Decimal), or convert the data",
+                        ));
+                    }
+                    return Ok((null, Some(reason)));
+                }
+            };
+            return Ok(decimal_value(decimal.round(*scale, *mode), || {
+                child_paths(node)
+            }));
+        }
         let is_abs = matches!(node.expr(), Expr::Abs(_));
         Ok(match number {
             Number::Int(i) => match if is_abs {
@@ -915,10 +968,8 @@ impl<L: Logic> Evaluator<'_, '_, L> {
                     Some(Reason::new(ReasonCode::IntOverflow, child_paths(node))),
                 ),
             },
-            other => {
-                let f = other.to_f64();
-                (Value::Float(if is_abs { f.abs() } else { -f }), None)
-            }
+            Number::Decimal(d) => (Value::Decimal(if is_abs { d.abs() } else { -d }), None),
+            Number::Float(f) => (Value::Float(if is_abs { f.abs() } else { -f }), None),
         })
     }
 }
@@ -1016,13 +1067,48 @@ pub(crate) fn recompute<L: Logic>(
             let (truth, reason) = evaluator.string_test(node, child(0)?)?;
             (Outcome::Truth(truth), reason)
         }
-        Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_) => {
+        Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_) | Expr::Round { .. } => {
             return Err(Error::new(
                 ErrorCode::ExpressionError,
                 "a value has no truth value",
             ));
         }
     })
+}
+
+/// Why `round` refuses a float (`spec/ast.md`, *Rounding*).
+const ROUND_FLOAT: &str = "round takes ints and decimals, not floats";
+
+/// A decimal operation's result, or null with the reason it has none
+/// (`spec/ast.md`, *Decimal arithmetic*).
+fn decimal_result(
+    op: ArithOp,
+    a: Decimal,
+    b: Decimal,
+    paths: impl Fn() -> Vec<Vec<Segment>>,
+) -> (Value, Option<Reason>) {
+    let result = match op {
+        ArithOp::Add => a.try_add(b),
+        ArithOp::Sub => a.try_sub(b),
+        ArithOp::Mul => a.try_mul(b),
+        ArithOp::Div => a.try_div(b),
+    };
+    decimal_value(result, paths)
+}
+
+/// A decimal, or null with the reason decimal arithmetic gave none.
+fn decimal_value(
+    result: std::result::Result<Decimal, ArithmeticError>,
+    paths: impl Fn() -> Vec<Vec<Segment>>,
+) -> (Value, Option<Reason>) {
+    let code = match result {
+        Ok(d) => return (Value::Decimal(d), None),
+        Err(error) => ReasonCode::from(error),
+    };
+    (
+        Value::Null(NullCause::Null),
+        Some(Reason::new(code, paths())),
+    )
 }
 
 /// A float result: NaN is null with `nan_result`; infinities are kept.
@@ -1090,6 +1176,39 @@ mod tests {
         let mut map = Map::new();
         map.insert(key, value);
         Value::Map(map)
+    }
+
+    #[test]
+    fn arithmetic_errors_have_the_reason_codes_of_the_spec() {
+        use crate::value::ArithmeticError;
+        for error in [
+            ArithmeticError::DivisionByZero,
+            ArithmeticError::Overflow,
+            ArithmeticError::InvalidOperation,
+        ] {
+            assert_eq!(ReasonCode::from(error).as_str(), error.code());
+        }
+    }
+
+    #[test]
+    fn strict_round_of_a_float_says_why_and_how_to_fix_it() {
+        use crate::value::RoundingMode;
+        let price = crate::ast::Node::field(vec![crate::Segment::Key("price".into())]).unwrap();
+        let node = crate::ast::Node::round(price, 2, RoundingMode::HalfEven).unwrap();
+        let strict = Options {
+            strict: true,
+            ..Options::default()
+        };
+        let error =
+            evaluate_value_tree(&node, &input("price", Value::Float(1.005)), &Kleene, strict)
+                .unwrap_err();
+        assert_eq!(error.code(), ErrorCode::TypeMismatch);
+        assert_eq!(
+            error.message(),
+            "type mismatch: round takes ints and decimals, not floats"
+        );
+        assert!(error.hint().unwrap().contains("as a decimal"));
+        assert_eq!(error.context().types, [Group::Number, Group::Number]);
     }
 
     #[test]

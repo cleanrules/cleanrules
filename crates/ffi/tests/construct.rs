@@ -211,6 +211,49 @@ fn constants_follow_the_constant_rules() {
 }
 
 #[test]
+fn round_builds_its_node() {
+    let x = field(r#"["x"]"#);
+    let two = constant("2").unwrap();
+    let (op, op_len) = arg(b"mul");
+    // SAFETY: live nodes; the operator outlives the call.
+    let product =
+        handle(|out, error| unsafe { cr_node_new_arith(op, op_len, x.0, two.0, out, error) })
+            .map(Node)
+            .unwrap();
+    let (p, n) = arg(b"half_up");
+    // SAFETY: a live node; the name outlives the call.
+    let round = handle(|out, error| unsafe { cr_node_new_round(product.0, 2, p, n, out, error) })
+        .map(Node)
+        .unwrap();
+    assert_eq!(write(&round, CR_FORMAT_TEXT), "ROUND(x * 2, 2, HALF_UP)");
+    assert_eq!(detail(&round), r#"[2,"half_up"]"#);
+    // SAFETY: a live node; `NULL` is `half_even`.
+    let even =
+        handle(|out, error| unsafe { cr_node_new_round(product.0, 0, ptr::null(), 0, out, error) })
+            .map(Node)
+            .unwrap();
+    assert_eq!(write(&even, CR_FORMAT_TEXT), "ROUND(x * 2, 0)");
+    // SAFETY: a live node.
+    let wide = handle(|out, error| unsafe {
+        cr_node_new_round(product.0, 39, ptr::null(), 0, out, error)
+    })
+    .map(Node)
+    .err()
+    .unwrap();
+    expression_error(&wide);
+    // SAFETY: a live node.
+    let negative = handle(|out, error| unsafe {
+        cr_node_new_round(product.0, -1, ptr::null(), 0, out, error)
+    })
+    .map(Node)
+    .err()
+    .unwrap();
+    expression_error(&negative);
+    assert!(message(&negative).contains("not -1"));
+    assert_eq!(tag(&round), "round");
+}
+
+#[test]
 fn every_operator_builds_its_node() {
     let x = field(r#"["x"]"#);
     let name = field(r#"["name"]"#);
@@ -347,13 +390,19 @@ fn constructors_report_the_core_errors() {
             .unwrap();
     assert_eq!(failure.status, CR_INVALID_ARGUMENT);
     assert!(message(&failure).starts_with("unknown comparison \"near\""));
-    for (call, op) in [("arith", "pow"), ("string", "has"), ("closed", "half")] {
+    for (call, op) in [
+        ("arith", "pow"),
+        ("string", "has"),
+        ("closed", "half"),
+        ("round", "half_odd"),
+    ] {
         let (p, n) = arg(op.as_bytes());
         // SAFETY: live nodes; the names outlive the calls.
         let failure = handle(|out, error| unsafe {
             match call {
                 "arith" => cr_node_new_arith(p, n, x.0, one.0, out, error),
                 "string" => cr_node_new_string_test(p, n, x.0, p, n, out, error),
+                "round" => cr_node_new_round(x.0, 2, p, n, out, error),
                 _ => cr_node_new_between(x.0, one.0, one.0, p, n, out, error),
             }
         })

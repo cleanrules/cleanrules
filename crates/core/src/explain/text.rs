@@ -230,7 +230,7 @@ pub(crate) fn reason(reason: &Reason) -> String {
         ReasonCode::Unorderable => "cannot order booleans".into(),
         ReasonCode::DivisionByZero => "division by zero".into(),
         ReasonCode::IntOverflow => within("integer overflow"),
-        ReasonCode::DecimalOverflow => within("decimal out of range"),
+        ReasonCode::DecimalOverflow => within("decimal overflow"),
         ReasonCode::NanResult => "NaN result".into(),
         ReasonCode::ReadError => match &reason.detail {
             Some(detail) => format!("cannot read {at}: {}", plain(detail)),
@@ -625,7 +625,7 @@ mod tests {
         let x = vec![Segment::Key("x".into())];
         assert_eq!(
             reason(&at(ReasonCode::DecimalOverflow, vec![x.clone()], None)),
-            "decimal out of range in x"
+            "decimal overflow in x"
         );
         assert_eq!(
             reason(&at(ReasonCode::IntOverflow, vec![], None)),

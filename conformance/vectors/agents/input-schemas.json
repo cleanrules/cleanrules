@@ -405,6 +405,19 @@
                     "type": "number"
                   },
                   {
+                    "type": "object",
+                    "properties": {
+                      "$decimal": {
+                        "type": "string",
+                        "pattern": "^(-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?|-?inf)$"
+                      }
+                    },
+                    "required": [
+                      "$decimal"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
                     "type": "null"
                   }
                 ]
@@ -463,6 +476,19 @@
                 "anyOf": [
                   {
                     "type": "number"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "$decimal": {
+                        "type": "string",
+                        "pattern": "^(-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?|-?inf)$"
+                      }
+                    },
+                    "required": [
+                      "$decimal"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "type": "null"
@@ -2159,6 +2185,284 @@
             "required": [
               "k"
             ]
+          }
+        }
+      }
+    },
+    {
+      "id": "agents/input-schemas/arithmetic-and-round",
+      "spec": [
+        "agents.md#types-of-a-field",
+        "agents.md#building-the-schema"
+      ],
+      "description": "arithmetic operands, and fields compared with arithmetic, take numbers and decimals; the operand of round and a field compared with round take decimals",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "prices": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "mul",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "a"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 2
+                        }
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "b"
+                        ]
+                      },
+                      "right": {
+                        "op": "add",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "c"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 1
+                        }
+                      }
+                    },
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "round",
+                        "operand": {
+                          "op": "field",
+                          "path": [
+                            "d"
+                          ]
+                        },
+                        "scale": 2,
+                        "mode": "half_even"
+                      },
+                      "right": {
+                        "op": "field",
+                        "path": [
+                          "e"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "tool": "summary",
+        "arguments": {
+          "ruleset": "prices"
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "prices",
+          "summary": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "priority": 0,
+                "outputs": []
+              }
+            ],
+            "fields": [
+              {
+                "path": [
+                  "a"
+                ],
+                "conditions": [
+                  "r"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "b"
+                ],
+                "conditions": [
+                  "r"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "c"
+                ],
+                "conditions": [
+                  "r"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "d"
+                ],
+                "conditions": [
+                  "r"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "e"
+                ],
+                "conditions": [
+                  "r"
+                ],
+                "payloads": []
+              }
+            ],
+            "outputs": [],
+            "tags": []
+          },
+          "input_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "a": {
+                "description": "conditions of r",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "$decimal": {
+                        "type": "string",
+                        "pattern": "^(-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?|-?inf)$"
+                      }
+                    },
+                    "required": [
+                      "$decimal"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "b": {
+                "description": "conditions of r",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "$decimal": {
+                        "type": "string",
+                        "pattern": "^(-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?|-?inf)$"
+                      }
+                    },
+                    "required": [
+                      "$decimal"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "c": {
+                "description": "conditions of r",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "$decimal": {
+                        "type": "string",
+                        "pattern": "^(-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?|-?inf)$"
+                      }
+                    },
+                    "required": [
+                      "$decimal"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "d": {
+                "description": "conditions of r",
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "$decimal": {
+                        "type": "string",
+                        "pattern": "^(-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?|-?inf)$"
+                      }
+                    },
+                    "required": [
+                      "$decimal"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "e": {
+                "description": "conditions of r",
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "$decimal": {
+                        "type": "string",
+                        "pattern": "^(-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?|-?inf)$"
+                      }
+                    },
+                    "required": [
+                      "$decimal"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
           }
         }
       }

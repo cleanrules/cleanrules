@@ -49,7 +49,7 @@ fn unknown_keys(members: &[(String, Json)], known: &[&str], pointer: &str) -> Re
     }
 }
 
-const TAGS: [&str; 24] = [
+const TAGS: [&str; 25] = [
     "field",
     "const",
     "eq",
@@ -74,6 +74,7 @@ const TAGS: [&str; 24] = [
     "div",
     "abs",
     "neg",
+    "round",
 ];
 
 /// A recorded result tree whose shape is valid, with its values already read, so

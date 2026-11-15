@@ -94,13 +94,28 @@ the selected payloads. Within a key:
   `min` and `max` of no values are null;
 - `sum`, `min` and `max` need numbers (not booleans) and raise `HitPolicyError`
   otherwise, naming the rules whose payloads hold such a value (`errors.md`);
-- `min` and `max` return the smallest or largest value unchanged (after
-  decimals are converted to float), so the minimum of `2` and `3.5` is the int
-  `2`; between equal values, the first in rule order is returned;
-- decimal values are converted to float64 before `sum`, `min` and `max`, as
-  arithmetic does with decimal operands;
-- the result follows the arithmetic rules: an integer `sum` outside the signed
-  64-bit range is null, and a NaN `sum` (such as `inf + -inf`) is null;
+- `min` and `max` return the smallest or largest value unchanged, compared
+  exactly (`ast.md`, *Types*), so the minimum of `2` and `3.5` is the int `2`,
+  and the minimum of the decimal `0.1` and the float `0.1` is the decimal,
+  which is smaller; between equal values, the first in rule order is returned;
+- `sum` adds every value **exactly**, whatever its kind (a float is an exact
+  binary fraction, an int an integer and a decimal a decimal fraction), and
+  rounds the exact total **once**, so the result does not depend on the order
+  of the rules (as Python's `math.fsum`):
+  - only ints: the total as an int, null when it is outside the signed 64-bit
+    range;
+  - ints and decimals: the total as a decimal whose ideal scale is the largest
+    scale among the values (an int has scale 0), as *Decimal arithmetic* in
+    `ast.md` says: exact when it fits, rounded half to even when it does not,
+    and null when it does not fit at any scale;
+  - a float among the values: the total rounded to the nearest float, ties to
+    even, which is an infinity when it is beyond the largest float. So `1`, `1`
+    and the float `1e16` sum to `10000000000000002.0` in any order, where
+    adding in turn from `1e16` would give `1e16`. A `sum` with floats can
+    therefore differ from the same values added with `add`, which rounds at
+    each step;
+  - infinities (float or decimal): one sign gives that infinity, a float one
+    when there is a float among the values; both signs give null;
 - the aggregate is a map of every key of the selected payloads, its keys
   sorted by Unicode code point like a payload's;
 - with no selected rule at all, the aggregate is null.

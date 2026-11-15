@@ -34,6 +34,8 @@ class ExprSuite extends munit.FunSuite:
       (x / 2, "x / 2", "div"),
       (-x, "-x", "neg"),
       (x.abs, "ABS(x)", "abs"),
+      (x.round(2), "ROUND(x, 2)", "round"),
+      (x.round(0, java.math.RoundingMode.FLOOR), "ROUND(x, 0, FLOOR)", "round"),
     )
     for (node, text, tag) <- cases do
       assertEquals(node.toString, text)

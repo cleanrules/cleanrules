@@ -569,7 +569,8 @@ fn tuple_shape(term: Term<'_>) -> Shape {
             .and_then(|parsed| match parsed {
                 Ok(decimal) => Some(Value::Decimal(decimal)),
                 Err(DecimalError::DoesNotFit) => Some(Value::Null(NullCause::DecimalOverflow)),
-                Err(DecimalError::Malformed) => None,
+                // Malformed text, or any error a later core may add.
+                Err(_) => None,
             }),
         [tag, local, offset, zone] if atoms::cleanrules_datetime() == tag => {
             tagged_datetime(local, offset, zone)
@@ -759,6 +760,7 @@ fn elixir_decimal(term: Term<'_>) -> Option<Value> {
     match Decimal::parse(&format!("{sign}{digits}E{exp}")) {
         Ok(decimal) => Some(Value::Decimal(decimal)),
         Err(DecimalError::DoesNotFit) => Some(Value::Null(NullCause::DecimalOverflow)),
-        Err(DecimalError::Malformed) => None,
+        // Malformed text, or any error a later core may add.
+        Err(_) => None,
     }
 }

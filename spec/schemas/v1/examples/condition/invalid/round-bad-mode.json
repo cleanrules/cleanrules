@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "gt",
+    "left": {
+      "op": "round",
+      "operand": {
+        "op": "field",
+        "path": [
+          "x"
+        ]
+      },
+      "scale": 2,
+      "mode": "half_odd"
+    },
+    "right": {
+      "op": "const",
+      "value": 1
+    }
+  }
+}

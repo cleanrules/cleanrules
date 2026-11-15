@@ -1012,57 +1012,6 @@
       }
     },
     {
-      "id": "ast/nodes/decimal-to-float",
-      "spec": [
-        "ast.md#node-semantics",
-        "ast.md#evaluating-one-node",
-        "json-format.md#result-trees"
-      ],
-      "description": "decimal operands are converted to float",
-      "given": {
-        "kind": "value",
-        "value": {
-          "op": "add",
-          "left": {
-            "op": "field",
-            "path": [
-              "a"
-            ]
-          },
-          "right": {
-            "op": "const",
-            "value": 1
-          }
-        },
-        "input": {
-          "a": {
-            "$decimal": "0.5"
-          }
-        }
-      },
-      "expect": {
-        "result": {
-          "op": "add",
-          "value": 1.5,
-          "children": [
-            {
-              "op": "field",
-              "path": [
-                "a"
-              ],
-              "value": {
-                "$decimal": "0.5"
-              }
-            },
-            {
-              "op": "const",
-              "value": 1
-            }
-          ]
-        }
-      }
-    },
-    {
       "id": "ast/nodes/inf-kept",
       "spec": [
         "ast.md#node-semantics",

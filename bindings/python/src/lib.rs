@@ -41,6 +41,7 @@ fn native_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(node::string_test, module)?)?;
     module.add_function(wrap_pyfunction!(node::arith, module)?)?;
     module.add_function(wrap_pyfunction!(node::abs_, module)?)?;
+    module.add_function(wrap_pyfunction!(node::round_, module)?)?;
     module.add_function(wrap_pyfunction!(node::neg, module)?)?;
     module.add_function(wrap_pyfunction!(node::node_from_json, module)?)?;
     module.add_class::<rules::PyRule>()?;

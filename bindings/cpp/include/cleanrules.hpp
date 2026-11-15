@@ -2159,6 +2159,18 @@ public:
     [[nodiscard]] static node abs(const node &n, error_info &error) { return unary_(cr_node_new_abs, n, &error); }
     CLEANRULES_THROWING([[nodiscard]] static node neg(const node &n) { return unary_(cr_node_new_neg, n, nullptr); })
     [[nodiscard]] static node neg(const node &n, error_info &error) { return unary_(cr_node_new_neg, n, &error); }
+    // An int or a decimal rounded to `scale` digits after the point (0 to 38),
+    // as a decimal; `mode` is `half_even` (also when empty), `half_up`,
+    // `half_down`, `up`, `down`, `ceiling` or `floor`. A float operand is
+    // unknown with a type mismatch (`spec/ast.md`, *Rounding*).
+    CLEANRULES_THROWING([[nodiscard]] static node round(const node &n, std::int64_t scale,
+                                                        std::string_view mode = {}) {
+        return round_(n, scale, mode, nullptr);
+    })
+    [[nodiscard]] static node round(const node &n, std::int64_t scale, std::string_view mode,
+                                    error_info &error) {
+        return round_(n, scale, mode, &error);
+    }
     // Membership in a list of constants, kept sorted and without repeats.
     CLEANRULES_THROWING([[nodiscard]] static node is_in(const node &n, value_ref values) {
         return is_in_(n, values, nullptr);
@@ -2263,6 +2275,12 @@ private:
         return make_(sink, [&](cr_node **o, cr_error **e) {
             return cr_node_new_between(n.c_ptr(), low.c_ptr(), high.c_ptr(),
                                    closed.empty() ? nullptr : closed.data(), closed.size(), o, e);
+        });
+    }
+    static node round_(const node &n, std::int64_t scale, std::string_view mode, error_info *sink) {
+        return make_(sink, [&](cr_node **o, cr_error **e) {
+            return cr_node_new_round(n.c_ptr(), scale, mode.empty() ? nullptr : mode.data(),
+                                     mode.size(), o, e);
         });
     }
     static node matches_(const node &n, std::string_view pattern, error_info *sink) {

@@ -289,6 +289,8 @@ export type Status = 'selected' | 'fired' | 'not_fired' | 'unknown'
 export type Kind = 'condition' | 'value' | 'any'
 /** Which ends of `between` are included. */
 export type Closed = 'both' | 'left' | 'right' | 'none'
+/** How `round` drops digits, as Java's `RoundingMode` (`spec/ast.md`, *Rounding*). */
+export type RoundingMode = 'half_even' | 'half_up' | 'half_down' | 'up' | 'down' | 'ceiling' | 'floor'
 /** A comparison's tag. */
 export type CompareOp = 'eq' | 'ne' | 'lt' | 'le' | 'gt' | 'ge'
 /** Why a rule that fired was not selected. */
@@ -316,6 +318,7 @@ export type Tag =
   | 'div'
   | 'abs'
   | 'neg'
+  | 'round'
 /** Why a result is unknown or null (`spec/ast.md`, *Results and reasons*). */
 export type ReasonCode =
   | 'missing_field'
@@ -394,6 +397,12 @@ export declare class Expr {
   neg(): Expr
   /** The absolute value. */
   abs(): Expr
+  /**
+   * An int or a decimal rounded to `scale` digits after the point (0 to 38), as a
+   * decimal: `F.price.mul(decimal('0.85')).round(2)`; `mode` is `'half_even'` by
+   * default. A float operand is unknown with a type mismatch.
+   */
+  round(scale: number, options?: { mode?: RoundingMode }): Expr
   /** Membership in constants of one type group: `F.country.isIn(['ES', 'PT'])` (an iterable object, never a string). */
   isIn(values: Iterable<Constant> & object): Expr
   /** A range test, both ends included unless `closed` says otherwise. */

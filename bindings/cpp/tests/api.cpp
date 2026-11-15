@@ -580,6 +580,14 @@ void building() {
     CHECK(cr::node::matches(country, "^E").tag() == "matches");
     auto price = cr::node::neg(cr::node::abs(cr::node::arith("mul", total, cr::node::constant(2))));
     CHECK(price.kind() == "value");
+    auto cents = cr::node::round(cr::node::arith("mul", total, cr::node::constant(cr::value::decimal("0.85"))), 2);
+    CHECK(cents.write(cr::format::text) == "ROUND(order.total * 0.85, 2)");
+    CHECK(cr::node::round(total, 0, "half_up").detail()[1].as_string() == "half_up");
+    CHECK_THROWS(cr::node::round(total, 39), cr::expression_error);
+    CHECK_THROWS(cr::node::round(total, 2, "half_odd"), cr::invalid_argument_error);
+    cr::error_info round_error;
+    CHECK(!cr::node::round(total, -1, "", round_error));
+    CHECK(round_error.code() == cr::errc::expression_error);
     CHECK_THROWS(cr::node::compare("gt", vip_when, years), cr::expression_error);
     CHECK_THROWS(cr::node::or_({years}), cr::expression_error);
     CHECK_THROWS(cr::node::constant(cr::value::list({1})), cr::expression_error);

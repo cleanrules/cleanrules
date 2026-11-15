@@ -1553,6 +1553,310 @@
           "pointer": "/condition/alpha"
         }
       }
+    },
+    {
+      "id": "format/conditions/round-mode-default",
+      "spec": [
+        "json-format.md#conditions",
+        "json-format.md#writing"
+      ],
+      "description": "round without a mode is half_even, which writers always write",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "round",
+              "operand": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "scale": 2
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "round",
+              "operand": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "scale": 2,
+              "mode": "half_even"
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/conditions/round-scale-not-integer",
+      "spec": [
+        "json-format.md#conditions"
+      ],
+      "description": "a round scale is an integer literal",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "round",
+              "operand": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "scale": 2.0
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/left/scale"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/round-scale-too-large",
+      "spec": [
+        "json-format.md#reading",
+        "ast.md#construction-rules",
+        "ast.md#rounding"
+      ],
+      "description": "a round scale is at most 38",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "round",
+              "operand": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "scale": 39
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition/left"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/round-scale-negative",
+      "spec": [
+        "json-format.md#reading",
+        "ast.md#construction-rules",
+        "ast.md#rounding"
+      ],
+      "description": "a round scale is not negative",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "round",
+              "operand": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "scale": -1
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition/left"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/round-unknown-mode",
+      "spec": [
+        "json-format.md#conditions"
+      ],
+      "description": "an unknown rounding mode",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "round",
+              "operand": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "scale": 2,
+              "mode": "half_odd"
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/left/mode"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/round-float-constant",
+      "spec": [
+        "json-format.md#reading",
+        "ast.md#construction-rules",
+        "ast.md#rounding"
+      ],
+      "description": "round rejects a float constant, which it could never round",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "round",
+              "operand": {
+                "op": "const",
+                "value": 2.5
+              },
+              "scale": 0
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition/left"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/round-missing-scale",
+      "spec": [
+        "json-format.md#conditions"
+      ],
+      "description": "round needs a scale",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "round",
+              "operand": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              }
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/left/scale"
+        }
+      }
+    },
+    {
+      "id": "format/conditions/round-as-condition",
+      "spec": [
+        "json-format.md#reading",
+        "ast.md#construction-rules"
+      ],
+      "description": "round is a value, not a condition",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "round",
+            "operand": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "scale": 2
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/condition"
+        }
+      }
     }
   ]
 }

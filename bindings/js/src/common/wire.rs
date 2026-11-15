@@ -336,7 +336,7 @@ impl Decoder {
                 Ok(decimal) => Value::Decimal(decimal),
                 Err(DecimalError::DoesNotFit) => Value::Null(NullCause::DecimalOverflow),
                 // A marker of another copy of the package, or a forged one.
-                Err(DecimalError::Malformed) => self.opaque("Decimal", arg(2)),
+                Err(_) => self.opaque("Decimal", arg(2)),
             },
             "D" | "N" | "A" => self.datetime(tag, form)?,
             "l" => {

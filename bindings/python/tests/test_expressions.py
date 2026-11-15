@@ -5,6 +5,7 @@ The API, the pitfall guards, and the construction rules that the core checks.
 
 import copy
 import datetime as dt
+import decimal
 import enum
 import pickle
 import zoneinfo
@@ -13,7 +14,15 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from cleanrules import Const, Expr, ExpressionError, F, Field
+from cleanrules import (
+    Const,
+    Expr,
+    ExpressionError,
+    F,
+    Field,
+    TypeMismatchError,
+    evaluate_value_tree,
+)
 from hypothesis import given
 
 from tests.strategies import conditions, decimals, value_exprs
@@ -331,11 +340,52 @@ def test_connectives_reject_values() -> None:
         (-F.a, "-F.a"),
         (abs(F.a), "abs(F.a)"),
         (F.a.abs(), "abs(F.a)"),
+        (round(F.a, 2), "F.a.round(2)"),
+        (round(F.a), "F.a.round(0)"),
+        (F.a.round(2, "half_up"), "F.a.round(2, 'half_up')"),
+        ((F.a * 2).round(2), "(F.a * 2).round(2)"),
     ],
 )
 def test_arithmetic(built: Expr, text: str) -> None:
     assert repr(built) == text
     assert built.kind == "value"
+
+
+def test_round() -> None:
+    price = (F.price * Decimal("0.85")).round(2)
+    assert str(price) == "ROUND(price * 0.85, 2)"
+    assert evaluate_value_tree(price, {"price": Decimal("19.99")}).value == Decimal("16.99")
+    assert repr(evaluate_value_tree(price, {"price": Decimal("19.99")}).value) == "Decimal('16.99')"
+    assert str(F.price.round(2, decimal.ROUND_HALF_UP)) == "ROUND(price, 2, HALF_UP)"
+    assert str(F.price.round(2, decimal.ROUND_CEILING)) == "ROUND(price, 2, CEILING)"
+    up = F.price.round(1, "ceiling")
+    assert evaluate_value_tree(up, {"price": Decimal("-1.25")}).value == Decimal("-1.2")
+    # A float is never rounded: null with a type mismatch, and an error in strict mode.
+    tree = evaluate_value_tree(F.price.round(2), {"price": 1.005})
+    assert tree.value is None
+    assert tree.reason is not None
+    assert tree.reason.code == "type_mismatch"
+    with pytest.raises(TypeMismatchError):
+        evaluate_value_tree(F.price.round(2), {"price": 1.005}, strict=True)
+
+
+@pytest.mark.parametrize(
+    ("build", "message"),
+    [
+        (lambda: F.a.round(39), "not 39"),
+        (lambda: F.a.round(-1), "not -1"),
+        (lambda: F.a.round(10**40), r"point$"),
+        (lambda: F.a.round(2, decimal.ROUND_05UP), "ROUND_05UP"),
+        (lambda: F.a.round(2, "half_odd"), "half_odd"),  # pyright: ignore[reportArgumentType]
+        (lambda: F.a.round(2.0), "an int"),  # pyright: ignore[reportArgumentType]
+        (lambda: F.a.round(True), "an int"),
+        (lambda: Const(2.5).round(0), "float"),
+        (lambda: (F.a > 1).round(0), "condition"),
+    ],
+)
+def test_round_rejects(build: Callable[[], Expr], message: str) -> None:
+    with pytest.raises(ExpressionError, match=message):
+        build()
 
 
 @pytest.mark.parametrize("value", ["text", True, dt.date(2026, 1, 1)])

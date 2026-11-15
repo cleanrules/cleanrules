@@ -28,6 +28,7 @@ import {
   NaiveDateTime,
   Note,
   type Output,
+  type RoundingMode,
   Reason,
   Rule,
   RuleExplanation,
@@ -150,6 +151,10 @@ const segments: ReadonlyArray<string | number> = indexed.path
 const one: Const = constant(decimal('0.10'))
 const value: Value = one.value
 const total: Expr = F.price.mul(F.quantity).sub(5).add(constant(1)).div(2).neg().abs()
+const cents: Expr = total.round(2, { mode: 'half_up' }).round(0)
+const mode: RoundingMode = 'ceiling'
+void cents
+void mode
 const tests: Expr[] = [
   F.name.matches('^A'),
   F.name.startsWith('A'),

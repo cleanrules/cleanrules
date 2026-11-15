@@ -31,6 +31,7 @@ const INTERNAL = [
   'nodeField',
   'nodeIsIn',
   'nodeMatches',
+  'nodeRound',
   'nodeSameAs',
   'nodeStringTest',
   'nodeTree',

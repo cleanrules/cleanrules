@@ -158,6 +158,18 @@ pub fn node_unary(env: &Env, tag: String, operand: &Node) -> Result<Node> {
         .or_fail(env)
 }
 
+/// An int or a decimal rounded to `scale` digits after the point.
+///
+/// # Errors
+///
+/// `ExpressionError`, as the core reports it.
+#[napi]
+pub fn node_round(env: &Env, operand: &Node, scale: f64, mode: String) -> Result<Node> {
+    build::round(operand.core.node(), scale, &mode)
+        .map(node)
+        .or_fail(env)
+}
+
 /// Membership in constants, a list in the reader's encoding.
 ///
 /// # Errors

@@ -36,6 +36,8 @@ func TestOperators(t *testing.T) {
 		{x.Div(3), "div", KindValue, "x / 3"},
 		{x.Neg(), "neg", KindValue, "-x"},
 		{x.Abs(), "abs", KindValue, "ABS(x)"},
+		{x.Round(2), "round", KindValue, "ROUND(x, 2)"},
+		{x.Mul(MustDecimal("0.85")).RoundWith(0, RoundHalfUp), "round", KindValue, "ROUND(x * 0.85, 0, HALF_UP)"},
 		{x.Gt(1).And(Field("y").Lt(2)), "and", KindCondition, "x > 1 AND y < 2"},
 		{And(x.Gt(1), Field("y").Lt(2), Field("z")), "and", KindCondition, "x > 1 AND y < 2 AND z"},
 		{x.Gt(1).Or(Field("y")), "or", KindCondition, "x > 1 OR y"},

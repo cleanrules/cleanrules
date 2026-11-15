@@ -259,6 +259,9 @@ def build(node: dict[str, Any]) -> Expr:
         return abs(operand)
     if op == "neg":
         return -operand
+    if op == "round":
+        mode, scale = node.get("mode", "half_even"), typed(node["scale"])
+        return round(operand, scale) if mode == "half_even" else operand.round(scale, mode)
     raise AssertionError(f"unknown op {op}")
 
 

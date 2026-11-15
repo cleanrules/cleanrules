@@ -41,6 +41,7 @@ function immutable() {
 
 const COMPARE_SYMBOLS = { eq: '==', ne: '!=', lt: '<', le: '<=', gt: '>', ge: '>=' }
 const CLOSED = ['both', 'left', 'right', 'none']
+const ROUNDING_MODES = ['half_even', 'half_up', 'half_down', 'up', 'down', 'ceiling', 'floor']
 
 /** The `ExpressionError` of a constant read as `form`, or `null`. */
 function constantProblem(form, thrown, value) {
@@ -317,6 +318,24 @@ function expressions(native, build) {
     /** The absolute value. */
     abs() {
       return wrap(native.nodeUnary('abs', nodeOf(this)))
+    }
+
+    /**
+     * An int or a decimal rounded to `scale` digits after the point, as a
+     * decimal: `F.price.mul(decimal('0.85')).round(2)`. A float operand is
+     * unknown with a type mismatch: floats are never rounded implicitly.
+     */
+    round(scale, roundOptions) {
+      const { mode = 'half_even' } = options(roundOptions, ['mode'], "{ mode: 'half_up' }")
+      if (!Number.isInteger(scale)) {
+        throw new ExpressionError(`round needs an integer scale from 0 to 38, not ${show(scale)}`)
+      }
+      if (!ROUNDING_MODES.includes(mode)) {
+        throw new ExpressionError(
+          `mode must be 'half_even', 'half_up', 'half_down', 'up', 'down', 'ceiling' or 'floor', not ${show(mode)}`,
+        )
+      }
+      return wrap(native.nodeRound(nodeOf(this), scale, mode))
     }
 
     // --- Predicates ---

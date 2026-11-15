@@ -443,6 +443,7 @@ public final class Native {
     private static final MethodHandle NODE_IS_NULL = bind("cr_node_new_is_null", fn(I, P, P, P));
     private static final MethodHandle NODE_ABS = bind("cr_node_new_abs", fn(I, P, P, P));
     private static final MethodHandle NODE_NEG = bind("cr_node_new_neg", fn(I, P, P, P));
+    private static final MethodHandle NODE_ROUND = bind("cr_node_new_round", fn(I, P, L, P, SIZE_T, P, P));
     private static final MethodHandle NODE_IS_IN = bind("cr_node_new_is_in", fn(I, P, P, P, P));
     private static final MethodHandle NODE_BETWEEN = bind("cr_node_new_between", fn(I, P, P, P, P, SIZE_T, P, P));
     private static final MethodHandle NODE_MATCHES = bind("cr_node_new_matches", fn(I, P, P, SIZE_T, P, P));
@@ -1689,6 +1690,15 @@ public final class Native {
     public static int nodeNeg(MemorySegment operand, MemorySegment out, MemorySegment error) {
         try {
             return (int) NODE_NEG.invokeExact(operand, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int nodeRound(
+            MemorySegment operand, long scale, MemorySegment mode, long modeLen, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) NODE_ROUND.invokeExact(operand, scale, mode, modeLen, out, error);
         } catch (Throwable thrown) {
             throw rethrow(thrown);
         }

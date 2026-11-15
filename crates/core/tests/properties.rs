@@ -18,7 +18,7 @@ use cleanrules::json::{Json, JsonNumber, Limits, same, to_string};
 use cleanrules::logic::{Kleene, Truth};
 use cleanrules::rules::{Aggregate, Config, HitPolicy, Rule, RuleSet};
 use cleanrules::table::DecisionTable;
-use cleanrules::value::{Decimal, Map, NullCause, Value};
+use cleanrules::value::{Decimal, Map, NullCause, RoundingMode, Value};
 use cleanrules::visual::{DiagramFormat, draw_explanation, draw_rule, draw_ruleset};
 use cleanrules::{ErrorCode, Segment};
 use proptest::prelude::*;
@@ -78,7 +78,18 @@ fn numeric() -> impl Strategy<Value = Node> {
             inner
                 .clone()
                 .prop_filter_map("valid abs", |n| Node::abs(n).ok()),
-            inner.prop_filter_map("valid neg", |n| Node::neg(n).ok()),
+            inner
+                .clone()
+                .prop_filter_map("valid neg", |n| Node::neg(n).ok()),
+            (
+                inner,
+                0_u32..=4,
+                prop::sample::select(RoundingMode::ALL.to_vec())
+            )
+                .prop_filter_map("valid round", |(n, scale, mode)| Node::round(
+                    n, scale, mode
+                )
+                .ok()),
         ]
     })
 }
@@ -798,5 +809,79 @@ proptest! {
             .count();
         prop_assert_eq!(cause_lines, listed);
         prop_assert_eq!(text.lines().filter(|l| l.starts_with('[')).count(), explanation.rules.len());
+    }
+}
+
+// --- Decimal arithmetic (`spec/ast.md`, *Decimal arithmetic*) ----------------------
+
+/// Decimals small enough that sums and products are always exact.
+fn small_decimal() -> impl Strategy<Value = Decimal> {
+    (-1_000_000_000_000_i128..1_000_000_000_000, 0_u32..=12)
+        .prop_map(|(c, s)| Decimal::new(c, s).unwrap())
+}
+
+/// Decimals of the whole range, and the two infinities.
+fn any_decimal() -> impl Strategy<Value = Decimal> {
+    let limit = 10_i128.pow(38);
+    prop_oneof![
+        8 => (-limit + 1..limit, 0_u32..=38).prop_map(|(c, s)| Decimal::new(c, s).unwrap()),
+        4 => small_decimal(),
+        1 => Just(Decimal::INFINITY),
+        1 => Just(Decimal::NEG_INFINITY),
+    ]
+}
+
+/// The result with its scale, which equality ignores.
+fn shown(result: Result<Decimal, cleanrules::value::ArithmeticError>) -> String {
+    result.map_or_else(|e| format!("{e:?}"), |d| d.to_string())
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(512))]
+
+    #[test]
+    fn decimal_addition_and_multiplication_commute(a in any_decimal(), b in any_decimal()) {
+        prop_assert_eq!(shown(a.try_add(b)), shown(b.try_add(a)));
+        prop_assert_eq!(shown(a.try_mul(b)), shown(b.try_mul(a)));
+        prop_assert_eq!(shown(a.try_sub(b)), shown((-b).try_add(a)));
+    }
+
+    #[test]
+    fn exact_decimal_results_undo_each_other(a in small_decimal(), b in small_decimal()) {
+        let sum = a.try_add(b).unwrap();
+        prop_assert_eq!(sum.try_sub(b).unwrap(), a);
+        let product = a.try_mul(b).unwrap();
+        let (_, sa) = a.parts().unwrap();
+        let (_, sb) = b.parts().unwrap();
+        prop_assert_eq!(product.parts().unwrap().1, sa + sb);
+        if b != Decimal::from(0) {
+            // A quotient that fits is exact.
+            prop_assert_eq!(product.try_div(b).unwrap(), a);
+        }
+    }
+
+    #[test]
+    fn rounding_brackets_the_value(a in any_decimal(), scale in 0_u32..=38) {
+        // Down and up are the neighbours at `scale` places; every mode gives one
+        // of them, and a value that fits is exact under both.
+        if let (Ok(down), Ok(up)) = (a.round(scale, RoundingMode::Down), a.round(scale, RoundingMode::Up)) {
+            prop_assert!(down.abs() <= a.abs() && a.abs() <= up.abs());
+            for mode in RoundingMode::ALL {
+                let r = a.round(scale, mode).unwrap();
+                prop_assert!(r == down || r == up);
+                if let Some((_, s)) = r.parts() {
+                    prop_assert_eq!(s, scale);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn decimal_results_always_fit(a in any_decimal(), b in any_decimal()) {
+        for result in [a.try_add(b), a.try_sub(b), a.try_mul(b), a.try_div(b)].into_iter().flatten() {
+            if let Some((c, s)) = result.parts() {
+                prop_assert!(c.unsigned_abs() < 10_u128.pow(38) && s <= 38);
+            }
+        }
     }
 }

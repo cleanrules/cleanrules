@@ -705,6 +705,16 @@ func (c *conformance) build(v any) *Expr {
 		return sub("operand").Neg()
 	case "abs":
 		return sub("operand").Abs()
+	case "round":
+		scale, err := node.get("scale").(interface{ Int64() (int64, error) }).Int64()
+		if err != nil {
+			failf("the scale %v", node.get("scale"))
+		}
+		mode, ok := node.get("mode").(string)
+		if !ok {
+			return sub("operand").Round(int(scale))
+		}
+		return sub("operand").RoundWith(int(scale), RoundingMode(mode))
 	case "is_null":
 		return sub("operand").IsNull()
 	case "in":

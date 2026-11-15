@@ -37,8 +37,8 @@ Rule files written as text use the suffix `.rules`.
 - **Keywords** are case-insensitive: `IF`, `THEN`, `DO`, `RULE`, `PRIORITY`,
   `TAGS`, `DESCRIPTION`, `HIT`, `POLICY`, `AGGREGATE`, `LOGIC`, `STRICT`, `AND`, `OR`,
   `NOT`, `IN`, `BETWEEN`, `CLOSED`, `IS`, `NULL`, `TRUE`, `FALSE`, `MATCHES`,
-  `STARTS`, `ENDS`, `WITH`, `CONTAINS`, `ABS`, `DATE`, `DATETIME`, `DECIMAL`,
-  `FLOAT`.
+  `STARTS`, `ENDS`, `WITH`, `CONTAINS`, `ABS`, `ROUND`, `DATE`, `DATETIME`,
+  `DECIMAL`, `FLOAT`.
 - **Names** are ASCII identifiers (`[A-Za-z_][A-Za-z0-9_]*`) that are not
   keywords, or any text between backticks (`` `first name` ``, `` `and` ``), in
   which a backtick is written twice. Names are case-sensitive.
@@ -77,7 +77,7 @@ From the loosest binding to the tightest:
 | sum | `a + b`, `a - b` | `add`, `sub` |
 | product | `a * b`, `a / b` | `mul`, `div` |
 | unary | `-a` | `neg` (a negative number is a constant instead) |
-| primary | a constant, a field, `ABS(a)` (`a` a sum), `( … )` | `const`, `field`, `abs` |
+| primary | a constant, a field, `ABS(a)` (`a` a sum), `ROUND(a, scale)` and `ROUND(a, scale, MODE)` (`a` a sum, `scale` an int written with digits and an optional `-`, checked by the construction rule as in JSON, `MODE` one of `HALF_EVEN`, `HALF_UP`, `HALF_DOWN`, `UP`, `DOWN`, `CEILING` and `FLOOR`, case-insensitive), `( … )` | `const`, `field`, `abs`, `round` (`mode` is `half_even` when omitted) |
 
 A predicate has one comparison at most: `0 < x < 10` is a syntax error (write
 `x BETWEEN 0 AND 10 CLOSED NONE`). In `BETWEEN low AND high`, the `AND` belongs
@@ -158,7 +158,7 @@ limits*):
 - conditions and payload values at most 256 nodes deep, counted as there. The
   reader checks each node as it completes it, and stops with `limit_exceeded`
   located where the first node that goes deeper starts;
-- parentheses, `NOT`, unary `-` and `ABS` nested at most `2 × max_depth + 2`
+- parentheses, `NOT`, unary `-`, `ABS` and `ROUND` nested at most `2 × max_depth + 2`
   deep (514), beyond which the reader stops with `limit_exceeded` at the token
   that goes deeper. Each node costs at most two levels, so a canonical text
   within the depth limit is never refused;
@@ -179,6 +179,9 @@ which reads back as the same model:
   a predicate needs none (`NOT x > 5`);
 - `=` and `!=` for equality and inequality, `x NOT IN (…)` never: the printer
   writes `NOT x IN (…)`, as the tree is;
+- `ROUND(a, scale)` when the mode is `half_even`, and `ROUND(a, scale, MODE)`
+  with the mode in upper case otherwise, as `CLOSED` is written only when it is
+  not `BOTH`;
 - constants as in *Lexical structure*: ints as digits; decimals in plain
   notation with their scale, and `DECIMAL "…"` when the scale is 0 or the value
   infinite; floats with the shortest digits that read back, as plain digits

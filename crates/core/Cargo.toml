@@ -47,3 +47,8 @@ yaml = ["dep:saphyr-parser"]
 [[example]]
 name = "fuzzy"
 path = "../../docs/examples/fuzzy.rs"
+
+# The example of decimal arithmetic in the documentation (task R.4).
+[[example]]
+name = "decimals"
+path = "../../docs/examples/decimals.rs"

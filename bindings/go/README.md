@@ -264,6 +264,13 @@ cr.Field("items", 0, "sku").StartsWith("A-")
 | `IsIn(values...)` (or one slice of them), `Between(lo, hi)`, `BetweenClosed(lo, hi, ClosedLeft)` | `in`, `between` |
 | `IsNull()`, `Matches(pattern)`, `StartsWith`, `EndsWith`, `Contains` | tests |
 | `Add`, `Sub`, `Mul`, `Div`, `Neg()`, `Abs()` | arithmetic |
+| `Round(2)`, `RoundWith(2, RoundHalfUp)` (`RoundHalfEven`, `RoundHalfUp`, `RoundHalfDown`, `RoundUp`, `RoundDown`, `RoundCeiling`, `RoundFloor`) | `round`: an int or a `Decimal` to that many places, as a `Decimal` |
+
+Arithmetic on `cr.Decimal` values and ints gives a `cr.Decimal`, exact when it
+fits in 38 digits (`spec/ast.md`, *Decimal arithmetic*): `Field("price").Mul(cr.MustDecimal("0.85"))`
+on a price of `cr.MustDecimal("19.99")` is `16.9915`, and `.Round(2)` gives
+`16.99`. A Go `float64`, such as the constant `0.85`, makes the result a
+`float64`, and `Round` on a float is unknown with a type mismatch.
 
 The core checks each node as it is built (`spec/ast.md`, *Construction
 rules*). A node that breaks a rule, such as `Field("x").Add("a")` or a NaN

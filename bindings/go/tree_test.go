@@ -87,6 +87,28 @@ func TestEvaluateTree(t *testing.T) {
 
 // TestEvaluateValueTree checks a value's result tree, Go data read along the
 // node's paths only, and opaque values given back as themselves.
+// TestRound checks Round: exact decimals, rounded once, and floats never rounded.
+func TestRound(t *testing.T) {
+	cents := must(Field("price").Mul(MustDecimal("0.85")).Round(2).EvaluateValueTree(map[string]any{"price": MustDecimal("19.99")}))(t)
+	if cents.Value != MustDecimal("16.99") {
+		t.Errorf("cents: %#v", cents.Value)
+	}
+	floor := must(Field("price").RoundWith(0, RoundFloor).EvaluateValueTree(map[string]any{"price": MustDecimal("-1.5")}))(t)
+	if floor.Value != MustDecimal("-2") {
+		t.Errorf("floor: %#v", floor.Value)
+	}
+	float := must(Field("price").Round(2).EvaluateValueTree(map[string]any{"price": 1.005}))(t)
+	if float.Value != nil || float.Reason == nil || float.Reason.Code != "type_mismatch" {
+		t.Errorf("float: %#v", float)
+	}
+	for _, bad := range []*Expr{Field("price").Round(39), Field("price").Round(-1), Field("price").RoundWith(2, "half_odd")} {
+		var e *Error
+		if !errors.As(bad.Err(), &e) || e.Code != CodeExpression {
+			t.Errorf("bad round: %v", bad.Err())
+		}
+	}
+}
+
 func TestEvaluateValueTree(t *testing.T) {
 	type order struct {
 		Total int `json:"total"`

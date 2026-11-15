@@ -20,12 +20,12 @@ use crate::format::{Document, ValueContext, read_value, write_value};
 use crate::json::{Json, JsonNumber, Limits};
 use crate::logic::LogicName;
 use crate::rules::{Aggregate, Config, HitPolicy, Rule, RuleSet};
-use crate::value::{NullCause, Value};
+use crate::value::{NullCause, RoundingMode, Value};
 use crate::walk::post_order;
 
 // --- Tokens -----------------------------------------------------------------------------
 
-const KEYWORDS: [&str; 32] = [
+const KEYWORDS: [&str; 33] = [
     "IF",
     "THEN",
     "DO",
@@ -54,6 +54,7 @@ const KEYWORDS: [&str; 32] = [
     "WITH",
     "CONTAINS",
     "ABS",
+    "ROUND",
     "DATE",
     "DATETIME",
     "DECIMAL",
@@ -313,6 +314,8 @@ enum Shape {
     Arith(ArithOp, Box<Syn>, Box<Syn>),
     Abs(Box<Syn>),
     Neg(Box<Syn>),
+    /// The operand, the scale as written and the mode.
+    Round(Box<Syn>, i128, RoundingMode),
     /// A node already built: the column a decision table's cell tests.
     Built(Node),
 }
@@ -361,7 +364,8 @@ impl Syn {
             | Shape::Matches(a, _)
             | Shape::StringTest(_, a, _)
             | Shape::Abs(a)
-            | Shape::Neg(a) => vec![a],
+            | Shape::Neg(a)
+            | Shape::Round(a, ..) => vec![a],
             Shape::Between(a, b, c, _) => vec![a, b, c],
         }
     }
@@ -394,6 +398,7 @@ impl Syn {
             Shape::Arith(op, a, b) => (Own::Arith(op), vec![*a, *b]),
             Shape::Abs(a) => (Own::Abs, vec![*a]),
             Shape::Neg(a) => (Own::Neg, vec![*a]),
+            Shape::Round(a, scale, mode) => (Own::Round(scale, mode), vec![*a]),
             Shape::Built(node) => (Own::Built(node), vec![]),
         };
         (Head { own, line, column }, children.into_iter())
@@ -423,6 +428,7 @@ enum Own {
     Arith(ArithOp),
     Abs,
     Neg,
+    Round(i128, RoundingMode),
     Built(Node),
 }
 
@@ -461,6 +467,11 @@ impl Head {
             }
             Own::Abs => Node::abs(next()?).map_err(at),
             Own::Neg => Node::neg(next()?).map_err(at),
+            Own::Round(scale, mode) => {
+                let operand = next()?;
+                let scale = crate::ast::check_round_scale(scale).map_err(at)?;
+                Node::round(operand, scale, mode).map_err(at)
+            }
             Own::Built(node) => Ok(node),
         }
     }
@@ -479,6 +490,8 @@ enum Waiting {
     Paren(Token),
     /// `ABS(`, at its token.
     Abs(Token),
+    /// `ROUND(`, at its token.
+    Round(Token),
     /// `left op`, for the right operand.
     Arith(ArithOp, Syn),
     /// `left op`, for the right side.
@@ -685,7 +698,7 @@ impl<'a> Parser<'a> {
             return Err(Error::new(
                 ErrorCode::LimitExceeded,
                 format!(
-                    "parentheses, NOT, - and ABS are nested more than {} deep",
+                    "parentheses, NOT, -, ABS and ROUND are nested more than {} deep",
                     self.max_recursion
                 ),
             )
@@ -842,6 +855,28 @@ impl<'a> Parser<'a> {
                 self.expect_symbol(")")?;
                 made(Shape::Abs(Box::new(read)), &token)
             }
+            Waiting::Round(token) => {
+                self.expect_symbol(",")?;
+                // An int, maybe negative: the construction rule rejects it as it
+                // does in JSON (`spec/ast.md`, *Rounding*).
+                let negative = self.accept_symbol("-");
+                let scale =
+                    self.take("the number of digits after the point", |kind| match kind {
+                        Kind::Number(digits) if digits.bytes().all(|b| b.is_ascii_digit()) => {
+                            // Too many digits for an i128 is out of range anyway.
+                            Some(digits.parse::<i128>().unwrap_or(i128::MAX))
+                        }
+                        _ => None,
+                    })?;
+                let scale = if negative { -scale } else { scale };
+                let rounding = if self.accept_symbol(",") {
+                    self.rounding_mode()?
+                } else {
+                    RoundingMode::HalfEven
+                };
+                self.expect_symbol(")")?;
+                made(Shape::Round(Box::new(read), scale, rounding), &token)
+            }
             Waiting::Arith(op, left) => {
                 let (line, column) = (left.line, left.column);
                 Syn::new(
@@ -979,6 +1014,10 @@ impl<'a> Parser<'a> {
             self.expect_symbol("(")?;
             return Ok(Prefixed::Operand(Waiting::Abs(token), SUM));
         }
+        if self.accept_keyword("ROUND") {
+            self.expect_symbol("(")?;
+            return Ok(Prefixed::Operand(Waiting::Round(token), SUM));
+        }
         self.primary().map(Prefixed::Read)
     }
 
@@ -1070,6 +1109,22 @@ impl<'a> Parser<'a> {
             negated,
             Syn::new(shape, line, column),
         )))
+    }
+
+    fn rounding_mode(&mut self) -> Result<RoundingMode> {
+        let found = match &self.peek().kind {
+            Kind::Name(word) | Kind::Keyword(_, word) => {
+                RoundingMode::from_name(&word.to_ascii_lowercase())
+            }
+            _ => None,
+        };
+        let Some(mode) = found else {
+            return Err(
+                self.unexpected("HALF_EVEN, HALF_UP, HALF_DOWN, UP, DOWN, CEILING or FLOOR")
+            );
+        };
+        self.next();
+        Ok(mode)
     }
 
     fn closed(&mut self) -> Result<Closed> {
@@ -1992,6 +2047,22 @@ fn pieces(node: &Node, single: bool) -> Vec<Piece<'_>> {
             vec![Child(left, own), Text(symbol), Child(right, own + 1)]
         }
         Expr::Abs(operand) => vec![Text("ABS("), Child(operand, 5), Text(")")],
+        Expr::Round {
+            operand,
+            scale,
+            mode,
+        } => {
+            let mode = match mode {
+                RoundingMode::HalfEven => String::new(),
+                other => format!(", {}", other.as_str().to_ascii_uppercase()),
+            };
+            vec![
+                Text("ROUND("),
+                Child(operand, 5),
+                Owned(format!(", {scale}{mode}")),
+                Text(")"),
+            ]
+        }
         // `-5` would read back as the constant -5.
         Expr::Neg(operand) if is_number_constant(operand) => {
             vec![Text("-("), Piece::Node(operand), Text(")")]

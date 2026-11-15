@@ -70,7 +70,11 @@ class Aggregate(enum.StrEnum):
     """How `COLLECT` combines the outputs of the rules that fired."""
 
     SUM = "sum"
-    """The sum of the non-null values (decimals are added as floats)."""
+    """The exact sum of the non-null values, rounded once whatever the rule order.
+
+    An int for ints, a decimal for ints and decimals, and the nearest float when a
+    float is among them.
+    """
     MIN = "min"
     """The smallest non-null value."""
     MAX = "max"

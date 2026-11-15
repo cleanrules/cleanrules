@@ -55,6 +55,21 @@ const (
 	ClosedNone  Closed = "none"
 )
 
+// RoundingMode says how Round drops digits, as Java's RoundingMode
+// (spec/ast.md, Rounding).
+type RoundingMode string
+
+// The rounding modes.
+const (
+	RoundHalfEven RoundingMode = "half_even" // to the nearest; a tie to the even neighbour
+	RoundHalfUp   RoundingMode = "half_up"   // to the nearest; a tie away from zero
+	RoundHalfDown RoundingMode = "half_down" // to the nearest; a tie toward zero
+	RoundUp       RoundingMode = "up"        // away from zero
+	RoundDown     RoundingMode = "down"      // toward zero
+	RoundCeiling  RoundingMode = "ceiling"   // toward positive infinity
+	RoundFloor    RoundingMode = "floor"     // toward negative infinity
+)
+
 func wrapNode(ptr *C.cr_node) *Expr {
 	e := &Expr{}
 	e.h = newHandle(e, unsafe.Pointer(ptr), func(p unsafe.Pointer) { C.cr_node_free((*C.cr_node)(p)) })
@@ -310,6 +325,30 @@ func (e *Expr) Neg() *Expr {
 func (e *Expr) Abs() *Expr {
 	return unary(e, func(n *C.cr_node, out **C.cr_node, err **C.cr_error) C.cr_status {
 		return C.cr_node_new_abs(n, out, err)
+	})
+}
+
+// Round is e, an int or a decimal, rounded half to even to scale digits after
+// the point (0 to 38), as a decimal: Field("price").Mul(cr.MustDecimal("0.85")).Round(2).
+// A float operand is unknown with a type mismatch: floats are never rounded
+// implicitly.
+func (e *Expr) Round(scale int) *Expr { return e.RoundWith(scale, RoundHalfEven) }
+
+// RoundWith is Round with the digits dropped as mode says.
+func (e *Expr) RoundWith(scale int, mode RoundingMode) *Expr {
+	switch mode {
+	case RoundHalfEven, RoundHalfUp, RoundHalfDown, RoundUp, RoundDown, RoundCeiling, RoundFloor:
+	default:
+		if err := e.Err(); err != nil {
+			return failed(err)
+		}
+		return failed(newError(CodeExpression,
+			fmt.Sprintf("mode must be 'half_even', 'half_up', 'half_down', 'up', 'down', 'ceiling' or 'floor', got %q", string(mode)),
+			"use RoundHalfEven, RoundHalfUp, RoundHalfDown, RoundUp, RoundDown, RoundCeiling or RoundFloor"))
+	}
+	return unary(e, func(n *C.cr_node, out **C.cr_node, err **C.cr_error) C.cr_status {
+		p, l := text(string(mode))
+		return C.cr_node_new_round(n, C.int64_t(scale), p, l, out, err)
 	})
 }
 

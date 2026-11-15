@@ -49,6 +49,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cannot give now that maps are sorted. Added to version 1 of the ABI. The
   core's new `json::by_key` gives an object's members in the order readers
   visit them (task R.1).
+- Node `round` (task R.4, `spec/ast.md`, *Rounding*): an int or a decimal
+  rounded to `scale` digits after the point (0 to 38), as a decimal, with a
+  `mode` named as Java's `RoundingMode` (`half_even`, the default, `half_up`,
+  `half_down`, `up`, `down`, `ceiling`, `floor`). A float operand is a type
+  mismatch (strict mode raises), so floats are never rounded implicitly; a
+  result beyond 38 digits is `decimal_overflow`; null propagates. JSON
+  `{"op": "round", "operand": ..., "scale": 2, "mode": "half_up"}` (`mode`
+  optional, always written), the keyword `ROUND(a, 2[, HALF_UP])` in the text
+  format (`round` is now reserved: a field named so is written
+  `` `round` ``), a leaf in diagrams, and in every binding: `Expr.round(scale,
+  mode="half_even")` and `round(node, 2)` in Python, with the type
+  `RoundingMode`; `round(scale, { mode })` in JavaScript, with the type
+  `RoundingMode`; `round(scale[, java.math.RoundingMode])` in Java and Scala;
+  `Round(scale)` and `RoundWith(scale, RoundingMode)` with `RoundHalfEven` …
+  `RoundFloor` in Go; `cr::node::round(n, scale[, mode])` in C++; and
+  `cr_node_new_round` in the C ABI, whose `cr_node_detail` gives `[scale,
+  mode]`.
+- Core (task R.4): `Decimal::{try_add, try_sub, try_mul, try_div, round,
+  abs}` and `std::ops::Neg`, documented as rounding when the result does not
+  fit; `value::RoundingMode`; `value::ArithmeticError` (`DivisionByZero`,
+  `Overflow`, `InvalidOperation`, named after Python's `decimal` signals;
+  `#[non_exhaustive]`), with `code()` giving the reason code of the null it
+  becomes, and `From<ArithmeticError> for eval::ReasonCode`;
+  `ast::check_round_scale`, which every reader and binding uses so that an
+  out-of-range scale gives the same error everywhere (without echoing a
+  number too large for its integers); `Node::round` and `Expr::Round`. No new
+  dependency: the core keeps its own decimal type.
+- Conformance (task R.4): `ast/decimals.json` (63 vectors: every operator with
+  decimals, ints and floats, ideal scales, repeating quotients, ties to even,
+  underflow, overflow, zero and infinities, strict mode, an exact comparison),
+  `ast/rounding.json` (53: every mode on ties and near ties of both signs,
+  padding, ints, carries, overflow, infinities, floats, null and a chained
+  discount), 19 aggregate vectors (exact and order-independent sums, floats
+  that cancel, float overflow, infinities, `min` and `max` of decimals), 13
+  `read` vectors for `round` in JSON and text, a diagram, and an input schema.
+  `conformance/tools/decimal_vectors.py` generates the first two from an oracle
+  in Python's exact rationals and, with `--check` (run in CI), recomputes every
+  arithmetic node and aggregate of every vector.
+- Examples and docs: `docs/examples/decimals.rs` (a chained discount rounded
+  to cents, an exact sum), the pitfalls "A float makes arithmetic a float" and
+  "Round once, at the end" in `docs/pitfalls.md`, and notes on decimals given
+  back in the Python, JavaScript, Java and Go READMEs.
 - Tools for AI agents (`spec/agents.md`, task O.1): the contract that the MCP
   server (O.2) and the agent guardrails (O.3) implement. Five tools,
   `list_rulesets`, `summary`, `evaluate`, `explain` and `validate`, with
@@ -1322,6 +1364,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ResultTree.JSON()` write the canonical form through `cr_tree_to_json`. The Go runner no longer gives maps with unsorted keys as structs, the
   JavaScript runner no longer reorders expected maps as plain objects do, and
   the Scala runner passes plain `Map`s for every map.
+- Decimal arithmetic (task R.4, `spec/ast.md`, *Arithmetic* and *Decimal
+  arithmetic*), **incompatible with the draft** of format version 1, which
+  stays `"version": 1` because it was not published: `add`, `sub`, `mul`,
+  `div`, `abs` and `neg` on decimals, or on a decimal and an int, now give a
+  decimal instead of converting to float64; a float among the operands still
+  gives a float, and two ints keep their kinds (`div` of two ints is still a
+  float). Decimal results are exact whenever they fit in 38 digits, with the
+  ideal scale (`max(a, b)` for `add` and `sub`, `a + b` for `mul`,
+  `max(a − b, 0)` for `div`), and are otherwise rounded half to even to 38
+  significant digits, never more than 38 after the point, within the
+  operation itself, so a division keeps 38 significant digits
+  (`1 / 3.0` is `0.33333333333333333333333333333333333333`). A result that does
+  not fit at any scale is null with reason `decimal_overflow`, a division by
+  any zero is `division_by_zero`, and infinities follow IEEE 754 (`inf - inf`
+  is `nan_result`). Comparisons are unchanged. The reason `decimal_overflow`
+  now also covers arithmetic results, and its text in explanations reads
+  `decimal overflow in <paths>` (was `decimal out of range in <path>`).
+- `collect` aggregates (task R.4, `spec/rules.md`, *`COLLECT` aggregates*),
+  incompatible with the draft: `sum` adds every value exactly, floats included
+  (as exact binary fractions), and rounds once, so it no longer depends on rule
+  order (`1 + 1 + 1e16` and `1e16 + 1 + 1` are both `1e16 + 2`; before, the
+  second was `1e16`): an int for ints, a decimal with the largest scale for
+  ints and decimals (`0.1 + 0.2` is `0.3`), and the nearest float when there
+  is a float (the float `0.1` plus the decimal `0.2` is the float `0.3`). `min`
+  and `max` return a decimal unchanged, compared exactly (before, decimals were
+  converted to float first).
+- Input schemas for agents (`spec/agents.md`, *Types of a field*): an operand
+  of arithmetic, and a field compared with arithmetic, take `number` and
+  `decimal` (was `number` only); the operand of `round`, and a field compared
+  with `round`, take `decimal`.
+- `ROUND` is a keyword of the text syntax (task R.4, `spec/text.md`),
+  **incompatible with the draft**: wherever rules are read as text, a field,
+  key or column named `round` (in any case) must be written between backticks
+  as its first segment (`` `round` > 1 ``; `order.round` still reads). This
+  covers rule files, `rule_from_text` and its equivalents, and the headers and
+  cells of decision tables in CSV, JSON and YAML, which are text (a column
+  named `round` is written `` `round` ``); conditions in JSON and YAML
+  documents are trees and do not change. In the
+  bindings, `.round` is now the method, so a field named `round` after a dot
+  is reached as `F.x["round"]` in Python, `F.x.at('round')` in JavaScript and
+  `F.x("round")` in Scala (Java and Go name fields by strings).
+- Core: `Decimal::checked_sub` is renamed `Decimal::exact_sub` (it never
+  rounds, unlike `try_sub`); `DecimalError` is `#[non_exhaustive]`.
+- **Migration note for JavaScript**: an output or aggregate computed from a
+  `decimal(...)` operand is now a `Decimal`, no longer a `number`; read it with
+  `String(d)` or `d.toJSON()`. Python gets a `Decimal`, Java and Scala a
+  `BigDecimal`, Go a `cr.Decimal` and Erlang a `cleanrules_decimal` tuple where
+  they got floats.
+- Conformance: `ast/nodes/decimal-to-float` and
+  `rules/aggregates/decimal-to-float` are removed; the arithmetic results of
+  132 generated vectors and of `agents/tools/evaluate-rule-order`, the
+  aggregate of `rules/aggregates/float-decimal-sum` and the input schema of
+  `agents/input-schemas/types` follow the new rules.
 - `registry_error` is also raised for a rule set or a tool that a tool call
   for agents names (`spec/errors.md`, `spec/agents.md`), with the pointer
   `/ruleset` for a rule set.

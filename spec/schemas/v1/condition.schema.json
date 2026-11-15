@@ -70,11 +70,14 @@
         },
         {
           "$ref": "#/$defs/unary"
+        },
+        {
+          "$ref": "#/$defs/round"
         }
       ]
     },
     "numericOperand": {
-      "description": "An operand of arithmetic: like operand, but constants must be numbers.",
+      "description": "An operand of arithmetic and round: like operand, but constants must be numbers.",
       "anyOf": [
         {
           "$ref": "#/$defs/field"
@@ -87,6 +90,9 @@
         },
         {
           "$ref": "#/$defs/unary"
+        },
+        {
+          "$ref": "#/$defs/round"
         }
       ]
     },
@@ -160,6 +166,30 @@
         },
         "value": {
           "$ref": "value.schema.json#/$defs/number"
+        }
+      },
+      "required": [
+        "op",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "constRoundable": {
+      "description": "A constant that round takes: an int or a decimal, never a float.",
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "const"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "value.schema.json#/$defs/int"
+            },
+            {
+              "$ref": "value.schema.json#/$defs/decimal"
+            }
+          ]
         }
       },
       "required": [
@@ -458,6 +488,56 @@
       ],
       "additionalProperties": false
     },
+    "round": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "round"
+        },
+        "operand": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/field"
+            },
+            {
+              "$ref": "#/$defs/constRoundable"
+            },
+            {
+              "$ref": "#/$defs/arith"
+            },
+            {
+              "$ref": "#/$defs/unary"
+            },
+            {
+              "$ref": "#/$defs/round"
+            }
+          ]
+        },
+        "scale": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 38
+        },
+        "mode": {
+          "enum": [
+            "half_even",
+            "half_up",
+            "half_down",
+            "up",
+            "down",
+            "ceiling",
+            "floor"
+          ],
+          "default": "half_even"
+        }
+      },
+      "required": [
+        "op",
+        "operand",
+        "scale"
+      ],
+      "additionalProperties": false
+    },
     "tag": {
       "description": "Every node tag (op). Shared by the decision schema.",
       "enum": [
@@ -484,7 +564,8 @@
         "mul",
         "div",
         "abs",
-        "neg"
+        "neg",
+        "round"
       ]
     }
   }

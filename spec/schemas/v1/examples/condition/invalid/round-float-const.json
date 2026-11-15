@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "gt",
+    "left": {
+      "op": "round",
+      "operand": {
+        "op": "const",
+        "value": 2.5
+      },
+      "scale": 0
+    },
+    "right": {
+      "op": "const",
+      "value": 1
+    }
+  }
+}

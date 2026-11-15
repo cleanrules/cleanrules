@@ -299,7 +299,7 @@ pub unsafe extern "C" fn cr_value_new_decimal(
         let value = match Decimal::parse(text) {
             Ok(decimal) => Value::Decimal(decimal),
             Err(DecimalError::DoesNotFit) => Value::Null(NullCause::DecimalOverflow),
-            Err(DecimalError::Malformed) => {
+            Err(_) => {
                 return Err(Failure::Core(
                     Error::new(ErrorCode::FormatError, format!("{text:?} is not a decimal"))
                         .with_hint("write digits with an optional point and exponent: 0.15, 1e3"),

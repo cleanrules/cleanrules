@@ -1,0 +1,3878 @@
+{
+  "version": 1,
+  "area": "ast",
+  "vectors": [
+    {
+      "id": "ast/decimals/add-decimals",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "two decimals add exactly, with the larger scale",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "1.10"
+          },
+          "b": {
+            "$decimal": "2.205"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": {
+            "$decimal": "3.305"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "1.10"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "2.205"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/add-point-one-point-two",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "0.1 + 0.2 is exactly 0.3 with decimals",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "0.1"
+          },
+          "b": {
+            "$decimal": "0.2"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": {
+            "$decimal": "0.3"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "0.1"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0.2"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/add-scale-kept",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a sum keeps the ideal scale, trailing zeros included",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "1.5"
+          },
+          "b": {
+            "$decimal": "1.5"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": {
+            "$decimal": "3.0"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "1.5"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "1.5"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/add-decimal-int",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a decimal plus an int is a decimal",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "0.5"
+          },
+          "b": 1
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": {
+            "$decimal": "1.5"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "0.5"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/add-int-decimal",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "an int plus a decimal is a decimal",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": -3,
+          "b": {
+            "$decimal": "0.25"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": {
+            "$decimal": "-2.75"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": -3
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0.25"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/add-decimal-float",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a decimal plus a float is a float",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "0.1"
+          },
+          "b": 0.2
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": 0.30000000000000004,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "0.1"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 0.2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/add-float-decimal",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a float plus a decimal is a float",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": 0.5,
+          "b": {
+            "$decimal": "0.25"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": 0.75,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 0.5
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0.25"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/add-int-min",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "the smallest int promotes exactly",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$int": "-9223372036854775808"
+          },
+          "b": {
+            "$decimal": "0.5"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": {
+            "$decimal": "-9223372036854775807.5"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$int": "-9223372036854775808"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0.5"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/add-rounds-fraction",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a sum without room for its fraction is rounded half to even",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "10000000000000000000000000000000000000"
+          },
+          "b": {
+            "$decimal": "0.5"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": {
+            "$decimal": "10000000000000000000000000000000000000"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "10000000000000000000000000000000000000"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0.5"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/add-rounds-up",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a tie rounds to the even neighbour, here up",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "10000000000000000000000000000000000001"
+          },
+          "b": {
+            "$decimal": "0.5"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": {
+            "$decimal": "10000000000000000000000000000000000002"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "10000000000000000000000000000000000001"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0.5"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/add-overflow",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a sum beyond 38 digits is null with decimal_overflow",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "99999999999999999999999999999999999999"
+          },
+          "b": 1
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": null,
+          "reason": {
+            "code": "decimal_overflow",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "99999999999999999999999999999999999999"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/add-inf",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "an infinity plus a finite decimal is that infinity",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "inf"
+          },
+          "b": {
+            "$decimal": "1.5"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": {
+            "$decimal": "inf"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "inf"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "1.5"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/add-inf-int",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "an infinity plus an int is a decimal infinity",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": 7,
+          "b": {
+            "$decimal": "-inf"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": {
+            "$decimal": "-inf"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 7
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "-inf"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/add-infs",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "inf + inf is inf",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "add",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "inf"
+          },
+          "b": {
+            "$decimal": "inf"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "add",
+          "value": {
+            "$decimal": "inf"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "inf"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "inf"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/sub-decimals",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "two decimals subtract exactly",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "sub",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "10.05"
+          },
+          "b": {
+            "$decimal": "9.9"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "sub",
+          "value": {
+            "$decimal": "0.15"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "10.05"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "9.9"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/sub-to-zero",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a zero difference keeps the scale and has no sign",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "sub",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "1.50"
+          },
+          "b": {
+            "$decimal": "1.5"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "sub",
+          "value": {
+            "$decimal": "0.00"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "1.50"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "1.5"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/sub-int-decimal",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "an int minus a decimal is a decimal",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "sub",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": 1,
+          "b": {
+            "$decimal": "0.001"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "sub",
+          "value": {
+            "$decimal": "0.999"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 1
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0.001"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/sub-decimal-float",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a decimal minus a float is a float",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "sub",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "1"
+          },
+          "b": 0.1
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "sub",
+          "value": 0.9,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "1"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 0.1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/sub-overflow",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a difference beyond 38 digits is null",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "sub",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "-99999999999999999999999999999999999999"
+          },
+          "b": {
+            "$decimal": "1"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "sub",
+          "value": null,
+          "reason": {
+            "code": "decimal_overflow",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-99999999999999999999999999999999999999"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "1"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/sub-inf-inf",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "inf - inf is null with nan_result",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "sub",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "inf"
+          },
+          "b": {
+            "$decimal": "inf"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "sub",
+          "value": null,
+          "reason": {
+            "code": "nan_result",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "inf"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "inf"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/sub-inf-minus-inf",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "inf - (-inf) is inf",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "sub",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "inf"
+          },
+          "b": {
+            "$decimal": "-inf"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "sub",
+          "value": {
+            "$decimal": "inf"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "inf"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "-inf"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/mul-decimals",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a product has the sum of the scales",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "19.99"
+          },
+          "b": {
+            "$decimal": "0.15"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": {
+            "$decimal": "2.9985"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "19.99"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0.15"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/mul-int-decimal",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "an int times a decimal is a decimal",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": 2,
+          "b": {
+            "$decimal": "0.10"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": {
+            "$decimal": "0.20"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 2
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0.10"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/mul-decimal-int",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a decimal times an int is a decimal",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "1.25"
+          },
+          "b": 4
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": {
+            "$decimal": "5.00"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "1.25"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 4
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/mul-decimal-float",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a decimal times a float is a float",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "0.1"
+          },
+          "b": 3.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": 0.30000000000000004,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "0.1"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 3.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/mul-negative-zero",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a negative decimal times zero is an unsigned zero",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "-1.5"
+          },
+          "b": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": {
+            "$decimal": "0.0"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-1.5"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/mul-tiny",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a product below 38 places rounds to a zero with scale 38",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "0.00000000000000000001"
+          },
+          "b": {
+            "$decimal": "0.00000000000000000001"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": {
+            "$decimal": "0.00000000000000000000000000000000000000"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "0.00000000000000000001"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0.00000000000000000001"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/mul-rounds",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a product with more than 38 significant digits is rounded half to even",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "1.23456789012345678901"
+          },
+          "b": {
+            "$decimal": "1.23456789012345678901"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": {
+            "$decimal": "1.5241578753238836750437433565526596568"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "1.23456789012345678901"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "1.23456789012345678901"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/mul-ideal-scale-too-large",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "an exact product whose ideal scale does not fit keeps the largest scale that fits",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "1.0000000000000000000000000000000000000"
+          },
+          "b": {
+            "$decimal": "1.00"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": {
+            "$decimal": "1.0000000000000000000000000000000000000"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "1.0000000000000000000000000000000000000"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "1.00"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/mul-int-max-squared",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "the largest int squared as a decimal is exact at scale 0",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$int": "9223372036854775807"
+          },
+          "b": {
+            "$decimal": "9223372036854775807.0"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": {
+            "$decimal": "85070591730234615847396907784232501249"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$int": "9223372036854775807"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "9223372036854775807.0"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/mul-overflow",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a product beyond 38 digits is null",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "100000000000000000000"
+          },
+          "b": {
+            "$decimal": "100000000000000000000"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": null,
+          "reason": {
+            "code": "decimal_overflow",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "100000000000000000000"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "100000000000000000000"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/mul-inf-negative",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "an infinity times a negative decimal changes sign",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "inf"
+          },
+          "b": {
+            "$decimal": "-2"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": {
+            "$decimal": "-inf"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "inf"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "-2"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/mul-inf-zero",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "an infinity times zero is null with nan_result",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "inf"
+          },
+          "b": {
+            "$decimal": "0.00"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": null,
+          "reason": {
+            "code": "nan_result",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "inf"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0.00"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-exact",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "an exact quotient has the ideal scale",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "7.5"
+          },
+          "b": {
+            "$decimal": "2.5"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "3"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "7.5"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "2.5"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-int-decimal",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "an int divided by a decimal is a decimal",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": 1,
+          "b": {
+            "$decimal": "0.25"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "4"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 1
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0.25"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-decimal-int",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a terminating quotient keeps the digits it needs",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "1.00"
+          },
+          "b": 4
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "0.25"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "1.00"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 4
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-ideal-scale",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "trailing zeros up to the ideal scale are kept",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "1.000"
+          },
+          "b": 4
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "0.250"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "1.000"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 4
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-terminating-longer",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a terminating quotient beyond the ideal scale is exact",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": 1,
+          "b": {
+            "$decimal": "8.0"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "0.125"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 1
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "8.0"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-one-third",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a repeating quotient keeps 38 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": 1,
+          "b": {
+            "$decimal": "3.0"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "0.33333333333333333333333333333333333333"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 1
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "3.0"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-two-thirds",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a repeating quotient is rounded half to even at the last place",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": 2,
+          "b": {
+            "$decimal": "3.0"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "0.66666666666666666666666666666666666667"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 2
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "3.0"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-ten-thirds",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a repeating quotient keeps 38 significant digits",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "10"
+          },
+          "b": 3
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "3.3333333333333333333333333333333333333"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "10"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-hundred-sevenths",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a repeating quotient with an integer part keeps 38 significant digits",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": 100,
+          "b": {
+            "$decimal": "7.0"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "14.285714285714285714285714285714285714"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 100
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "7.0"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-small-quotient",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a quotient below 1 keeps 38 places, not 38 significant digits",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "0.1"
+          },
+          "b": 3
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "0.03333333333333333333333333333333333333"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "0.1"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-negative",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a negative repeating quotient rounds its magnitude",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2"
+          },
+          "b": {
+            "$decimal": "3"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "-0.66666666666666666666666666666666666667"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "3"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-tie-to-even-up",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a quotient exactly halfway rounds to the even neighbour, up",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "99999999999999999999999999999999999999"
+          },
+          "b": 2
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "50000000000000000000000000000000000000"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "99999999999999999999999999999999999999"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-tie-to-even-down",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a quotient exactly halfway rounds to the even neighbour, down",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "99999999999999999999999999999999999997"
+          },
+          "b": 2
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "49999999999999999999999999999999999998"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "99999999999999999999999999999999999997"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-underflow",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a quotient below 38 places is a zero with scale 38",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "0.00000000000000000001"
+          },
+          "b": {
+            "$decimal": "1000000000000000000000000000000"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "0.00000000000000000000000000000000000000"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "0.00000000000000000001"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "1000000000000000000000000000000"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-overflow",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a quotient beyond 38 digits is null",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "10000000000000000000000000000000000000"
+          },
+          "b": {
+            "$decimal": "0.01"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": null,
+          "reason": {
+            "code": "decimal_overflow",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "10000000000000000000000000000000000000"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0.01"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-by-int-zero",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a decimal divided by the int 0 is null",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "1.5"
+          },
+          "b": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": null,
+          "reason": {
+            "code": "division_by_zero",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "1.5"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-by-decimal-zero",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a division by a decimal zero is null",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": 1,
+          "b": {
+            "$decimal": "0.00"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": null,
+          "reason": {
+            "code": "division_by_zero",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 1
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0.00"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-inf-by-zero",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "an infinity divided by zero is a division by zero",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "inf"
+          },
+          "b": {
+            "$decimal": "0"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": null,
+          "reason": {
+            "code": "division_by_zero",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "inf"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "0"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-decimal-float",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a decimal divided by a float is a float",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "1"
+          },
+          "b": 4.0
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": 0.25,
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "1"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 4.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-by-inf",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a finite decimal divided by an infinity is zero with the ideal scale",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "1.50"
+          },
+          "b": {
+            "$decimal": "inf"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "0.00"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "1.50"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "inf"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-inf-by-negative",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "an infinity divided by a negative decimal changes sign",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "inf"
+          },
+          "b": -2
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": {
+            "$decimal": "-inf"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "inf"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": -2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/div-inf-by-inf",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "inf / inf is null with nan_result",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "div",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "-inf"
+          },
+          "b": {
+            "$decimal": "inf"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "div",
+          "value": null,
+          "reason": {
+            "code": "nan_result",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-inf"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": {
+                "$decimal": "inf"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/abs-decimal",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "abs of a decimal is a decimal with its scale",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "abs",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "-1.50"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "abs",
+          "value": {
+            "$decimal": "1.50"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-1.50"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/neg-decimal",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "neg of a decimal is a decimal with its scale",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "neg",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.25"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "neg",
+          "value": {
+            "$decimal": "-2.25"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.25"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/neg-zero",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "neg of a decimal zero is the same unsigned zero",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "neg",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "0.00"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "neg",
+          "value": {
+            "$decimal": "0.00"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "0.00"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/neg-inf",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "neg of an infinity is the other infinity",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "neg",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "-inf"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "neg",
+          "value": {
+            "$decimal": "inf"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-inf"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/abs-inf",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "abs of an infinity is inf",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "abs",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "-inf"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "abs",
+          "value": {
+            "$decimal": "inf"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-inf"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/strict-overflow",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "decimal overflow is a null with its reason, never an error, in strict mode",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "field",
+            "path": [
+              "b"
+            ]
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "99999999999999999999999999999999999999"
+          },
+          "b": 10
+        },
+        "strict": true
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": null,
+          "reason": {
+            "code": "decimal_overflow",
+            "paths": [
+              [
+                "a"
+              ],
+              [
+                "b"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "99999999999999999999999999999999999999"
+              }
+            },
+            {
+              "op": "field",
+              "path": [
+                "b"
+              ],
+              "value": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/const-operand",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#decimal-arithmetic",
+        "json-format.md#result-trees"
+      ],
+      "description": "a decimal constant in arithmetic keeps the result exact",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "mul",
+          "left": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "right": {
+            "op": "const",
+            "value": {
+              "$decimal": "0.85"
+            }
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "80.00"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "mul",
+          "value": {
+            "$decimal": "68.0000"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "80.00"
+              }
+            },
+            {
+              "op": "const",
+              "value": {
+                "$decimal": "0.85"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/decimals/compare-exact-sum",
+      "spec": [
+        "ast.md#arithmetic",
+        "ast.md#types",
+        "ast.md#evaluating-one-node"
+      ],
+      "description": "a decimal sum compares exactly: 0.1 + 0.2 equals 0.3",
+      "given": {
+        "kind": "condition",
+        "condition": {
+          "op": "eq",
+          "left": {
+            "op": "add",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "field",
+              "path": [
+                "b"
+              ]
+            }
+          },
+          "right": {
+            "op": "const",
+            "value": {
+              "$decimal": "0.3"
+            }
+          }
+        },
+        "input": {
+          "a": {
+            "$decimal": "0.1"
+          },
+          "b": {
+            "$decimal": "0.2"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "eq",
+          "truth": true,
+          "children": [
+            {
+              "op": "add",
+              "value": {
+                "$decimal": "0.3"
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "a"
+                  ],
+                  "value": {
+                    "$decimal": "0.1"
+                  }
+                },
+                {
+                  "op": "field",
+                  "path": [
+                    "b"
+                  ],
+                  "value": {
+                    "$decimal": "0.2"
+                  }
+                }
+              ]
+            },
+            {
+              "op": "const",
+              "value": {
+                "$decimal": "0.3"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

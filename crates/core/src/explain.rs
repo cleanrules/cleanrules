@@ -845,13 +845,13 @@ fn gap(a: &Value, b: &Value) -> Option<Gap> {
     match (a, b) {
         (Value::Int(x), Value::Int(y)) => x.checked_sub(*y).map(|d| Gap::Number(Value::Int(d))),
         (Value::Decimal(x), Value::Decimal(y)) => {
-            x.checked_sub(*y).map(|d| Gap::Number(Value::Decimal(d)))
+            x.exact_sub(*y).map(|d| Gap::Number(Value::Decimal(d)))
         }
         (Value::Decimal(x), Value::Int(y)) => x
-            .checked_sub((*y).into())
+            .exact_sub((*y).into())
             .map(|d| Gap::Number(Value::Decimal(d))),
         (Value::Int(x), Value::Decimal(y)) => crate::value::Decimal::from(*x)
-            .checked_sub(*y)
+            .exact_sub(*y)
             .map(|d| Gap::Number(Value::Decimal(d))),
         (Value::Float(_) | Value::Int(_), Value::Float(_) | Value::Int(_)) => {
             let (x, y) = (

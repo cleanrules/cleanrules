@@ -8,6 +8,7 @@ use std::ffi::{CStr, c_char};
 use std::hash::{Hash, Hasher};
 
 use cleanrules::ast::{ArithOp, Closed, CompareOp, Expr, Kind, Node, StringOp};
+use cleanrules::value::RoundingMode;
 use cleanrules::{Error, ErrorCode, NullCause, Segment, Value};
 
 use crate::boundary::{Failure, Outcome, bytes, call, clear, give, handle, utf8_arg};
@@ -436,6 +437,51 @@ pub unsafe extern "C" fn cr_node_new_between(
     unsafe { build(out, error, make) }
 }
 
+/// `operand`, an int or a decimal, as a decimal with exactly `scale` digits
+/// after the point, from 0 to 38 (`spec/ast.md`, *Rounding*); `mode` names how
+/// digits are dropped: `half_even` (also for `NULL`), `half_up`, `half_down`,
+/// `up`, `down`, `ceiling` or `floor` (`CR_INVALID_ARGUMENT` otherwise). A
+/// scale below 0 or above 38, or a constant operand that is a float, is a
+/// `CR_EXPRESSION_ERROR`.
+///
+/// # Safety
+///
+/// `operand` is `NULL` or a live `cr_node`; `mode` is `NULL` or points to
+/// `mode_len` readable bytes; `out` is `NULL` or points to a writable
+/// `cr_node *`; `error` is `NULL` or points to a writable `cr_error *` set to
+/// `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_node_new_round(
+    operand: *const cr_node,
+    scale: i64,
+    mode: *const c_char,
+    mode_len: usize,
+    out: *mut *mut cr_node,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let make = || {
+        let mode = if mode.is_null() {
+            RoundingMode::HalfEven
+        } else {
+            // SAFETY: `mode` and `mode_len` (# Safety).
+            let name = unsafe { name(mode, mode_len, "mode") }?;
+            RoundingMode::from_name(name).ok_or_else(|| {
+                unknown(
+                    "mode",
+                    name,
+                    "use half_even, half_up, half_down, up, down, ceiling or floor",
+                )
+            })?
+        };
+        // SAFETY: `operand` is NULL or live (# Safety).
+        let operand = unsafe { self::operand(operand, "operand") }?;
+        let scale = cleanrules::ast::check_round_scale(i128::from(scale))?;
+        Ok(Node::round(operand, scale, mode)?)
+    };
+    // SAFETY: `out` and `error` (# Safety).
+    unsafe { build(out, error, make) }
+}
+
 /// A regular expression search, in the syntax of Rust's `regex` crate: no
 /// lookaround, no backreferences (a pattern that does not compile is a
 /// `CR_EXPRESSION_ERROR`).
@@ -532,7 +578,7 @@ pub unsafe extern "C" fn cr_node_new_arith(
 
 /// The static C string of a tag: one for every tag of the catalogue.
 fn tag_name(tag: &str) -> &'static CStr {
-    const TAGS: [&CStr; 24] = [
+    const TAGS: [&CStr; 25] = [
         c"field",
         c"const",
         c"eq",
@@ -557,6 +603,7 @@ fn tag_name(tag: &str) -> &'static CStr {
         c"div",
         c"abs",
         c"neg",
+        c"round",
     ];
     TAGS.iter()
         .find(|name| name.to_bytes() == tag.as_bytes())
@@ -753,8 +800,9 @@ pub unsafe extern "C" fn cr_node_hash(node: *const cr_node) -> u64 {
 /// The node's own data, as a new value freed with `cr_value_free`: a field's
 /// path (a list of strings and ints), a constant's value, the values of an
 /// `in` (a list, sorted), `between`'s `closed` (`both`, `left`, `right` or
-/// `none`), the pattern of `matches` and the text of a string test (strings);
-/// a null for every other node.
+/// `none`), the pattern of `matches` and the text of a string test (strings),
+/// `round`'s scale and mode (a list of an int and a string, such as
+/// `[2, "half_even"]`); a null for every other node.
 ///
 /// # Safety
 ///
@@ -780,6 +828,10 @@ pub unsafe extern "C" fn cr_node_detail(
             Expr::Between { closed, .. } => Value::String(closed.as_str().to_owned()),
             Expr::Matches { pattern, .. } => Value::String(pattern.source().to_owned()),
             Expr::StringTest { text, .. } => Value::String(text.clone()),
+            Expr::Round { scale, mode, .. } => Value::List(vec![
+                Value::Int(i64::from(*scale)),
+                Value::String(mode.as_str().to_owned()),
+            ]),
             _ => Value::Null(NullCause::Null),
         };
         // SAFETY: `out` is NULL or writable (# Safety).
@@ -858,6 +910,7 @@ mod tests {
             "div",
             "abs",
             "neg",
+            "round",
         ] {
             assert_eq!(tag_name(tag).to_str().ok(), Some(tag));
         }

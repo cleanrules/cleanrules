@@ -870,6 +870,12 @@ class Conformance {
             case "contains" -> operand.contains(text(node, "text"));
             case "abs" -> operand.abs();
             case "neg" -> operand.neg();
+            case "round" -> {
+                int scale = Integer.parseInt(((Num) need(node, "scale")).text());
+                yield node.get("mode") instanceof String mode
+                        ? operand.round(scale, java.math.RoundingMode.valueOf(mode.toUpperCase(Locale.ROOT)))
+                        : operand.round(scale);
+            }
             default -> throw new VectorError("unknown op " + op);
         };
     }

@@ -1,0 +1,2462 @@
+{
+  "version": 1,
+  "area": "ast",
+  "vectors": [
+    {
+      "id": "ast/rounding/half-even-2p345",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_even rounds a positive tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_even"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.345"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.345"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/half-even-minus-2p345",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_even rounds a negative tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_even"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2.345"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2.345"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/half-even-2p3451",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_even rounds just above a tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_even"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.3451"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.3451"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/half-even-minus-2p3449",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_even rounds just below a negative tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_even"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2.3449"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2.3449"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/half-even-2p355",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_even rounds a tie after an odd digit to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_even"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.355"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.36"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.355"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/half-up-2p345",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_up rounds a positive tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_up"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.345"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.345"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/half-up-minus-2p345",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_up rounds a negative tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_up"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2.345"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2.345"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/half-up-2p3451",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_up rounds just above a tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_up"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.3451"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.3451"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/half-up-minus-2p3449",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_up rounds just below a negative tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_up"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2.3449"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2.3449"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/half-up-2p355",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_up rounds a tie after an odd digit to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_up"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.355"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.36"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.355"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/half-down-2p345",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_down rounds a positive tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_down"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.345"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.345"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/half-down-minus-2p345",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_down rounds a negative tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_down"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2.345"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2.345"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/half-down-2p3451",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_down rounds just above a tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_down"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.3451"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.3451"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/half-down-minus-2p3449",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_down rounds just below a negative tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_down"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2.3449"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2.3449"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/half-down-2p355",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "half_down rounds a tie after an odd digit to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_down"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.355"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.355"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/up-2p345",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "up rounds a positive tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "up"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.345"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.345"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/up-minus-2p345",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "up rounds a negative tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "up"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2.345"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2.345"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/up-2p3451",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "up rounds just above a tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "up"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.3451"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.3451"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/up-minus-2p3449",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "up rounds just below a negative tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "up"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2.3449"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2.3449"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/up-2p355",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "up rounds a tie after an odd digit to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "up"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.355"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.36"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.355"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/down-2p345",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "down rounds a positive tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "down"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.345"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.345"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/down-minus-2p345",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "down rounds a negative tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "down"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2.345"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2.345"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/down-2p3451",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "down rounds just above a tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "down"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.3451"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.3451"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/down-minus-2p3449",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "down rounds just below a negative tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "down"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2.3449"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2.3449"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/down-2p355",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "down rounds a tie after an odd digit to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "down"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.355"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.355"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/ceiling-2p345",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "ceiling rounds a positive tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "ceiling"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.345"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.345"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/ceiling-minus-2p345",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "ceiling rounds a negative tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "ceiling"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2.345"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2.345"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/ceiling-2p3451",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "ceiling rounds just above a tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "ceiling"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.3451"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.3451"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/ceiling-minus-2p3449",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "ceiling rounds just below a negative tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "ceiling"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2.3449"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2.3449"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/ceiling-2p355",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "ceiling rounds a tie after an odd digit to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "ceiling"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.355"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.36"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.355"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/floor-2p345",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "floor rounds a positive tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "floor"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.345"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.345"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/floor-minus-2p345",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "floor rounds a negative tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "floor"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2.345"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2.345"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/floor-2p3451",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "floor rounds just above a tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "floor"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.3451"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.34"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.3451"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/floor-minus-2p3449",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "floor rounds just below a negative tie to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "floor"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-2.3449"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-2.3449"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/floor-2p355",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "floor rounds a tie after an odd digit to 2 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "floor"
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.355"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2.35"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.355"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/default-mode",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "the mode is half_even when omitted",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 0
+        },
+        "input": {
+          "a": {
+            "$decimal": "2.5"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "2"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "2.5"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/exact-padded",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "a value with fewer places is padded",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 3
+        },
+        "input": {
+          "a": {
+            "$decimal": "1.5"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "1.500"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "1.5"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/int-padded",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "an int becomes a decimal with the places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2
+        },
+        "input": {
+          "a": 5
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "5.00"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/int-zero-places",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "an int with scale 0 is the same number as a decimal",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 0
+        },
+        "input": {
+          "a": -7
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-7"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": -7
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/scale-zero",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "rounding to an integer",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 0,
+          "mode": "half_up"
+        },
+        "input": {
+          "a": {
+            "$decimal": "16.9915"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "17"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "16.9915"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/cents",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "a price rounded to cents",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2
+        },
+        "input": {
+          "a": {
+            "$decimal": "16.9915"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "16.99"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "16.9915"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/cents-up",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "a price rounded up to cents",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "up"
+        },
+        "input": {
+          "a": {
+            "$decimal": "16.9915"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "17.00"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "16.9915"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/scale-38",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "38 places",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 38
+        },
+        "input": {
+          "a": {
+            "$decimal": "0.1"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "0.10000000000000000000000000000000000000"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "0.1"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/carry",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "rounding can carry into a new digit",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2,
+          "mode": "half_up"
+        },
+        "input": {
+          "a": {
+            "$decimal": "9.995"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "10.00"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "9.995"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/no-negative-zero",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "a negative value rounded to zero is an unsigned zero",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2
+        },
+        "input": {
+          "a": {
+            "$decimal": "-0.001"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "0.00"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-0.001"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/negative-down",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "down truncates toward zero",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 1,
+          "mode": "down"
+        },
+        "input": {
+          "a": {
+            "$decimal": "-1.999"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-1.9"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-1.999"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/overflow-padding",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "padding beyond 38 digits is null",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2
+        },
+        "input": {
+          "a": {
+            "$decimal": "10000000000000000000000000000000000000"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": null,
+          "reason": {
+            "code": "decimal_overflow",
+            "paths": [
+              [
+                "a"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "10000000000000000000000000000000000000"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/carry-at-the-limit",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "a carry to a 38th digit fits",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 0,
+          "mode": "half_up"
+        },
+        "input": {
+          "a": {
+            "$decimal": "9999999999999999999999999999999999999.5"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "10000000000000000000000000000000000000"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "9999999999999999999999999999999999999.5"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/infinity-kept",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "an infinity is kept",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2
+        },
+        "input": {
+          "a": {
+            "$decimal": "-inf"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "-inf"
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": {
+                "$decimal": "-inf"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/float-mismatch",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "a float operand is a type mismatch, never rounded",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2
+        },
+        "input": {
+          "a": 2.345
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": null,
+          "reason": {
+            "code": "type_mismatch",
+            "paths": [
+              [
+                "a"
+              ]
+            ],
+            "types": [
+              "number",
+              "number"
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": 2.345
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/float-strict",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "a float operand raises in strict mode",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2
+        },
+        "input": {
+          "a": 2.345
+        },
+        "strict": true
+      },
+      "expect": {
+        "error": {
+          "code": "type_mismatch",
+          "path": [
+            "a"
+          ],
+          "types": [
+            "number",
+            "number"
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/null",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees"
+      ],
+      "description": "a null operand is null with its reason",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "field",
+            "path": [
+              "a"
+            ]
+          },
+          "scale": 2
+        },
+        "input": {
+          "a": null
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": null,
+          "reason": {
+            "code": "null",
+            "paths": [
+              [
+                "a"
+              ]
+            ]
+          },
+          "children": [
+            {
+              "op": "field",
+              "path": [
+                "a"
+              ],
+              "value": null,
+              "reason": {
+                "code": "null",
+                "paths": [
+                  [
+                    "a"
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ast/rounding/chained-discount",
+      "spec": [
+        "ast.md#rounding",
+        "json-format.md#result-trees",
+        "ast.md#decimal-arithmetic"
+      ],
+      "description": "a discounted price rounded to cents: 19.99 * 0.85 is 16.9915, so 16.99",
+      "given": {
+        "kind": "value",
+        "value": {
+          "op": "round",
+          "operand": {
+            "op": "mul",
+            "left": {
+              "op": "field",
+              "path": [
+                "price"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "0.85"
+              }
+            }
+          },
+          "scale": 2,
+          "mode": "half_even"
+        },
+        "input": {
+          "price": {
+            "$decimal": "19.99"
+          }
+        }
+      },
+      "expect": {
+        "result": {
+          "op": "round",
+          "value": {
+            "$decimal": "16.99"
+          },
+          "children": [
+            {
+              "op": "mul",
+              "value": {
+                "$decimal": "16.9915"
+              },
+              "children": [
+                {
+                  "op": "field",
+                  "path": [
+                    "price"
+                  ],
+                  "value": {
+                    "$decimal": "19.99"
+                  }
+                },
+                {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.85"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

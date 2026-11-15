@@ -148,6 +148,18 @@ pub fn node_unary(tag: &str, operand: &Node) -> Result<Node, JsValue> {
     build::unary(tag, operand.core.node()).map(node).or_fail()
 }
 
+/// An int or a decimal rounded to `scale` digits after the point.
+///
+/// # Errors
+///
+/// As in the napi-rs build.
+#[wasm_bindgen(js_name = nodeRound)]
+pub fn node_round(operand: &Node, scale: f64, mode: &str) -> Result<Node, JsValue> {
+    build::round(operand.core.node(), scale, mode)
+        .map(node)
+        .or_fail()
+}
+
 /// Membership in constants, a list in the reader's encoding.
 ///
 /// # Errors

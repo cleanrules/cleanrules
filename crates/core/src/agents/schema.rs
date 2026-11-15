@@ -113,7 +113,9 @@ fn int(n: u64) -> Json {
 fn facing(other: &Node) -> Vec<Type> {
     match other.expr() {
         Expr::Const(value) => Type::of(value).into_iter().collect(),
-        Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_) => vec![Type::Number],
+        // Arithmetic is exact on decimals and float with floats.
+        Expr::Arith { .. } | Expr::Abs(_) | Expr::Neg(_) => vec![Type::Number, Type::Decimal],
+        Expr::Round { .. } => vec![Type::Decimal],
         _ => Vec::new(),
     }
 }
@@ -134,8 +136,11 @@ fn child_types(node: &Node, condition: &[Type]) -> Vec<Vec<Type>> {
         }
         Expr::In { values, .. } => vec![values.iter().filter_map(Type::of).collect()],
         Expr::Matches { .. } | Expr::StringTest { .. } => vec![vec![Type::String]],
-        Expr::Arith { .. } => vec![vec![Type::Number]; 2],
-        Expr::Abs(_) | Expr::Neg(_) => vec![vec![Type::Number]],
+        Expr::Arith { .. } => vec![vec![Type::Number, Type::Decimal]; 2],
+        Expr::Abs(_) | Expr::Neg(_) => vec![vec![Type::Number, Type::Decimal]],
+        // `round` takes ints and decimals, never floats: the decimal is the
+        // only type an agent can send without risking a float.
+        Expr::Round { .. } => vec![vec![Type::Decimal]],
         Expr::IsNull(_) => vec![Vec::new()],
     }
 }

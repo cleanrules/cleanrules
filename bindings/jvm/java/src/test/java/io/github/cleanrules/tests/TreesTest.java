@@ -59,8 +59,21 @@ class TreesTest {
         assertEquals(Optional.empty(), tree.truth());
         assertEquals(List.of(2.5, 4L), tree.children().stream().map(ResultTree::value).toList());
         ResultTree decimal = field("price").mul(2).evaluateValueTree(Map.of("price", new BigDecimal("1.25")));
-        // Arithmetic converts decimals to floats (spec/ast.md).
-        assertEquals(2.5, decimal.value());
+        // A decimal times an int is an exact decimal (spec/ast.md, Decimal arithmetic).
+        assertEquals(new BigDecimal("2.50"), decimal.value());
+        // Rounded to cents, exactly; a float is never rounded.
+        ResultTree cents = field("price").mul(new BigDecimal("0.85")).round(2)
+                .evaluateValueTree(Map.of("price", new BigDecimal("19.99")));
+        assertEquals(new BigDecimal("16.99"), cents.value());
+        ResultTree up = field("price").round(0, java.math.RoundingMode.CEILING)
+                .evaluateValueTree(Map.of("price", new BigDecimal("-1.5")));
+        assertEquals(new BigDecimal("-1"), up.value());
+        ResultTree floating = field("price").round(2).evaluateValueTree(Map.of("price", 1.005));
+        assertEquals("type_mismatch", floating.reason().orElseThrow().code());
+        assertThrows(ExpressionException.class, () -> field("price").round(39));
+        IllegalArgumentException unnecessary = assertThrows(IllegalArgumentException.class,
+                () -> field("price").round(2, java.math.RoundingMode.UNNECESSARY));
+        assertTrue(unnecessary.getMessage().startsWith("RoundingMode.UNNECESSARY is not a mode of round"));
         ResultTree missing = field("price").abs().evaluateValueTree(Map.of());
         assertEquals(null, missing.value());
         assertEquals("missing_field", missing.reason().orElseThrow().code());

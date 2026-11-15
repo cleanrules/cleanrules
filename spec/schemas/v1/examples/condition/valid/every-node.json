@@ -207,6 +207,35 @@
       {
         "op": "const",
         "value": false
+      },
+      {
+        "op": "le",
+        "left": {
+          "op": "round",
+          "operand": {
+            "op": "mul",
+            "left": {
+              "op": "field",
+              "path": [
+                "price"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "0.85"
+              }
+            }
+          },
+          "scale": 2,
+          "mode": "half_up"
+        },
+        "right": {
+          "op": "const",
+          "value": {
+            "$decimal": "100.00"
+          }
+        }
       }
     ]
   }

@@ -11,11 +11,13 @@ import io.github.cleanrules.internal.Scope;
 import io.github.cleanrules.internal.Text;
 import io.github.cleanrules.internal.Values;
 import java.lang.foreign.MemorySegment;
+import java.math.RoundingMode;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Function;
 
@@ -604,6 +606,42 @@ public abstract sealed class Expr implements DocumentContent permits Field, Cons
      */
     public Expr abs() {
         return unary(this, Native::nodeAbs);
+    }
+
+    /**
+     * This int or decimal rounded half to even to {@code scale} digits after the
+     * point, as a decimal: {@code field("price").mul(new BigDecimal("0.85")).round(2)}.
+     *
+     * @param scale the digits after the point, from 0 to 38
+     * @return a {@code round} node
+     * @throws ExpressionException if the scale is out of range, or this is a condition or a constant
+     *     that is not an int or a decimal
+     */
+    public Expr round(int scale) {
+        return round(scale, RoundingMode.HALF_EVEN);
+    }
+
+    /**
+     * This int or decimal rounded to {@code scale} digits after the point, as a decimal, digits
+     * dropped as {@code mode} says (spec/ast.md, Rounding). A float operand is unknown with a type
+     * mismatch: floats are never rounded implicitly.
+     *
+     * @param scale the digits after the point, from 0 to 38
+     * @param mode how digits are dropped; every mode but {@link RoundingMode#UNNECESSARY}
+     * @return a {@code round} node
+     * @throws ExpressionException if the scale is out of range, or this is a condition or a constant
+     *     that is not an int or a decimal
+     * @throws IllegalArgumentException for {@link RoundingMode#UNNECESSARY}
+     */
+    public Expr round(int scale, RoundingMode mode) {
+        Objects.requireNonNull(mode, "mode");
+        if (mode == RoundingMode.UNNECESSARY) {
+            throw new IllegalArgumentException("RoundingMode.UNNECESSARY is not a mode of round: use HALF_EVEN, "
+                    + "HALF_UP, HALF_DOWN, UP, DOWN, CEILING or FLOOR");
+        }
+        byte[] name = Text.name(mode.name().toLowerCase(Locale.ROOT));
+        return with(List.of(this), pointers -> make((out, error, scope) -> Native.nodeRound(
+                pointers[0], scale, scope.bytes(name), name.length, out, error)));
     }
 
     // ---- Predicates.

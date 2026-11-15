@@ -1020,12 +1020,12 @@
       }
     },
     {
-      "id": "rules/aggregates/decimal-to-float",
+      "id": "rules/aggregates/decimal-sum-exact",
       "spec": [
         "rules.md#collect-aggregates",
-        "rules.md#deviations-from-dmn"
+        "ast.md#decimal-arithmetic"
       ],
-      "description": "decimals are converted to float before sum",
+      "description": "a sum of decimals is an exact decimal",
       "given": {
         "kind": "evaluate",
         "ruleset": {
@@ -1034,7 +1034,7 @@
           "logic": "boolean",
           "rules": [
             {
-              "name": "a",
+              "name": "r1",
               "when": {
                 "op": "const",
                 "value": true
@@ -1049,7 +1049,7 @@
               }
             },
             {
-              "name": "b",
+              "name": "r2",
               "when": {
                 "op": "const",
                 "value": true
@@ -1074,7 +1074,7 @@
           "logic": "boolean",
           "results": [
             {
-              "rule": "a",
+              "rule": "r1",
               "fired": true,
               "when": {
                 "op": "const",
@@ -1096,7 +1096,7 @@
               }
             },
             {
-              "rule": "b",
+              "rule": "r2",
               "fired": true,
               "when": {
                 "op": "const",
@@ -1119,11 +1119,2243 @@
             }
           ],
           "selected": [
-            "a",
-            "b"
+            "r1",
+            "r2"
           ],
           "aggregated": {
-            "n": 0.30000000000000004
+            "n": {
+              "$decimal": "0.3"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/decimal-sum-largest-scale",
+      "spec": [
+        "rules.md#collect-aggregates",
+        "ast.md#decimal-arithmetic"
+      ],
+      "description": "a decimal sum has the largest scale among the values",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "1.50"
+                  }
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "2.5"
+                  }
+                }
+              }
+            },
+            {
+              "name": "r3",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.250"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "1.50"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "2.5"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "r3",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.250"
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2",
+            "r3"
+          ],
+          "aggregated": {
+            "n": {
+              "$decimal": "4.250"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/decimal-int-sum",
+      "spec": [
+        "rules.md#collect-aggregates",
+        "ast.md#decimal-arithmetic"
+      ],
+      "description": "ints and decimals sum to a decimal",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.25"
+                  }
+                }
+              }
+            },
+            {
+              "name": "r3",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.25"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "r3",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2",
+            "r3"
+          ],
+          "aggregated": {
+            "n": {
+              "$decimal": "3.25"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/decimal-sum-exact-total",
+      "spec": [
+        "rules.md#collect-aggregates",
+        "ast.md#decimal-arithmetic"
+      ],
+      "description": "the running total is exact: only the total must fit",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "99999999999999999999999999999999999999"
+                  }
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "r3",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": -1
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "99999999999999999999999999999999999999"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "rule": "r3",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": -1
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2",
+            "r3"
+          ],
+          "aggregated": {
+            "n": {
+              "$decimal": "99999999999999999999999999999999999999"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/decimal-sum-overflow",
+      "spec": [
+        "rules.md#collect-aggregates",
+        "ast.md#decimal-arithmetic"
+      ],
+      "description": "a decimal total beyond 38 digits is null",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "99999999999999999999999999999999999999"
+                  }
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "1"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "99999999999999999999999999999999999999"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "1"
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2"
+          ],
+          "aggregated": {
+            "n": null
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/decimal-sum-rounded",
+      "spec": [
+        "rules.md#collect-aggregates",
+        "ast.md#decimal-arithmetic"
+      ],
+      "description": "a decimal total without room for its fraction is rounded once, at the end",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "10000000000000000000000000000000000000"
+                  }
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.3"
+                  }
+                }
+              }
+            },
+            {
+              "name": "r3",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.3"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "10000000000000000000000000000000000000"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.3"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "r3",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.3"
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2",
+            "r3"
+          ],
+          "aggregated": {
+            "n": {
+              "$decimal": "10000000000000000000000000000000000001"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/decimal-sum-inf",
+      "spec": [
+        "rules.md#collect-aggregates",
+        "ast.md#decimal-arithmetic"
+      ],
+      "description": "a decimal infinity gives that infinity",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "inf"
+                  }
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "1.5"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "inf"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "1.5"
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2"
+          ],
+          "aggregated": {
+            "n": {
+              "$decimal": "inf"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/decimal-sum-both-infs",
+      "spec": [
+        "rules.md#collect-aggregates",
+        "ast.md#decimal-arithmetic"
+      ],
+      "description": "both decimal infinities give null",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "inf"
+                  }
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "-inf"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "inf"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "-inf"
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2"
+          ],
+          "aggregated": {
+            "n": null
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/decimal-float-sum",
+      "spec": [
+        "rules.md#collect-aggregates",
+        "ast.md#decimal-arithmetic"
+      ],
+      "description": "with a float among the values, the exact total is rounded once to a float",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.1"
+                  }
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.2"
+                  }
+                }
+              }
+            },
+            {
+              "name": "r3",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 0.5
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.1"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.2"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "r3",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 0.5
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2",
+            "r3"
+          ],
+          "aggregated": {
+            "n": 0.8
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/float-decimal-sum",
+      "spec": [
+        "rules.md#collect-aggregates",
+        "ast.md#decimal-arithmetic"
+      ],
+      "description": "a float and a decimal add exactly and round once: the float 0.1 plus the decimal 0.2 is the float 0.3",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 0.1
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.2"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 0.1
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.2"
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2"
+          ],
+          "aggregated": {
+            "n": 0.3
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/decimal-min-unchanged",
+      "spec": [
+        "rules.md#collect-aggregates",
+        "ast.md#decimal-arithmetic"
+      ],
+      "description": "min compares exactly and returns the decimal unchanged",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "min",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 0.1
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.1"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "min",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 0.1
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.1"
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2"
+          ],
+          "aggregated": {
+            "n": {
+              "$decimal": "0.1"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/decimal-max-scale-kept",
+      "spec": [
+        "rules.md#collect-aggregates",
+        "ast.md#decimal-arithmetic"
+      ],
+      "description": "max returns the decimal with its scale",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "max",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "2.50"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "max",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "2.50"
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2"
+          ],
+          "aggregated": {
+            "n": {
+              "$decimal": "2.50"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/decimal-max-first-of-equals",
+      "spec": [
+        "rules.md#collect-aggregates",
+        "ast.md#decimal-arithmetic"
+      ],
+      "description": "between equal values, max returns the first in rule order",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "max",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "2.0"
+                  }
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            },
+            {
+              "name": "r3",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2.0
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "max",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "2.0"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            },
+            {
+              "rule": "r3",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 2.0
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2",
+            "r3"
+          ],
+          "aggregated": {
+            "n": {
+              "$decimal": "2.0"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/sum-order-independent-small-first",
+      "spec": [
+        "rules.md#collect-aggregates"
+      ],
+      "description": "a sum is exact and rounded once: 1 + 1 + 1e16 is 1e16 + 2",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "r3",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1e+16
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "rule": "r3",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1e+16
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2",
+            "r3"
+          ],
+          "aggregated": {
+            "n": 1.0000000000000002e+16
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/sum-order-independent-large-first",
+      "spec": [
+        "rules.md#collect-aggregates"
+      ],
+      "description": "a sum does not depend on rule order: 1e16 + 1 + 1 is also 1e16 + 2, not 1e16",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1e+16
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "r3",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1e+16
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "rule": "r3",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2",
+            "r3"
+          ],
+          "aggregated": {
+            "n": 1.0000000000000002e+16
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/sum-floats-cancel",
+      "spec": [
+        "rules.md#collect-aggregates"
+      ],
+      "description": "floats that cancel exactly leave the small value: 1e308 + 1 - 1e308 is 1.0",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1e+308
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "r3",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": -1e+308
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1e+308
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "rule": "r3",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": -1e+308
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2",
+            "r3"
+          ],
+          "aggregated": {
+            "n": 1.0
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/sum-float-overflow",
+      "spec": [
+        "rules.md#collect-aggregates"
+      ],
+      "description": "a float total beyond the largest float is an infinity",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1.7976931348623157e+308
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1.7976931348623157e+308
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1.7976931348623157e+308
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1.7976931348623157e+308
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2"
+          ],
+          "aggregated": {
+            "n": {
+              "$float": "inf"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/sum-mixed-infinities",
+      "spec": [
+        "rules.md#collect-aggregates"
+      ],
+      "description": "a decimal infinity and a float infinity of opposite signs give null",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "inf"
+                  }
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$float": "-inf"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "inf"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$float": "-inf"
+                  }
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2"
+          ],
+          "aggregated": {
+            "n": null
+          }
+        }
+      }
+    },
+    {
+      "id": "rules/aggregates/sum-decimal-infinity-with-float",
+      "spec": [
+        "rules.md#collect-aggregates"
+      ],
+      "description": "an infinity among values with a float is a float infinity",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "r1",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "-inf"
+                  }
+                }
+              }
+            },
+            {
+              "name": "r2",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1.5
+                }
+              }
+            }
+          ]
+        },
+        "input": {}
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "r1",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "-inf"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "r2",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              },
+              "then": {
+                "n": {
+                  "op": "const",
+                  "value": 1.5
+                }
+              }
+            }
+          ],
+          "selected": [
+            "r1",
+            "r2"
+          ],
+          "aggregated": {
+            "n": {
+              "$float": "-inf"
+            }
           }
         }
       }

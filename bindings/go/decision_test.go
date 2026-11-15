@@ -58,9 +58,9 @@ func TestDecisions(t *testing.T) {
 	if !errors.As(err, &e) || e.Code != CodeHitPolicy || len(e.Rules) != 0 || !errors.Is(err, ErrEvaluation) {
 		t.Errorf("collect output: %#v", err)
 	}
-	// Aggregates.
+	// Aggregates: decimals add exactly, with the largest scale (spec/rules.md).
 	sum := must(pricing(t, WithHitPolicy(HitPolicyCollect), WithAggregate(AggregateSum)).Evaluate(order))(t)
-	if agg := sum.Aggregated(); !reflect.DeepEqual(agg, map[string]any{"discount": 0.05}) {
+	if agg := sum.Aggregated(); !reflect.DeepEqual(agg, map[string]any{"discount": MustDecimal("0.05")}) {
 		t.Errorf("sum: %#v", agg)
 	}
 	count := must(pricing(t, WithHitPolicy(HitPolicyCollect), WithAggregate(AggregateCount)).Evaluate(order))(t)

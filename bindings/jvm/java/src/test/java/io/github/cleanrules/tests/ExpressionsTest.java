@@ -63,8 +63,10 @@ class ExpressionsTest {
         nodes.put("x / 2", x.div(2));
         nodes.put("-x", x.neg());
         nodes.put("ABS(x)", x.abs());
+        nodes.put("ROUND(x, 2, HALF_UP)", x.round(2, java.math.RoundingMode.HALF_UP));
         List<String> tags = List.of("eq", "ne", "lt", "le", "gt", "ge", "and", "or", "not", "in", "between",
-                "is_null", "matches", "starts_with", "ends_with", "contains", "add", "sub", "mul", "div", "neg", "abs");
+                "is_null", "matches", "starts_with", "ends_with", "contains", "add", "sub", "mul", "div", "neg", "abs",
+                "round");
         int i = 0;
         for (Map.Entry<String, Expr> entry : nodes.entrySet()) {
             assertEquals(entry.getKey(), entry.getValue().toString());

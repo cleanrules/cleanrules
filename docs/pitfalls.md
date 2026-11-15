@@ -88,7 +88,7 @@ Any public attribute of a `Field` keeps its meaning after a dot: `path`, `tag`,
 `kind`, `children`, `walk`, `same_as`, `structural_key`, `field_paths`,
 and the methods
 `is_in`, `between`, `is_null`, `matches`, `starts_with`, `ends_with`,
-`contains` and `abs`. So `F.customer.kind` is the node's kind (`"any"`), not a
+`contains`, `abs` and `round`. So `F.customer.kind` is the node's kind (`"any"`), not a
 field called `kind`. A comparison on it is plain Python:
 
 - `(F.p > 5) & (F.product.tag == "sale")` raises, because `&` receives a
@@ -123,6 +123,30 @@ numpy scalars work on either side: `np.int64(5) < F.x` builds `F.x > 5`.
 Arrays, Series and DataFrames are not constants. `np.array([1, 2]) == F.x`
 and `df["a"] > F.x` raise instead of comparing element by element. To check
 whole columns, use vectorized validation (phase I of the roadmap).
+
+## A float makes arithmetic a float
+
+Arithmetic on `Decimal` values and ints is exact: `F.price * Decimal("0.85")`
+gives `Decimal("16.9915")` for a price of `Decimal("19.99")`, and a division
+keeps 38 significant digits (`F.price / 3` gives
+`Decimal("6.6633333333333333333333333333333333333")`). A Python float anywhere
+in the expression makes the result a float, because `0.85` is a binary float,
+not the decimal written: `F.price * 0.15` gives the float
+`2.9984999999999995`. Write constants that must be exact as `Decimal("0.15")`
+and pass amounts as `Decimal`; in rule files, `0.15` is already a decimal.
+`round()` refuses floats for the same reason: `round(F.price, 2)` on the float
+`1.005` is unknown with a type mismatch, never `1.0` or `1.01`.
+
+## Round once, at the end
+
+`round(F.price * Decimal("0.85") * Decimal("0.90"), 2)` rounds the exact price
+to cents once: `Decimal("7.67")` for `Decimal("10.03")` (exactly `7.67295`).
+Rounding each step, `round(round(F.price * Decimal("0.85"), 2) *
+Decimal("0.90"), 2)`, rounds a rounded value and is a cent off here
+(`Decimal("7.68")`). Keep intermediate results
+exact, which they are, and round the value the rule outputs or compares.
+Likewise, a `sum` aggregate adds the exact values and rounds once, so round the
+payloads only if each one must be in cents on its own.
 
 ## Strings in table cells are quoted
 

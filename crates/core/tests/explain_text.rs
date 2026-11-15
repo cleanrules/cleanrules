@@ -173,6 +173,21 @@ fn the_summary_of_the_spec() {
 }
 
 #[test]
+fn decimal_overflow_and_round_give_their_reason() {
+    let text = explained(
+        "HIT POLICY first
+         RULE overflow IF price * 10 > 0
+         RULE rounded IF ROUND(rate, 2) > 0
+         RULE cents IF ROUND(price / 3, 2, HALF_UP) > 0",
+        &format!(
+            r#"{{"price": {{"$decimal": "{}"}}, "rate": 0.5}}"#,
+            "9".repeat(38)
+        ),
+    );
+    insta::assert_snapshot!(text);
+}
+
+#[test]
 fn actions_are_one_per_rule() {
     let ruleset = rules("HIT POLICY first\nRULE a IF x > 1\nRULE b IF x > 2");
     assert_eq!(summary(&ruleset).actions, [false, false]);

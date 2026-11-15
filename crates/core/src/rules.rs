@@ -4,7 +4,7 @@ use crate::ast::{Kind, Node};
 use crate::error::{Error, ErrorCode, Result};
 use crate::eval::{Evaluated, Options, Trees, evaluate_tree_in, evaluate_value_tree_in};
 use crate::logic::{Kleene, Logic, LogicName, Truth};
-use crate::value::{Map, NullCause, Number, Value};
+use crate::value::{ExactSum, Map, NullCause, Number, Value};
 
 /// A rule: a condition, a payload and descriptive data (`spec/rules.md`,
 /// *Rules*). Actions are code of the host language and live in the bindings;
@@ -818,27 +818,11 @@ fn reduce(aggregate: Aggregate, values: &[Value]) -> Value {
     if values.is_empty() {
         return Value::Null(NullCause::Null);
     }
-    let any_decimal = values.iter().any(|v| matches!(v, Value::Decimal(_)));
-    // Decimals turn every value into a float, as arithmetic does with decimal operands.
-    let numbers: Vec<Number> = values
-        .iter()
-        .filter_map(Value::as_number)
-        .map(|n| {
-            if any_decimal {
-                Number::Float(n.to_f64())
-            } else {
-                n
-            }
-        })
-        .collect();
-    let to_value = |n: Number| match n {
-        Number::Int(i) => Value::Int(i),
-        Number::Float(f) => Value::float(f),
-        Number::Decimal(d) => Value::Decimal(d),
-    };
+    let numbers: Vec<Number> = values.iter().filter_map(Value::as_number).collect();
     match aggregate {
         Aggregate::Min | Aggregate::Max => {
-            // The first of equal values wins, as Python's min and max.
+            // Compared exactly and returned unchanged; the first of equal values
+            // wins, as Python's min and max.
             let mut best = numbers[0];
             for &n in &numbers[1..] {
                 let order = n.compare(best);
@@ -851,32 +835,26 @@ fn reduce(aggregate: Aggregate, values: &[Value]) -> Value {
                     best = n;
                 }
             }
-            to_value(best)
+            match best {
+                Number::Int(i) => Value::Int(i),
+                Number::Float(f) => Value::float(f),
+                Number::Decimal(d) => Value::Decimal(d),
+            }
         }
         _ => sum(&numbers),
     }
 }
 
-/// Python's `sum`: an exact integer until a float appears, then a float; an int
-/// outside 64 bits or a NaN result is null.
+/// The exact total of every value, rounded once: an int, a decimal or a
+/// float, the kind `add` would give; null for an int outside 64 bits, a decimal
+/// that does not fit, or both infinities (`spec/rules.md`, *`COLLECT`
+/// aggregates*).
 fn sum(numbers: &[Number]) -> Value {
-    enum Total {
-        Int(i128),
-        Float(f64),
-    }
-    let mut total = Total::Int(0);
-    for n in numbers {
-        total = match (total, n) {
-            (Total::Int(acc), Number::Int(i)) => Total::Int(acc + i128::from(*i)),
-            // Rounds to nearest, as Python's int-to-float conversion.
-            #[allow(clippy::cast_precision_loss)]
-            (Total::Int(acc), other) => Total::Float(acc as f64 + other.to_f64()),
-            (Total::Float(acc), other) => Total::Float(acc + other.to_f64()),
-        };
-    }
-    match total {
-        Total::Int(i) => i64::try_from(i).map_or(Value::Null(NullCause::Null), Value::Int),
-        Total::Float(f) => Value::float(f),
+    match ExactSum::of(numbers).total() {
+        Some(Number::Int(i)) => Value::Int(i),
+        Some(Number::Float(f)) => Value::float(f),
+        Some(Number::Decimal(d)) => Value::Decimal(d),
+        None => Value::Null(NullCause::Null),
     }
 }
 

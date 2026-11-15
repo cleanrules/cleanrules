@@ -203,8 +203,10 @@ def test_multi_hit_decisions_have_several_outputs() -> None:
 def test_collect_aggregates() -> None:
     data = {"customer": {"years": 9}, "order": {"total": 2000}}
     total = shop(hit_policy="collect", aggregate="sum").evaluate(data)
-    # Aggregates add decimals as floats (spec/data-model.md, *Decimals*).
-    assert total.output == total.aggregated == {"discount": pytest.approx(0.2)}
+    # Decimals add exactly, keeping the largest scale (spec/rules.md, *`COLLECT` aggregates*).
+    assert total.output == total.aggregated == {"discount": Decimal("0.20")}
+    assert total.output is not None
+    assert repr(dict(total.output)) == "{'discount': Decimal('0.20')}"
     count = shop(hit_policy="collect", aggregate="count").evaluate(data)
     assert count.output == {"discount": 2}
     nothing = shop(hit_policy="collect", aggregate="sum").evaluate({})
@@ -241,7 +243,12 @@ def test_payloads_and_maps_come_back_sorted_by_code_point() -> None:
 
 def test_payload_values_are_evaluated() -> None:
     rules = RuleSet([Rule("r", F.total > 0, {"tax": F.total * Decimal("0.21"), "k": "v"})])
-    assert rules.evaluate({"total": 100}).output == {"tax": pytest.approx(21.0), "k": "v"}
+    # An int times a decimal is an exact decimal (spec/ast.md, *Decimal arithmetic*).
+    output = rules.evaluate({"total": 100}).output
+    assert output == {"tax": Decimal("21.00"), "k": "v"}
+    assert output is not None
+    # Payload keys come back by code point (spec/rules.md, *Outputs*).
+    assert repr(dict(output)) == "{'k': 'v', 'tax': Decimal('21.00')}"
 
 
 def test_strict_mode_raises_with_context() -> None:

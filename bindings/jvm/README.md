@@ -66,7 +66,9 @@ rules.bind(Map.of("notify_sales", context -> System.out.println(context.output()
   as methods (`a.and(b)`, `a.or(b)`, `a.not()`). Comparisons `eq`, `ne`, `lt`,
   `le`, `gt`, `ge`; `isIn(values...)` (or a collection), `between(low, high[,
   Closed])`, `isNull()`, `matches(pattern)`, `startsWith`, `endsWith`,
-  `contains`; arithmetic `add`, `sub`, `mul`, `div`, `neg()`, `abs()`.
+  `contains`; arithmetic `add`, `sub`, `mul`, `div`, `neg()`, `abs()`, and
+  `round(scale[, java.math.RoundingMode])`, which gives a `BigDecimal` with
+  exactly `scale` places (every mode but `UNNECESSARY`).
   The core builds every node and applies the construction rules of
   `spec/ast.md`: a node that breaks one, a NaN, an integer beyond 64 bits, a
   decimal beyond 38 digits, a datetime finer than a microsecond or a constant
@@ -284,6 +286,7 @@ an error):
 | `a === b`, `a =!= b` | `eq`, `ne` | `eq`, `ne` |
 | `a < b`, `a <= b`, `a > b`, `a >= b` | `lt`, `le`, `gt`, `ge` | `lt`, `le`, `gt`, `ge` |
 | `a + b`, `a - b`, `a * b`, `a / b`, `-a`, `a.abs` | arithmetic | `add`, `sub`, `mul`, `div`, `neg`, `abs` |
+| `a.round(2)`, `a.round(2, RoundingMode.HALF_UP)` | `round` | `round` |
 | `a.isIn("ES", "PT")`, `a.isIn(set)` | `in` | `isIn` |
 | `a.between(1, 10[, Closed.LEFT])` | `between` | `between` |
 | `a.isNull`, `a.matches(re)`, `a.startsWith(s)`, `a.endsWith(s)`, `a.contains(s)` | tests | the same |
@@ -316,7 +319,7 @@ and `F.customer("age")` (`F` and `Field` are `Dynamic`: `selectDynamic` and
 `applyDynamic`, because any key must work and `Selectable` needs the keys in a
 type). Keys are never split at dots. A key that is a member of a field (the
 operators, `isIn`, `between`, `isNull`, `matches`, `startsWith`, `endsWith`,
-`contains`, `abs`, `evaluateTree`, `evaluateValueTree`, `fieldPaths`,
+`contains`, `abs`, `round`, `evaluateTree`, `evaluateValueTree`, `fieldPaths`,
 `toJson`, `asJava`, `apply`, or a method every Scala object has, such as
 `equals`, `eq`, `ne`, `wait`, `notify`, `synchronized`, `hashCode` or
 `toString`) is reached with `apply`: `F.customer("contains")`. So is a key
@@ -898,6 +901,14 @@ values come back as Java values (*Values given back* in
 
 Each reads back as the same value, except a decimal infinity (a float) and an
 opaque `null`.
+
+Arithmetic keeps the kind its operands give it (`spec/ast.md`,
+*Arithmetic*): `BigDecimal` and integer operands give a `BigDecimal`, exact
+when it fits in 38 digits, so `field("price").mul(new BigDecimal("0.85"))` on
+`new BigDecimal("19.99")` is `16.9915`, and `.round(2)` gives `16.99`. A
+`double` operand, such as the literal `0.85`, makes the result a `Double`, and
+`round` on a float is unknown with a type mismatch. In Scala, a
+`BigDecimal("0.85")` keeps it exact; `0.85` is a `Double`.
 
 ## Errors
 

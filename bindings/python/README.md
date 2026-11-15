@@ -130,6 +130,19 @@ rules.run({"customer": {"years": 9}, "order": {"total": 2000}})
 Unbound, the rules still evaluate, explain and write; `run` raises a
 `RegistryError`, as `rules.bind(actions)` does for a name the registry lacks.
 
+Prices stay exact: arithmetic on `Decimal` values and ints gives a `Decimal`
+(a Python float makes it a float), and `round()` gives it a number of places,
+rounded once on the exact value (`spec/ast.md`, *Rounding*):
+
+```python
+price = round(F.order.total * (1 - F.discount), 2)  # or .round(2, "half_up")
+rules = RuleSet([Rule("vip", F.customer.years > 5, {"discount": Decimal("0.15"), "price": price})])
+rules.evaluate(
+    {"customer": {"years": 9}, "order": {"total": Decimal("19.99")}, "discount": Decimal("0.15")}
+).output
+# {'discount': Decimal('0.15'), 'price': Decimal('16.99')}
+```
+
 Rules can also be a decision table, read from CSV as spreadsheets write it (or
 from JSON or YAML). Cells use the same syntax, without their column; output
 values in priority order rank the rows, as in DMN. This is

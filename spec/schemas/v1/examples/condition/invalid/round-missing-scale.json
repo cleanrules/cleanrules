@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "condition": {
+    "op": "gt",
+    "left": {
+      "op": "round",
+      "operand": {
+        "op": "field",
+        "path": [
+          "x"
+        ]
+      }
+    },
+    "right": {
+      "op": "const",
+      "value": 1
+    }
+  }
+}
