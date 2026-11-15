@@ -277,8 +277,9 @@ describe('lists', () => {
 })
 
 describe('maps', () => {
-  test('a Map is a map in insertion order', () => {
-    assert.equal(read({ x: new Map([['b', 1], ['10', 2], ['a', 3]]) }), '{"b":1,"10":2,"a":3}')
+  test('a Map is a map, whatever its order: given back by key', () => {
+    assert.equal(read({ x: new Map([['b', 1], ['10', 2], ['a', 3]]) }), '{"10":2,"a":3,"b":1}')
+    assert.equal(read({ x: { b: 1, a: { d: 2, c: 3 } } }), '{"a":{"c":3,"d":2},"b":1}')
     assert.equal(read({ x: new Map([['k', 1]]) }, 'x.k'), '1')
     assert.equal(read({ x: new Map([['k', undefined]]) }, 'x.k'), 'missing_field')
     assert.equal(read({ x: new Map() }, 'x.size'), 'missing_field')
@@ -299,15 +300,16 @@ describe('maps', () => {
 
 describe('objects', () => {
   test('plain objects are maps of their own enumerable string keys', () => {
-    assert.equal(read({ x: { b: 1, a: { c: true } } }), '{"b":1,"a":{"c":true}}')
+    // Given back by key, by code point, whatever the order of the object.
+    assert.equal(read({ x: { b: 1, a: { c: true } } }), '{"a":{"c":true},"b":1}')
     assert.equal(read({ x: { a: { c: true } } }, 'x.a.c'), 'true')
     const bare = Object.create(null)
     bare.k = 'v'
     assert.equal(read({ x: bare }), '{"k":"v"}')
   })
 
-  test('JavaScript puts integer-like keys first', () => {
-    assert.equal(read({ x: { b: 1, 10: 2, a: 3 } }), '{"10":2,"b":1,"a":3}')
+  test('integer-like keys, which JavaScript puts first, are sorted with the others', () => {
+    assert.equal(read({ x: { b: 1, 10: 2, a: 3, 9: 4 } }), '{"10":2,"9":4,"a":3,"b":1}')
   })
 
   test('class instances: own fields and class getters, never methods', () => {
@@ -342,7 +344,7 @@ describe('objects', () => {
       }
     }
     const customer = new Customer()
-    assert.equal(read({ x: customer }), '{"id":1,"name":"Ana","years":6,"kind":"base"}')
+    assert.equal(read({ x: customer }), '{"id":1,"kind":"base","name":"Ana","years":6}')
     assert.equal(read({ x: customer }, 'x.years'), '6')
     assert.equal(read({ x: customer }, 'x.kind'), '"base"')
     assert.equal(read({ x: customer }, 'x.method'), 'missing_field')
@@ -523,7 +525,7 @@ describe('reading', () => {
     const ruleset = rules('RULE r\nIF customer.age > 18\nTHEN who = customer, age = customer.age')
     const decision = ruleset.evaluate(data)
     assert.equal(reads, 1)
-    assert.equal(decision.outputJson(), '{"who":{"age":31,"name":"Ana"},"age":31}')
+    assert.equal(decision.outputJson(), '{"age":31,"who":{"age":31,"name":"Ana"}}')
   })
 
   test('the same object is the same opaque value', () => {

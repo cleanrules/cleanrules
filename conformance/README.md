@@ -75,8 +75,9 @@ runners compare errors as `spec/errors.md` (*Comparing errors*) says.
 ## Comparing
 
 Runners compare the actual output with `expect` as parsed JSON trees, as
-`spec/json-format.md` (*Comparing documents*) defines: object members in
-order, numbers by lexical class and exact value, and the sign of a float zero
+`spec/json-format.md` (*Comparing documents*) defines: objects by their
+members whatever their order (*Objects*), arrays item by item in order, numbers
+by lexical class and exact value, and the sign of a float zero
 (use `copysign` or its equivalent: `-0.0 == 0.0` in most languages). Some parts are not compared,
 because the spec says that they are informative:
 
@@ -88,17 +89,15 @@ because the spec says that they are informative:
   `validate` result) must have a non-empty `hint`, and is compared on every
   member of its JSON form except `message`, `hint`, `cause`, `node`,
   `operation` and `reason`, which are dropped from the actual error: so
-  `pointer`, `name` and `available` are compared too. A tool error is compared
-  without regard to member order; a `validate` result's error is written in
-  its JSON form's order.
+  `pointer`, `name` and `available` are compared too.
 
 Runners must parse the vectors without losing what is compared. A generic
-parser that turns `1.0` into `1`, reads integers through floats, or reorders
-object members cannot be used as is: JavaScript needs a lossless parser (or
-`JSON.parse` with access to the source text) and an ordered representation of
-objects, because plain objects move integer-like keys such as `"10"` first; Go
-needs a token-stream decoder with `UseNumber`, because `map[string]any` loses
-member order.
+parser that turns `1.0` into `1` or reads integers through floats cannot be
+used as is: JavaScript needs a lossless parser (or `JSON.parse` with access to
+the source text), and Go a decoder with `UseNumber`. Member order is never
+compared, so a parser may reorder object members (plain JavaScript objects
+move integer-like keys such as `"10"` first, and Go's `map[string]any` has no
+order).
 
 A runner reports every failing vector with its id, the expected and the actual
 output, never stopping at the first one.
@@ -186,7 +185,7 @@ output, never stopping at the first one.
   `big.Int`, `float32` and `float64`, `Decimal`, `Date`, `DateTime`,
   `time.Time`, slices, arrays, maps and structs, named types and pointers, in
   turn); results are compared as the Go values given back
-  (`spec/data-model.md`, which gives a map back without order, the zone `UTC`
+  (`spec/data-model.md`, which gives a map back as a `map[string]any`, the zone `UTC`
   as `time.UTC` and a zone Go does not know at its offset) and as their JSON
   forms. `read` vectors go through `Loads`, `Dumps`, `RuleFromText`,
   `NewDecisionTable` and `ReadDecision`. Grids are Go data, so `table_grid`
@@ -203,12 +202,10 @@ output, never stopping at the first one.
 - **Each binding** runs every vector twice: once through its JSON entry points,
   and once converting `input` into the language's native data (with the
   conversions of `spec/data-model.md`: floats as floats, with `cr.float` in
-  JavaScript, decimals as the language's decimal, maps as an ordered map) and
-  calling the idiomatic API. The second run tests the binding's own code, its
-  data conversion. In a language whose maps have no order (Go), maps given
-  back are compared without regard to member order in that run; Go's runner
-  gives a map whose keys are not sorted as a struct, whose fields keep their
-  order, so the JSON forms of its results are still compared exactly.
+  JavaScript, decimals as the language's decimal, maps as the language's map)
+  and calling the idiomatic API. The second run tests the binding's own code,
+  its data conversion. Maps, like every object, are compared without regard to
+  member order.
 
 ## Coverage
 

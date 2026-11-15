@@ -39,7 +39,7 @@ import java.util.SequencedMap;
  * <tr><td>naive datetime</td><td>{@link LocalDateTime}</td></tr>
  * <tr><td>aware datetime</td><td>{@link ZonedDateTime} in its zone, or at a {@link ZoneOffset}</td></tr>
  * <tr><td>list</td><td>an unmodifiable {@link List}</td></tr>
- * <tr><td>map</td><td>an unmodifiable {@link SequencedMap}, in the value's order</td></tr>
+ * <tr><td>map</td><td>an unmodifiable {@link SequencedMap}, its keys sorted by Unicode code point as the core keeps them</td></tr>
  * <tr><td>opaque</td><td>the object it was read from, or {@code null}</td></tr>
  * </table>
  */

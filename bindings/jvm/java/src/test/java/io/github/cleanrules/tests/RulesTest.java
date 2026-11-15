@@ -64,18 +64,28 @@ class RulesTest {
         assertTrue(rule.action().isEmpty());
         assertEquals("Rule(vip: customer.years > 5 AND order.total > 1000)", rule.toString());
 
-        // Each step is a new rule; a repeated key keeps its place.
+        // Each step is a new rule; a repeated key takes the new value.
         Rule twice = loyal().then("rate", field("rate").mul(2)).then("discount", 0);
         assertEquals(List.of("discount", "rate"), List.copyOf(twice.then().keySet()));
         assertEquals(0L, ((io.github.cleanrules.Const) twice.then().get("discount")).value());
         assertEquals(1, loyal().then().size());
-        // A payload from a map: in its order when it has one, else sorted.
+        // A payload has no order: its keys are kept sorted by code point,
+        // whatever the map (U+FF5A before U+1F600, unlike UTF-16 order).
         Map<String, Object> sequenced = new LinkedHashMap<>();
         sequenced.put("z", 1);
+        sequenced.put("\uD83D\uDE00", 3);
+        sequenced.put("\uFF5A", 4);
         sequenced.put("a", 2);
-        assertEquals(List.of("z", "a"), List.copyOf(loyal().then(sequenced).then().keySet()).subList(1, 3));
+        List<String> sorted = List.of("a", "discount", "z", "\uFF5A", "\uD83D\uDE00");
+        assertEquals(sorted, List.copyOf(loyal().then(sequenced).then().keySet()));
         Map<String, Object> plain = new HashMap<>(sequenced);
-        assertEquals(List.of("a", "z"), List.copyOf(loyal().then(plain).then().keySet()).subList(1, 3));
+        assertEquals(sorted, List.copyOf(loyal().then(plain).then().keySet()));
+        // Of two conditions, the first by key is reported.
+        Map<String, Object> conditions = new LinkedHashMap<>();
+        conditions.put("b", field("x").gt(1));
+        conditions.put("a", field("y").gt(1));
+        RuleDefinitionException error = assertThrows(RuleDefinitionException.class, () -> loyal().then(conditions));
+        assertTrue(error.getMessage().contains("\"a\""), error.getMessage());
         // Code as the action; a named one keeps its name.
         Rule coded = loyal().action(context -> {});
         assertTrue(coded.action().isPresent());

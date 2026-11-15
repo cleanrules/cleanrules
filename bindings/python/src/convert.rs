@@ -448,11 +448,18 @@ fn metadata_at(
         }
         open.push(id);
         let converted = if let Ok(dict) = value.cast::<PyDict>() {
-            let mut map = Map::new();
+            let mut entries = Vec::with_capacity(dict.len());
             for (key, item) in dict.iter() {
                 let Ok(key) = key.extract::<String>() else {
                     return Ok(Err(format!("{at} has a key that is not a string: {key}")));
                 };
+                entries.push((key, item));
+            }
+            // By key, by code point, as the core visits a map, so the first
+            // problem is that of the first key (`spec/json-format.md`, *Objects*).
+            entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+            let mut map = Map::new();
+            for (key, item) in entries {
                 match metadata_at(&item, &format!("{at}[{key:?}]"), open, count)? {
                     Ok(item) => map.insert(key, item),
                     Err(problem) => return Ok(Err(problem)),

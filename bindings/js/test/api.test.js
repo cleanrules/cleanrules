@@ -51,7 +51,7 @@ describe('Rule', () => {
     assert.ok(Object.isFrozen(rule))
     assert.equal(rule.name, 'vip')
     assert.equal(rule.when, when)
-    assert.deepEqual(Object.keys(rule.then), ['discount', 'base', '__proto__'])
+    assert.deepEqual(Object.keys(rule.then), ['__proto__', 'base', 'discount'])
     assert.equal(rule.then.discount.value.text, '0.15')
     assert.ok(rule.then.base.sameAs(F.price.mul(2)))
     assert.ok(Object.isFrozen(rule.then))
@@ -117,6 +117,23 @@ describe('Rule', () => {
     throwsWith(() => new Rule('r', F.x, { v: F.y.gt(1) }), RuleDefinitionError, /payload value "v" is a condition/)
     throwsWith(() => new Rule('r', F.x, null, { do: '' }), RuleDefinitionError, /action name cannot be empty/)
     throwsWith(() => new Rule('r', F.x, null, { metadata: { d: decimal('1e40') } }), RuleDefinitionError, /metadata\["d"\] is out of range/)
+  })
+
+  test('a payload and metadata are associations: keys by code point, errors at the first key', () => {
+    // U+FF5A sorts before U+1F600 by code point, after it by UTF-16 code unit.
+    const [wide, emoji] = ['\uFF5A', '\u{1F600}']
+    const rule = new Rule('r', F.x, { b: 1, a: 2, [emoji]: 3, [wide]: 4 })
+    assert.deepEqual(Object.keys(rule.then), ['a', 'b', wide, emoji])
+    const viaMap = new Rule('r', F.x, new Map([['b', 1], [emoji, 3], [wide, 4], ['a', 2]]))
+    assert.deepEqual(Object.keys(viaMap.then), ['a', 'b', wide, emoji])
+    const output = new RuleSet([rule]).evaluate({ x: true }).output
+    assert.deepEqual(Object.keys(output), ['a', 'b', wide, emoji])
+    throwsWith(() => new Rule('r', F.x, { b: NaN, [emoji]: NaN, a: NaN }), ExpressionError, /^then\["a"\]/)
+    throwsWith(() => new Rule('r', F.x, { b: F.y.gt(1), a: F.z.gt(1) }), RuleDefinitionError, /payload value "a" is a condition/)
+    throwsWith(() => new Rule('r', F.x, null, { metadata: { b: NaN, a: { d: NaN, c: NaN } } }), RuleDefinitionError, /metadata\["a"\]\["c"\] is NaN/)
+    const meta = new Rule('r', F.x, null, { metadata: { b: 1, [emoji]: 2, [wide]: 3, a: { d: 1, c: 2 } } }).metadata
+    assert.deepEqual(Object.keys(meta), ['a', 'b', wide, emoji])
+    assert.deepEqual(Object.keys(meta.a), ['c', 'd'])
   })
 })
 

@@ -132,7 +132,9 @@ class Rule:
         name: Unique within a rule set; appears in decisions and errors.
         when: The condition; the rule fires when it is true.
         then: The payload: string keys whose values are constants or value
-            expressions such as `F.total * 0.1`. Its order is kept.
+            expressions such as `F.total * 0.1`. A payload is an association:
+            its keys are kept, evaluated and given back sorted by Unicode code
+            point, whatever their order here.
         priority: Used by the `PRIORITY` hit policy; higher wins.
         tags: Labels for grouping and filtering.
         description: A human-readable description.
@@ -240,7 +242,7 @@ class Rule:
 
     @property
     def then(self) -> Mapping[str, Expr]:
-        """The payload, in order; empty when the rule has none."""
+        """The payload, keys sorted by Unicode code point; empty when the rule has none."""
         return dict(self._then)
 
     @property
@@ -373,10 +375,14 @@ def _payload(rule: str, then: Mapping[str, object] | None) -> dict[str, Expr]:
             rule=rule,
             hint='e.g. then={"discount": 0.1}',
         )
-    payload: dict[str, Expr] = {}
-    for key, value in then.items():
+    items = list(then.items())
+    for key, _ in items:
         if not isinstance(key, str):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise RuleDefinitionError(f"payload keys must be strings, got {key!r}", rule=rule)
+    payload: dict[str, Expr] = {}
+    # A payload is an association: keys by code point, as the core keeps them,
+    # so the first error is that of the first key (`spec/rules.md`, *Rules*).
+    for key, value in sorted(items, key=lambda item: item[0]):
         if isinstance(value, Expr):
             payload[key] = value
             continue

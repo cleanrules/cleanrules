@@ -227,12 +227,12 @@
       }
     },
     {
-      "id": "format/rules/payload-order",
+      "id": "format/rules/payload-keys-sorted",
       "spec": [
         "json-format.md#rules",
-        "errors.md#which-error-comes-first"
+        "json-format.md#objects"
       ],
-      "description": "payload members keep their order",
+      "description": "payload members have no order: they are read whatever their order and written sorted by code point",
       "given": {
         "kind": "read",
         "document": {
@@ -292,14 +292,6 @@
               }
             },
             "then": {
-              "b": {
-                "op": "const",
-                "value": 1
-              },
-              "a": {
-                "op": "const",
-                "value": 2
-              },
               "10": {
                 "op": "const",
                 "value": 3
@@ -307,9 +299,218 @@
               "2": {
                 "op": "const",
                 "value": 4
+              },
+              "a": {
+                "op": "const",
+                "value": 2
+              },
+              "b": {
+                "op": "const",
+                "value": 1
               }
             }
           }
+        }
+      }
+    },
+    {
+      "id": "format/rules/payload-condition-first-by-key",
+      "spec": [
+        "json-format.md#rules",
+        "json-format.md#objects",
+        "errors.md#which-error-comes-first"
+      ],
+      "description": "of two payload values that are conditions, the error is at the first key by code point, whatever the order of the text",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {
+              "b": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "a": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "y"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 2
+                }
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/rule/then/a"
+        }
+      }
+    },
+    {
+      "id": "format/rules/payload-shape-first-by-key",
+      "spec": [
+        "json-format.md#rules",
+        "json-format.md#errors-and-limits",
+        "json-format.md#objects"
+      ],
+      "description": "shape errors in payload values are found key by key, by code point, whatever the order of the text",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {
+              "b": {
+                "op": "nope"
+              },
+              "B": {
+                "op": "const"
+              },
+              "a": {
+                "op": "nope"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/then/B/value"
+        }
+      }
+    },
+    {
+      "id": "format/rules/metadata-error-first-by-key",
+      "spec": [
+        "json-format.md#rules",
+        "json-format.md#lists-and-maps",
+        "json-format.md#objects"
+      ],
+      "description": "metadata and the maps inside it are read key by key, by code point: the first malformed value by key is reported",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "metadata": {
+              "n": {
+                "$date": "2026-02-30"
+              },
+              "m": {
+                "b": {
+                  "$int": "x"
+                },
+                "a": {
+                  "$int": "y"
+                }
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/metadata/m/a/$int"
+        }
+      }
+    },
+    {
+      "id": "format/rules/unknown-keys-first-by-key",
+      "spec": [
+        "json-format.md#errors-and-limits",
+        "json-format.md#objects"
+      ],
+      "description": "of two unknown keys, the first by code point is reported, whatever the order of the text",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "zz": 1,
+            "aa": 2
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/aa"
         }
       }
     },

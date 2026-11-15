@@ -102,9 +102,10 @@ pub unsafe extern "C" fn cr_rule_new(
     unsafe { call(error, body) }
 }
 
-/// The rule with `key` in its payload, given `value` (copied): a new key goes
-/// last, and a key it has keeps its place and takes the new value. A
-/// condition as the value is a `CR_RULE_DEFINITION_ERROR`.
+/// The rule with `key` in its payload, given `value` (copied); a key it has
+/// takes the new value. A payload is an association: its keys are kept sorted
+/// by Unicode code point, whatever the order they are added in. A condition
+/// as the value is a `CR_RULE_DEFINITION_ERROR`.
 ///
 /// # Safety
 ///
@@ -218,7 +219,7 @@ pub unsafe extern "C" fn cr_rule_with_description(
 }
 
 /// The rule with this metadata instead of its own: `metadata` is a map of
-/// data values (copied), in its order. An opaque value or a null with a
+/// data values (copied); like every map, its keys have no order. An opaque value or a null with a
 /// reason other than `CR_REASON_NULL` anywhere in it is a
 /// `CR_RULE_DEFINITION_ERROR` that names where; a `metadata` that is not a
 /// map, `CR_INVALID_ARGUMENT`.
@@ -507,7 +508,8 @@ fn entry(rule: &Rule, index: usize) -> Outcome<&(String, cleanrules::ast::Node)>
     })
 }
 
-/// The key of the payload entry at `index`, in order, borrowed from the rule
+/// The key of the payload entry at `index`, by key (Unicode code point order:
+/// a payload is an association, `spec/rules.md`, *Rules*), borrowed from the rule
 /// and not NUL-terminated.
 ///
 /// # Safety
@@ -531,7 +533,7 @@ pub unsafe extern "C" fn cr_rule_payload_key(
     }
 }
 
-/// A copy of the value node of the payload entry at `index`, in order, freed
+/// A copy of the value node of the payload entry at `index`, by key, freed
 /// with `cr_node_free`.
 ///
 /// # Safety

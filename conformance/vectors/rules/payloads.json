@@ -209,14 +209,13 @@
       }
     },
     {
-      "id": "rules/payloads/order-kept",
+      "id": "rules/payloads/keys-without-order",
       "spec": [
-        "rules.md#when-payloads-are-evaluated",
-        "rules.md#outputs",
         "rules.md#rules",
-        "data-model.md#lists-and-maps"
+        "rules.md#outputs",
+        "json-format.md#objects"
       ],
-      "description": "payload keys keep their order",
+      "description": "a payload is an association: the order of its keys in the document changes nothing, and writers give them sorted by code point",
       "given": {
         "kind": "evaluate",
         "ruleset": {
@@ -271,14 +270,6 @@
                 ]
               },
               "then": {
-                "b": {
-                  "op": "const",
-                  "value": 1
-                },
-                "a": {
-                  "op": "const",
-                  "value": 2
-                },
                 "10": {
                   "op": "const",
                   "value": 3
@@ -286,6 +277,14 @@
                 "2": {
                   "op": "const",
                   "value": 4
+                },
+                "a": {
+                  "op": "const",
+                  "value": 2
+                },
+                "b": {
+                  "op": "const",
+                  "value": 1
                 }
               }
             }
@@ -297,12 +296,13 @@
       }
     },
     {
-      "id": "rules/payloads/map-order-kept",
+      "id": "rules/payloads/map-keys-without-order",
       "spec": [
         "data-model.md#lists-and-maps",
-        "rules.md#outputs"
+        "rules.md#outputs",
+        "json-format.md#objects"
       ],
-      "description": "a map passed through a payload keeps the order of its keys, which are not sorted, also in a nested map",
+      "description": "a map passed through a payload is the same map whatever the order of its keys, also in a nested map, and writers give it sorted by code point",
       "given": {
         "kind": "evaluate",
         "ruleset": {
@@ -363,13 +363,13 @@
                     "m"
                   ],
                   "value": {
-                    "b": 1,
+                    "Z": 2.5,
                     "a": {
-                      "z": true,
-                      "y": null
+                      "y": null,
+                      "z": true
                     },
-                    "\u00e9": "x",
-                    "Z": 2.5
+                    "b": 1,
+                    "\u00e9": "x"
                   }
                 }
               }

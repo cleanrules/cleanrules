@@ -20,7 +20,7 @@ import { CleanRulesError, RuleDefinitionError, UnsupportedError, fromNative } fr
 import { decode, int } from '../output.js'
 import { capture, encodeData, notData, registerOpaque } from '../read.js'
 import { ActionContext, Explanation, INTERNAL, RuleResult, Summary, notFound } from './results.js'
-import { brand, options, sameBuild, show } from './shared.js'
+import { brand, byCodePoint, options, sameBuild, show } from './shared.js'
 
 const INSPECT = Symbol.for('nodejs.util.inspect.custom')
 const DENO_INSPECT = Symbol.for('Deno.customInspect')
@@ -79,7 +79,11 @@ function rules(native, expressions, trees, build) {
     return new RuleDefinitionError(message, options)
   }
 
-  /** The payload: each value a node, or a constant made from it. */
+  /**
+   * The payload: each value a node, or a constant made from it, by key, by
+   * code point (a payload is an association, `spec/rules.md`, *Rules*), so the
+   * first error is that of the first key, as in the core.
+   */
   function payload(rule, then) {
     if (then === undefined || then === null) return []
     const entries = entriesOf(then)
@@ -87,10 +91,14 @@ function rules(native, expressions, trees, build) {
     if (entries === null || then instanceof Expr) {
       throw definition(`then must be an object of outputs, not ${show(then)}`, rule, 'e.g. { discount: 0.1 }')
     }
-    return entries.map(([key, value]) => {
+    for (const [key] of entries) {
       if (typeof key !== 'string') {
         throw definition(`payload keys must be strings, not ${show(key)}`, rule)
       }
+    }
+    // A `Map` may repeat no key, and a plain object neither: sorting is enough.
+    const sorted = [...entries].sort(([a], [b]) => byCodePoint(a, b))
+    return sorted.map(([key, value]) => {
       if (value instanceof Expr) return [key, value]
       sameBuild(value, build)
       try {
@@ -267,7 +275,11 @@ function rules(native, expressions, trees, build) {
       return this.#when
     }
 
-    /** The payload, in order: each key with its node (frozen; empty without one). */
+    /**
+     * The payload: each key with its node, added by Unicode code point
+     * (frozen; empty without one). A plain object lists integer-like keys
+     * first, which means nothing: a payload has no order.
+     */
     get then() {
       return this.#then
     }

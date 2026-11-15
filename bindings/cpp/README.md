@@ -326,7 +326,8 @@ Rules read back: `ruleset::rule_at(i)` and `document::as_rule()` give a
 syntax (`rule_1` without a `RULE` line). A rule gives its `name()` (borrowed,
 like `ruleset::rule_name`), `description()` and `action_name()` (copied,
 `std::nullopt` when it has none), `priority()`, `when()` and `payload()` (each
-key with its value node, in order). `document::from_condition(node)` and `document::from_rule(rule)`
+key with its value node, keys sorted by Unicode code point: a payload has
+no order). `document::from_condition(node)` and `document::from_rule(rule)`
 make documents to `write`, and `document::as_condition()` reads a condition
 document's node.
 

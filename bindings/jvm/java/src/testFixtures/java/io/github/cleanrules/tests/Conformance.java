@@ -1213,8 +1213,64 @@ class Conformance {
         return out;
     }
 
+    /** Strings by Unicode code point, not by UTF-16 code unit: the runner's own. */
+    static int byCodePoint(String a, String b) {
+        return java.util.Arrays.compare(a.codePoints().toArray(), b.codePoints().toArray());
+    }
+
+    /**
+     * Where a map given back lists its keys out of code point order
+     * (spec/data-model.md, Lists and maps), or null.
+     */
+    static String outOfOrder(Object value, String where) {
+        if (value instanceof Optional<?> optional) {
+            return optional.map(v -> outOfOrder(v, where)).orElse(null);
+        }
+        if (value instanceof List<?> list) {
+            for (int i = 0; i < list.size(); i++) {
+                String found = outOfOrder(list.get(i), where + "[" + i + "]");
+                if (found != null) {
+                    return found;
+                }
+            }
+            return null;
+        }
+        if (value instanceof Map<?, ?> map) {
+            List<String> keys = new ArrayList<>();
+            map.keySet().forEach(key -> keys.add((String) key));
+            List<String> sorted = new ArrayList<>(keys);
+            sorted.sort(Conformance::byCodePoint);
+            if (!keys.equals(sorted)) {
+                return where + ": keys " + keys + " are not by code point";
+            }
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                String found = outOfOrder(entry.getValue(), where + "." + entry.getKey());
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** The maps a decision and its rules give back, by code point. */
+    private static String givenByKey(Decision d) {
+        List<String> found = new ArrayList<>();
+        found.add(outOfOrder(d.outputs(), "outputs()"));
+        found.add(outOfOrder(d.aggregated(), "aggregated()"));
+        for (Rule rule : d.ruleSet().rules()) {
+            found.add(outOfOrder(rule.then(), rule.name() + ".then()"));
+            found.add(outOfOrder(rule.metadata(), rule.name() + ".metadata()"));
+        }
+        return found.stream().filter(java.util.Objects::nonNull).findFirst().orElse(null);
+    }
+
     /** A {@link Decision} of the idiomatic API against the expected decision. */
     private static String checkDecision(RuleSet ruleset, Decision d, Map<?, ?> expected, Mode mode) {
+        String ordered = givenByKey(d);
+        if (ordered != null) {
+            return ordered;
+        }
         List<?> results = array(need(expected, "results"));
         if (d.ruleSet() != ruleset) {
             return "ruleSet() is another rule set";
@@ -1446,7 +1502,12 @@ class Conformance {
             return rule.name() + ": when() " + TestJson.write(when);
         }
         List<Object> keys = new ArrayList<>(rule.then().keySet());
-        List<Object> wantKeys = source.get("then") instanceof Map<?, ?> then ? new ArrayList<>(then.keySet()) : List.of();
+        List<String> wantKeys = new ArrayList<>();
+        if (source.get("then") instanceof Map<?, ?> then) {
+            then.keySet().forEach(key -> wantKeys.add((String) key));
+        }
+        // A payload's keys come by code point, whatever the document's order.
+        wantKeys.sort(Conformance::byCodePoint);
         if (!keys.equals(wantKeys)) {
             return rule.name() + ": then() keys " + keys;
         }
@@ -1746,7 +1807,8 @@ class Conformance {
             {"0.1", "0.10000000000000001", true}, // the same double
             {"-0.0", "0.0", false},
             {"[1,2]", "[2,1]", false},
-            {"{\"a\":1,\"b\":2}", "{\"b\":2,\"a\":1}", false},
+            {"{\"a\":1,\"b\":2}", "{\"b\":2,\"a\":1}", true}, // members have no order
+            {"{\"a\":1,\"b\":2}", "{\"a\":1,\"c\":2}", false},
             {"{\"a\":1}", "{\"a\":1,\"b\":2}", false},
             {"{\"$opaque\":\"socket\"}", "{\"$opaque\":\"bytes\"}", true},
             {"{\"$opaque\":\"socket\"}", "null", false},

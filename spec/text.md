@@ -111,10 +111,13 @@ IF <condition>
 - The name is a name or a string. Without a `RULE` header, a rule is named
   `rule_<n>` by its position in the text, from 1: `IF a > 1 THEN x = 1` alone
   is the rule `rule_1`.
-- The payload is optional; its keys are names or strings, in order, and its
-  values are value expressions (`THEN tax = order.total * 0.21`). A condition
+- The payload is optional; its keys are names or strings, and its values are
+  value expressions (`THEN tax = order.total * 0.21`). A payload is an
+  association (`rules.md`, *Rules*): its keys are kept, and printed, sorted by
+  Unicode code point, whatever the order they are written in. A condition
   there is a `rule_definition_error`, as in JSON (`rules.md`), located at the
-  value; so is a key written twice, located at its second occurrence.
+  value (of two, the one whose key comes first by code point); so is a key
+  written twice, located at its second occurrence.
 - `DO` names the rule's action (`rules.md`, *Actions*): a name or a non-empty
   string, such as `DO notify_billing` or `DO "notify billing"`. Like every
   keyword, `do` in any case is no longer a name: a field, key or rule named

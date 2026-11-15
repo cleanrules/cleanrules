@@ -195,7 +195,8 @@ func TestConformanceComparator(t *testing.T) {
 		{`-0.0`, `0.0`, false},
 		{`[1,2]`, `[2,1]`, false},
 		{`[1]`, `[1,2]`, false},
-		{`{"a":1,"b":2}`, `{"b":2,"a":1}`, false},
+		{`{"a":1,"b":2}`, `{"b":2,"a":1}`, true}, // members have no order
+		{`{"a":1,"b":2}`, `{"a":1,"c":2}`, false},
 		{`{"a":1}`, `{"a":1,"b":2}`, false},
 		{`{"$opaque":"socket"}`, `{"$opaque":"bytes"}`, true},
 		{`{"$opaque":"socket"}`, `null`, false},
@@ -212,22 +213,17 @@ func TestConformanceComparator(t *testing.T) {
 			t.Errorf("exact: %s vs %s: %v", c.a, c.b, got)
 		}
 	}
-	// What Go gives back, in that mode only: maps without order, the zone
-	// UTC as Z, a zone Go does not know at its offset.
-	unordered := func(s string) any {
-		o := parse(s).(*jsonObject)
-		o.unordered = true
-		return o
-	}
+	// What Go gives back, in that mode only: the zone UTC as Z, a zone Go
+	// does not know at its offset.
 	for _, c := range []struct {
 		a    any
 		b    string
 		same bool
 	}{
-		{unordered(`{"a":1,"b":2}`), `{"b":2,"a":1}`, true},
-		{unordered(`{"a":1,"b":2}`), `{"b":2,"a":1.0}`, false},
-		{unordered(`{"a":1}`), `{"a":1,"b":2}`, false},
-		{unordered(`{"a":{"c":1,"d":2}}`), `{"a":{"d":2,"c":1}}`, false}, // an inner map is a map of its own
+		{parse(`{"a":1,"b":2}`), `{"b":2,"a":1}`, true},
+		{parse(`{"a":1,"b":2}`), `{"b":2,"a":1.0}`, false},
+		{parse(`{"a":1}`), `{"a":1,"b":2}`, false},
+		{parse(`{"a":{"c":1,"d":2}}`), `{"a":{"d":2,"c":1}}`, true},
 		{parse(`{"$datetime":"2026-10-31T09:30:00Z"}`), `{"$datetime":"2026-10-31T09:30:00+00:00[UTC]"}`, true},
 		{parse(`{"$datetime":"2026-10-31T09:30:00+01:00"}`), `{"$datetime":"2026-10-31T09:30:00+01:00[Mars/Olympus]"}`, true},
 		{parse(`{"$datetime":"2026-10-31T09:30:00+01:00"}`), `{"$datetime":"2026-10-31T09:30:00+01:00[Europe/Madrid]"}`, false},
@@ -237,9 +233,6 @@ func TestConformanceComparator(t *testing.T) {
 		if got := sameJSON(c.a, parse(c.b), modeGiven); got != c.same {
 			t.Errorf("given: %s vs %s: %v", writeJSON(c.a), c.b, got)
 		}
-	}
-	if sameJSON(unordered(`{"a":1,"b":2}`), parse(`{"a":1,"b":2}`), modeExact) {
-		t.Error("exact: a map given back is never what the core writes")
 	}
 	if !sameJSON(nil, parse(`{"$opaque":"x"}`), modeRecorded) {
 		t.Error("recorded: an opaque value comes back as nil")
@@ -323,9 +316,8 @@ var wrongVectors = [][3]string{
 	{"ast/types/aware-by-instant", "08:30:00Z", "08:30:01Z"},
 	{"format/tables/grid-header-empty", `"pointer":"/header/1"`, `"pointer":"/header/0"`},
 	{"format/decisions/tree-too-deep", `"code":"limit_exceeded"`, `"code":"format_error"`},
-	// Go's own: the order of a map passed through to an output, and a
-	// max_values limit's row.
-	{"rules/payloads/map-order-kept", `"value":{"b":1,"a":{"z":true,"y":null},`, `"value":{"a":{"z":true,"y":null},"b":1,`},
+	// A map passed through to an output, and a max_values limit's row.
+	{"rules/payloads/map-keys-without-order", `"Z":2.5`, `"Z":2.25`},
 	{"rules/limits/batch-row", `"row":1`, `"row":0`},
 }
 

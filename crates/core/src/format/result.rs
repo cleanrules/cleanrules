@@ -146,7 +146,10 @@ pub fn any_result_value(tree: &AnyTree<'_>) -> Value {
 /// [`write_result`]'s JSON (`spec/json-format.md`, *Result trees*): a map per
 /// result, a truth as a boolean or a plain null, paths as lists of strings and
 /// ints, and the values themselves, opaque ones included. Writing it with
-/// [`write_value`](crate::format::write_value) gives [`write_result`]'s JSON.
+/// [`write_value`](crate::format::write_value) gives [`write_result`]'s tree
+/// with each object's members sorted by key, as every map is (`spec/json-format.md`,
+/// *Objects*); [`write_result`] writes them in the order of the format's table,
+/// the canonical form.
 #[must_use]
 pub fn result_value(result: &Evaluated<'_, Truth>) -> Value {
     self::result(result, truth)
@@ -154,7 +157,7 @@ pub fn result_value(result: &Evaluated<'_, Truth>) -> Value {
 
 /// [`result_value`] under a graded logic: a truth as a float, or a list of two
 /// floats. Writing it with [`write_value`](crate::format::write_value) gives
-/// [`write_graded_result`]'s JSON.
+/// [`write_graded_result`]'s tree, its members sorted by key.
 #[must_use]
 pub fn graded_result_value(result: &Evaluated<'_, Interval>) -> Value {
     self::result(result, graded)
@@ -168,14 +171,31 @@ mod tests {
     };
     use crate::eval::{AnyTree, Options, evaluate_tree, evaluate_value_tree};
     use crate::format::write_value;
-    use crate::json::{Limits, to_string};
+    use crate::json::{Json, Limits, to_string};
     use crate::logic::{AnyLogic, Complement, Fuzzy, Interval, Kleene, Norm};
     use crate::text::parse_node;
     use crate::value::{Map, Value};
 
-    /// The value has the tree's JSON structure: written, it is the JSON.
-    /// Graded truth values are numbers and intervals, and the value form
-    /// writes as the JSON form.
+    /// Every object's members sorted by key, recursively: the JSON of a value,
+    /// whose maps are sorted (`spec/json-format.md`, *Objects*).
+    fn by_key(json: Json) -> Json {
+        match json {
+            Json::Object(ref members) => {
+                let mut members: Vec<(String, Json)> = members
+                    .iter()
+                    .map(|(k, v)| (k.clone(), by_key(v.clone())))
+                    .collect();
+                members.sort_by(|(a, _), (b, _)| a.cmp(b));
+                Json::Object(members)
+            }
+            Json::Array(ref items) => Json::Array(items.iter().cloned().map(by_key).collect()),
+            other => other,
+        }
+    }
+
+    /// The value has the tree's JSON structure: written, it is the JSON with
+    /// its members sorted by key. Graded truth values are numbers and
+    /// intervals, and the value form writes as the JSON form.
     #[test]
     fn graded_trees() {
         let limits = Limits::default();
@@ -188,7 +208,7 @@ mod tests {
         let tree = evaluate_tree(&condition, &input, &logic, Options::default()).unwrap();
         assert_eq!(
             write_value(&graded_result_value(&tree)),
-            write_graded_result(&tree)
+            by_key(write_graded_result(&tree))
         );
         let json = to_string(&write_graded_result(&tree));
         assert!(
@@ -220,7 +240,7 @@ mod tests {
                 .evaluate_tree(&condition, &input, Options::default())
                 .unwrap();
             let json = write_any_result(&tree);
-            assert_eq!(write_value(&any_result_value(&tree)), json);
+            assert_eq!(write_value(&any_result_value(&tree)), by_key(json.clone()));
             match (&tree, logic.as_fuzzy()) {
                 (AnyTree::Crisp(crisp), None) => assert_eq!(json, write_result(crisp)),
                 (AnyTree::Graded(graded), Some(_)) => {
@@ -258,14 +278,20 @@ mod tests {
         )
         .unwrap();
         let tree = evaluate_tree(&condition, &input, &Kleene, options()).unwrap();
-        assert_eq!(write_value(&result_value(&tree)), write_result(&tree));
+        assert_eq!(
+            write_value(&result_value(&tree)),
+            by_key(write_result(&tree))
+        );
         let Value::Map(root) = result_value(&tree) else {
             panic!("not a map")
         };
         assert!(matches!(root.get("truth"), Some(Value::Null(_))));
         let value = parse_node("abs(price * 2) + missing", &limits).unwrap();
         let tree = evaluate_value_tree(&value, &input, &Kleene, options()).unwrap();
-        assert_eq!(write_value(&result_value(&tree)), write_result(&tree));
+        assert_eq!(
+            write_value(&result_value(&tree)),
+            by_key(write_result(&tree))
+        );
         // An opaque value is itself in the value.
         let value = parse_node("thing", &limits).unwrap();
         let tree = evaluate_value_tree(&value, &input, &Kleene, options()).unwrap();

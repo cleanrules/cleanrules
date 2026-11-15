@@ -1,9 +1,9 @@
 // A lossless JSON reader, writer and comparer for the conformance runner
 // (conformance/README.md, *Comparing*), which never uses the library's own
 // JSON or equality: numbers keep their text (`JSON.parse` turns `1.0` into
-// `1` and reads integers beyond 2⁵³ through a float) and objects their member
-// order (plain objects move integer-like keys first), as the C++ runner's
-// json.hpp does.
+// `1` and reads integers beyond 2⁵³ through a float), as the C++ runner's
+// json.hpp does. Objects keep their members as read, but member order is
+// never compared (`spec/json-format.md`, *Objects*).
 
 class Num {
   /**
@@ -24,7 +24,7 @@ class Num {
 }
 
 class Obj {
-  /** `entries` are the `[key, value]` members, in order. */
+  /** `entries` are the `[key, value]` members, as read; their order means nothing. */
   constructor(entries) {
     this.entries = entries
   }
@@ -173,13 +173,13 @@ function sameNumber(a, b, given) {
 
 /**
  * Whether `actual` matches `expected` (`conformance/README.md`, *Comparing*):
- * object members in order, ints exact at any size, floats by exact double and
- * sign of zero, any two opaque values equal, and `detail` in reasons ignored.
+ * objects by their members whatever their order, ints exact at any size,
+ * floats by exact double and sign of zero, any two opaque values equal, and
+ * `detail` in reasons ignored.
  *
  * `given` says that `actual` was encoded from values given back to
  * JavaScript, so that an int made from a `number` matches a float with the
- * same value (see `Num`); the order of a map's members given back is handled
- * by the caller (`jsOrder`). `recorded` accepts `null` for an opaque value, as
+ * same value (see `Num`). `recorded` accepts `null` for an opaque value, as
  * a decision read from a document gives it back.
  */
 function same(actual, expected, mode = {}, inReason = false) {
@@ -197,30 +197,20 @@ function same(actual, expected, mode = {}, inReason = false) {
     const strip = (o) => (inReason ? o.entries.filter(([k]) => k !== 'detail') : o.entries)
     const a = strip(actual)
     const e = strip(expected)
-    return a.length === e.length && e.every(([k, v], n) => a[n][0] === k && same(a[n][1], v, mode, k === 'reason'))
+    const value = (k) => a.find(([key]) => key === k)
+    return a.length === e.length && e.every(([k, v]) => value(k) !== undefined && same(value(k)[1], v, mode, k === 'reason'))
   }
   return actual === expected
 }
 
-/** Whether a key is an array index, which a plain object lists first, in ascending order. */
-const isIndex = (key) => /^(?:0|[1-9]\d*)$/.test(key) && Number(key) < 2 ** 32 - 1
-
-/**
- * A data value of the format with each map's members in the order a plain
- * object lists them (indices first, ascending, then the rest in order), as
- * a map comes back to JavaScript (`spec/data-model.md`, *Values given back*:
- * "equality ignores that order").
- */
-function jsOrder(value) {
-  if (Array.isArray(value)) return value.map(jsOrder)
-  if (!(value instanceof Obj)) return value
-  if (value.entries.length === 1 && value.entries[0][0].startsWith('$')) {
-    const [[key, inner]] = value.entries
-    return key === '$map' ? new Obj([[key, jsOrder(inner)]]) : value
+/** Strings by Unicode code point (not by UTF-16 code unit), the runner's own. */
+function byCodePoint(a, b) {
+  const x = [...a].map((c) => c.codePointAt(0))
+  const y = [...b].map((c) => c.codePointAt(0))
+  for (let i = 0; i < Math.min(x.length, y.length); i += 1) {
+    if (x[i] !== y[i]) return x[i] - y[i]
   }
-  const entries = value.entries.map(([k, v]) => [k, jsOrder(v)])
-  const indices = entries.filter(([k]) => isIndex(k)).sort(([a], [b]) => Number(a) - Number(b))
-  return new Obj([...indices, ...entries.filter(([k]) => !isIndex(k))])
+  return x.length - y.length
 }
 
-export { Num, Obj, jsOrder, parse, same, tree, write }
+export { Num, Obj, byCodePoint, parse, same, tree, write }

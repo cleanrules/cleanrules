@@ -436,10 +436,11 @@ fn an_open_grid_takes_nodes_and_outputs_and_the_table_says_what_it_holds() {
     let row = handle(|out, error| unsafe { cr_document_table_row(table.0, 0, out, error) })
         .map(Value)
         .unwrap();
-    assert_eq!(
-        value_to_json(row.0),
-        r#"{"name":"minor","priority":null,"description":null}"#
-    );
+    // A map's members have no order (they come sorted by key).
+    assert!(same(
+        &json(&value_to_json(row.0)),
+        &json(r#"{"name":"minor","priority":null,"description":null}"#)
+    ));
     // SAFETY: a live document.
     let input = handle(|out, error| unsafe { cr_document_table_input(table.0, 0, out, error) })
         .map(Node)
@@ -507,7 +508,18 @@ fn an_open_header_is_checked_at_the_first_row_with_pointers() {
     );
 }
 
+/// The canonical JSON of the whole tree (`cr_tree_to_json`).
 fn tree_json(tree: &Tree) -> String {
+    tree_json_at(tree, 0).unwrap()
+}
+
+fn tree_json_at(tree: &Tree, index: usize) -> Result<String, Failure> {
+    // SAFETY: a live tree; the text is freed by `text`.
+    text(|out, len, error| unsafe { cr_tree_to_json(tree.0, index, out, len, error) })
+}
+
+/// The tree as a value, written to JSON: its members sorted by key.
+fn tree_value_json(tree: &Tree) -> String {
     // SAFETY: a live tree.
     let value = handle(|out, error| unsafe { cr_tree_value(tree.0, out, error) })
         .map(Value)
@@ -530,9 +542,32 @@ fn result_trees_are_handles_with_their_value_and_nodes() {
     })
     .map(Tree)
     .unwrap();
-    // The value writes as the JSON result tree.
+    // The canonical JSON is the core's, exactly; the value is the same tree,
+    // its members sorted by key.
     let wanted = common::evaluate_node(&node, &input, None, false, false).unwrap();
     assert_eq!(tree_json(&tree), wanted);
+    assert!(same(&json(&tree_value_json(&tree)), &json(&wanted)));
+    assert_ne!(tree_value_json(&tree), wanted);
+    // A subtree by its pre-order index, and an index out of the tree.
+    assert_eq!(
+        tree_json_at(&tree, 4).unwrap(),
+        r#"{"op":"in","truth":null,"reason":{"code":"missing_field","paths":[["country"]]},"children":[{"op":"field","path":["country"],"value":null,"reason":{"code":"missing_field","paths":[["country"]]}}]}"#
+    );
+    assert_eq!(
+        tree_json_at(&tree, 2).unwrap(),
+        r#"{"op":"field","path":["age"],"value":20}"#
+    );
+    assert_eq!(
+        tree_json_at(&tree, 6).unwrap_err().status,
+        CR_INVALID_ARGUMENT
+    );
+    assert_eq!(
+        // SAFETY: NULL is refused.
+        text(|out, len, error| unsafe { cr_tree_to_json(ptr::null(), 0, out, len, error) })
+            .unwrap_err()
+            .status,
+        CR_INVALID_ARGUMENT
+    );
     // SAFETY: a live tree.
     let len = unsafe { cr_tree_len(tree.0) };
     assert_eq!(len, 6);

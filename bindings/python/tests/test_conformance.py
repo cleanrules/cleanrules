@@ -26,7 +26,7 @@ import json
 import math
 import operator
 import zoneinfo
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, TypedDict, cast
@@ -114,7 +114,8 @@ def same(actual: Any, expected: Any) -> bool:
         if not isinstance(actual, dict):
             return False
         a, e = cast(dict[str, Any], actual), cast(dict[str, Any], expected)
-        return list(a) == list(e) and all(same(a[k], e[k]) for k in e)
+        # Members have no order (`json-format.md`, *Objects*).
+        return a.keys() == e.keys() and all(same(a[k], e[k]) for k in e)
     if isinstance(expected, list):
         if not isinstance(actual, list):
             return False
@@ -513,6 +514,29 @@ def run_json(vector: dict[str, Any]) -> None:
         )
 
 
+def by_key(value: Any, where: str) -> None:
+    """Every dict in `value` lists its keys by code point (data-model.md, *Lists and maps*)."""
+    if isinstance(value, Mapping):
+        mapping = cast(Mapping[Any, Any], value)
+        keys = list(mapping)
+        assert keys == sorted(keys), f"{where}: keys {keys} are not by code point"
+        for item in mapping.values():
+            by_key(item, where)
+    elif isinstance(value, (list, tuple)):
+        for item in cast(list[Any], value):
+            by_key(item, where)
+
+
+def given_by_key(decision: cleanrules.Decision) -> cleanrules.Decision:
+    """The maps a decision and its rules give back come by key, by code point."""
+    by_key(decision.outputs, "outputs")
+    by_key(decision.aggregated, "aggregated")
+    for rule in decision.ruleset:
+        by_key(dict(rule.then), f"{rule.name}.then")
+        by_key(dict(rule.metadata), f"{rule.name}.metadata")
+    return decision
+
+
 def run_native(vector: dict[str, Any]) -> None:
     given, expect = vector["given"], vector["expect"]
     kind = given["kind"]
@@ -545,18 +569,18 @@ def run_native(vector: dict[str, Any]) -> None:
             )
         else:
             expect_result(
-                lambda: (
-                    build_ruleset(given["ruleset"])
-                    .evaluate(native(given["input"]), max_values=max_values)
-                    .to_dict()["decision"]
-                ),
+                lambda: given_by_key(
+                    build_ruleset(given["ruleset"]).evaluate(
+                        native(given["input"]), max_values=max_values
+                    )
+                ).to_dict()["decision"],
                 expect,
                 "decision",
             )
     elif kind == "explain":
 
         def decision() -> cleanrules.Decision:
-            return build_ruleset(given["ruleset"]).evaluate(native(given["input"]))
+            return given_by_key(build_ruleset(given["ruleset"]).evaluate(native(given["input"])))
 
         expect_result(lambda: decision().to_dict()["decision"], expect, "decision")
         expect_result(lambda: decision().explain().to_dict()["explanation"], expect, "explanation")

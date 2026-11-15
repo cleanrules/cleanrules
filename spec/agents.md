@@ -57,8 +57,9 @@ a call reports **one** error, the first it finds in this order:
 2. the tool's members in the order of the table: a required member that is
    missing, a member of the wrong JSON type, or a `budget` out of its range,
    is a `format_error` at the member (`/budget`);
-3. members the tool does not take, and a member given twice, in the order they
-   are written: `format_error` at the member;
+3. members the tool does not take, and a member given twice, by key, by
+   Unicode code point (`json-format.md`, *Objects*), whatever the order they
+   are written in: `format_error` at the member;
 4. the members' values, in the order of the table:
    - a `ruleset` that the catalog does not have: `registry_error` with `name`,
      `available` (the catalog's names, sorted) and the pointer `/ruleset`;
@@ -242,7 +243,7 @@ decimal `0.1` (`ast.md`, *Types*).
 
 A field's types are those of every place that reads it, in the order the
 summary visits them (rules in rule order; the condition, then the payload
-values in member order; each node in depth-first pre-order), each once. Under
+values by key, by code point; each node in depth-first pre-order), each once. Under
 the logic `boolean`, a field used as a condition is `boolean`; the graded
 logics of phase J also accept numbers there (`ast.md`, *Truth values*).
 
@@ -262,8 +263,9 @@ their paths first appear among the fields. Each node gets a schema:
    | `string` | `{"type": "string"}` |
 
    Then, when it has children reached by keys, a map: `{"type": "object",
-   "properties": {...}}` with one property per key, in order, and the
-   `required` keys (*Required members*) when there are any. A map with a key
+   "properties": {...}}` with one property per key, by key, by Unicode code
+   point (an object has no order: `json-format.md`, *Objects*), and the
+   `required` keys (*Required members*), in that order, when there are any. A map with a key
    that starts with `$` is written `{"$map": ...}` (`json-format.md`, *Lists
    and maps*), so then the map's schema is instead `{"type": "object",
    "properties": {"$map": <the map's schema>}, "required": ["$map"],

@@ -1,7 +1,8 @@
 // A lossless JSON tree for the conformance runner, written for the test so
-// that it depends on nothing: object members stay in order, numbers keep the
+// that it depends on nothing: object members stay as read, numbers keep the
 // text they were written with, and strings decode every escape. Comparing two
-// trees follows conformance/README.md (*Comparing*): integers by exact value
+// trees follows conformance/README.md (*Comparing*): objects by their members
+// whatever their order (spec/json-format.md, *Objects*), integers by exact value
 // (of any size), floats by exact double value and the sign of zero, and any two
 // opaque values as equal. The library's own JSON is never the oracle.
 
@@ -452,8 +453,9 @@ inline std::string quote(std::string_view s) {
 }
 
 // Whether `actual` equals `expected` (conformance/README.md, *Comparing*):
-// members in order, numbers by lexical class and exact value, the sign of a
-// float zero, and any opaque value for an expected opaque one.
+// objects whatever the order of their members, numbers by lexical class and
+// exact value, the sign of a float zero, and any opaque value for an expected
+// opaque one.
 inline bool same(const value &actual, const value &expected) {
     if (expected.get("$opaque") != nullptr) {
         return actual.get("$opaque") != nullptr;
@@ -493,9 +495,9 @@ inline bool same(const value &actual, const value &expected) {
         if (actual.members.size() != expected.members.size()) {
             return false;
         }
-        for (std::size_t i = 0; i < expected.members.size(); ++i) {
-            if (actual.members[i].first != expected.members[i].first ||
-                !same(actual.members[i].second, expected.members[i].second)) {
+        for (const auto &member : expected.members) {
+            const value *found = actual.get(member.first);
+            if (found == nullptr || !same(*found, member.second)) {
                 return false;
             }
         }

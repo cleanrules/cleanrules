@@ -1,9 +1,9 @@
 //! A strict JSON reader and writer for the format of `spec/json-format.md`.
 //!
 //! Generic JSON libraries lose what the format compares: they let the last
-//! duplicate key win, read every number through a float, reorder object members
-//! and report positions in bytes. This reader keeps member order and each
-//! number's text, rejects duplicate keys, lone surrogates and byte order marks,
+//! duplicate key win, read every number through a float and report positions in
+//! bytes. This reader keeps each number's text, rejects duplicate keys, lone
+//! surrogates and byte order marks,
 //! enforces the size and nesting limits, and reports syntax errors by 1-based line
 //! and column in Unicode code points (`spec/json-format.md`, *Errors and limits*).
 //! It is iterative, so no input within the limits can overflow the stack.
@@ -13,7 +13,11 @@ use std::fmt::Write as _;
 
 use crate::error::{Error, ErrorCode, Result};
 
-/// A JSON value, with object members in document order and numbers as text.
+/// A JSON value, with numbers as text.
+///
+/// An object's members are kept in the order they were read or built, but that
+/// order means nothing (`spec/json-format.md`, *Objects*): readers visit them
+/// by key ([`by_key`]), and [`same`] compares objects whatever their order.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Json {
     /// `null`.
@@ -26,7 +30,7 @@ pub enum Json {
     String(String),
     /// An array.
     Array(Vec<Json>),
-    /// An object, members in document order, keys unique.
+    /// An object, keys unique; the order of its members is not significant.
     Object(Vec<(String, Json)>),
 }
 
@@ -676,8 +680,8 @@ fn write_string(out: &mut String, text: &str) {
 }
 
 /// Typed equality of JSON trees (`spec/json-format.md`, *Comparing documents*):
-/// members in order, numbers by lexical class and exact value, and the sign of a
-/// float zero.
+/// objects by their members whatever their order, numbers by lexical class and
+/// exact value, and the sign of a float zero.
 #[must_use]
 pub fn same(a: &Json, b: &Json) -> bool {
     // Pairs still to compare, with an explicit stack (see `to_string`), which
@@ -700,10 +704,13 @@ pub fn same(a: &Json, b: &Json) -> bool {
             }
             (Json::Object(x), Json::Object(y)) => {
                 x.len() == y.len()
-                    && x.iter().zip(y).all(|((k, p), (l, q))| {
-                        pending.push((p, q));
-                        k == l
-                    })
+                    && by_key(x)
+                        .into_iter()
+                        .zip(by_key(y))
+                        .all(|((k, p), (l, q))| {
+                            pending.push((p, q));
+                            k == l
+                        })
             }
             (Json::Null, Json::Null) => true,
             (Json::Bool(x), Json::Bool(y)) => x == y,
@@ -717,6 +724,18 @@ pub fn same(a: &Json, b: &Json) -> bool {
     true
 }
 
+/// An object's members sorted by key, by Unicode code point: the order in which
+/// readers visit them, so that the first error among an object's members, and
+/// the order of what is read from it, never depend on the order of the text
+/// (`spec/json-format.md`, *Objects*).
+#[must_use]
+pub fn by_key(members: &[(String, Json)]) -> Vec<&(String, Json)> {
+    let mut sorted: Vec<&(String, Json)> = members.iter().collect();
+    // Rust compares strings by their UTF-8 bytes, the order of code points.
+    sorted.sort_by(|(a, _), (b, _)| a.cmp(b));
+    sorted
+}
+
 /// Escape a key for a JSON Pointer: `~` becomes `~0` and `/` becomes `~1`.
 #[must_use]
 pub fn pointer_token(key: &str) -> String {
@@ -725,7 +744,7 @@ pub fn pointer_token(key: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Json, Limits, parse, parse_bytes, pointer_token, to_string};
+    use super::{Json, Limits, by_key, parse, parse_bytes, pointer_token, same, to_string};
     use crate::ErrorCode;
 
     fn ok(text: &str) -> Json {
@@ -741,6 +760,22 @@ mod tests {
     fn values_round_trip_in_order() {
         let text = r#"{"b":1,"a":[true,false,null,"x\n\"y\"",-0,1.0,1e2],"10":{},"2":[]}"#;
         assert_eq!(to_string(&ok(text)), text);
+    }
+
+    #[test]
+    fn objects_compare_and_are_visited_without_order() {
+        let a = ok(r#"{"b":1,"a":{"y":[1.0],"x":-0.0}}"#);
+        let b = ok(r#"{"a":{"x":-0.0,"y":[1e0]},"b":1}"#);
+        assert!(same(&a, &b));
+        assert!(!same(&a, &ok(r#"{"a":{"x":0.0,"y":[1.0]},"b":1}"#)));
+        assert!(!same(&a, &ok(r#"{"b":1,"c":{"y":[1.0],"x":-0.0}}"#)));
+        assert!(!same(&a, &ok(r#"{"b":1}"#)));
+        let Json::Object(ref members) = ok("{\"b\":1,\"\u{1F600}\":2,\"\u{ff5a}\":3,\"B\":4}")
+        else {
+            panic!()
+        };
+        let keys: Vec<&str> = by_key(members).iter().map(|(k, _)| k.as_str()).collect();
+        assert_eq!(keys, ["B", "b", "\u{ff5a}", "\u{1F600}"]);
     }
 
     #[test]

@@ -142,7 +142,8 @@ Conformance vectors still compare only the fields of *Comparing errors*.
 
 A conformance vector's `error` holds the code and the compared fields that
 apply. A runner keeps, from the actual error, the code and the compared fields
-only, and compares the two objects without regard to member order:
+only, and compares the two objects, whose members have no order
+(`json-format.md`, *Objects*):
 
 - a compared field that applies must be present and equal;
 - one that does not apply must be absent: `rule` when a bare condition or value

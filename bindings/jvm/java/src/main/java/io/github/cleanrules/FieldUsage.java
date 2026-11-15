@@ -42,7 +42,7 @@ public final class FieldUsage {
     }
 
     /**
-     * The payload values that read it, in order.
+     * The payload values that read it, in rule order and then by key.
      *
      * @return the payload values
      */

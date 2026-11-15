@@ -22,7 +22,7 @@ data, and what each native type becomes.
 | naive datetime | a date and a time of day, to the microsecond | `naive_datetime` |
 | aware datetime | an instant, to the microsecond, with a fixed UTC offset or an IANA time zone | `aware_datetime` |
 | list | an ordered sequence of values | `other` |
-| map | string keys mapped to values, in a fixed order | `other` |
+| map | string keys mapped to values, without order | `other` |
 | opaque | a native value with no equivalent here | `other` |
 
 Their JSON encoding is in `json-format.md` (*Values*).
@@ -83,10 +83,21 @@ are the fixed offset `Z`, never the zone `UTC`.
 
 ### Lists and maps
 
-Map keys are strings. A map keeps an order, because outputs keep the order of
-what they pass through. A native map whose order is defined keeps it; one
-without a defined order is sorted by key, by Unicode code point (not by UTF-16
-code unit), so the result never depends on hashing (invariant 7).
+Map keys are strings. A map is an association: its entries have **no order**,
+so two maps with the same entries are the same map, however they were built
+or written (`json-format.md`, *Objects*). Wherever the order of a map's
+entries can be seen, in an output, a written document, an explanation, a
+diagram or a native value given back, it is the order of their keys by
+Unicode code point (not by UTF-16 code unit), so the result depends neither on
+the order of the input nor on hashing (invariant 7). Two native forms cannot
+keep that order, and say nothing else: a Go `map[string]any` has no order at
+all, and a JavaScript plain object lists its integer-like keys (such as `"10"`)
+first, ascending, then the others in the order they were added (by code
+point). A native map is read the same whatever its order, or lack of one.
+
+A **record** (*Reading native data*) also gives its entries positions, for
+integer segments to read; they serve reading only, and the record is given
+back like any map, by key. Lists keep their order.
 
 A list or map **read from native data** stays a reference to the native object
 (*Reading native data*). Its elements are converted only when they are needed:
@@ -107,7 +118,7 @@ at that place.
 binding's tests check them.*
 
 A native value with no equivalent is **opaque**: bytes, a time of day without a
-date, a duration, a complex number, a set (it has no order), a string with a
+date, a duration, a complex number, a set, a string with a
 lone surrogate (possible in Python, JavaScript and Java) or that is not valid
 UTF-8 (possible in Go and Erlang), and anything else the tables below do not list. An opaque value:
 
@@ -338,6 +349,10 @@ module, records included.
 | any `Sequence` except `str`, `bytes` and namedtuples, `numpy` arrays | list |
 | `Mapping`, objects with `keys()` such as pandas rows, namedtuples, dataclasses, attrs classes, Pydantic models (by field name, including extra and computed fields), other objects | map; a segment reads a key, a field or a public attribute (properties included), and an integer indexes a namedtuple or a pandas row |
 
+A map given back to Python is a `dict` whose keys are inserted by Unicode code
+point (*Lists and maps*), whatever the order of the data it came from; a
+payload's outputs too.
+
 #### JavaScript and TypeScript
 
 | Native | Value |
@@ -356,15 +371,12 @@ module, records included.
 | `cr.ZonedDateTime` (as the binding gives it back, below) | aware datetime: its instant, in its zone or with its offset |
 | `Array`, typed arrays except `Uint8Array` (and `Buffer`) | list; holes and `undefined` elements are null (a list cannot hold a missing element) |
 | `Uint8Array`, `Buffer`, `ArrayBuffer`, `DataView` | opaque, like bytes in other languages |
-| `Map` | map, in insertion order; an entry whose key is not a string is left out |
+| `Map` | map; an entry whose key is not a string is left out |
 | objects of the runtime: `Error`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `Promise`, `RegExp`, boxed primitives, iterators, generators, module namespaces, and the binding's own objects (rule sets, decisions...) | opaque, never read through; recognised by brand (a built-in method or getter that works across realms) or by `Symbol.toStringTag` |
 | plain objects and class instances | map of own enumerable string-keyed properties (checked with `Object.hasOwn`), plus getters defined by the object's classes, never by `Object.prototype`; `constructor` and `__proto__` are always missing |
 
 Temporal values are recognised by `Symbol.toStringTag`, so polyfills work;
 those in a non-ISO calendar are opaque, and nanoseconds are truncated.
-JavaScript orders an object's integer-like keys first, so a map passed through
-from a JavaScript object may come out in a different order than the same data
-in Python; equality ignores that order.
 
 **Values given back.** Outputs, payloads, aggregates, metadata, constants (a
 constant node's value, a decision table's output values), the values in an
@@ -384,7 +396,7 @@ browsers:
 | naive datetime | `cr.NaiveDateTime` |
 | aware datetime | `cr.ZonedDateTime`: the local date and time, the offset in seconds, the IANA zone name or `null` for a fixed offset, and the instant; it converts to `Date` and, where the runtime has it, to `Temporal.ZonedDateTime` in its IANA zone or at its offset. Temporal's offset zones have whole minutes, so an offset with seconds is a `RangeError`; in a named zone, the Temporal value's local fields follow the runtime's zone database |
 | list | `Array` |
-| map | a plain object whose own enumerable properties are the map's entries (a key such as `__proto__` is an own property, never the prototype) |
+| map | a plain object whose own enumerable properties are the map's entries, added by Unicode code point (a key such as `__proto__` is an own property, never the prototype) |
 | opaque | the native object it was read from, the same object; `null` in a decision read from a document (`readDecision`), which keeps only the type's name |
 
 A counterfactual's gap is a `number`, `bigint` or `cr.Decimal`, like the int,
@@ -401,9 +413,9 @@ three exceptions: a plain object never yields the keys `__proto__` and
 `constructor` (pass such a map as a `Map`); an opaque value given back as
 `null` reads as null; and a float that holds an integer comes back as a
 `number`, which reads back as an int (wrap it in `cr.float(x)` where the
-difference matters). JavaScript orders an object's integer-like keys first, so
-a map given back may list them in another order than the core; equality ignores
-that order.
+difference matters). JavaScript lists an object's integer-like keys such as
+`"10"` first, whatever the order they were added in; that order means nothing
+(*Lists and maps*).
 
 #### Java and Scala
 
@@ -423,13 +435,13 @@ that order.
 | `Instant`, `java.util.Date`, `java.sql.Timestamp` | aware datetime in `Z` |
 | `ZonedDateTime` | aware datetime in its zone, or with a fixed offset when the zone is a `ZoneOffset` |
 | `List`, arrays except `byte[]`; Scala `Seq` except `LazyList` (Scala layer) | list |
-| `java.util.Map`; Scala `Map` (Scala layer); with `String` keys | map: `SequencedMap` and `SortedMap` (Scala `SeqMap` and `SortedMap`) keep their order, every other map is sorted |
-| records | map of their components, in their order |
-| case classes and `enum` cases with parameters (Scala layer) | map of their fields, in their order: those with a public accessor in the class file, so `private` and `private[this]` fields are left out and `protected` and `private[p]` ones are read. A product written by hand whose element names are empty or repeated is opaque |
+| `java.util.Map`; Scala `Map` (Scala layer); with `String` keys | map, whatever its order |
+| records | map of their components |
+| case classes and `enum` cases with parameters (Scala layer) | map of their fields: those with a public accessor in the class file, so `private` and `private[this]` fields are left out and `protected` and `private[p]` ones are read. A product written by hand whose element names are empty or repeated is opaque |
 | sets and other collections that are not lists, `byte[]`, iterators, lambdas and other hidden classes, threads, class loaders, `Class` objects, and every other object of the Java platform (a class of a module `java.*` or `jdk.*`) not listed above | opaque, never read through |
 | Scala sets and other collections that are not `Seq` or `Map`, `LazyList` (never forced), tuples, functions, every other object of the Scala library (a package `scala` or `scala.*`) not listed above, and every `scala.Product` that reaches the Java reader (a case class held by a record or a JavaBean) | opaque, never read through |
 | the binding's own objects (rule sets, decisions, limits, errors, its enums..., and those of its Scala layer) | opaque, never read through |
-| other objects | map of their public instance fields and public JavaBean accessors (`getAge()` and `isActive()` read as `age` and `active`; `getURL()` as `URL`), sorted by name by Unicode code point; an accessor wins over a field of the same name, and `getX` over `isX`. Never a member that a class of the platform or of the Scala library declares, such as `getClass()` |
+| other objects | map of their public instance fields and public JavaBean accessors (`getAge()` and `isActive()` read as `age` and `active`; `getURL()` as `URL`); an accessor wins over a field of the same name, and `getX` over `isX`. Never a member that a class of the platform or of the Scala library declares, such as `getClass()` |
 
 A public member of a class that is not public (a private nested record) is
 read where its package is open to the binding, which it always is on the class
@@ -460,7 +472,7 @@ counterfactual's target) and in a result tree come back to Java as follows:
 | naive datetime | `LocalDateTime` |
 | aware datetime | `ZonedDateTime` at its instant: in its IANA zone when Java's zone database knows it, whose rules then give the local fields, and otherwise (a fixed offset, or a zone Java does not know) at a `ZoneOffset` |
 | list | an unmodifiable `List` |
-| map | an unmodifiable `SequencedMap`, in the value's order |
+| map | an unmodifiable `SequencedMap`, its keys sorted by Unicode code point |
 | opaque | the native object it was read from, the same object; `null` in a decision read from a document, which keeps only the type's name |
 
 A counterfactual's gap is a `Long`, `Double` or `BigDecimal`, like the int,
@@ -477,7 +489,7 @@ The Scala layer gives the same values back as Scala values: null as `None`,
 int as `Long`, float as `Double`, decimal as `scala.math.BigDecimal` (exact,
 with an unlimited `MathContext`; the infinities as `Double`'s), string, date
 and datetimes as in Java, list as an immutable `Vector`, map as an immutable
-`VectorMap` (a `SeqMap`, in the value's order), and opaque as the native object
+`VectorMap` (a `SeqMap`, its keys sorted by code point), and opaque as the native object
 it was read from (`None` in a decision read from a document). Gaps and
 priorities are as in Java, with `scala.math.BigDecimal` for a decimal gap and
 `Option[Long]` for an optional priority. Each reads back as the same value.
@@ -496,8 +508,8 @@ priorities are as in Java, with `scala.math.BigDecimal` for a decimal gap and
 | `cr.DateTime` (Go has no naive datetime) | naive datetime |
 | `time.Time` | aware datetime: `time.UTC` is `Z`; `time.Local` and a location with a single offset for all time (`time.FixedZone`, or a fixed zone loaded by name such as `Etc/GMT+5`) are their offset at that instant; any other location (loaded by name, with `time.LoadLocation`) is that zone, by its name |
 | slices and arrays, except those of bytes (element kind `uint8`: `[]byte`, `[16]byte`) | list |
-| maps | map of their entries whose key is a string, sorted by key: every entry when the key kind is `string`; for an interface key type (`map[any]any`), those whose key's dynamic kind is `string`, the key of type `string` winning when two have the same text (else the one whose type's name sorts first); no entry for other key kinds. An entry whose key is not valid UTF-8 is left out too |
-| structs | map of their exported fields, as `encoding/json` chooses them: fields promoted from embedded structs included, the shallowest one or the only tagged one winning a name, and ambiguous ones left out. A field is named by its `cleanrules:"name"` tag, else its `json` tag (a name `encoding/json` accepts), else its name; a field with a `cleanrules` tag is never named or left out by its `json` tag, and a tag `"-"` leaves it out. In their declaration order |
+| maps | map of their entries whose key is a string: every entry when the key kind is `string`; for an interface key type (`map[any]any`), those whose key's dynamic kind is `string`, the key of type `string` winning when two have the same text (else the one whose type's name sorts first); no entry for other key kinds. An entry whose key is not valid UTF-8 is left out too |
+| structs | map of their exported fields, as `encoding/json` chooses them: fields promoted from embedded structs included, the shallowest one or the only tagged one winning a name, and ambiguous ones left out. A field is named by its `cleanrules:"name"` tag, else its `json` tag (a name `encoding/json` accepts), else its name; a field with a `cleanrules` tag is never named or left out by its `json` tag, and a tag `"-"` leaves it out |
 | slices and arrays of bytes, `time.Duration`, `big.Float`, `big.Rat`, complex numbers, channels, functions, `unsafe.Pointer`, `uintptr`, and the package's own objects (rule sets, rules, expressions, decisions, errors, explanations, summaries…) | opaque, never read through |
 
 Pointers and interfaces are followed, and named types are matched by their
@@ -530,7 +542,7 @@ the values in a result tree come back to Go as follows:
 | naive datetime | `cr.DateTime` |
 | aware datetime | `time.Time` at its instant: in its IANA zone when Go's zone database knows it (`time.LoadLocation`), whose rules then give the local fields; otherwise at its offset (`time.FixedZone`), and `Z` in `time.UTC` |
 | list | `[]any` |
-| map | `map[string]any`: Go's maps have no order, so the value's order is not kept |
+| map | `map[string]any`; Go's maps have no order, so visit its keys sorted to see them in the map's order (by code point) |
 | opaque | the value it was read from (*Opaque values* above), the same object; `nil` in a decision read from a document, which keeps only the type's name |
 
 A counterfactual's gap is an `int64`, `float64` or `cr.Decimal`, like the int,
@@ -538,7 +550,7 @@ float or decimal above; between dates it is a `cr.GapDays`, and between
 datetimes a `cr.GapMicroseconds`, each an `int64` (a `time.Duration` cannot
 hold every gap). Priorities in notes, summaries and a decision table's rows
 are `int64` (`*int64` where a note or a row may lack them). Each value reads
-back as the same value, except a map, whose keys come back sorted, an opaque
+back as the same value, except an opaque
 value of a decision read from a document, which comes back as `nil`, and two
 kinds of aware datetimes, which read
 back at their offset: one in a zone Go's database does not know, which comes
@@ -588,8 +600,8 @@ A list of pairs (a `proplists` list, or an Elixir keyword list such as
 | `calendar:datetime()`: a tuple `{{Y, Mo, D}, {H, Mi, S}}` with such a date, `0 <= H <= 23`, `0 <= Mi <= 59` and `0 <= S <= 59`, and the same with a time `{H, Mi, S, Micro}`, `0 <= Micro <= 999999`; `%NaiveDateTime{}` (Elixir, `'Elixir.NaiveDateTime'`) | naive datetime |
 | `{cleanrules_datetime, Local, Offset, Zone}`: `Local` a `calendar` tuple as in the row above, `Offset` the UTC offset in seconds, an integer, `Zone` an IANA name as a binary, or `undefined` for a fixed offset; `%DateTime{}` (Elixir, `'Elixir.DateTime'`), whose offset is `utc_offset` plus `std_offset` | aware datetime: the instant `Local` minus `Offset`, in that zone (*Time zones*) or with that offset; a `%DateTime{}` in `Etc/UTC` with offset 0 is `Z` |
 | proper lists, charlists (`"abc"`, a list of integers) included | list |
-| maps | map of the entries whose key is a binary that is valid UTF-8 or an atom (its name), sorted by key: Erlang's maps have no defined order. When a binary and an atom key have the same text, the binary's entry is kept. Entries with any other key (integers, tuples, charlists, other binaries) are left out |
-| structs (Elixir) other than those above and below | map of their fields except those whose name starts with `__`, sorted by key |
+| maps | map of the entries whose key is a binary that is valid UTF-8 or an atom (its name). When a binary and an atom key have the same text, the binary's entry is kept. Entries with any other key (integers, tuples, charlists, other binaries) are left out |
+| structs (Elixir) other than those above and below | map of their fields except those whose name starts with `__` |
 | tuples other than those above (records included), improper lists, pids, ports, references, funs; `%MapSet{}`, `%Range{}`, `%Regex{}`, `%Time{}`, `%Duration{}` and exceptions, structs with `__exception__` set to `true` (Elixir) | opaque, never read through |
 
 The Elixir structs above are matched by module and, for dates and datetimes,
@@ -647,10 +659,8 @@ like the int, float or decimal above; between dates it is `{days, N}`, and
 between datetimes `{microseconds, N}`, each `N` an integer. Gaps are never
 read as data, so these two tuples carry no `cleanrules_` tag. Priorities in
 notes, summaries and a decision table's rows are integers (`null` where a note
-or a row may lack them). Each value reads back as the same value, except a
-map, whose order is lost (Erlang's maps have none) and which reads back
-sorted by key, and an opaque value of a decision read from a document, which
-comes back as `null`. Elixir terms come back as Erlang terms: a decimal or
+or a row may lack them). Each value reads back as the same value, except an
+opaque value of a decision read from a document, which comes back as `null`. Elixir terms come back as Erlang terms: a decimal or
 datetime as the tuples above, not as structs, and null as the atom `null`,
 not `nil`, which Elixir treats as true (`output || default` keeps it).
 
@@ -664,7 +674,8 @@ null is an `expression_error` (*Constants*), and data or a constant beyond
 #### C, C++ and Rust
 
 C and C++ build values through the C ABI's value builder or from JSON, and C++
-adds conversions from `std::` types (with `std::unordered_map` sorted). Rust
+adds conversions from `std::` types (`std::map` and `std::unordered_map`
+alike: the core keeps a map's keys sorted). Rust
 builds values with `Value`'s constructors and a `ToValue` trait,
 implemented for the standard types and, behind Cargo features, for `chrono`,
 `jiff` and `rust_decimal`. There is no conversion through `serde`, because those

@@ -2,8 +2,7 @@ package cleanrules
 
 // The conformance runner's JSON: a reader that loses nothing the vectors
 // compare, a writer, and the comparison of conformance/README.md
-// (Comparing). The runner never compares with encoding/json's maps, which
-// lose member order, nor with the library's own equality.
+// (Comparing). The runner never compares with the library's own equality.
 
 import (
 	"bytes"
@@ -19,14 +18,11 @@ import (
 	"time"
 )
 
-// jsonObject is a JSON object that keeps its members' order. unordered
-// marks a map given back to Go (spec/data-model.md, Go, Values given back:
-// Go's maps have no order), whose keys are sorted and whose order is not
-// compared.
+// jsonObject is a JSON object: its members as read, though their order is
+// never compared (spec/json-format.md, Objects).
 type jsonObject struct {
-	keys      []string
-	values    map[string]any
-	unordered bool
+	keys   []string
+	values map[string]any
 }
 
 func newObject() *jsonObject { return &jsonObject{values: map[string]any{}} }
@@ -203,9 +199,9 @@ const (
 	// modeExact compares trees as the core writes them.
 	modeExact compareMode = iota
 	// modeGiven compares Go values given back (spec/data-model.md, Go,
-	// Values given back): maps without their order, an aware datetime in
-	// the zone UTC as Z (Go's time.UTC), and one in a zone Go's database
-	// does not know at its offset.
+	// Values given back): an aware datetime in the zone UTC as Z (Go's
+	// time.UTC), and one in a zone Go's database does not know at its
+	// offset.
 	modeGiven
 	// modeRecorded is modeGiven for a decision read from a document, whose
 	// opaque values come back as nil.
@@ -217,7 +213,7 @@ const (
 func isFloatText(n json.Number) bool { return strings.ContainsAny(string(n), ".eE") }
 
 // sameJSON reports whether actual matches expected (conformance/README.md,
-// Comparing): object members in order, ints exact at any size, floats by
+// Comparing): objects by their members whatever their order, ints exact at any size, floats by
 // exact double and sign of zero, an int never equal to a float, any two
 // opaque values equal, and detail in reasons ignored; with what mode
 // allows.
@@ -262,19 +258,8 @@ func sameIn(actual, expected any, mode compareMode, inReason bool) bool {
 		if len(a) != len(e) {
 			return false
 		}
-		if got.unordered {
-			if mode == modeExact {
-				return false
-			}
-			for _, key := range e {
-				if !got.has(key) || !sameIn(got.values[key], want.values[key], mode, key == "reason") {
-					return false
-				}
-			}
-			return true
-		}
-		for i, key := range e {
-			if a[i] != key || !sameIn(got.values[key], want.values[key], mode, key == "reason") {
+		for _, key := range e {
+			if !got.has(key) || !sameIn(got.values[key], want.values[key], mode, key == "reason") {
 				return false
 			}
 		}

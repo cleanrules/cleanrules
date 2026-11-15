@@ -587,7 +587,8 @@ public:
     value_ref operator[](std::size_t index) const & noexcept;
     value_ref operator[](std::string_view key) const & noexcept;
 
-    // A map's entry by position: its key and its value.
+    // A map's entry by position among its keys sorted by Unicode code point
+    // (a map has no order of its own): its key and its value.
     CLEANRULES_THROWING(std::pair<std::string_view, value_ref> entry(std::size_t index) const &;)
     std::pair<std::string_view, value_ref> entry(std::size_t index, error_info &error) const &;
 
@@ -909,7 +910,8 @@ public:
     }
 
     // A record: a map whose entries also have positions, their order of
-    // insertion (spec/ast.md, *Reading data*).
+    // insertion, for integer path segments (spec/ast.md, *Reading data*). Like
+    // every map, it gives its entries back by key, by Unicode code point.
     [[nodiscard]] static value record() { return value(cr_value_new_record(), adopt_tag()); }
     CLEANRULES_THROWING([[nodiscard]] static value record(
         std::initializer_list<std::pair<std::string_view, value>> entries) {
@@ -2365,8 +2367,8 @@ public:
             return cr_rule_new(name.data(), name.size(), when.c_ptr(), o, e);
         });
     }
-    // With `key` in its payload, given a value node (a repeated key keeps its
-    // place and takes the new value).
+    // With `key` in its payload, given a value node (a repeated key takes the
+    // new value; the payload keeps its keys sorted by Unicode code point).
     CLEANRULES_THROWING([[nodiscard]] rule with_payload(std::string_view key, const node &v) const {
         return payload_(key, v, nullptr);
     })
@@ -2446,7 +2448,7 @@ public:
     std::int64_t priority() const noexcept { return cr_rule_priority(c_ptr()); }
     CLEANRULES_THROWING([[nodiscard]] node when() const { return when_(nullptr); })
     [[nodiscard]] node when(error_info &error) const { return when_(&error); }
-    // The payload in order: each key and its value node.
+    // The payload, its keys sorted by Unicode code point: each key and its value node.
     CLEANRULES_THROWING([[nodiscard]] std::vector<std::pair<std::string, node>> payload() const {
         return payload_entries_(nullptr);
     })

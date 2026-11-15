@@ -271,18 +271,20 @@ days, hours, minutes and seconds, leaving out the zero ones (`1 hour 30 minutes
 `summary()` describes a rule set without evaluating it:
 
 - its configuration: policy, aggregate, logic and strictness;
-- its **rules**, in rule order: name, priority, output keys, whether the rule
+- its **rules**, in rule order: name, priority, output keys (sorted by Unicode
+  code point, as payload keys are kept: `rules.md`, *Rules*), whether the rule
   has an action, and the action's name when it has one;
 - the **fields** it reads, in order of first appearance. Rules are visited in
-  rule order; within a rule, the condition first, then the payload values in
-  member order; within a node, in depth-first pre-order, with children in the
+  rule order; within a rule, the condition first, then the payload values by
+  key, by code point; within a node, in depth-first pre-order, with children in the
   key order of *Conditions* in `json-format.md` (for `between`: operand, low,
   high). A path that is a
   prefix of another is listed on its own (`customer` and `customer.age`). Each
   field lists the rules whose condition reads it, in rule order, and the
-  `(rule, output key)` pairs whose payload value reads it, in rule and member
-  order;
-- the **outputs**: every payload key, in order of first appearance;
+  `(rule, output key)` pairs whose payload value reads it, in rule order and
+  then by key;
+- the **outputs**: every payload key, in order of first appearance (rule by
+  rule, and by key within a rule);
 - the **tags**, sorted by Unicode code point, each with the names of the rules
   that carry it, in rule order.
 

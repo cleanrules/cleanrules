@@ -164,7 +164,8 @@ describe('values given back', () => {
     assert.deepEqual(echo([1, [2.5, 'a'], null, undefined]), [1, [2.5, 'a'], null, null])
     const map = echo(new Map([['b', 1], ['__proto__', { c: 2n ** 60n }], ['a', [decimal('1.0')]]]))
     assert.equal(Object.getPrototypeOf(map), Object.prototype)
-    assert.deepEqual(Object.keys(map), ['b', '__proto__', 'a'])
+    // Given back by key, by code point, whatever the order of the data.
+    assert.deepEqual(Object.keys(map), ['__proto__', 'a', 'b'])
     assert.ok(Object.hasOwn(map, '__proto__'))
     assert.deepEqual(map.__proto__, { c: 2n ** 60n }) // eslint-disable-line no-proto
     assert.equal(map.a[0].text, '1.0')

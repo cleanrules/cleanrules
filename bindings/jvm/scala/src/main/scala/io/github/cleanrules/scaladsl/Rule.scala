@@ -23,8 +23,8 @@ import scala.jdk.OptionConverters.*
  * Rules are immutable: each `with...` step gives a new rule, which the core
  * checks (an empty name, a value as the condition, a condition in the payload
  * are an `io.github.cleanrules.RuleDefinitionException`). Payload values are
- * nodes or Scala constants; a `SeqMap` (`ListMap`, `VectorMap`) keeps its
- * order, and any other map is sorted by key, by Unicode code point. Rules
+ * nodes or Scala constants. A payload is an association: whatever the map
+ * and its order, its keys are kept sorted by Unicode code point. Rules
  * compare by identity (that of the Java rule), and may be shared between
  * threads.
  *
@@ -37,7 +37,7 @@ final class Rule private (val asJava: io.github.cleanrules.Rule):
   /** The condition. */
   def when: Expr = Expr.fromJava(asJava.when())
 
-  /** The payload: its keys, in order, and their nodes. */
+  /** The payload: its keys, sorted by Unicode code point, and their nodes. */
   def payload: SeqMap[String, Expr] =
     VectorMap.from(asJava.`then`().asScala.iterator.map((key, node) => key -> Expr.fromJava(node)))
 
@@ -61,10 +61,10 @@ final class Rule private (val asJava: io.github.cleanrules.Rule):
 
   // ---- Steps.
 
-  /** This rule with one more payload entry (a node or a Scala constant), after the others. */
+  /** This rule with one more payload entry (a node or a Scala constant). */
   def withPayload(key: String, value: Operand | Null): Rule = Rule(asJava.`then`(key, Expr.operand(value)))
 
-  /** This rule with more payload entries, in the map's order if it has one (a `SeqMap`), by key otherwise. */
+  /** This rule with more payload entries, added by key, by Unicode code point. */
   def withPayload(payload: collection.Map[String, Operand | Null]): Rule =
     Rule(asJava.`then`(Rule.javaPayload(payload)))
 
@@ -155,11 +155,9 @@ object Rule:
   private[scaladsl] def javaActions(actions: collection.Map[String, Action]): Map[String, io.github.cleanrules.Action] =
     actions.iterator.map((name, code) => name -> (ScalaAction(code): io.github.cleanrules.Action)).toMap
 
-  /** A payload for the Java binding: in order for a `SeqMap` or a `SortedMap`, sorted by Java otherwise. */
+  /** A payload for the Java binding, which adds its entries by key. */
   private def javaPayload(payload: collection.Map[String, Operand | Null]): java.util.Map[String, AnyRef] =
-    val ordered = payload.isInstanceOf[collection.SeqMap[?, ?]] || payload.isInstanceOf[collection.SortedMap[?, ?]]
-    val map: java.util.Map[String, AnyRef] =
-      if ordered then java.util.LinkedHashMap[String, AnyRef]() else java.util.HashMap[String, AnyRef]()
+    val map = java.util.HashMap[String, AnyRef]()
     payload.foreach((key, value) => map.put(key, Expr.operand(value)))
     map
 

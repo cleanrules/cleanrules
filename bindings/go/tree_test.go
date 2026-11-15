@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -54,6 +55,10 @@ func TestEvaluateTree(t *testing.T) {
 	}
 	if !reflect.DeepEqual(root["children"].([]any)[1], child) || root["op"] != "and" {
 		t.Errorf("JSON: %s\n%s", tree.JSON(), between.JSON())
+	}
+	// In the canonical form: the members in the order of the format's table.
+	if !strings.HasPrefix(tree.JSON(), `{"op":"and","truth":`) || !strings.HasPrefix(between.JSON(), `{"op":"between",`) {
+		t.Errorf("not canonical: %s", tree.JSON())
 	}
 
 	// Options.

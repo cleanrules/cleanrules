@@ -3190,7 +3190,7 @@
         "write": "text"
       },
       "expect": {
-        "printed": "RULE \"if\" TAGS \"a-b\", c\nIF `if`.`a b`.x = 1\nTHEN \"unit price\" = 1, ok = 2"
+        "printed": "RULE \"if\" TAGS \"a-b\", c\nIF `if`.`a b`.x = 1\nTHEN ok = 2, \"unit price\" = 1"
       }
     },
     {
@@ -4021,6 +4021,60 @@
           "line": 1,
           "column": 4,
           "name": "max_path_segments"
+        }
+      }
+    },
+    {
+      "id": "format/text/payload-keys-by-code-point",
+      "spec": [
+        "text.md#printing",
+        "rules.md#rules"
+      ],
+      "description": "A payload prints its keys sorted by code point, whatever the order they were written in",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE r IF a > 1 THEN b = 1, \"é\" = 2, Z = 3, a = 4",
+        "write": "text"
+      },
+      "expect": {
+        "printed": "RULE r\nIF a > 1\nTHEN Z = 3, a = 4, b = 1, \"é\" = 2"
+      }
+    },
+    {
+      "id": "format/text/payload-condition-first-by-key",
+      "spec": [
+        "text.md#errors-and-limits",
+        "rules.md#rules"
+      ],
+      "description": "Of two payload values that are conditions, the error is at the one whose key comes first by code point",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE r IF a\nTHEN late = days > 30, early = days < 2"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 2,
+          "column": 32
+        }
+      }
+    },
+    {
+      "id": "format/text/payload-construction-first-by-key",
+      "spec": [
+        "text.md#errors-and-limits",
+        "rules.md#rules"
+      ],
+      "description": "Payload values are built by key, by code point: of two that break a construction rule, the error is at the first key",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE r IF a\nTHEN b = x MATCHES \"(\", a = y MATCHES \"[\""
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "line": 2,
+          "column": 29
         }
       }
     }

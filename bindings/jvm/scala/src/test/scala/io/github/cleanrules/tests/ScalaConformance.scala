@@ -15,9 +15,9 @@ import scala.util.boundary
 import scala.util.boundary.break
 
 // Case classes for the shapes of map that the vectors' data use most, by
-// their keys in order: a map with exactly these keys is, in turn, one of them
-// (spec/data-model.md, Java and Scala: a case class is a map of its fields, in
-// their order).
+// their keys: a map with exactly these keys, in this order, is, in turn, one
+// of them (spec/data-model.md, Java and Scala: a case class is a map of its
+// fields; a map has no order).
 final case class AB(a: Any, b: Any)
 final case class BA(b: Any, a: Any)
 final case class ABC(a: Any, b: Any, c: Any)
@@ -43,9 +43,9 @@ final case class CustomerOrder(customer: Any, order: Any)
  *  - Inputs are Scala data made from the vector, never JSON: ints as `Long`,
  *    `Int` or `BigInt` in turn, `Double`, `BigDecimal`, `java.time`, `None`
  *    for null and sometimes `Some(x)` for a member, `Vector`, `List` or
- *    `Array` in turn, maps as `VectorMap`, `ListMap` or `SeqMap` in turn, as a
- *    plain `Map` when their keys are sorted (the layer sorts every other map)
- *    and as a case class when one has their keys.
+ *    `Array` in turn, maps as `VectorMap`, `ListMap`, `SeqMap` or a plain `Map`
+ *    in turn (a map has no order), and as a case class when one has their
+ *    keys.
  *  - Results are compared as the Scala values given back (spec/data-model.md,
  *    Java and Scala, the Scala paragraph of Values given back): `None` for
  *    null, `Long`, `Double`, `BigDecimal` with an unlimited `MathContext`,
@@ -176,17 +176,16 @@ final class ScalaConformance extends Conformance:
       wrapped
     else data(json)
 
-  /** Whether keys are in the order the layer sorts an unordered map in: by Unicode code point. */
-  private def sorted(keys: Seq[String]): Boolean =
-    keys.zip(keys.drop(1)).forall((a, b) => java.util.Arrays.compare(a.codePoints.toArray, b.codePoints.toArray) < 0)
-
-  /** A map: an ordered Scala map in turn, a plain `Map` when its keys are sorted, or a case class with its keys. */
+  /** A map: in turn an ordered Scala map, a plain `Map`, or a case class with its keys. */
   private def map(members: java.util.Map[?, ?], caseClasses: Boolean): Any =
     val pairs = members.asScala.iterator.map((key, value) => key.asInstanceOf[String] -> member(value)).toVector
     val keys = pairs.map(_._1)
-    val forms = Vector[() => Any](() => VectorMap.from(pairs), () => ListMap.from(pairs), () => SeqMap.from(pairs))
-      ++ Option.when(sorted(keys))(() => Map.from(pairs))
-      ++ (if caseClasses then caseClass(keys, pairs.map(_._2)) else None)
+    val forms = Vector[() => Any](
+      () => VectorMap.from(pairs),
+      () => ListMap.from(pairs),
+      () => SeqMap.from(pairs),
+      () => Map.from(pairs),
+    ) ++ (if caseClasses then caseClass(keys, pairs.map(_._2)) else None)
     forms(turn(forms.size))()
 
   private def caseClass(keys: Seq[String], values: Seq[Any]): Option[() => Any] = (keys, values) match
@@ -306,13 +305,14 @@ final class ScalaConformance extends Conformance:
       case "neg" => -operand0
       case _ => throw VectorError(s"unknown op $op")
 
-  /** A payload's map: ordered in turn, or a plain `Map` (sorted by the layer) when its keys are sorted. */
+  /** A payload's map: in turn an ordered Scala map or a plain `Map` (a payload has no order). */
   private def payloadOf(pairs: Vector[(String, Operand | Null)]): collection.Map[String, Operand | Null] =
     val forms = Vector[() => collection.Map[String, Operand | Null]](
       () => SeqMap.from(pairs),
       () => VectorMap.from(pairs),
       () => ListMap.from(pairs),
-    ) ++ Option.when(sorted(pairs.map(_._1)))(() => Map.from(pairs))
+      () => Map.from(pairs),
+    )
     forms(turn(forms.size))()
 
   /** A rule of the format, built with `Rule(...)` or, in turn, with its `with...` steps. */
@@ -619,7 +619,21 @@ final class ScalaConformance extends Conformance:
     out
 
   /** A [[Decision]] of the Scala layer against the expected decision. */
+  /** Where a Scala map given back lists its keys out of code point order (spec/data-model.md), or "". */
+  private def outOfOrder(value: Any, where: String): String = value match
+    case Some(inner) => outOfOrder(inner, where)
+    case map: collection.Map[?, ?] =>
+      val keys = map.keys.toVector.map(_.asInstanceOf[String])
+      if keys != keys.sortWith((a, b) => Conformance.byCodePoint(a, b) < 0) then s"$where: keys $keys are not by code point"
+      else map.iterator.map((k, v) => outOfOrder(v, s"$where.$k")).find(_.nonEmpty).getOrElse("")
+    case items: Iterable[?] => items.iterator.zipWithIndex.map((v, i) => outOfOrder(v, s"$where[$i]")).find(_.nonEmpty).getOrElse("")
+    case _ => ""
+
   private def checkDecision(ruleset: RuleSet, d: Decision, expected: JsonMap, mode: Mode): String = boundary:
+    val ordered = (Seq(outOfOrder(d.outputs, "outputs"), outOfOrder(d.aggregated, "aggregated"))
+      ++ d.ruleSet.rules.flatMap(r => Seq(outOfOrder(r.payload, s"${r.name}.payload"), outOfOrder(r.metadata, s"${r.name}.metadata"))))
+      .find(_.nonEmpty)
+    ordered.foreach(issue => break(issue))
     val results = arr(need(expected, "results"))
     if !(d.ruleSet.asJava eq ruleset.asJava) then break("ruleSet is another rule set")
     if d.hitPolicy.jsonName != need(expected, "hit_policy") then break(s"hitPolicy ${d.hitPolicy}")
@@ -831,9 +845,10 @@ final class ScalaConformance extends Conformance:
     val when = TestJson.parse(rule.when.toJson)
     if !TestJson.same(when, source.get("when")) then break(s"${rule.name}: when ${TestJson.write(when)}")
     val keys = rule.payload.keys.toVector
-    val wantKeys = source.get("then") match
-      case members: java.util.Map[?, ?] => members.keySet.asScala.toVector
-      case _ => Vector.empty
+    // A payload's keys come by code point, whatever the document's order.
+    val wantKeys = (source.get("then") match
+      case members: java.util.Map[?, ?] => members.keySet.asScala.toVector.map(_.asInstanceOf[String])
+      case _ => Vector.empty[String]).sortWith((a, b) => Conformance.byCodePoint(a, b) < 0)
     if keys != wantKeys then break(s"${rule.name}: payload keys $keys")
     join((checkConstants(rule.when) +: rule.payload.values.toVector.map(checkConstants))*)
 

@@ -50,8 +50,8 @@ import java.util.Optional;
  * {@code java.sql.Timestamp} are aware datetimes in {@code Z},
  * {@link java.time.OffsetDateTime} at its offset and
  * {@link java.time.ZonedDateTime} in its zone; lists and arrays (except
- * {@code byte[]}) are lists; maps with string keys are maps, in their order
- * when they are {@link java.util.SequencedMap}s and sorted otherwise; records
+ * {@code byte[]}) are lists; maps with string keys are maps, whatever their
+ * order (a map has no order: it comes back sorted by key); records
  * are maps of their components, and other objects maps of their public fields
  * and JavaBean accessors. Anything else, and every other object of the Java
  * platform, is opaque: compared by identity, and given back as itself. A getter

@@ -4,6 +4,7 @@ import static java.lang.foreign.ValueLayout.ADDRESS;
 
 import io.github.cleanrules.internal.Build;
 import io.github.cleanrules.internal.Handle;
+import io.github.cleanrules.internal.Members;
 import io.github.cleanrules.internal.Native;
 import io.github.cleanrules.internal.Scope;
 import io.github.cleanrules.internal.Text;
@@ -12,12 +13,12 @@ import java.lang.foreign.MemorySegment;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.SequencedMap;
+import java.util.TreeMap;
 import java.util.function.Function;
 
 /**
@@ -107,7 +108,7 @@ public final class Rule implements DocumentContent {
             byte[] bytes = Text.name(name);
             MemorySegment made = condition.with(pointer ->
                     step((out, error, scope) -> Native.ruleNew(scope.bytes(bytes), bytes.length, pointer, out, error)));
-            return new Rule(new Core(made), name, condition, new LinkedHashMap<>(), 0, null, null, null);
+            return new Rule(new Core(made), name, condition, payloadMap(), 0, null, null, null);
         }
     }
 
@@ -153,8 +154,10 @@ public final class Rule implements DocumentContent {
     // ---- Steps.
 
     /**
-     * This rule with {@code key} in its payload: a new key goes last, a key it
-     * has keeps its place and takes the new value.
+     * This rule with {@code key} in its payload, replacing the value of a key it
+     * has. A payload is an association ({@code spec/rules.md}, <i>Rules</i>): its
+     * keys are kept sorted by Unicode code point, whatever the order they are
+     * added in.
      *
      * @param key the payload key
      * @param value a value node, such as {@code field("order", "total").mul(0.1)}, or a Java constant
@@ -168,15 +171,17 @@ public final class Rule implements DocumentContent {
         byte[] bytes = Text.name(key);
         MemorySegment made = node.with(nodePointer -> next((rule, out, error, scope) ->
                 Native.ruleWithPayload(rule, scope.bytes(bytes), bytes.length, nodePointer, out, error)));
-        SequencedMap<String, Expr> payload = new LinkedHashMap<>(then);
+        SequencedMap<String, Expr> payload = payloadMap();
+        payload.putAll(then);
         payload.put(key, node);
         return copy(made, payload, priority, description, actionName, action);
     }
 
     /**
      * This rule with each entry of {@code payload} added as
-     * {@link #then(String, Object)} does: in the map's order for a
-     * {@link SequencedMap}, otherwise sorted by key.
+     * {@link #then(String, Object)} does, by key, by Unicode code point, whatever
+     * the map's order: so a condition among the values is reported for the
+     * first such key.
      *
      * @param payload the keys and values
      * @return the new rule
@@ -185,9 +190,7 @@ public final class Rule implements DocumentContent {
     public Rule then(Map<String, ?> payload) {
         Objects.requireNonNull(payload, "payload");
         List<String> keys = new ArrayList<>(payload.keySet());
-        if (!(payload instanceof SequencedMap<?, ?>)) {
-            keys.sort(Rule::byCodePoint);
-        }
+        keys.sort(Members::compareCodePoints);
         Rule rule = this;
         for (String key : keys) {
             rule = rule.then(key, payload.get(key));
@@ -195,9 +198,9 @@ public final class Rule implements DocumentContent {
         return rule;
     }
 
-    /** Strings ordered by Unicode code point, as the core orders them. */
-    static int byCodePoint(String left, String right) {
-        return java.util.Arrays.compare(left.codePoints().toArray(), right.codePoints().toArray());
+    /** An empty payload, its keys sorted by code point as the core keeps them. */
+    private static SequencedMap<String, Expr> payloadMap() {
+        return new TreeMap<>(Members::compareCodePoints);
     }
 
     /**
@@ -320,7 +323,7 @@ public final class Rule implements DocumentContent {
     }
 
     /**
-     * The payload, in order; empty when the rule has none.
+     * The payload, keys sorted by Unicode code point; empty when the rule has none.
      *
      * @return the keys and their value nodes, unmodifiable
      */
@@ -410,7 +413,7 @@ public final class Rule implements DocumentContent {
         return core.with(pointer -> {
             String name = lend((text, len, error) -> Native.ruleName(pointer, text, len, error));
             Expr when = Expr.make((out, error, scope) -> Native.ruleWhen(pointer, out, error));
-            SequencedMap<String, Expr> payload = new LinkedHashMap<>();
+            SequencedMap<String, Expr> payload = payloadMap();
             long entries = Native.rulePayloadLen(pointer);
             for (long i = 0; i < entries; i++) {
                 long index = i;

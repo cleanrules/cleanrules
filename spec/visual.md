@@ -58,7 +58,8 @@ A rule's diagram has, in order:
    writes them;
 2. the nodes of its condition, as above, with an edge from the rule's node to
    the condition's root;
-3. a node of class `output` for each payload entry, in order, with the line
+3. a node of class `output` for each payload entry, by key, by Unicode code
+   point (`rules.md`, *Rules*), with the line
    `THEN <key> = <value>`, and a dashed edge from the rule's node;
 4. a node of class `output` with the line `DO <action>` when the rule names its
    action, with a dashed edge from the rule's node.
@@ -86,7 +87,7 @@ order:
 The edges are, for each rule in rank order: a solid edge from each field its
 condition reads, in the fields' order; a dashed edge from each field that only
 its payload values read, in the fields' order; and a solid edge to the output of
-each of its payload keys, in payload order.
+each of its payload keys, by key, by Unicode code point.
 
 ### Explanations
 

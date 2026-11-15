@@ -45,11 +45,9 @@ private[scaladsl] final class ToJava:
     case bytes: Array[Byte] => bytes
     case array: Array[?] => view(array)(ArrayView(array, this))
     case seq: scala.collection.Seq[?] if !ToJava.lazySeq(seq) => view(seq)(SeqView(seq, this))
-    case map: scala.collection.SeqMap[?, ?] => view(map)(OrderedMapView(map, this))
-    case map: scala.collection.SortedMap[?, ?] => view(map)(OrderedMapView(map, this))
+    // Every map alike: a map has no order, and the core sorts its keys.
     case map: scala.collection.Map[?, ?] => view(map)(MapView(map, this))
     case list: java.util.List[?] => view(list)(JavaListView(list, this))
-    case map: java.util.SequencedMap[?, ?] => view(map)(OrderedJavaMapView(map, this))
     case map: java.util.Map[?, ?] => view(map)(JavaMapView(map, this))
     // A case object is its name, as an enum case without parameters.
     case product: Product if ToJava.caseObject(product) => product.productPrefix
@@ -157,7 +155,7 @@ private final class JavaListView(val underlying: java.util.List[?], convert: ToJ
   override def size: Int = underlying.size
   override def iterator: java.util.Iterator[AnyRef] = underlying.asScala.iterator.map(convert(_)).asJava
 
-/** Entries in a given order; the Java reader keeps the order of a `SequencedMap`. */
+/** A map's entries, unconverted (in any order: the core sorts a map's keys). */
 private sealed abstract class Entries(convert: ToJava) extends AbstractMap[Any, AnyRef] with View:
   /** The keys and the values, in order, unconverted. */
   protected def pairs: Iterator[(Any, Any)]
@@ -182,11 +180,6 @@ private class MapView(val underlying: scala.collection.Map[?, ?], convert: ToJav
   protected def pairs: Iterator[(Any, Any)] = scalaMap.iterator
   protected def count: Int = underlying.size
 
-private final class OrderedMapView(underlying: scala.collection.Map[?, ?], convert: ToJava)
-    extends MapView(underlying, convert)
-    with SequencedMap[Any, AnyRef]:
-  override def reversed: SequencedMap[Any, AnyRef] = super.reversed
-
 private class JavaMapView(val underlying: java.util.Map[?, ?], convert: ToJava) extends Entries(convert):
   private def javaMap = underlying.asInstanceOf[java.util.Map[Any, Any]]
   override def containsKey(key: Any): Boolean = javaMap.containsKey(key)
@@ -194,13 +187,9 @@ private class JavaMapView(val underlying: java.util.Map[?, ?], convert: ToJava) 
   protected def pairs: Iterator[(Any, Any)] = javaMap.asScala.iterator
   protected def count: Int = underlying.size
 
-private final class OrderedJavaMapView(underlying: java.util.SequencedMap[?, ?], convert: ToJava)
-    extends JavaMapView(underlying, convert)
-    with SequencedMap[Any, AnyRef]:
-  override def reversed: SequencedMap[Any, AnyRef] = super.reversed
-
 /**
- * A case class as a map of its public fields, in their order: a field the
+ * A case class as a map of its public fields (in their order, which means
+ * nothing: the core sorts a map's keys): a field the
  * class declares without a public accessor (a `private val`) is left out. A
  * product written by hand, with no member of an element's name, shows it.
  */

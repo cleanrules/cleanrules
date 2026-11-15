@@ -6,7 +6,7 @@ use crate::error::{Error, ErrorCode, Result};
 use crate::format::condition::{Raw, build, shape, write_node_in};
 use crate::format::result::write_result;
 use crate::format::value::{ValueContext, read_value, write_value};
-use crate::json::{Json, Limits, pointer_token};
+use crate::json::{Json, Limits, by_key, pointer_token};
 use crate::logic::LogicName;
 use crate::rules::{Aggregate, Aggregated, Config, Decision, HitPolicy, Rule, RuleSet};
 use crate::value::{Map, Value};
@@ -24,13 +24,17 @@ pub(crate) fn get<'a>(members: &'a [(String, Json)], key: &str) -> Option<&'a Js
     members.iter().find(|(k, _)| k == key).map(|(_, v)| v)
 }
 
-/// After the known keys: an unknown key is an error, in text order.
+/// After the known keys: an unknown key is an error, the first by code point
+/// (`spec/json-format.md`, *Errors and limits*).
 pub(crate) fn no_unknown_keys(
     members: &[(String, Json)],
     known: &[&str],
     pointer: &str,
 ) -> Result<()> {
-    match members.iter().find(|(k, _)| !known.contains(&k.as_str())) {
+    match by_key(members)
+        .into_iter()
+        .find(|(k, _)| !known.contains(&k.as_str()))
+    {
         Some((key, _)) => Err(
             format_error(&at(pointer, key), format!("unknown key {key:?}"))
                 .with_hint("it may come from a newer version of cleanrules"),
@@ -97,7 +101,8 @@ pub(crate) fn shape_rule(json: &Json, pointer: &str, limits: &Limits) -> Result<
         None => {}
         Some(Json::Object(entries)) => {
             let base = at(pointer, "then");
-            for (key, value) in entries {
+            // A payload is an association: its keys are read by code point.
+            for (key, value) in by_key(entries) {
                 then.push((key.clone(), shape(value, &at(&base, key), 1, limits)?));
             }
         }
@@ -158,7 +163,7 @@ pub(crate) fn shape_rule(json: &Json, pointer: &str, limits: &Limits) -> Result<
             let base = at(pointer, "metadata");
             let mut map = Map::new();
             // Metadata keys are taken literally; their values are data values.
-            for (key, value) in entries {
+            for (key, value) in by_key(entries) {
                 map.insert(
                     key.clone(),
                     read_value(value, &at(&base, key), ValueContext::Data)?,

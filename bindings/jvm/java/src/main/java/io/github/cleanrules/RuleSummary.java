@@ -39,7 +39,7 @@ public final class RuleSummary {
     }
 
     /**
-     * The payload keys, in order.
+     * The payload keys, sorted by Unicode code point.
      *
      * @return the keys
      */

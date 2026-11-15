@@ -1525,6 +1525,34 @@
           "pointer": "/condition/left"
         }
       }
+    },
+    {
+      "id": "format/conditions/unknown-keys-first-by-key",
+      "spec": [
+        "json-format.md#errors-and-limits",
+        "json-format.md#objects"
+      ],
+      "description": "of two unknown keys of a node, the first by code point is reported, whatever the order of the text",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "field",
+            "path": [
+              "x"
+            ],
+            "zeta": 1,
+            "alpha": 2
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/alpha"
+        }
+      }
     }
   ]
 }

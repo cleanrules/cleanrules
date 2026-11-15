@@ -472,13 +472,13 @@ fn a_decision_is_read_without_json() {
         assert_eq!(token, 99);
         assert_eq!(
             value_to_json(outputs.0),
-            r#"[{"discount":{"$decimal":"0.15"},"badge":{"$opaque":"image"}},{"discount":0}]"#
+            r#"[{"badge":{"$opaque":"image"},"discount":{"$decimal":"0.15"}},{"discount":0}]"#
         );
     }
-    // The same in JSON.
+    // The same in JSON; a payload's keys come sorted by code point.
     assert_eq!(
         common::outputs(&decision).unwrap(),
-        r#"[{"discount":{"$decimal":"0.15"},"badge":{"$opaque":"image"}},{"discount":0}]"#
+        r#"[{"badge":{"$opaque":"image"},"discount":{"$decimal":"0.15"}},{"discount":0}]"#
     );
 }
 

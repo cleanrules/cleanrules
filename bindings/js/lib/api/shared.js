@@ -1,7 +1,7 @@
 // What the idiomatic API's modules share: describing values in messages,
 // checking options objects, and telling apart the objects of the two builds.
 
-import { typeName } from '../read.js'
+import { byCodePoint, typeName } from '../read.js'
 
 /** The brand of the API's prototypes: its value names the build. */
 const API = Symbol.for('cleanrules.api')
@@ -70,4 +70,4 @@ function sameBuild(value, build) {
   }
 }
 
-export { API, brand, options, sameBuild, show }
+export { API, brand, byCodePoint, options, sameBuild, show }

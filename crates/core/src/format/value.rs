@@ -9,7 +9,7 @@ use jiff::civil::{Date, DateTime};
 use jiff::tz::{Offset, TimeZone};
 
 use crate::error::{Error, ErrorCode, Result};
-use crate::json::{Json, JsonNumber, pointer_token};
+use crate::json::{Json, JsonNumber, by_key, pointer_token};
 use crate::value::{
     AwareDateTime, Decimal, DecimalError, Map, NullCause, Opaque, Value, Zone, check_date,
     check_naive,
@@ -48,8 +48,9 @@ pub fn read_value(json: &Json, pointer: &str, context: ValueContext) -> Result<V
         return read_scalar(json, pointer, context);
     }
     // Lists and maps nest as deep as the JSON nesting limit allows: they are read
-    // with an explicit stack (`crate::walk`), children in order after their
-    // container's own checks, as a recursive reader would.
+    // with an explicit stack (`crate::walk`), children in order (a map's by
+    // key, by code point) after their container's own checks, as a recursive
+    // reader would.
     post_order(
         open_value(json, Cow::Borrowed(pointer), context)?,
         |reading, done| {
@@ -60,7 +61,7 @@ pub fn read_value(json: &Json, pointer: &str, context: ValueContext) -> Result<V
                     None => return Ok(None),
                 },
                 Items::Map(members) => match members.get(done) {
-                    Some((key, item)) => {
+                    Some(&(key, item)) => {
                         (format!("{}/{}", reading.pointer, pointer_token(key)), item)
                     }
                     None => return Ok(None),
@@ -95,7 +96,8 @@ enum Items<'j> {
     /// A value without items, already read.
     None(Value),
     List(&'j [Json]),
-    Map(&'j [(String, Json)]),
+    /// A map's entries, sorted by key.
+    Map(Vec<&'j (String, Json)>),
 }
 
 /// Check a value as a reader entering it would, and read it if it has no items.
@@ -170,7 +172,8 @@ fn read_float_literal(n: &JsonNumber, pointer: &str) -> Result<Value> {
 /// pointer or, for a `$map`, at this one.
 enum Object<'j> {
     Value(Value),
-    Map(&'j [(String, Json)], Option<String>),
+    /// The entries, sorted by key.
+    Map(Vec<&'j (String, Json)>, Option<String>),
 }
 
 fn read_object<'j>(
@@ -178,16 +181,18 @@ fn read_object<'j>(
     pointer: &str,
     context: ValueContext,
 ) -> Result<Object<'j>> {
-    let Some(typed) = members.iter().position(|(k, _)| k.starts_with('$')) else {
+    // Members are visited by key, so the first `$`-key and the first extra key
+    // never depend on the order of the text.
+    let sorted = by_key(members);
+    let Some(&(tag, inner)) = sorted.iter().find(|(k, _)| k.starts_with('$')) else {
         if context == ValueContext::Constant {
             return Err(format_error(
                 pointer,
                 "a constant must be a scalar, not a map",
             ));
         }
-        return Ok(Object::Map(members, None));
+        return Ok(Object::Map(sorted, None));
     };
-    let (tag, inner) = &members[typed];
     let at = format!("{pointer}/{}", pointer_token(tag));
     if !matches!(
         tag.as_str(),
@@ -195,7 +200,7 @@ fn read_object<'j>(
     ) {
         return Err(format_error(&at, format!("{tag} is not a type of value")));
     }
-    if let Some((extra, _)) = members.iter().find(|(k, _)| k != tag) {
+    if let Some((extra, _)) = sorted.iter().find(|(k, _)| k != tag) {
         return Err(format_error(
             &format!("{pointer}/{}", pointer_token(extra)),
             format!("a typed value has the single key {tag}; {extra:?} is extra"),
@@ -211,7 +216,7 @@ fn read_object<'j>(
                 "a constant must be a scalar, not a map",
             ));
         }
-        return Ok(Object::Map(entries, Some(at)));
+        return Ok(Object::Map(by_key(entries), Some(at)));
     }
     let value = match tag.as_str() {
         "$int" => read_typed_int(inner, &at, context),
@@ -591,9 +596,21 @@ mod tests {
 
     #[test]
     fn lists_and_maps_in_data_round_trip() {
+        // A map is written sorted by key, whatever the order it was read in.
         let text = r#"{"b":[1,2.5,null],"a":{"$map":{"$ref":{"$date":"2026-10-31"}}},"c":{"$int":"9007199254740992"}}"#;
+        let sorted = r#"{"a":{"$map":{"$ref":{"$date":"2026-10-31"}}},"b":[1,2.5,null],"c":{"$int":"9007199254740992"}}"#;
         let value = read(text, ValueContext::Data).unwrap();
-        assert_eq!(to_string(&write_value(&value)), text);
+        assert_eq!(to_string(&write_value(&value)), sorted);
+        let error = read(
+            r#"{"b": {"$int": "x"}, "a": {"$int": "y"}}"#,
+            ValueContext::Data,
+        )
+        .unwrap_err();
+        assert_eq!(error.context().pointer.as_deref(), Some("/a/$int"));
+        // The type is the first `$`-key by code point, and the extra key the
+        // first other one.
+        let error = read(r#"{"$int": "1", "$date": "x"}"#, ValueContext::Data).unwrap_err();
+        assert_eq!(error.context().pointer.as_deref(), Some("/$int"));
         assert!(read("[1]", ValueContext::Constant).is_err());
         assert!(read(r#"{"a": 1}"#, ValueContext::Constant).is_err());
     }

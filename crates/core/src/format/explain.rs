@@ -438,11 +438,11 @@ mod tests {
         let Json::Object(members) = &json else {
             panic!("not an object")
         };
+        // The same keys; a map's are sorted.
         let keys: Vec<&str> = value.iter().map(|(k, _)| k).collect();
-        assert_eq!(
-            keys,
-            members.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>()
-        );
+        let mut written: Vec<&str> = members.iter().map(|(k, _)| k.as_str()).collect();
+        written.sort_unstable();
+        assert_eq!(keys, written);
         let Some(Value::List(entries)) = value.get("rules") else {
             panic!("no rules")
         };

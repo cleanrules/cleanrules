@@ -8,7 +8,7 @@ import datetime as dt
 import json
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import cleanrules
 import pytest
@@ -209,6 +209,34 @@ def test_collect_aggregates() -> None:
     assert count.output == {"discount": 2}
     nothing = shop(hit_policy="collect", aggregate="sum").evaluate({})
     assert nothing.output is None
+
+
+def test_payloads_and_maps_come_back_sorted_by_code_point() -> None:
+    # spec/rules.md, *Rules*, and spec/data-model.md, *Lists and maps*: a payload
+    # and a map are associations, given back by key whatever the order of the data.
+    # U+FF5A sorts before U+1F600 by code point, after it by UTF-16 code unit.
+    wide, emoji = chr(0xFF5A), chr(0x1F600)
+    keys = ["10", "a", "b", wide, emoji]
+    rule = Rule("r", F.x.is_null(), {"b": 1, wide: 2, emoji: 3, "a": F.m, "10": 4})
+    assert list(rule.then) == keys
+    rules = RuleSet([rule], hit_policy="collect", aggregate="count")
+    decision = rules.evaluate({"m": {"z": 1, "y": {"d": 2, "c": 3}, "Z": 0}})
+    (output,) = decision.outputs
+    assert list(output) == keys
+    passed = output["a"]
+    assert isinstance(passed, dict)
+    assert list(cast(dict[str, Any], passed)) == ["Z", "y", "z"]
+    assert list(cast(dict[str, Any], passed)["y"]) == ["c", "d"]
+    assert list(decision.aggregated or {}) == keys
+    with pytest.raises(RuleDefinitionError, match='"a"'):
+        Rule("r", F.x > 1, {"b": F.y > 2, "a": F.z > 3})
+    with pytest.raises(ExpressionError, match=r"then\['a'\]"):
+        Rule("r", F.x > 1, {"b": float("nan"), "a": float("nan")})
+    nan = float("nan")
+    with pytest.raises(RuleDefinitionError, match=r'\["a"\]\["c"\]'):
+        Rule("r", F.x > 1, metadata={"b": nan, "a": {"d": nan, "c": nan}})
+    meta = Rule("r", F.x > 1, metadata={"b": 1, emoji: 2, wide: 3, "a": {"d": 1, "c": 2}}).metadata
+    assert list(meta) == ["a", "b", wide, emoji]
 
 
 def test_payload_values_are_evaluated() -> None:

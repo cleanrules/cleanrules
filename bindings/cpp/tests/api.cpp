@@ -234,8 +234,10 @@ void values() {
     CHECK(!v["missing"]);
     CHECK(v["price"].as_decimal() == "19.90");
     CHECK(v["nothing"].as_null().detail == "getter raised");
-    CHECK(v.entry(1).first == "count");
-    CHECK(v.entry(1).second.as_int() == -7);
+    // Entries come by key, by code point: at, big, count...
+    CHECK(v.entry(1).first == "big");
+    CHECK(v.entry(2).first == "count");
+    CHECK(v.entry(2).second.as_int() == -7);
     CHECK(cr::value(std::numeric_limits<double>::quiet_NaN()).is_null());
 
     // Copies are deep and keep what JSON loses.

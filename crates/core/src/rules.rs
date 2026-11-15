@@ -29,6 +29,15 @@ fn rule_error(rule: &str, message: impl Into<String>) -> Error {
     error
 }
 
+/// Put `value` under `key` in a payload sorted by key (by UTF-8 bytes, which is
+/// the order of code points), replacing the value of a key it has.
+fn put(payload: &mut Vec<(String, Node)>, key: String, value: Node) {
+    match payload.binary_search_by(|(k, _)| k.as_str().cmp(&key)) {
+        Ok(at) => payload[at].1 = value,
+        Err(at) => payload.insert(at, (key, value)),
+    }
+}
+
 fn check_payload_value(rule: &str, key: &str, value: &Node) -> Result<()> {
     if value.kind() == Kind::Condition {
         return Err(rule_error(
@@ -89,13 +98,14 @@ impl Rule {
         Self::with_payload(name, when, Vec::new())
     }
 
-    /// A rule with a payload, keys in order (a repeated key keeps its first place
-    /// and its last value).
+    /// A rule with a payload. A payload is an association: its keys are kept
+    /// sorted by Unicode code point, whatever order they come in, and a
+    /// repeated key keeps its last value (`spec/rules.md`, *Rules*).
     ///
     /// # Errors
     ///
     /// As [`Rule::new`], and `rule_definition_error` when a payload value is a
-    /// condition, naming the first such key.
+    /// condition, naming the first such key by code point.
     pub fn with_payload(
         name: impl Into<String>,
         when: Node,
@@ -124,11 +134,10 @@ impl Rule {
         }
         let mut payload: Vec<(String, Node)> = Vec::with_capacity(then.len());
         for (key, value) in then {
-            check_payload_value(&name, &key, &value)?;
-            match payload.iter_mut().find(|(k, _)| *k == key) {
-                Some(entry) => entry.1 = value,
-                None => payload.push((key, value)),
-            }
+            put(&mut payload, key, value);
+        }
+        for (key, value) in &payload {
+            check_payload_value(&name, key, value)?;
         }
         Ok(Self {
             name,
@@ -192,8 +201,8 @@ impl Rule {
         Ok(self.metadata(metadata))
     }
 
-    /// The rule with `key` in its payload, given `value`: a new key goes last,
-    /// a key it has keeps its place and takes the new value.
+    /// The rule with `key` in its payload, given `value`, replacing the value of
+    /// a key it has; keys stay sorted by Unicode code point.
     ///
     /// # Errors
     ///
@@ -201,10 +210,7 @@ impl Rule {
     pub fn with_payload_entry(mut self, key: impl Into<String>, value: Node) -> Result<Self> {
         let key = key.into();
         check_payload_value(&self.name, &key, &value)?;
-        match self.then.iter_mut().find(|(k, _)| *k == key) {
-            Some(entry) => entry.1 = value,
-            None => self.then.push((key, value)),
-        }
+        put(&mut self.then, key, value);
         Ok(self)
     }
 
@@ -236,7 +242,7 @@ impl Rule {
         &self.when
     }
 
-    /// The payload, keys in order.
+    /// The payload, keys sorted by Unicode code point.
     #[must_use]
     pub fn then(&self) -> &[(String, Node)] {
         &self.then
@@ -879,7 +885,7 @@ fn sum(numbers: &[Number]) -> Value {
 pub enum Aggregated {
     /// No rule was selected: the aggregate is null.
     NothingSelected,
-    /// Each payload key with its aggregate, keys in order of first appearance.
+    /// Each payload key with its aggregate, keys sorted by Unicode code point.
     Values(Map),
 }
 
@@ -1020,6 +1026,33 @@ mod tests {
     }
 
     #[test]
+    fn payloads_are_sorted_by_code_point() {
+        let gt = || field("x").gt(1).build().unwrap();
+        let payload = vec![
+            ("z".to_owned(), gt()),
+            ("b".to_owned(), constant(1).build().unwrap()),
+            ("a".to_owned(), gt()),
+            ("b".to_owned(), constant(2).build().unwrap()),
+        ];
+        let error = Rule::with_payload("r", gt(), payload).unwrap_err();
+        assert!(error.message().contains("\"a\""), "{}", error.message());
+        let payload = vec![
+            ("\u{1F600}".to_owned(), constant(1).build().unwrap()),
+            ("b".to_owned(), constant(2).build().unwrap()),
+            ("\u{ff5a}".to_owned(), constant(3).build().unwrap()),
+            ("b".to_owned(), constant(4).build().unwrap()),
+        ];
+        let rule = Rule::with_payload("r", gt(), payload).unwrap();
+        let keys: Vec<&str> = rule.then().iter().map(|(k, _)| k.as_str()).collect();
+        assert_eq!(keys, ["b", "\u{ff5a}", "\u{1F600}"]);
+        // A repeated key keeps its last value.
+        assert!(matches!(
+            rule.then()[0].1.expr(),
+            crate::ast::Expr::Const(Value::Int(4))
+        ));
+    }
+
+    #[test]
     fn steps_names_and_action_errors() {
         use super::{ActionFailure, action_error};
         use crate::logic::LogicName;
@@ -1027,11 +1060,11 @@ mod tests {
         let gt = || field("x").gt(1).build().unwrap();
         let rule = Rule::new("r", gt())
             .unwrap()
-            .with_payload_entry("a", constant(1).build().unwrap())
+            .with_payload_entry("b", constant(1).build().unwrap())
             .unwrap()
-            .with_payload_entry("b", constant(2).build().unwrap())
+            .with_payload_entry("a", constant(2).build().unwrap())
             .unwrap()
-            .with_payload_entry("a", constant(3).build().unwrap())
+            .with_payload_entry("b", constant(3).build().unwrap())
             .unwrap();
         let keys: Vec<&str> = rule.then().iter().map(|(k, _)| k.as_str()).collect();
         assert_eq!(keys, ["a", "b"]);

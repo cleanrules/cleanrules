@@ -113,8 +113,9 @@ func (r *Rule) use(f func(*C.cr_rule) error) error {
 var errNilRule = newError(CodeRuleDefinition, "a nil or zero *Rule is not a rule", "make rules with NewRule")
 
 // Then adds key to the payload with value: an *Expr (a value node, such as
-// Field("order", "total").Mul(0.9)) or a constant. A new key goes last; a key
-// the payload has keeps its place and takes the new value.
+// Field("order", "total").Mul(0.9)) or a constant. A key the payload has
+// takes the new value. A payload has no order: its keys are kept sorted by
+// Unicode code point, whatever the order they are added in.
 func Then(key string, value any) RuleOption {
 	node := operand(value)
 	return ruleOption(func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
@@ -226,7 +227,7 @@ type PayloadEntry struct {
 	Value *Expr
 }
 
-// Payload is the rule's payload, in order.
+// Payload is the rule's payload, its keys sorted by Unicode code point.
 func (r *Rule) Payload() []PayloadEntry {
 	var payload []PayloadEntry
 	_ = r.use(func(rule *C.cr_rule) error {

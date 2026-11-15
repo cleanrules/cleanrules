@@ -2289,6 +2289,126 @@
           "column": 24
         }
       }
+    },
+    {
+      "id": "agents/arguments/unknown-members-first-by-key",
+      "spec": [
+        "agents.md#arguments",
+        "json-format.md#objects"
+      ],
+      "description": "of two members the tool does not take, the first by code point is reported, whatever the order of the text",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "pricing": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "is_null",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "since"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "label": {
+                    "op": "const",
+                    "value": "vip"
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "gold"
+                ]
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5
+              },
+              {
+                "name": "base",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tool": "evaluate",
+        "arguments": {
+          "ruleset": "pricing",
+          "input": {},
+          "zeta": true,
+          "alpha": true
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/alpha"
+        }
+      }
     }
   ]
 }

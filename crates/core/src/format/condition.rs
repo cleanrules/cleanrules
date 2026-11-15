@@ -10,7 +10,7 @@ use std::vec::Drain;
 use crate::ast::{ArithOp, Closed, CompareOp, Expr, Node, READ_PATH_HINT, StringOp, path_too_long};
 use crate::error::{Error, ErrorCode, Result, Segment};
 use crate::format::value::{ValueContext, read_value, write_value};
-use crate::json::{Json, JsonNumber, Limits, pointer_token};
+use crate::json::{Json, JsonNumber, Limits, by_key, pointer_token};
 use crate::value::Value;
 use crate::walk::{Walk, post_order};
 
@@ -94,12 +94,11 @@ impl<'a> Object<'a> {
         }
     }
 
-    /// After the known keys: an unknown key is an error, in text order;
-    /// else the object's pointer.
+    /// After the known keys: an unknown key is an error, the first by code
+    /// point; else the object's pointer.
     fn finish(self) -> Result<String> {
-        match self
-            .members
-            .iter()
+        match by_key(self.members)
+            .into_iter()
             .find(|(k, _)| !self.known.contains(&k.as_str()))
         {
             Some((key, _)) => Err(format_error(

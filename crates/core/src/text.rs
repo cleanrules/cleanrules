@@ -1326,6 +1326,11 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
+        // A payload is an association (`spec/rules.md`, *Rules*): its values
+        // are built, and their errors reported, by key, by code point, as in
+        // JSON. Keys are unique here (a repeated one is an error above).
+        let mut then = then;
+        then.sort_by(|(a, _), (b, _)| a.cmp(b));
         let positions: Vec<(u64, u64)> = std::iter::once(&when)
             .chain(then.iter().map(|(_, value)| value))
             .map(|syn| (syn.line, syn.column))
@@ -1336,7 +1341,8 @@ impl<'a> Parser<'a> {
             .map(|(key, value)| value.build().map(|node| (key, node)))
             .collect::<Result<Vec<_>>>()?;
         // A rule error is located at the condition or payload value it is
-        // about, else at the rule.
+        // about, else at the rule: of two payload values that are
+        // conditions, the first by key.
         let at = if when.is_null_constant() || when.kind() == crate::ast::Kind::Value {
             Some(positions[0])
         } else {

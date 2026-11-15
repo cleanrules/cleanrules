@@ -276,8 +276,9 @@ func TestMapKeys(t *testing.T) {
 }
 
 // TestKeyOrder checks the order of the keys of maps and structs read
-// whole, which the core keeps in decisions: sorted for a Go map, in
-// declaration order for a struct, whatever the order of iteration.
+// whole, as decisions write them: a map has no order, so both come out
+// sorted by key, by code point, whatever the order of iteration or of
+// declaration.
 func TestKeyOrder(t *testing.T) {
 	type record struct {
 		Zeta, Alpha, Mid int
@@ -290,7 +291,7 @@ func TestKeyOrder(t *testing.T) {
 	want := `"value":{"a":1,"b":1,"c":1,"d":1,"k":1,"m":1,"q":1,"x":1,"z":1,"é":2}`
 	for range 10 {
 		text := must(must(rs.Evaluate(map[string]any{"m": m, "s": record{1, 2, 3}}))(t).JSON())(t)
-		if !strings.Contains(text, want) || !strings.Contains(text, `"value":{"Zeta":1,"Alpha":2,"Mid":3}`) {
+		if !strings.Contains(text, want) || !strings.Contains(text, `"value":{"Alpha":2,"Mid":3,"Zeta":1}`) {
 			t.Fatalf("order: %s", text)
 		}
 	}

@@ -224,14 +224,16 @@ class ValuesTest {
     }
 
     @Test
-    void mapsKeepTheirOrderOrAreSorted() {
+    void mapsAreGivenBackByKeyWhateverTheirOrder() {
+        // A map has no order (spec/data-model.md, Lists and maps): it comes
+        // back sorted by key, by code point, whatever the order of the data.
         SequencedMap<String, Object> ordered = new LinkedHashMap<>();
         ordered.put("b", 1);
         ordered.put("a", 2);
-        assertEquals("[{\"value\":{\"b\":1,\"a\":2}}]", echoJson(ordered));
+        assertEquals("[{\"value\":{\"a\":2,\"b\":1}}]", echoJson(ordered));
         Object back = echo(ordered);
         assertInstanceOf(SequencedMap.class, back);
-        assertEquals(List.of("b", "a"), List.copyOf(((Map<?, ?>) back).keySet()));
+        assertEquals(List.of("a", "b"), List.copyOf(((Map<?, ?>) back).keySet()));
         assertThrows(UnsupportedOperationException.class, () -> ((Map<?, ?>) back).clear());
 
         Map<String, Object> unordered = new HashMap<>();
@@ -245,7 +247,7 @@ class ValuesTest {
         TreeMap<String, Object> sorted = new TreeMap<>(java.util.Comparator.reverseOrder());
         sorted.put("a", 1);
         sorted.put("b", 2);
-        assertEquals("[{\"value\":{\"b\":2,\"a\":1}}]", echoJson(sorted));
+        assertEquals("[{\"value\":{\"a\":1,\"b\":2}}]", echoJson(sorted));
 
         // Keys that are not strings are left out; a null value is a null.
         Map<Object, Object> mixed = new LinkedHashMap<>();
@@ -292,7 +294,7 @@ class ValuesTest {
 
     @Test
     void recordsAndBeansAreMapsOfTheirPublicData() {
-        assertEquals("[{\"value\":{\"y\":2,\"x\":1}}]", echoJson(new Point(2, 1)));
+        assertEquals("[{\"value\":{\"x\":1,\"y\":2}}]", echoJson(new Point(2, 1)));
         assertEquals("[{\"value\":{\"name\":\"n\"}}]", echoJson(new Hidden("n")));
         assertEquals(
                 "[{\"value\":{\"URL\":\"u\",\"active\":true,\"field\":1,\"name\":\"bean\"}}]",

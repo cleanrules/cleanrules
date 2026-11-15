@@ -225,7 +225,11 @@ fn tree(summary: &Summary<'_>) -> Vec<Place> {
 fn map(place: &Place, tree: &[Place], schemas: &mut [Option<Json>], strict: bool) -> Json {
     let mut properties = Vec::new();
     let mut required = Vec::new();
-    for (key, child) in &place.keys {
+    // By key, by code point: `properties` is an object, which has no order,
+    // and `required` lists its keys in that order too (`spec/agents.md`).
+    let mut keys: Vec<&(String, usize)> = place.keys.iter().collect();
+    keys.sort_by(|(a, _), (b, _)| a.cmp(b));
+    for (key, child) in keys {
         properties.push((key.clone(), schemas[*child].take().unwrap_or(Json::Null)));
         if strict && tree[*child].condition {
             required.push(string(key));

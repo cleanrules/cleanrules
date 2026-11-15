@@ -685,11 +685,11 @@ platform and tag, and the examples
   `float32` and `float64`, `Decimal`, `Date`, `DateTime`, `time.Time` (in
   `time.UTC` for `Z`, in a zone by name, and in a fixed zone, unnamed, named
   or `Etc/GMT`, for an offset), slices, arrays, maps
-  (`map[string]any`, `map[any]any`, typed and named maps) and structs (whose
-  fields keep the order of a map that is not sorted), with pointers and nils
+  (`map[string]any`, `map[any]any`, typed and named maps) and structs, in
+  turn (a map has no order), with pointers and nils
   of several types. Results are compared as the Go values given back
   (`spec/data-model.md`, *Go*), checking each Go type (`int64`, `float64`,
-  `[]any`, `map[string]any` without order...), through `Decision`,
+  `[]any`, `map[string]any`...), through `Decision`,
   `Explanation`, `Summary` and `ResultTree`, and as their JSON forms. `read`
   vectors go through `Loads`, `Dumps`, `RuleFromText`, `NewDecisionTable`
   (grids) and `ReadDecision`.

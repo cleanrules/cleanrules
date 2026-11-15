@@ -43,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Erlang NIF: `max_path_segments` in the limits map and in
   `default_limits()`.
 
+- C ABI (task R.1): `cr_tree_to_json(tree, index, ...)`, the canonical JSON
+  of a result tree or of the subtree at a pre-order index (members in the
+  order of the format's tables), which `cr_value_to_json` of `cr_tree_value`
+  cannot give now that maps are sorted. Added to version 1 of the ABI. The
+  core's new `json::by_key` gives an object's members in the order readers
+  visit them (task R.1).
 - Tools for AI agents (`spec/agents.md`, task O.1): the contract that the MCP
   server (O.2) and the agent guardrails (O.3) implement. Five tools,
   `list_rulesets`, `summary`, `evaluate`, `explain` and `validate`, with
@@ -1238,6 +1244,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   constructors of every language (`Node::field`, `cr_node_new_field`, `F` and
   `Field` in Python, `field` in JavaScript, `Conditions.field` on the JVM,
   `Field` in Go, `node::field` in C++), with `limit_exceeded`.
+- **Incompatible with the earlier draft of format version 1** (task R.1,
+  author's decision of 2026-11-15; the format stays at `"version": 1`
+  because nothing has been published): JSON objects have no significant
+  member order (`spec/json-format.md`, *Objects*). Two documents whose
+  objects hold the same members in other orders are the same document, with
+  the same results, errors, explanations and diagrams. Arrays and the order
+  of rules keep their meaning. In detail:
+  - a payload (`then`) is an association: its keys are kept, evaluated,
+    explained, drawn, printed and given back sorted by Unicode code point
+    (not by UTF-16 code unit), whatever the order they were written or built
+    in; a key given twice keeps its last value. Before, a payload kept the
+    order of its definition. Summaries list a rule's output keys, and the
+    payload reads of each field, in that order;
+  - maps in data, metadata and the `aggregated` member of a decision are
+    compared without order and given back sorted by key, by code point, in
+    every language: Python `dict`s, JavaScript plain objects (whose
+    integer-like keys still come first, which now changes nothing), Java
+    `SequencedMap`s and Scala `VectorMap`s, Go `map[string]any`, Erlang maps,
+    C and C++ (`cr_value_map_entry` and `value::entry` count positions among
+    the keys sorted). A Java `SequencedMap`, a Scala `SeqMap` or a JavaScript
+    `Map` no longer keeps its order. A record (a namedtuple, a pandas row, a
+    C ABI record) still reads integer segments by position;
+  - the first error among an object's keys follows their code point order:
+    unknown keys (before, the first in the text), payload keys (shape,
+    construction and `rule_definition_error`, also in the rule syntax), the
+    keys of metadata and of maps, an object's `$`-keys (the type is the first
+    `$`-key by code point, and the extra key the first other one), and an agent tool's
+    unknown or repeated arguments. Keys that a table defines are still
+    checked in the order of their table;
+  - reading a decision accepts `then` with the payload's keys in any order
+    (before, `decision_mismatch`), so a decision written with
+    `JSON.stringify` in JavaScript reads back even when a payload key is
+    integer-like;
+  - conformance runners compare objects without regard to member order
+    (`conformance/README.md`, *Comparing*). Vectors retired:
+    `rules/payloads/order-kept`, `rules/payloads/map-order-kept`,
+    `format/rules/payload-order` and `format/decisions/then-keys-order`;
+    added: `rules/payloads/keys-without-order`,
+    `rules/payloads/map-keys-without-order`, `format/rules/payload-keys-sorted`,
+    `format/rules/payload-condition-first-by-key`,
+    `format/rules/payload-shape-first-by-key`,
+    `format/rules/metadata-error-first-by-key`,
+    `format/rules/unknown-keys-first-by-key`,
+    `format/conditions/unknown-keys-first-by-key`,
+    `format/values/typed-keys-by-code-point`,
+    `format/documents/unknown-keys-first-by-key`,
+    `format/decisions/then-keys-any-order`,
+    `agents/arguments/unknown-members-first-by-key`,
+    `explain/summaries/payload-keys-by-code-point`,
+    `visual/rules/payload-entries-by-code-point`,
+    `format/text/payload-keys-by-code-point` and
+    `format/text/payload-condition-first-by-key`,
+    `format/text/payload-construction-first-by-key` (the rule syntax builds
+    payload values by key, so their construction errors match JSON's);
+    `format/text/names` now prints its payload by key, and the input schemas
+    of `agents/input-schemas.json` list `properties` and `required` by key;
+  - the input schema of a rule set (`spec/agents.md`) lists a map's
+    `properties`, and its `required` keys, by key, by code point (before, in
+    order of first appearance);
+  - the C ABI stays at version 1 (`CR_ABI_VERSION`), as the format stays at
+    1: nothing has been published, so `cr_value_map_entry`,
+    `cr_rule_payload_key` and `cr_rule_payload_value` giving entries by key
+    are noted here instead of raising it. A guide from the earlier draft
+    comes with task R.6.
+- Core (task R.1): `Map` keeps its entries sorted by key (lookups by binary
+  search; a record keeps its positions apart), `Rule::then()`,
+  `Rule::with_payload` and `Rule::with_payload_entry` keep payload keys
+  sorted, and `json::same` compares objects whatever their order.
+- Bindings (task R.1): Python's `Rule.then`, JavaScript's `Rule.then`
+  (integer-like keys still first, as in any plain object), Java's
+  `Rule.then()`, Scala's `Rule.payload` and Go's `Rule.Payload()` give the
+  payload's keys sorted by code point, and the binding checks the payload's
+  values, and the metadata's, by key (so a NaN in two payload values is
+  reported at the first key); Java's `Rule.then(Map)` adds a map's entries by
+  key whatever its kind. Java's `ResultTree.toJson()` and Go's
+  `ResultTree.JSON()` write the canonical form through `cr_tree_to_json`. The Go runner no longer gives maps with unsorted keys as structs, the
+  JavaScript runner no longer reorders expected maps as plain objects do, and
+  the Scala runner passes plain `Map`s for every map.
 - `registry_error` is also raised for a rule set or a tool that a tool call
   for agents names (`spec/errors.md`, `spec/agents.md`), with the pointer
   `/ruleset` for a rule set.

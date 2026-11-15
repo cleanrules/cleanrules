@@ -42,7 +42,7 @@ pub enum Value {
     AwareDateTime(AwareDateTime),
     /// An ordered sequence of values.
     List(Vec<Value>),
-    /// String keys mapped to values, in a fixed order.
+    /// String keys mapped to values, without order (given back by key).
     Map(Map),
     /// A native value with no equivalent.
     Opaque(Opaque),
@@ -229,15 +229,22 @@ impl fmt::Display for Group {
     }
 }
 
-/// A map with string keys, kept in insertion order, without duplicate keys.
+/// A map with string keys, without duplicate keys: an association, whose
+/// entries have no order of their own. They are kept, and given back, sorted
+/// by key by Unicode code point (`spec/data-model.md`, *Lists and maps*), so a
+/// map never depends on the order it was built in.
 ///
 /// A **record** is a map whose entries also have positions, such as a Python
 /// namedtuple or a pandas row: an integer segment reads the entry at that
-/// position (`spec/ast.md`, *Reading data*).
+/// position (`spec/ast.md`, *Reading data*). Positions are the order of
+/// insertion; they serve reading only, and entries are still given back by key.
 #[derive(Clone, Debug, Default)]
 pub struct Map {
+    /// Sorted by key; Rust compares strings by their UTF-8 bytes, which is
+    /// the order of their code points.
     entries: Vec<(String, Value)>,
-    record: bool,
+    /// For a record, the index in `entries` of the entry at each position.
+    positions: Option<Vec<usize>>,
 }
 
 impl Map {
@@ -252,42 +259,48 @@ impl Map {
     pub fn record() -> Self {
         Self {
             entries: Vec::new(),
-            record: true,
+            positions: Some(Vec::new()),
         }
     }
 
     /// Whether the map is a record.
     #[must_use]
     pub fn is_record(&self) -> bool {
-        self.record
+        self.positions.is_some()
     }
 
     /// For a record, the value at a position; never for a plain map.
     #[must_use]
     pub fn get_index(&self, index: usize) -> Option<&Value> {
-        if self.record {
-            self.entries.get(index).map(|(_, v)| v)
-        } else {
-            None
-        }
+        let at = *self.positions.as_ref()?.get(index)?;
+        self.entries.get(at).map(|(_, v)| v)
     }
 
-    /// Insert a value, replacing the one under the same key in place.
+    /// Insert a value, replacing the one under the same key (which, in a
+    /// record, keeps its position).
     pub fn insert(&mut self, key: impl Into<String>, value: Value) {
         let key = key.into();
-        match self.entries.iter_mut().find(|(k, _)| *k == key) {
-            Some(entry) => entry.1 = value,
-            None => self.entries.push((key, value)),
+        match self.find(&key) {
+            Ok(at) => self.entries[at].1 = value,
+            Err(at) => {
+                self.entries.insert(at, (key, value));
+                if let Some(positions) = &mut self.positions {
+                    for position in positions.iter_mut().filter(|p| **p >= at) {
+                        *position += 1;
+                    }
+                    positions.push(at);
+                }
+            }
         }
     }
 
     /// The value under `key`, if present.
     #[must_use]
     pub fn get(&self, key: &str) -> Option<&Value> {
-        self.entries.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+        self.find(key).ok().map(|at| &self.entries[at].1)
     }
 
-    /// The entries, in order.
+    /// The entries, sorted by key by Unicode code point.
     pub fn iter(&self) -> impl Iterator<Item = (&str, &Value)> {
         self.entries.iter().map(|(k, v)| (k.as_str(), v))
     }
@@ -303,15 +316,31 @@ impl Map {
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
+
+    /// Where `key` is in `entries`, or where it would go.
+    fn find(&self, key: &str) -> std::result::Result<usize, usize> {
+        self.entries.binary_search_by(|(k, _)| k.as_str().cmp(key))
+    }
 }
 
+/// A plain map of the entries, in O(n log n): sorted by key (a stable sort),
+/// a repeated key keeping its last value, as [`Map::insert`] does.
 impl FromIterator<(String, Value)> for Map {
     fn from_iter<I: IntoIterator<Item = (String, Value)>>(items: I) -> Self {
-        let mut map = Map::new();
+        let mut items: Vec<(String, Value)> = items.into_iter().collect();
+        items.sort_by(|(a, _), (b, _)| a.cmp(b));
+        let mut entries: Vec<(String, Value)> = Vec::with_capacity(items.len());
         for (key, value) in items {
-            map.insert(key, value);
+            match entries.last_mut() {
+                // Equal keys are adjacent, in their original order: the later wins.
+                Some(last) if last.0 == key => last.1 = value,
+                _ => entries.push((key, value)),
+            }
         }
-        map
+        Self {
+            entries,
+            positions: None,
+        }
     }
 }
 
@@ -346,7 +375,7 @@ impl Clone for Value {
                             .map(|(k, _)| k.clone())
                             .zip(items)
                             .collect(),
-                        record: map.record,
+                        positions: map.positions.clone(),
                     }),
                     scalar => scalar.clone_scalar(),
                 })
@@ -509,7 +538,7 @@ impl Value {
             Value::List(_) => Value::List(Vec::new()),
             Value::Map(map) => Value::Map(Map {
                 entries: Vec::new(),
-                record: map.record,
+                positions: map.positions.as_ref().map(|_| Vec::new()),
             }),
             Value::Opaque(o) => Value::Opaque(o.clone()),
         }
@@ -612,13 +641,52 @@ mod tests {
     }
 
     #[test]
-    fn maps_keep_order_and_replace_in_place() {
+    fn maps_are_sorted_by_code_point_and_replace() {
         let mut map = Map::new();
         map.insert("b", Value::Int(1));
         map.insert("a", Value::Int(2));
         map.insert("b", Value::Int(3));
+        // U+FF5A sorts before U+1F600 by code point, after it by UTF-16 unit.
+        map.insert("\u{1F600}", Value::Int(4));
+        map.insert("\u{ff5a}", Value::Int(5));
+        map.insert("B", Value::Int(6));
         let keys: Vec<&str> = map.iter().map(|(k, _)| k).collect();
-        assert_eq!(keys, ["b", "a"]);
+        assert_eq!(keys, ["B", "a", "b", "\u{ff5a}", "\u{1F600}"]);
         assert!(matches!(map.get("b"), Some(Value::Int(3))));
+        assert!(map.get("c").is_none());
+        let collected: Map = [("b", 1), ("a", 2), ("b", 3), ("c", 4), ("a", 5)]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), Value::Int(v)))
+            .collect();
+        let pairs: Vec<(&str, i64)> = collected
+            .iter()
+            .map(|(k, v)| (k, if let Value::Int(i) = v { *i } else { 0 }))
+            .collect();
+        assert_eq!(pairs, [("a", 5), ("b", 3), ("c", 4)]);
+        assert!(!collected.is_record());
+        assert!(map.get_index(0).is_none());
+    }
+
+    #[test]
+    fn records_keep_positions_and_give_entries_by_key() {
+        let mut row = Map::record();
+        row.insert("name", s("ana"));
+        row.insert("age", Value::Int(30));
+        row.insert("city", s("vigo"));
+        row.insert("name", s("eva"));
+        let keys: Vec<&str> = row.iter().map(|(k, _)| k).collect();
+        assert_eq!(keys, ["age", "city", "name"]);
+        let at = |i| match row.get_index(i) {
+            Some(Value::String(text)) => text.clone(),
+            Some(Value::Int(n)) => n.to_string(),
+            _ => String::new(),
+        };
+        assert_eq!([at(0), at(1), at(2), at(3)], ["eva", "30", "vigo", ""]);
+        let copy = Value::Map(row).clone();
+        let Value::Map(copy) = copy else {
+            unreachable!("a map clones to a map")
+        };
+        assert!(copy.is_record());
+        assert!(matches!(copy.get_index(1), Some(Value::Int(30))));
     }
 }

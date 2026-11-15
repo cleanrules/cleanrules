@@ -4,11 +4,9 @@ import io.github.cleanrules.internal.Build;
 import io.github.cleanrules.internal.Handle;
 import io.github.cleanrules.internal.Native;
 import io.github.cleanrules.internal.Scope;
-import io.github.cleanrules.internal.Text;
 import io.github.cleanrules.internal.Values;
 import java.lang.foreign.MemorySegment;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -45,23 +43,18 @@ public final class ResultTree {
         }
     }
 
-    private static final byte[] CHILDREN = Text.name("children");
-
     private final Shared shared;
     /** The result's position in pre-order, which is its node's. */
     private final int index;
-    /** The child positions from the root to this result. */
-    private final int[] route;
     private final Truth truth;
     private final Object value;
     private final Reason reason;
     private final List<ResultTree> children;
     private volatile Expr node;
 
-    private ResultTree(Shared shared, int index, int[] route, Map<String, Object> result, int[] next) {
+    private ResultTree(Shared shared, int index, Map<String, Object> result, int[] next) {
         this.shared = shared;
         this.index = index;
-        this.route = route;
         if (result.containsKey("truth")) {
             Object found = result.get("truth");
             this.truth = found == null ? Truth.UNKNOWN : (Boolean) found ? Truth.TRUE : Truth.FALSE;
@@ -75,11 +68,9 @@ public final class ResultTree {
         List<ResultTree> made = new ArrayList<>();
         if (found != null) {
             List<?> items = Read.list(found);
-            for (int i = 0; i < items.size(); i++) {
-                int[] deeper = Arrays.copyOf(route, route.length + 1);
-                deeper[route.length] = i;
+            for (Object item : items) {
                 next[0]++;
-                made.add(new ResultTree(shared, next[0], deeper, Read.map(items.get(i)), next));
+                made.add(new ResultTree(shared, next[0], Read.map(item), next));
             }
         }
         this.children = Collections.unmodifiableList(made);
@@ -98,7 +89,7 @@ public final class ResultTree {
         MemorySegment pointer = shared.value.acquire();
         try {
             Map<String, Object> root = Read.map(Values.toJava(pointer, opaques));
-            return new ResultTree(shared, 0, new int[0], root, new int[] {0});
+            return new ResultTree(shared, 0, root, new int[] {0});
         } finally {
             shared.value.release();
         }
@@ -168,18 +159,12 @@ public final class ResultTree {
      * @return the JSON text
      */
     public String toJson() {
-        MemorySegment pointer = shared.value.acquire();
-        try (Scope scope = new Scope()) {
-            MemorySegment found = pointer;
-            MemorySegment key = scope.bytes(CHILDREN);
-            for (int step : route) {
-                MemorySegment list = Native.valueMapGet(found, key, CHILDREN.length);
-                found = Native.valueListGet(list, step);
-            }
-            MemorySegment at = found;
-            return Scope.text((out, len, error) -> Native.valueToJson(at, out, len, error));
+        MemorySegment pointer = shared.tree.acquire();
+        try {
+            // The canonical form, the members in the order of the format's tables.
+            return Scope.text((out, len, error) -> Native.treeToJson(pointer, index, out, len, error));
         } finally {
-            shared.value.release();
+            shared.tree.release();
         }
     }
 

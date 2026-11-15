@@ -21,7 +21,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.SequencedMap;
 import java.util.TreeMap;
 
 /**
@@ -489,12 +488,11 @@ public final class DataReader implements AutoCloseable {
     }
 
     private MemorySegment wholeMap(Map<?, ?> value) {
-        // Maps with an order keep it; the others are sorted by key, by code
-        // point (spec/data-model.md, *Lists and maps*). Keys that are not
-        // strings, or not Unicode, are left out.
-        Map<String, Object> entries = value instanceof SequencedMap<?, ?>
-                ? new java.util.LinkedHashMap<>()
-                : new TreeMap<>(Members::compareCodePoints);
+        // A map has no order (spec/data-model.md, *Lists and maps*): its
+        // entries are read by key, by code point, as the core keeps them, so
+        // the walk never depends on the map's kind or on hashing. Keys that
+        // are not strings, or not Unicode, are left out.
+        Map<String, Object> entries = new TreeMap<>(Members::compareCodePoints);
         try {
             for (Map.Entry<?, ?> entry : value.entrySet()) {
                 if (entry.getKey() instanceof String key && Text.wellFormed(key)) {

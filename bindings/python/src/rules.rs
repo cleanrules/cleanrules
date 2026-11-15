@@ -74,7 +74,7 @@ impl PyRule {
         }
     }
 
-    /// The payload, in order.
+    /// The payload, keys sorted by Unicode code point (as the core keeps them).
     #[getter]
     fn then(&self) -> Vec<(String, PyNode)> {
         self.rule
@@ -115,7 +115,7 @@ impl PyRule {
     }
 }
 
-/// A rule: `then` holds the payload in order; `metadata` is converted as data.
+/// A rule: `then` holds the payload (the core sorts its keys); `metadata` is converted as data.
 #[pyfunction]
 #[pyo3(signature = (name, when, then, priority, tags, description, metadata, action=None))]
 #[allow(clippy::needless_pass_by_value, clippy::too_many_arguments)] // PyO3 extracts lists by value; the arguments are `Rule`'s.

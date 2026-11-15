@@ -73,15 +73,16 @@ class DecisionsSuite extends munit.FunSuite:
       .withDescription("d")
       .withMetadata(SeqMap("owner" -> "risk", "levels" -> Seq(1, 2), "extra" -> Map("k" -> None)))
       .withActionName("act")
-    assertEquals(stepped.payload.keys.toSeq, Seq("b", "z", "a"))
+    // A payload has no order: its keys are kept sorted by code point.
+    assertEquals(stepped.payload.keys.toSeq, Seq("a", "b", "z"))
     assertEquals(stepped.priority, 3L)
     assertEquals(stepped.tags, Seq("t1", "t2"))
     assertEquals(stepped.description, Some("d"))
     assertEquals(stepped.metadata, VectorMap("owner" -> "risk", "levels" -> Vector(1L, 2L), "extra" -> VectorMap("k" -> None)))
     assertEquals(stepped.actionName, Some("act"))
-    // A map without an order is sorted by key; a SeqMap keeps its order.
+    // Whatever the map, a payload's keys are sorted by code point.
     assertEquals(Rule("r", F.a, payload = Map("b" -> 1, "a" -> 2, "c" -> 3)).payload.keys.toSeq, Seq("a", "b", "c"))
-    assertEquals(Rule("r", F.a, payload = SeqMap("b" -> 1, "a" -> 2)).payload.keys.toSeq, Seq("b", "a"))
+    assertEquals(Rule("r", F.a, payload = SeqMap("b" -> 1, "a" -> 2)).payload.keys.toSeq, Seq("a", "b"))
     assertEquals(Rule("r", F.a, payload = Map("n" -> null)).payload("n"), Const(null))
     // Rules compare by identity.
     assertEquals(vip, vip)
@@ -202,7 +203,8 @@ class DecisionsSuite extends munit.FunSuite:
     )
     val echo = Rule("echo", Const(true), payload = SeqMap.from(data.keys.map(key => key -> F(key))))
     val output = RuleSet(echo).evaluate(data).output.get
-    assertEquals(output.keys.toSeq, data.keys.toSeq)
+    // The payload's keys come back sorted by code point.
+    assertEquals(output.keys.toSeq, data.keys.toSeq.sorted)
     assertEquals(output("bool"), true)
     assertEquals(output("int"), 7L)
     assertEquals(output("float"), 1.5)

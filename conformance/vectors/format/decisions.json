@@ -11432,11 +11432,12 @@
       }
     },
     {
-      "id": "format/decisions/then-keys-order",
+      "id": "format/decisions/then-keys-any-order",
       "spec": [
-        "json-format.md#reading-a-decision"
+        "json-format.md#reading-a-decision",
+        "json-format.md#objects"
       ],
-      "description": "then has the payload's keys, in order",
+      "description": "then has the payload's keys, in any order; it is read back with its keys sorted by code point, and so is aggregated",
       "given": {
         "kind": "read",
         "document": {
@@ -11603,8 +11604,8 @@
               "p"
             ],
             "aggregated": {
-              "y": 4,
-              "z": 0
+              "z": 0,
+              "y": 4
             }
           }
         },
@@ -11716,9 +11717,174 @@
         }
       },
       "expect": {
-        "error": {
-          "code": "decision_mismatch",
-          "pointer": "/decision/results/0/then"
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "p",
+                "fired": true,
+                "when": {
+                  "op": "and",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "between",
+                      "truth": true,
+                      "children": [
+                        {
+                          "op": "ge",
+                          "truth": true,
+                          "children": [
+                            {
+                              "op": "field",
+                              "path": [
+                                "x"
+                              ],
+                              "value": 3
+                            },
+                            {
+                              "op": "const",
+                              "value": 1
+                            }
+                          ]
+                        },
+                        {
+                          "op": "lt",
+                          "truth": true,
+                          "children": [
+                            {
+                              "op": "field",
+                              "path": [
+                                "x"
+                              ],
+                              "value": 3
+                            },
+                            {
+                              "op": "const",
+                              "value": 10
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "not",
+                      "truth": true,
+                      "children": [
+                        {
+                          "op": "field",
+                          "path": [
+                            "flag"
+                          ],
+                          "truth": false,
+                          "children": [
+                            {
+                              "op": "field",
+                              "path": [
+                                "flag"
+                              ],
+                              "value": false
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "add",
+                    "value": 4,
+                    "children": [
+                      {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ],
+                        "value": 3
+                      },
+                      {
+                        "op": "const",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  "z": {
+                    "op": "const",
+                    "value": 0
+                  }
+                }
+              },
+              {
+                "rule": "q",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": null,
+                  "reason": {
+                    "code": "missing_field",
+                    "paths": [
+                      [
+                        "w"
+                      ]
+                    ]
+                  },
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "w"
+                      ],
+                      "value": null,
+                      "reason": {
+                        "code": "missing_field",
+                        "paths": [
+                          [
+                            "w"
+                          ]
+                        ]
+                      }
+                    },
+                    {
+                      "op": "const",
+                      "value": 0
+                    }
+                  ]
+                }
+              },
+              {
+                "rule": "r",
+                "fired": false,
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "flag"
+                  ],
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ],
+                      "value": false
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "p"
+            ],
+            "aggregated": {
+              "y": 4,
+              "z": 0
+            }
+          }
         }
       }
     },

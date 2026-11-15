@@ -519,6 +519,7 @@ public final class Native {
     private static final MethodHandle TREE_VALUE = bind("cr_tree_value", fn(I, P, P, P));
     private static final MethodHandle TREE_LEN = bind("cr_tree_len", fn(SIZE_T, P));
     private static final MethodHandle TREE_NODE = bind("cr_tree_node", fn(I, P, SIZE_T, P, P));
+    private static final MethodHandle TREE_TO_JSON = bind("cr_tree_to_json", fn(I, P, SIZE_T, P, P, P));
     private static final MethodHandle TREE_FREE = bind("cr_tree_free", proc(P));
 
     // Actions.
@@ -2195,6 +2196,15 @@ public final class Native {
     public static int treeNode(MemorySegment tree, long index, MemorySegment out, MemorySegment error) {
         try {
             return (int) TREE_NODE.invokeExact(tree, index, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int treeToJson(MemorySegment tree, long index, MemorySegment out, MemorySegment len,
+            MemorySegment error) {
+        try {
+            return (int) TREE_TO_JSON.invokeExact(tree, index, out, len, error);
         } catch (Throwable thrown) {
             throw rethrow(thrown);
         }

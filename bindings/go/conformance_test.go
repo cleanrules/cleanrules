@@ -898,8 +898,12 @@ func checkRule(r *Rule, source *jsonObject) string {
 	if len(payload) != len(then.keys) {
 		return fmt.Sprintf("%s: Payload() has %d entries", name, len(payload))
 	}
+	// A payload's keys come by code point (Go's byte order of UTF-8),
+	// whatever the document's order.
+	keys := slices.Clone(then.keys)
+	slices.Sort(keys)
 	for i, entry := range payload {
-		if entry.Key != then.keys[i] {
+		if entry.Key != keys[i] {
 			return fmt.Sprintf("%s: Payload()[%d] is %q", name, i, entry.Key)
 		}
 		if value := valueNode(entry.Value); !sameJSON(value, then.values[entry.Key], modeExact) {
@@ -1202,6 +1206,12 @@ func outputOf(result *jsonObject) *jsonObject {
 func checkDecision(rs *RuleSet, d *Decision, expected *jsonObject, mode compareMode) string {
 	if d.RuleSet() != rs {
 		return "RuleSet() is another rule set"
+	}
+	// Go's maps have no order; a rule's payload, a slice, comes by code point.
+	for _, r := range rs.Rules() {
+		if !slices.IsSortedFunc(r.Payload(), func(a, b PayloadEntry) int { return strings.Compare(a.Key, b.Key) }) {
+			return r.Name() + ": Payload() is not by code point"
+		}
 	}
 	if string(d.HitPolicy()) != expected.str("hit_policy") {
 		return "HitPolicy() " + string(d.HitPolicy())

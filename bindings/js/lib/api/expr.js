@@ -212,7 +212,7 @@ function expressions(native, build) {
      * The node in the JSON format (`spec/json-format.md`, *Conditions*).
      * Floats that hold an integer are `{"$float": n}` (`stringifiable`), so
      * `JSON.stringify` writes the same node, but for the sign of a float zero
-     * and the order of integer-like keys, which plain objects list first.
+     * (integer-like keys, which plain objects list first, change nothing).
      */
     toJSON() {
       return JSON.parse(native.stringifiable(nodeOf(this).write('json')))

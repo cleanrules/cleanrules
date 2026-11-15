@@ -3384,6 +3384,42 @@
           "pointer": "/condition/right/value"
         }
       }
+    },
+    {
+      "id": "format/values/typed-keys-by-code-point",
+      "spec": [
+        "json-format.md#lists-and-maps",
+        "json-format.md#objects"
+      ],
+      "description": "an object with two $-keys is the typed value of the first by code point, and the other is the extra key",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "eq",
+            "left": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$int": "1",
+                "$date": "2026-01-01"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/condition/right/value/$int"
+        }
+      }
     }
   ]
 }

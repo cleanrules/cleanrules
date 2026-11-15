@@ -12,8 +12,13 @@ A rule has:
   kinds*), such as a comparison, a field, or a boolean constant. Value nodes,
   such as number or string constants and arithmetic, are rejected when the rule
   is built;
-- a **payload** (`then`, optional): string keys mapped to value nodes, in the
-  order they were defined. Native constants become `const` nodes when the rule
+- a **payload** (`then`, optional): string keys mapped to value nodes. A
+  payload is an association: its keys have no order of their own, and are
+  kept, evaluated and given back sorted by Unicode code point, whatever the
+  order they were defined in (`json-format.md`, *Objects*). Documents and
+  texts reject a key written twice; an API that adds payload entries one by
+  one (such as a builder's `then(key, value)`) keeps a repeated key's last
+  value. Native constants become `const` nodes when the rule
   is built, so a payload is defined with scalars and value expressions. A field
   in a payload passes through whatever the data holds, which may be a list, a
   map or an opaque value (type group `other`; `data-model.md`);
@@ -53,7 +58,7 @@ Payload values are evaluated against the same input, with the same strictness,
 **only for the selected rules**, plus every fired rule under `ANY`, whose payloads
 must be compared. Except under `ANY`, a rule that fired but was discarded by the
 policy therefore never raises in strict mode because of its payload. Within a
-payload, values are evaluated in key order. A null payload value keeps its reason
+payload, values are evaluated by key, by Unicode code point. A null payload value keeps its reason
 (the value's result tree), like any other value.
 
 **`ANY` equality**: two payloads are equal when they have the same keys and, for
@@ -73,8 +78,8 @@ equal:
 ### Outputs
 
 - `outputs`: the payloads of the selected rules, in rule order (`{}` for a rule
-  without a payload). Each payload keeps its keys in definition order. Outputs
-  are read-only.
+  without a payload). Each payload is a map, its keys sorted by Unicode code
+  point (*Rules*). Outputs are read-only.
 - `output`: for single-hit policies (`FIRST`, `PRIORITY`, `UNIQUE`, `ANY`), the
   winner's payload, or null when nothing was selected. For `COLLECT` with an
   aggregate, the aggregate. For `RULE_ORDER` and `COLLECT` without an aggregate,
@@ -96,7 +101,8 @@ the selected payloads. Within a key:
   arithmetic does with decimal operands;
 - the result follows the arithmetic rules: an integer `sum` outside the signed
   64-bit range is null, and a NaN `sum` (such as `inf + -inf`) is null;
-- keys appear in the order they are first met, in rule order;
+- the aggregate is a map of every key of the selected payloads, its keys
+  sorted by Unicode code point like a payload's;
 - with no selected rule at all, the aggregate is null.
 
 ### Deviations from DMN
@@ -118,8 +124,8 @@ These deviations are deliberate:
 In strict mode, every condition is evaluated first, in rule order, and conditions
 raise as specified in `ast.md`. Payloads come next, and raise in the order they
 are evaluated: under `ANY`, the payloads of every fired rule, in rule order;
-otherwise those of the selected rules, in rule order; within a payload, in key
-order. A hit-policy error comes last, after all conditions and the needed
+otherwise those of the selected rules, in rule order; within a payload, by key,
+by Unicode code point. A hit-policy error comes last, after all conditions and the needed
 payloads have been evaluated. One exception: `UNIQUE` raises as soon as more
 than one rule has fired, before any payload is evaluated.
 

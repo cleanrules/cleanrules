@@ -398,7 +398,7 @@ class RuleSummary {
     check(token, 'RuleSummary')
     this.name = rule.name
     this.priority = jsonInt(rule.priority)
-    /** The payload keys, in order. */
+    /** The payload keys, sorted by Unicode code point. */
     this.outputs = frozen(rule.outputs)
     /** Whether the rule has an action (code, or a name). */
     this.action = rule.action === true

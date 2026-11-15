@@ -53,6 +53,35 @@ Readers are strict:
   (such as `"\ud800"`) are `format_error`s. Strings are never
   Unicode-normalized: they are kept exactly as written.
 
+### Objects
+
+A JSON object is an association of keys with values: the order of its members
+is **not significant**, in every document and every value, in every language.
+Two documents whose objects hold the same members in other orders are the same
+document: they are read the same way, and give the same results, explanations,
+diagrams and errors (but for the line and column of a syntax error, which
+locate it in the text). Many tools reorder members (Go's `map[string]any`,
+PostgreSQL's `jsonb` and `jq -S` sort keys, and JavaScript objects put
+integer-like keys such as `"10"` first), and none of them changes what a
+document means.
+
+Where an order among an object's keys can be seen, it is a fixed one:
+
+- the keys that a table of this document defines (those of a node, a rule, a
+  rule set, a decision...) are checked in the order of their table (*Errors and
+  limits*) and written in it (*Writing*);
+- every other key is taken **by Unicode code point** (by scalar value, not by
+  UTF-16 code unit, so `"\uff5a"` comes before `"\ud83d\ude00"`): unknown keys,
+  the keys of a payload (`then`) and those of maps (data, `metadata`,
+  `aggregated`). Readers visit them in that order, so of two errors under
+  such keys the one under the first key is reported; payload values are
+  evaluated, explained and drawn in that order, maps and outputs are given
+  back in it (`rules.md`, *Rules*; `data-model.md`, *Lists and maps*), and
+  writers write them in it.
+
+Arrays keep their order and their meaning: operands, paths, lists, the rules
+of a rule set and the results of a decision.
+
 **Formats.** Documents are also read and written in YAML (*YAML*); the
 documents of conditions, rules and rule sets in the rule syntax (`text.md`);
 and those of decision tables in CSV (`tables.md`). Decisions are read and
@@ -184,12 +213,17 @@ by the zone name.
 ### Lists and maps
 
 Lists and maps occur only in data, never as constants in a condition. A map's
-keys are strings, kept in document order.
+keys are strings. A map is an association (*Objects*): the order of its
+members means nothing, and writers write them sorted by key, by Unicode code
+point.
 
 A JSON object with a key that starts with `$` is never a map: it is a typed
 value, and that must be its only key. The types in the table above are the only
 ones defined, and any other `$`-key is a `format_error`, so new types can be
-added later without changing what existing documents mean. A map with a key
+added later without changing what existing documents mean. Of an object with
+more than one key, the first `$`-key by code point is the type, and the first
+other key by code point is extra (`{"$int": "1", "$date": "2026-01-01"}` is a
+`$date` with the extra key `$int`). A map with a key
 that starts with `$` is written inside `{"$map": ...}`. For example,
 `{"$map": {"$ref": 1}}` is the map with the single key `$ref`. Writers use
 `$map` only in that case.
@@ -257,7 +291,8 @@ from the core and are worded the same in every language.
 
 Writers produce the **canonical form**:
 
-- keys in the order of the table above, `op` first;
+- keys in the order of the table above, `op` first; payload keys, metadata
+  and maps sorted by key, by Unicode code point (*Objects*);
 - `closed` always written, even when it is `"both"`;
 - `and` and `or` flattened;
 - `in` values in normalized order: ascending, numbers by exact value, strings by
@@ -269,7 +304,8 @@ Writers produce the **canonical form**:
 - values in their canonical form.
 
 **Comparing documents.** Conformance vectors compare documents as parsed JSON
-trees, never as text. Object members compare in order. Numbers compare by
+trees, never as text. Objects compare by their members, whatever their order
+(*Objects*); arrays compare item by item, in order. Numbers compare by
 lexical class (integer literal, or literal with a fraction or exponent) and
 exact value, so `1` and `1.0` differ and `100.0` equals `1e2`; the sign of a
 float zero is compared too, so `-0.0` and `0.0` differ. Whitespace and number
@@ -305,27 +341,20 @@ A rule is an object with these keys (`rules.md`, *Rules*):
 
 - **`then`** is the payload. Each member value is a node of kind value or any,
   written like a condition operand; a `const` may hold `null` here. Keys are
-  any strings, taken literally. Member order is significant: it is the order
-  of the outputs' keys, and the order in which payload values are evaluated
-  (`rules.md`, *When payloads are evaluated*). Readers keep it, and writers
-  write it.
+  any strings, taken literally. A payload is an association (*Objects*): its
+  keys are read, evaluated (`rules.md`, *When payloads are evaluated*), given
+  back and written sorted by Unicode code point, whatever their order in the
+  document.
 - **`priority`** is an int (*Values*), bare or as `$int`.
 - **`tags`** are a set: readers drop duplicates, and writers write them sorted
   by Unicode code point.
 - **`metadata`** is an object whose keys are taken literally (a key starting
   with `$` is an ordinary key here) and whose member values are data values
-  (*Values*). Member order is kept.
+  (*Values*). Like a map, it has no order: readers visit its keys, and
+  writers write them, by Unicode code point.
 - **`do`** names the rule's action, which a binding resolves in its action
   registry (`rules.md`, *Actions*). An action given as code has no name, and
   cannot be written (*Writing errors*).
-
-**Member order.** JSON objects are unordered for many tools: Go's
-`map[string]any`, PostgreSQL's `jsonb` and `jq -S` sort their keys, and
-JavaScript objects put integer-like keys such as `"10"` first. A tool that
-reorders the members of `then` changes the order of a decision's outputs and
-which payload error strict mode reports first. Readers and writers of this
-format, in every binding, must go through an order-preserving representation,
-never through an unordered map.
 
 Reading a rule checks its shape (`format_error`), builds its condition and
 payload values with the rules of *Reading* (`expression_error`), and then
@@ -336,8 +365,8 @@ applies the rule's own construction rules, which give
 2. `when` is not a node of kind value (pointer to `…/when`; a `const` holding
    `null` there is already an `expression_error`);
 3. no payload value is a node of kind condition (pointer to `…/then/<key>`,
-   with the key escaped as RFC 6901 requires, so `a/b` becomes `a~1b`), in
-   member order.
+   with the key escaped as RFC 6901 requires, so `a/b` becomes `a~1b`), the
+   first by key, by Unicode code point.
 
 Writers write the keys in the order of the table and omit every optional key
 that holds its default.
@@ -457,7 +486,7 @@ the rule set that produced it (*Reading a decision*).
 | `logic` | yes | the rule set's logic, in the same form |
 | `results` | yes | array of rule results, one per rule, in rule order |
 | `selected` | yes | array of the selected rules' names, in selection order (rule order for every policy of this version), without repetition |
-| `aggregated` | with an aggregate | object: payload key → data value, or `null` when nothing was selected |
+| `aggregated` | with an aggregate | object: payload key → data value, keys sorted by Unicode code point, or `null` when nothing was selected |
 
 A **rule result** is an object with:
 
@@ -466,7 +495,7 @@ A **rule result** is an object with:
 | `rule` | yes | the rule's name |
 | `fired` | yes | boolean: the truth value passed the logic's activation test |
 | `when` | yes | the result tree of the rule's condition |
-| `then` | when the payload was evaluated | object: payload key → result tree of that value, in the rule's member order |
+| `then` | when the payload was evaluated | object: payload key → result tree of that value, keys sorted by Unicode code point |
 
 `then` is present exactly for the rules whose payload was evaluated: the
 selected rules, and under `"any"` every rule that fired (`rules.md`, *When
@@ -604,7 +633,9 @@ that build objects of it: the same structure and keys, with the values
 themselves instead of their JSON encoding (an opaque value keeps its token),
 an unknown truth as a plain null, a graded truth as a float or a list of two
 floats, and paths as lists of strings and ints.
-Written as a JSON value, it is the result tree.
+Written as a JSON value, it is the result tree, its members sorted by key as
+every map's are (*Objects*); `cr_tree_to_json` writes the tree, or any of its
+subtrees, in the canonical form, the members in the order of their tables.
 
 ### Reading a decision
 
@@ -620,7 +651,7 @@ a `decision_mismatch`, with a pointer to the offending value:
    by node, depth first: the same `op`, the same `path`, the number of children
    given above, `between` halves whose ops agree with `closed`, `const` values
    equal to the rule's constants, and both copies of a `between` operand equal;
-4. `then` has exactly the payload's keys, in order, and is present exactly
+4. `then` has exactly the payload's keys, in any order, and is present exactly
    where *When payloads are evaluated* requires, judged from `selected` and
    `fired` as written (checks 6 and 7 verify those);
 5. each node's `truth` or `value`, and its `reason`, are what evaluation gives
@@ -777,7 +808,8 @@ would have been written:
   every binding names the same way in its language's case (`omitActions` in
   JavaScript); a named action is written as its name;
 - a metadata value that is not a data value, or a float NaN in metadata, which
-  would otherwise silently become null;
+  would otherwise silently become null (the first by key, by code point, in
+  depth-first pre-order);
 - a logic that is not one of the core's named logics, or one configured with
   parameters.
 
@@ -788,7 +820,8 @@ equivalent is recorded as an opaque value (*Values*).
 
 Rule files may also be written in YAML 1.2. A YAML document is read into
 exactly the JSON model above, and then read as that JSON document would be:
-same keys, same errors, same pointers, same limits. Mapping order is kept.
+same keys, same errors, same pointers, same limits. A mapping is an object
+(*Objects*): the order of its keys is not significant.
 
 **What a YAML file may hold.** One document (an optional `---` start and `...`
 end), block and flow mappings and sequences, plain, single-quoted,
@@ -824,7 +857,9 @@ arrays; flow collections, in addition, nest at most **255** deep
 (`limit_exceeded`), so deeper data is written in block style.
 
 **Writing.** The canonical YAML of a document is block style with two-space
-indentation: mapping keys in the document's order, written plain when they are
+indentation: mapping keys in the order the JSON writer gives them (that of
+their table, and by Unicode code point for payloads, metadata and maps),
+written plain when they are
 made of ASCII letters, digits, `_`, `$`, `.` and `-`, start with a letter, `_`
 or `$`, and are not `null`, `true` or `false`, and as JSON strings otherwise; a
 key longer than 1024 characters as written (the most YAML allows for an
@@ -867,17 +902,18 @@ A reader reports **one** error, the first it finds in this order:
 3. shape (`format_error`), node depth and path length (`limit_exceeded`),
    depth first in pre-order: an object's known keys in the order of that
    object's table (*Conditions*, *Rules*, *Rule sets*, *Decisions*, *Result
-   trees*), whatever their order in the text, then its unknown keys in text
-   order; within a `path`, its segments in order. The node too deep is the
-   first node at depth limit + 1 met this way. A path that is too long is
-   reported at its segment of (0-based) index `max_path_segments`, the first
-   one beyond the limit, unless a segment before it is malformed, which is
-   then reported instead. A document whose content
+   trees*), whatever their order in the text, then its unknown keys by
+   Unicode code point; the members of a payload, of metadata and of a map, by
+   key, by code point (*Objects*); within a `path`, its segments in order. The
+   node too deep is the first node at depth limit + 1 met this way. A path
+   that is too long is reported at its segment of (0-based) index
+   `max_path_segments`, the first one beyond the limit, unless a segment
+   before it is malformed, which is then reported instead. A document whose content
    key is `explanation` or `summary` is rejected with `unsupported` after the
    top-level keys are checked and before its content;
 4. construction rules, in depth-first post-order: children
    before their parent, operands in order. In a rule, the condition comes
-   first, then the payload values in order (`expression_error`), then the
+   first, then the payload values by key (`expression_error`), then the
    rule's own rules. In a rule set, the rules come first, in order, then the
    rule set's own rules. A decision has no construction rules; its checks
    against the rule set come here, as listed in *Reading a decision*.

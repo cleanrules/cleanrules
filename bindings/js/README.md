@@ -506,11 +506,12 @@ for `JSON.stringify`. JavaScript writes the number `1.0` as `1`, which reads
 back as an int, so a float that holds an integer is `{"$float": 1}` there, as
 `spec/json-format.md` (*Values*) asks of such writers (ints beyond 2⁵³ are
 already `{"$int": "…"}` and infinities `{"$float": "inf"}`): `loads` and
-`RuleSet.readDecision` read the text back as the same document. Two things a
-plain object cannot hold are lost: the sign of a float zero
-(`JSON.stringify(-0)` is `0`), and the order of integer-like keys, which come
-first (a payload `{ b, "10" }` becomes `{ "10", b }`, and a decision with that
-payload no longer matches its rule). `dumps` writes conditions, rules, rule
+`RuleSet.readDecision` read the text back as the same document. One thing a
+plain object cannot hold is lost: the sign of a float zero
+(`JSON.stringify(-0)` is `0`). Plain objects also list integer-like keys
+first (a payload `{ b, "10" }` is written `{ "10", b }`), which changes
+nothing: the members of a JSON object have no order, and payloads and maps
+come back sorted by key, by Unicode code point. `dumps` writes conditions, rules, rule
 sets and tables exactly, and so do the native layer's `write()` and
 `explain('json')` for decisions and explanations.
 
@@ -527,7 +528,7 @@ const table = new DecisionTable(
   ],
   { hitPolicy: 'priority' },
 )
-table.evaluate({ customer: { years: 9 }, order: { total: 200 } }).output   // { risk: 'low', discount: Decimal { text: '0.15' } }
+table.evaluate({ customer: { years: 9 }, order: { total: 200 } }).output   // { discount: Decimal { text: '0.15' }, risk: 'low' }
 ```
 
 A header item is a CSV header field's text (`'RULE'`, `'PRIORITY'`,
@@ -590,7 +591,7 @@ Deno and browsers:
 | date, naive datetime | `LocalDate`, `NaiveDateTime` |
 | aware datetime | `ZonedDateTime` |
 | list | `Array` |
-| map | a plain object; a key such as `__proto__` is an own property |
+| map | a plain object, its keys added by Unicode code point; a key such as `__proto__` is an own property |
 | opaque | the very object read from the input; `null` in a decision read from a document (`readDecision`), which keeps only the type's name |
 
 `ZonedDateTime` holds the local `year`, `month`, `day`, `hour`, `minute`,
@@ -639,7 +640,7 @@ once per evaluation.
 | `Temporal.ZonedDateTime` | aware datetime in its zone, or with its offset when the zone id is one |
 | `Array`, typed arrays except bytes | list; holes and `undefined` elements are null |
 | `Uint8Array`, `Buffer`, `ArrayBuffer`, `DataView` | opaque, like bytes in other languages |
-| `Map` | map, in insertion order; entries whose key is not a string are left out |
+| `Map` | map (its order means nothing); entries whose key is not a string are left out |
 | plain objects, class instances | map of their own enumerable string keys and their classes' getters |
 
 Anything else is opaque (`Set`, `RegExp`, `Error`, symbols, functions in a

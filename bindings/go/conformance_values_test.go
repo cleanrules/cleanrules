@@ -361,39 +361,29 @@ func structKey(key string) bool {
 }
 
 // mapOf is a map as a map[string]any, a map[any]any, a map of its values'
-// type, a named map, or a struct or a pointer to one, whose fields keep the
-// keys' order. Go reads a map's entries sorted by key (spec/data-model.md,
-// Go), so keys out of that order are given as a struct.
+// type, a named map, or a struct or a pointer to one, in turn: a map has no
+// order (spec/data-model.md, Lists and maps), so each is the same map.
 func (c *conformance) mapOf(o *jsonObject) any {
 	values := make([]any, len(o.keys))
 	for i, key := range o.keys {
 		values[i] = c.toGo(o.values[key])
 	}
-	sorted := slices.IsSorted(o.keys)
 	fields := !slices.ContainsFunc(o.keys, func(key string) bool { return !structKey(key) })
-	var forms []string
-	switch {
-	case !sorted && fields:
-		forms = []string{"struct", "*struct"}
-	case !sorted:
-		failf("the map %v has keys out of order that no struct field can name", o.keys)
-	default:
-		forms = []string{"map[string]any", "map[any]any", "named map", "struct", "*struct"}
-		var elem reflect.Type
-		for i, v := range values {
-			t := reflect.TypeOf(v)
-			if t == nil || (i > 0 && t != elem) {
-				elem = nil
-				break
-			}
-			elem = t
+	forms := []string{"map[string]any", "map[any]any", "named map", "struct", "*struct"}
+	var elem reflect.Type
+	for i, v := range values {
+		t := reflect.TypeOf(v)
+		if t == nil || (i > 0 && t != elem) {
+			elem = nil
+			break
 		}
-		if elem != nil {
-			forms = append(forms, "typed map")
-		}
-		if !fields {
-			forms = slices.DeleteFunc(forms, func(f string) bool { return strings.HasSuffix(f, "struct") })
-		}
+		elem = t
+	}
+	if elem != nil {
+		forms = append(forms, "typed map")
+	}
+	if !fields {
+		forms = slices.DeleteFunc(forms, func(f string) bool { return strings.HasSuffix(f, "struct") })
 	}
 	form := forms[c.pick(len(forms))]
 	switch form {
@@ -423,8 +413,8 @@ func (c *conformance) mapOf(o *jsonObject) any {
 		}
 		return m.Interface()
 	}
-	// A struct of its own, its fields named by cleanrules tags in the keys'
-	// order, of the values' types or of type any, in turn.
+	// A struct of its own, its fields named by cleanrules tags, of the
+	// values' types or of type any, in turn.
 	c.used(form)
 	typed := c.pick(2) == 0
 	fieldList := make([]reflect.StructField, len(o.keys))
@@ -561,11 +551,9 @@ func given(v any) any {
 	return nil
 }
 
-// givenMap is a map given back, without order: its keys sorted, its order
-// not compared.
+// givenMap is a map given back: its keys sorted (Go's maps have no order).
 func givenMap(m map[string]any) *jsonObject {
 	out := newObject()
-	out.unordered = true
 	keys := make([]string, 0, len(m))
 	for key := range m {
 		keys = append(keys, key)

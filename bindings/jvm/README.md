@@ -79,7 +79,8 @@ rules.bind(Map.of("notify_sales", context -> System.out.println(context.output()
   `true` differ, `0.0` and `-0.0` do not).
 - **Rules** (`Rule`): `Rule.named(name).when(condition)`, then
   `then(key, value)` (a node or a Java constant; `then(map)` adds a map's
-  entries, in order for a `SequencedMap` and sorted otherwise),
+  entries; a payload's keys are kept sorted by Unicode code point, whatever
+  the order they are added in),
   `priority(n)`, `tags(...)`, `description(text)`, `metadata(map)`, and
   `action(name)` (data, bound later) or `action(context -> ...)` (code). Each
   step gives a new immutable rule, checked by the core
@@ -331,9 +332,8 @@ description, metadata, actionName, action)`, with every argument after `when`
 named and optional, and the steps `withPayload`, `withPriority`, `withTags`
 (varargs or a collection),
 `withDescription`, `withMetadata`, `withActionName` and `withAction`, each a
-new rule (`then` is a keyword in Scala 3, hence `payload`). A payload in a
-`SeqMap` (`ListMap`, `VectorMap`) keeps its order; any other map is sorted by
-key. A rule gives back `name`, `when`, `payload` (a `SeqMap` of nodes),
+new rule (`then` is a keyword in Scala 3, hence `payload`). A payload's keys
+are kept sorted by Unicode code point, whatever the map. A rule gives back `name`, `when`, `payload` (a `SeqMap` of nodes),
 `priority`, `tags`, `description` and `actionName` (`Option`s), `metadata`
 and `action` (the very function). `RuleSet(rules*)`, or `RuleSet(rules,
 hitPolicy, aggregate, logic, strict)` with named arguments, gives `rules`,
@@ -373,7 +373,7 @@ read are read, each object once.
 | `BigDecimal` | decimal, exact; beyond 38 digits, a null with reason `decimal_overflow` |
 | `String`, `Boolean`, `java.time` | as in Java |
 | `Seq` (`List`, `Vector`, `Range`...) and arrays (not `Array[Byte]`) | list |
-| `Map` with `String` keys | map: a `SeqMap` (`ListMap`, `VectorMap`) or `SortedMap` keeps its order, any other map is sorted by key |
+| `Map` with `String` keys | map, whatever its order (it comes back sorted by key) |
 | case classes, and `enum` cases with parameters | map of their fields by name, in their order: those with a public accessor in the class file, so `private` and `private[this]` fields are left out and `protected` and `private[p]` ones are read |
 | Scala 3 `enum` cases without parameters, case objects | string: the case's or object's name |
 | a product written by hand whose element names are empty or repeated | opaque |
@@ -589,7 +589,7 @@ by turns), rules with `Rule(...)` or its `with...` steps, rule sets with
 `loads(dumps(x))`; inputs as Scala data: ints as `Long`, `Int` or `BigInt`,
 `Double`, `BigDecimal`, `java.time`, `None` for a null and `Some(x)` for some
 members, `Vector`, `List` or `Array`, maps as `VectorMap`, `ListMap` or
-`SeqMap`, as a plain `Map` when their keys are sorted and as a case class when
+`SeqMap`, as a plain `Map` and as a case class when
 one has their keys; results compared as the Scala values given back (`None`,
 `Long`, `Double`, `BigDecimal` with an unlimited `MathContext`, `Vector`,
 `VectorMap`, each class checked) through the layer's case classes
@@ -839,9 +839,9 @@ and Scala*):
 | `OffsetDateTime` | aware datetime at its offset |
 | `ZonedDateTime` | aware datetime in its zone, or at its offset for a `ZoneOffset` or a zone the engine does not know |
 | `List`, arrays (not `byte[]`) | list |
-| `Map` with `String` keys | map: a `SequencedMap` (`LinkedHashMap`, `TreeMap`) keeps its order, any other map is sorted by key; other keys are left out |
+| `Map` with `String` keys | map, whatever its order (it comes back sorted by key); other keys are left out |
 | records | map of their components |
-| other objects | map of their public instance fields and JavaBean accessors (`getAge()`, `isActive()`), sorted by name |
+| other objects | map of their public instance fields and JavaBean accessors (`getAge()`, `isActive()`) |
 | sets, `byte[]`, lambdas, threads, class loaders, classes, any other object of the Java platform or of the Scala library (`scala.*`), and the binding's own objects (its Scala layer's included) | opaque: never read through, compared by identity |
 
 Dates outside years 1 to 9999 are opaque. An index beyond `Integer.MAX_VALUE`
@@ -893,7 +893,7 @@ values come back as Java values (*Values given back* in
 | naive datetime | `LocalDateTime` |
 | aware datetime | `ZonedDateTime`, in its IANA zone (whose local fields follow Java's zone database), or at a `ZoneOffset` |
 | list | an unmodifiable `List` |
-| map | an unmodifiable `SequencedMap`, in the engine's order |
+| map | an unmodifiable `SequencedMap`, its keys sorted by Unicode code point |
 | opaque | the very object that was read; `null` in a decision read from a document |
 
 Each reads back as the same value, except a decimal infinity (a float) and an

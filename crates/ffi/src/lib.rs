@@ -11,6 +11,10 @@
 //! `cr_abi_version` the one the library implements; a program checks that they
 //! are equal. Adding functions or constants keeps the version; changing or
 //! removing one, or the meaning of a number, raises it.
+//!
+//! Until the first release the version stays at 1, as the JSON format's does:
+//! nothing has been published, so changes such as map entries and payload
+//! entries by key (task R.1) are noted in the changelog instead.
 
 // The ABI's names are C's.
 #![allow(non_camel_case_types)]

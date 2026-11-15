@@ -28,7 +28,7 @@
 // ./json.js and compared with the vectors as trees, never with the library's
 // own JSON parser or equality.
 
-import { Num, Obj, jsOrder, parse, same, tree, write } from './json.js'
+import { Num, Obj, byCodePoint, parse, same, tree, write } from './json.js'
 
 /** Vectors are only ever added: the count when this runner was written. */
 export const MINIMUM_VECTORS = 2508
@@ -512,7 +512,11 @@ export function conformance(R, N) {
     }
   }
 
-  /** A map: a plain object, or a `Map` where a plain object would reorder its keys or lose one. */
+  /**
+   * A map: a plain object, or a `Map` where a plain object would lose a key
+   * or list integer-like keys first (which changes nothing, since a map has
+   * no order, but keeps `Map`s in the native route).
+   */
   function mapOf(o) {
     const entries = o.entries.map(([k, v]) => [k, nativeOf(v)])
     if (entries.some(([k]) => /^(?:0|[1-9]\d*)$/.test(k) || k === '__proto__' || k === 'constructor')) return new Map(entries)
@@ -674,7 +678,7 @@ export function conformance(R, N) {
     ])
   }
 
-  /** The expected explanation without the causes' `at`, its maps in a plain object's order. */
+  /** The expected explanation without the causes' `at`. */
   function withoutAt(o) {
     if (Array.isArray(o)) return o.map(withoutAt)
     if (!(o instanceof Obj)) return o
@@ -716,10 +720,53 @@ export function conformance(R, N) {
   }
 
   /** Whether a value given back matches the expected value of the format. */
-  const sameGiven = (value, expected, recorded = false) => same(given(value), jsOrder(expected), { given: true, recorded })
+  const sameGiven = (value, expected, recorded = false) => same(given(value), expected, { given: true, recorded })
 
   /** A `Decision` of the idiomatic API against the expected decision: its results, selection and outputs. */
+  /**
+   * Where a plain object given back lists its keys out of the order the core
+   * gives them in (`spec/data-model.md`, *Lists and maps*): integer-like keys
+   * first, ascending, as JavaScript lists them, then the others by code point.
+   * Empty when every plain object in `value` is in that order.
+   */
+  function outOfOrder(value, where) {
+    if (Array.isArray(value)) {
+      for (const [i, item] of value.entries()) {
+        const found = outOfOrder(item, `${where}[${i}]`)
+        if (found !== '') return found
+      }
+      return ''
+    }
+    if (value === null || typeof value !== 'object') return ''
+    const proto = Object.getPrototypeOf(value)
+    if (proto !== Object.prototype && proto !== null) return ''
+    const keys = Object.keys(value)
+    const index = (k) => /^(?:0|[1-9]\d*)$/.test(k) && Number(k) < 2 ** 32 - 1
+    const wanted = [
+      ...keys.filter(index).sort((a, b) => Number(a) - Number(b)),
+      ...keys.filter((k) => !index(k)).sort(byCodePoint),
+    ]
+    if (keys.some((k, i) => k !== wanted[i])) return `${where}: keys ${JSON.stringify(keys)}, expected ${JSON.stringify(wanted)}`
+    for (const key of keys) {
+      const found = outOfOrder(value[key], `${where}.${key}`)
+      if (found !== '') return found
+    }
+    return ''
+  }
+
+  /** The maps a decision and its rules give back, in the core's order. */
+  function givenByKey(d) {
+    const found = [
+      outOfOrder([...d.outputs], 'outputs'),
+      outOfOrder(d.aggregated, 'aggregated'),
+      ...d.ruleset.rules.flatMap((r) => [outOfOrder(r.then, `${r.name}.then`), outOfOrder(r.metadata, `${r.name}.metadata`)]),
+    ]
+    return found.find((f) => f !== '') ?? ''
+  }
+
   function checkDecision(ruleset, d, expected, recorded = false) {
+    const ordered = givenByKey(d)
+    if (ordered !== '') return ordered
     const results = need(expected, 'results')
     if (d.ruleset !== ruleset) return 'decision.ruleset is another rule set'
     if (d.hitPolicy !== need(expected, 'hit_policy')) return `hitPolicy ${d.hitPolicy}`
@@ -857,21 +904,20 @@ export function conformance(R, N) {
   function checkStringify(what, object, expected, key) {
     let got = parse(JSON.stringify(object))
     if (key !== undefined) got = need(got, key)
-    // JSON.parse makes plain objects, which list integer-like keys first.
-    const want = jsOrder(stringified(expected))
+    const want = stringified(expected)
     return same(got, want) ? '' : `JSON.stringify of the ${what}\n  got  ${write(got)}\n  want ${write(want)}`
   }
 
   /**
    * `loads(JSON.stringify(value))` is `value`, but for what plain objects
-   * cannot hold: the sign of a float zero (`JSON.stringify(-0)` is `0`) and
-   * the order of integer-like keys, which come first.
+   * cannot hold: the sign of a float zero (`JSON.stringify(-0)` is `0`).
+   * Plain objects list integer-like keys first, which changes nothing.
    */
   function checkReload(value) {
     const text = JSON.stringify(value)
     const again = R.loads(value instanceof R.Expr ? `{"version":1,"condition":${text}}` : text)
     const got = parse(R.dumps(again))
-    const want = jsOrder(unsignedZeros(parse(R.dumps(value))))
+    const want = unsignedZeros(parse(R.dumps(value)))
     return same(got, want) ? '' : `loads(JSON.stringify(x)) writes\n  ${write(got)}\nnot\n  ${write(want)}`
   }
 
@@ -882,17 +928,9 @@ export function conformance(R, N) {
   function checkDecisionText(ruleset, decision, expected) {
     const written = checkStringify('Decision', decision, expected, 'decision')
     if (written !== '') return written
+    // Plain objects list integer-like keys first; a payload's keys have no
+    // order (`spec/json-format.md`, *Objects*), so the decision still reads.
     const read = attempt(R, () => ruleset.readDecision(JSON.stringify(decision)))
-    // A payload whose integer-like keys a plain object moves first is no longer
-    // the rule's: `then` keeps the payload's order (`spec/json-format.md`,
-    // *Reading a decision*), so the reader refuses it.
-    const moved = need(expected, 'results').some((r) => {
-      const then = r.get('then')
-      return then !== undefined && !same(jsOrder(then), then)
-    })
-    if (moved) {
-      return read.error?.code === 'decision_mismatch' ? '' : 'readDecision(JSON.stringify(decision)) with a payload reordered: expected a decision_mismatch'
-    }
     if (read.error !== undefined) return `readDecision(JSON.stringify(decision)): ${read.error.code}: ${read.error.message}`
     const issue = checkDecision(ruleset, read.result, expected, true)
     return issue === '' ? '' : `readDecision(JSON.stringify(decision)): ${issue}`
@@ -901,7 +939,7 @@ export function conformance(R, N) {
   // --- The native route: the idiomatic API --------------------------------------------
 
   const idiomatic = { form: contextForm }
-  const givenMode = { form: contextForm, mode: { given: true }, view: jsOrder }
+  const givenMode = { form: contextForm, mode: { given: true } }
 
   function readNative(given, expect) {
     const [source, format] = sourceOf(given)
@@ -1081,7 +1119,7 @@ export function conformance(R, N) {
         if (text !== '') return text
         const explained = compare(attempt(R, () => explanationOf(decision, explanation)), expect, 'explanation', {
           ...givenMode,
-          view: (e) => jsOrder(withoutAt(e)),
+          view: withoutAt,
         })
         if (explained !== '') return explained
         if (expect.has('text')) {
@@ -1140,7 +1178,8 @@ export function checkComparison() {
     ['0.1', '0.10000000000000001', true], // the same double
     ['-0.0', '0.0', false],
     ['[1,2]', '[2,1]', false],
-    ['{"a":1,"b":2}', '{"b":2,"a":1}', false],
+    ['{"a":1,"b":2}', '{"b":2,"a":1}', true], // members have no order
+    ['{"a":1,"b":2}', '{"a":1,"c":2}', false],
     ['{"a":1}', '{"a":1,"b":2}', false],
     ['{"$opaque":"socket"}', '{"$opaque":"bytes"}', true],
     ['{"$opaque":"socket"}', 'null', false],

@@ -461,6 +461,32 @@
           "code": "unsupported"
         }
       }
+    },
+    {
+      "id": "format/documents/unknown-keys-first-by-key",
+      "spec": [
+        "json-format.md#errors-and-limits",
+        "json-format.md#objects"
+      ],
+      "description": "of two unknown top-level keys, the first by code point is reported, whatever the order of the text",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "zz": 1,
+          "condition": {
+            "op": "const",
+            "value": true
+          },
+          "aa": 2
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/aa"
+        }
+      }
     }
   ]
 }

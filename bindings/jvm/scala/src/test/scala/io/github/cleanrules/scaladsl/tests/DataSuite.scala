@@ -68,14 +68,14 @@ class DataSuite extends munit.FunSuite:
   def read(value: Any): Any =
     RuleSet(Rule("r", F.ok, payload = Map("v" -> F.v))).evaluate(Map("ok" -> true, "v" -> value)).output.get("v")
 
-  test("case classes are maps of their fields, by name, in their order"):
+  test("case classes are maps of their fields, by name, given back by key"):
     val customer = Customer("Ana", 7, Address("Madrid", Some("28001")), Seq("vip"))
     val rules = RuleSet(Rule("r", F.years > 5 & F.address.city === "Madrid", payload = Map("who" -> F.address)))
     val decision = rules.evaluate(customer)
     assertEquals(decision.fired, Seq("r"))
     val address = decision.output.get("who").asInstanceOf[VectorMap[String, Any]]
     assertEquals(address.toSeq, Seq("city" -> "Madrid", "zip" -> "28001"))
-    assertEquals(read(customer).asInstanceOf[VectorMap[String, Any]].keys.toSeq, Seq("name", "years", "address", "tags"))
+    assertEquals(read(customer).asInstanceOf[VectorMap[String, Any]].keys.toSeq, Seq("address", "name", "tags", "years"))
     // A private field is left out.
     assertEquals(read(Secretive(1, 2)), VectorMap("open" -> 1L))
     assertEquals((F.hidden.isNull).evaluateTree(Secretive(1, 2)).children.head.reason.map(_.code), Some("missing_field"))
@@ -128,11 +128,11 @@ class DataSuite extends munit.FunSuite:
     assertEquals(read(Array(1, 2, 3)), Vector(1L, 2L, 3L))
     assertEquals(read(Array(Address("A", None))), Vector(VectorMap("city" -> "A", "zip" -> None)))
     assertEquals(read(Range(0, 3)), Vector(0L, 1L, 2L))
-    // A SeqMap and a SortedMap keep their order; any other map is sorted by key.
-    assertEquals(read(ListMap("b" -> 1, "a" -> 2)).asInstanceOf[VectorMap[String, Any]].keys.toSeq, Seq("b", "a"))
-    assertEquals(read(VectorMap("b" -> 1, "a" -> 2)).asInstanceOf[VectorMap[String, Any]].keys.toSeq, Seq("b", "a"))
+    // A map has no order: whatever its kind, it comes back sorted by key.
+    assertEquals(read(ListMap("b" -> 1, "a" -> 2)).asInstanceOf[VectorMap[String, Any]].keys.toSeq, Seq("a", "b"))
+    assertEquals(read(VectorMap("b" -> 1, "a" -> 2)).asInstanceOf[VectorMap[String, Any]].keys.toSeq, Seq("a", "b"))
     val reversed = TreeMap("a" -> 1, "b" -> 2)(using Ordering.String.reverse)
-    assertEquals(read(reversed: SortedMap[String, Int]).asInstanceOf[VectorMap[String, Any]].keys.toSeq, Seq("b", "a"))
+    assertEquals(read(reversed: SortedMap[String, Int]).asInstanceOf[VectorMap[String, Any]].keys.toSeq, Seq("a", "b"))
     assertEquals(read(Map("b" -> 1, "a" -> 2, "c" -> 3)).asInstanceOf[VectorMap[String, Any]].keys.toSeq, Seq("a", "b", "c"))
     // Only string keys are keys.
     assertEquals(read(Map(1 -> "x")), VectorMap.empty)

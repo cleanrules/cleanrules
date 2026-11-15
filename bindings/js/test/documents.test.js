@@ -406,15 +406,15 @@ describe('toJSON and JSON.stringify', () => {
     assert.equal(dumps(loads(dumps(negative))), dumps(negative))
   })
 
-  test('the limit: plain objects list integer-like keys first; dumps keeps the order', () => {
-    const ordered = new RuleSet([new Rule('a', F.go, new Map([['b', 1], ['10', 2], ['2', 3]]))])
-    assert.match(dumps(ordered), /"then":\{"b":.*,"10":.*,"2":/)
-    assert.match(JSON.stringify(ordered), /"then":\{"2":.*,"10":.*,"b":/)
-    // A payload's order is part of the rule, so the decision no longer matches it.
-    throwsWith(() => ordered.readDecision(JSON.stringify(ordered.evaluate({ go: true }))), FormatError, /./, (error) => {
-      assert.equal(error.code, 'decision_mismatch')
-    })
-    // Without a payload evaluated, it reads back.
-    assert.deepEqual(ordered.readDecision(JSON.stringify(ordered.evaluate({ go: false }))).fired, [])
+  test('plain objects list integer-like keys first, which changes nothing: payload keys have no order', () => {
+    const rules = new RuleSet([new Rule('a', F.go, new Map([['b', 1], ['10', 2], ['2', 3]]))])
+    // The core keeps a payload's keys sorted by code point.
+    assert.match(dumps(rules), /"then":\{"10":.*,"2":.*,"b":/)
+    assert.match(JSON.stringify(rules), /"then":\{"2":.*,"10":.*,"b":/)
+    const decision = rules.evaluate({ go: true })
+    const again = rules.readDecision(JSON.stringify(decision))
+    assert.deepEqual(again.outputs, decision.outputs)
+    assert.deepEqual(Object.keys(again.outputs[0]), ['2', '10', 'b'])
+    assert.deepEqual(rules.readDecision(JSON.stringify(rules.evaluate({ go: false }))).fired, [])
   })
 })

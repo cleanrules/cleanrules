@@ -73,8 +73,9 @@ strictness, and one rule per row, in row order unless the policy is
 - its **condition** is the conjunction (`and`) of the conditions of the input
   cells that are not `-`, in input order; one alone is itself; with none, the
   condition is `TRUE`;
-- its **payload** has one value per output cell that is not empty, in output
-  order;
+- its **payload** has one value per output cell that is not empty, under
+  its output's name (a payload has no order: `rules.md`, *Rules*; the
+  outputs' order is that of the table's columns, not of the payload);
 - its **priority** and **description** are the row's (priority 0 when it has
   none), except under `priority` and `output_order` with output values, below.
 

@@ -8,10 +8,11 @@ use std::ffi::c_char;
 use cleanrules::Value;
 use cleanrules::ast::Node;
 use cleanrules::eval::{Evaluated, Options, evaluate_tree, evaluate_value_tree};
-use cleanrules::format::result_value;
+use cleanrules::format::{result_value, write_result};
+use cleanrules::json::{Json, to_string};
 use cleanrules::logic::{Kleene, Truth};
 
-use crate::boundary::{Failure, Outcome, call, clear, free, give, handle};
+use crate::boundary::{Failure, Outcome, call, clear, free, give, give_text, handle};
 use crate::construct::build;
 use crate::cr_status;
 use crate::decision::cr_decision;
@@ -23,6 +24,9 @@ use crate::value::{borrow_value, cr_value, give_new_value};
 pub struct cr_tree {
     /// The tree as a value, in the structure of the JSON result tree.
     value: Value,
+    /// The tree in its canonical JSON form (`write_result`): its members in
+    /// the order of the format's table, which a value's sorted maps lose.
+    json: Json,
     /// The node of each result, in pre-order.
     nodes: Vec<Node>,
 }
@@ -44,8 +48,29 @@ impl cr_tree {
         nodes(evaluated, &mut found);
         Self {
             value: result_value(evaluated),
+            json: write_result(evaluated),
             nodes: found,
         }
+    }
+
+    /// The JSON of the result at `index`, counting in pre-order as `nodes`.
+    fn json_at(&self, index: usize) -> Option<&Json> {
+        // With an explicit stack: a result tree is as deep as its condition.
+        let mut pending = vec![&self.json];
+        let mut count = 0;
+        while let Some(json) = pending.pop() {
+            if count == index {
+                return Some(json);
+            }
+            count += 1;
+            if let Json::Object(members) = json
+                && let Some((_, Json::Array(children))) =
+                    members.iter().find(|(k, _)| k == "children")
+            {
+                pending.extend(children.iter().rev());
+            }
+        }
+        None
     }
 }
 
@@ -171,7 +196,8 @@ pub unsafe extern "C" fn cr_decision_rule_tree(
 /// map with `op`, `path` (a field's), `truth` (a boolean, or null for unknown)
 /// or `value` (the value itself: an opaque one keeps its token), `reason` (a
 /// map with `code`, and `paths`, `types` and `detail` when it has them) and
-/// `children`. `cr_value_to_json` of it is the tree's JSON.
+/// `children`. `cr_value_to_json` of it is the tree's JSON with its members
+/// sorted by key, as every map is; `cr_tree_to_json` gives the canonical form.
 ///
 /// # Safety
 ///
@@ -189,6 +215,44 @@ pub unsafe extern "C" fn cr_tree_value(
         let value = unsafe { handle(tree, "tree") }?.value.clone();
         // SAFETY: `out` is NULL or writable (# Safety).
         unsafe { give_new_value(out, value) }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call(error, body) }
+}
+
+/// The canonical JSON (`spec/json-format.md`, *Result trees*) of the result at
+/// `index`, counting the results in pre-order as `cr_tree_node` does (0 is the
+/// whole tree), freed with `cr_string_free`. Its members are in the order of
+/// the format's tables, as the core's writers put them; `cr_value_to_json` of
+/// `cr_tree_value` gives the same tree with its members sorted by key, as
+/// every map is.
+///
+/// # Safety
+///
+/// `tree` is `NULL` or a live `cr_tree`; `out` is `NULL` or points to a
+/// writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+/// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_tree_to_json(
+    tree: *const cr_tree,
+    index: usize,
+    out: *mut *mut c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `tree` is NULL or live (# Safety).
+        let tree = unsafe { handle(tree, "tree") }?;
+        let json = tree.json_at(index).ok_or_else(|| {
+            Failure::Invalid(
+                format!("result {index} is out of the tree of {}", tree.nodes.len()),
+                "pass an index below cr_tree_len",
+            )
+        })?;
+        // SAFETY: `out` passed `clear`; `len` is NULL or writable (# Safety).
+        unsafe { give_text(out, len, to_string(json)) }
     };
     // SAFETY: `error` is NULL or writable (# Safety).
     unsafe { call(error, body) }

@@ -41,14 +41,13 @@ type ResultTree struct {
 	Children []*ResultTree
 
 	shared *treeShared
-	index  int   // in pre-order, for cr_tree_node
-	route  []int // the children's positions from the root, for JSON
+	index  int // in pre-order, for cr_tree_node
 }
 
-// treeShared holds the native tree and its value, which every result of
-// the tree refers to: freed once no result is reachable.
+// treeShared holds the native tree, which every result of the tree refers
+// to: freed once no result is reachable.
 type treeShared struct {
-	tree, value *handle
+	tree *handle
 }
 
 // Node is the node evaluated (the halves of a between are the comparisons
@@ -73,27 +72,21 @@ func (t *ResultTree) Node() *Expr {
 var errNilTree = newError(CodeExpression, "a nil or zero *ResultTree has no node", "make result trees with Expr.EvaluateTree")
 
 // JSON is the result tree from this result down in the JSON format
-// (spec/json-format.md, Result trees), as the core writes it; "" for a nil
-// or zero ResultTree.
+// (spec/json-format.md, Result trees), as the core writes it, in its
+// canonical form; "" for a nil or zero ResultTree.
 func (t *ResultTree) JSON() string {
 	if t == nil || t.shared == nil {
 		return ""
 	}
-	p, err := t.shared.value.acquire()
+	p, err := t.shared.tree.acquire()
 	if err != nil {
 		return ""
 	}
-	defer t.shared.value.release()
-	found := (*C.cr_value)(p)
-	children := "children"
-	for _, step := range t.route {
-		k, n := text(children)
-		found = C.cr_value_list_get(C.cr_value_map_get(found, k, n), C.size_t(step))
-	}
+	defer t.shared.tree.release()
 	var out *C.char
 	var n C.size_t
 	var e *C.cr_error
-	if err := check(C.cr_value_to_json(found, &out, &n, &e), e); err != nil {
+	if err := check(C.cr_tree_to_json((*C.cr_tree)(p), C.size_t(t.index), &out, &n, &e), e); err != nil {
 		// The core wrote the tree, so it writes back: a bug otherwise.
 		return ""
 	}
@@ -130,16 +123,16 @@ func newResultTree(tree *C.cr_tree, opaques []any) (*ResultTree, error) {
 	}
 	shared := &treeShared{}
 	shared.tree = newHandle(shared, unsafe.Pointer(tree), func(p unsafe.Pointer) { C.cr_tree_free((*C.cr_tree)(p)) })
-	shared.value = newHandle(shared, unsafe.Pointer(value), func(p unsafe.Pointer) { C.cr_value_free((*C.cr_value)(p)) })
 	root, _ := goValue(value, opaques).(map[string]any)
+	C.cr_value_free(value)
 	next := 0
-	return readResult(shared, root, nil, &next), nil
+	return readResult(shared, root, &next), nil
 }
 
 // readResult reads one result of the tree's value and its children, counting
 // the results in pre-order.
-func readResult(shared *treeShared, m map[string]any, route []int, next *int) *ResultTree {
-	t := &ResultTree{Tag: str(m["op"]), Reason: reasonOf(m["reason"]), shared: shared, index: *next, route: route}
+func readResult(shared *treeShared, m map[string]any, next *int) *ResultTree {
+	t := &ResultTree{Tag: str(m["op"]), Reason: reasonOf(m["reason"]), shared: shared, index: *next}
 	*next++
 	if path, ok := m["path"]; ok {
 		t.Path = pathOfValue(path)
@@ -151,9 +144,9 @@ func readResult(shared *treeShared, m map[string]any, route []int, next *int) *R
 		t.Value = m["value"]
 	}
 	children, _ := m["children"].([]any)
-	for i, child := range children {
+	for _, child := range children {
 		m, _ := child.(map[string]any)
-		t.Children = append(t.Children, readResult(shared, m, append(route[:len(route):len(route)], i), next))
+		t.Children = append(t.Children, readResult(shared, m, next))
 	}
 	return t
 }

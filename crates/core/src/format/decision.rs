@@ -13,7 +13,7 @@ use crate::error::{Error, ErrorCode, Result, Segment};
 use crate::eval::{Evaluated, Outcome, Reason, ReasonCode, recompute};
 use crate::format::result::{write_reason, write_truth};
 use crate::format::value::{ValueContext, read_value, write_value};
-use crate::json::{Json, pointer_token, same};
+use crate::json::{Json, by_key, pointer_token, same};
 use crate::logic::{Kleene, Logic, Truth};
 use crate::rules::{Aggregated, Decision, HitPolicy, RuleResult, RuleSet};
 use crate::value::{Group, Value};
@@ -35,8 +35,12 @@ fn get<'a>(members: &'a [(String, Json)], key: &str) -> Option<&'a Json> {
     members.iter().find(|(k, _)| k == key).map(|(_, v)| v)
 }
 
+/// An unknown key is an error, the first by code point.
 fn unknown_keys(members: &[(String, Json)], known: &[&str], pointer: &str) -> Result<()> {
-    match members.iter().find(|(k, _)| !known.contains(&k.as_str())) {
+    match by_key(members)
+        .into_iter()
+        .find(|(k, _)| !known.contains(&k.as_str()))
+    {
         Some((key, _)) => Err(format_error(
             &at(pointer, key),
             format!("unknown key {key:?}"),
@@ -639,9 +643,10 @@ pub(crate) fn read_decision<'a>(
             None => None,
             Some(Json::Object(entries)) => {
                 let base = at(&item_at, "then");
+                // Read by key, as the payload's keys are kept.
                 Some(
-                    entries
-                        .iter()
+                    by_key(entries)
+                        .into_iter()
                         .map(|(k, v)| {
                             Ok((k.clone(), read_tree(v, &at(&base, k), 1, max_depth + 1)?))
                         })
@@ -681,8 +686,8 @@ pub(crate) fn read_decision<'a>(
     let recorded_aggregated: Option<Vec<(String, Value)>> = match aggregated_json {
         None | Some(Json::Null) => None,
         Some(Json::Object(entries)) => Some(
-            entries
-                .iter()
+            by_key(entries)
+                .into_iter()
                 .map(|(key, value)| {
                     let value_at = at(&aggregated_at, key);
                     Ok((
@@ -788,10 +793,7 @@ pub(crate) fn read_decision<'a>(
             let keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
             let wanted: Vec<&str> = result.rule.then().iter().map(|(k, _)| k.as_str()).collect();
             if keys != wanted {
-                return Err(mismatch(
-                    &at(item_at, "then"),
-                    "not the payload's keys, in order",
-                ));
+                return Err(mismatch(&at(item_at, "then"), "not the payload's keys"));
             }
         }
     }
@@ -842,8 +844,8 @@ pub(crate) fn read_decision<'a>(
             let computed = ruleset
                 .aggregated(aggregate, &results, &selected)
                 .map_err(|_| mismatch(&aggregated_at, "the aggregate cannot be computed"))?;
-            // Compared as values, key by key in order (`spec/rules.md`, *`COLLECT`
-            // aggregates*), so every accepted form of a value matches.
+            // Compared as values, key by key (both sorted by key; `spec/rules.md`,
+            // *`COLLECT` aggregates*), so every accepted form of a value matches.
             let agrees = match (&computed, &recorded_aggregated) {
                 (Aggregated::NothingSelected, None) => true,
                 (Aggregated::Values(map), Some(entries)) => {
@@ -898,6 +900,7 @@ mod tests {
                 r#"{"$map": {"a": [{"$int": 1}, {"$float": 2.5}]}}"#,
             ),
             (r#"{"$decimal": "1.50"}"#, r#"{"$decimal": "150e-2"}"#),
+            (r#"{"a": 1, "b": 2}"#, r#"{"b": 2, "a": 1}"#),
         ] {
             assert!(same_value(&value(a), &value(b)), "{a} and {b}");
         }
@@ -906,7 +909,7 @@ mod tests {
             (r#"{"$int": 3}"#, "3.0"),
             ("0.0", "-0.0"),
             (r#"{"$decimal": "1.0"}"#, r#"{"$decimal": "1.00"}"#),
-            (r#"{"a": 1, "b": 2}"#, r#"{"b": 2, "a": 1}"#),
+            (r#"{"a": 1, "b": 2}"#, r#"{"a": 1, "b": 2.5}"#),
         ] {
             assert!(!same_value(&value(a), &value(b)), "{a} and {b}");
         }
@@ -977,6 +980,8 @@ mod tests {
             r#"{"y": 608.0, "n": 3}"#,
             r#"{"y": {"$float": 608}, "n": {"$int": "3"}}"#,
             r#"{"y": 6.08e2, "n": {"$int": 3}}"#,
+            // An object's members have no order.
+            r#"{"n": 3, "y": 608.0}"#,
         ] {
             assert!(read_with_aggregated(accepted).is_ok(), "{accepted}");
         }
@@ -988,11 +993,6 @@ mod tests {
             ),
             (
                 r#"{"y": 608.0, "n": {"$float": 3}}"#,
-                ErrorCode::DecisionMismatch,
-                "/decision/aggregated",
-            ),
-            (
-                r#"{"n": 3, "y": 608.0}"#,
                 ErrorCode::DecisionMismatch,
                 "/decision/aggregated",
             ),

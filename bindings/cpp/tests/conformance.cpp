@@ -722,6 +722,30 @@ cr::value rebuild(cr::value_ref v) {
     return out;
 }
 
+// Where a map given back lists its keys out of code point order (UTF-8 bytes
+// compare as code points; spec/data-model.md, *Lists and maps*), or "".
+std::string out_of_order(const json::value &v, const std::string &where) {
+    if (v.kind == json::type::array) {
+        for (std::size_t i = 0; i < v.items.size(); ++i) {
+            std::string found = out_of_order(v.items[i], where + "[" + std::to_string(i) + "]");
+            if (!found.empty()) {
+                return found;
+            }
+        }
+    } else if (v.kind == json::type::object) {
+        for (std::size_t i = 0; i < v.members.size(); ++i) {
+            if (i > 0 && !(v.members[i - 1].first < v.members[i].first)) {
+                return where + ": the key " + v.members[i].first + " is out of code point order";
+            }
+            std::string found = out_of_order(v.members[i].second, where + "." + v.members[i].first);
+            if (!found.empty()) {
+                return found;
+            }
+        }
+    }
+    return "";
+}
+
 json::value json_of(cr::value_ref v) {
     cr::error_info error;
     std::string text = v.to_json(error);
@@ -819,6 +843,9 @@ std::string check_readers(const Decision &d, const json::value &expected, mode m
                json::write(need(expected, "selected"));
     }
     json::value got_outputs = json_of(CALL0(m, d.outputs));
+    if (std::string issue = out_of_order(got_outputs, "outputs()"); !issue.empty()) {
+        return issue;
+    }
     if (!json::same(got_outputs, want_outputs) ||
         !json::same(json::parse(CALL0(m, d.outputs_json)), want_outputs)) {
         return "outputs() " + json::write(got_outputs) + ", expected " +
@@ -989,7 +1016,8 @@ std::vector<std::string> check_comparison() {
         {"0.1", "0.10000000000000001", true},  // the same double
         {"-0.0", "0.0", false},
         {"[1,2]", "[2,1]", false},
-        {R"({"a":1,"b":2})", R"({"b":2,"a":1})", false},
+        {R"({"a":1,"b":2})", R"({"b":2,"a":1})", true}, // members have no order
+        {R"({"a":1,"b":2})", R"({"a":1,"c":2})", false},
         {R"({"a":1})", R"({"a":1,"b":2})", false},
         {R"({"$opaque":"socket"})", R"({"$opaque":"bytes"})", true},
         {R"({"$opaque":"socket"})", "null", false},

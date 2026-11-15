@@ -1653,7 +1653,8 @@ cr_status cr_rule_new(const char *name,
                       struct cr_rule **out,
                       struct cr_error **error);
 
-// The key of the payload entry at `index`, in order, borrowed from the rule
+// The key of the payload entry at `index`, by key (Unicode code point order:
+// a payload is an association, `spec/rules.md`, *Rules*), borrowed from the rule
 // and not NUL-terminated.
 //
 // # Safety
@@ -1674,7 +1675,7 @@ cr_status cr_rule_payload_key(const struct cr_rule *rule,
 // `rule` is `NULL` or a live `cr_rule`.
 size_t cr_rule_payload_len(const struct cr_rule *rule);
 
-// A copy of the value node of the payload entry at `index`, in order, freed
+// A copy of the value node of the payload entry at `index`, by key, freed
 // with `cr_node_free`.
 //
 // # Safety
@@ -1746,7 +1747,7 @@ cr_status cr_rule_with_description(const struct cr_rule *rule,
                                    struct cr_error **error);
 
 // The rule with this metadata instead of its own: `metadata` is a map of
-// data values (copied), in its order. An opaque value or a null with a
+// data values (copied); like every map, its keys have no order. An opaque value or a null with a
 // reason other than `CR_REASON_NULL` anywhere in it is a
 // `CR_RULE_DEFINITION_ERROR` that names where; a `metadata` that is not a
 // map, `CR_INVALID_ARGUMENT`.
@@ -1761,9 +1762,10 @@ cr_status cr_rule_with_metadata(const struct cr_rule *rule,
                                 struct cr_rule **out,
                                 struct cr_error **error);
 
-// The rule with `key` in its payload, given `value` (copied): a new key goes
-// last, and a key it has keeps its place and takes the new value. A
-// condition as the value is a `CR_RULE_DEFINITION_ERROR`.
+// The rule with `key` in its payload, given `value` (copied); a key it has
+// takes the new value. A payload is an association: its keys are kept sorted
+// by Unicode code point, whatever the order they are added in. A condition
+// as the value is a `CR_RULE_DEFINITION_ERROR`.
 //
 // # Safety
 //
@@ -2221,12 +2223,31 @@ cr_status cr_tree_node(const struct cr_tree *tree,
                        struct cr_node **out,
                        struct cr_error **error);
 
+// The canonical JSON (`spec/json-format.md`, *Result trees*) of the result at
+// `index`, counting the results in pre-order as `cr_tree_node` does (0 is the
+// whole tree), freed with `cr_string_free`. Its members are in the order of
+// the format's tables, as the core's writers put them; `cr_value_to_json` of
+// `cr_tree_value` gives the same tree with its members sorted by key, as
+// every map is.
+//
+// # Safety
+//
+// `tree` is `NULL` or a live `cr_tree`; `out` is `NULL` or points to a
+// writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_tree_to_json(const struct cr_tree *tree,
+                          size_t index,
+                          char **out,
+                          size_t *len,
+                          struct cr_error **error);
+
 // The tree as a new value, freed with `cr_value_free`, in the structure of
 // the JSON result tree (`spec/json-format.md`, *Result trees*): each result a
 // map with `op`, `path` (a field's), `truth` (a boolean, or null for unknown)
 // or `value` (the value itself: an opaque one keeps its token), `reason` (a
 // map with `code`, and `paths`, `types` and `detail` when it has them) and
-// `children`. `cr_value_to_json` of it is the tree's JSON.
+// `children`. `cr_value_to_json` of it is the tree's JSON with its members
+// sorted by key, as every map is; `cr_tree_to_json` gives the canonical form.
 //
 // # Safety
 //
@@ -2467,7 +2488,9 @@ cr_status cr_value_list_set(struct cr_value *list,
                             struct cr_value *item,
                             struct cr_error **error);
 
-// A map's entry by position: its key, borrowed and not NUL-terminated, and its
+// A map's entry by position among its keys sorted by Unicode code point (a
+// map has no order of its own, `spec/data-model.md`, *Lists and maps*; for a
+// record too): its key, borrowed and not NUL-terminated, and its
 // value, borrowed. Every out-parameter may be `NULL`.
 //
 // # Safety
@@ -2496,8 +2519,9 @@ const struct cr_value *cr_value_map_get(const struct cr_value *value,
                                         const char *key,
                                         size_t len);
 
-// Move `item` into `map` under `key`, replacing a value under the same key in
-// place. `item` is consumed, even when the call fails, unless it is `map`
+// Move `item` into `map` under `key`, replacing a value under the same key.
+// The map keeps its keys sorted by Unicode code point, whatever the order
+// they are inserted in (a record also keeps their positions). `item` is consumed, even when the call fails, unless it is `map`
 // itself, which is refused. Pointers borrowed from `map` are no longer valid
 // afterwards.
 //
@@ -2631,7 +2655,8 @@ cr_status cr_value_new_opaque(const char *type_name,
                               struct cr_error **error);
 
 // An empty record: a map whose entries also have positions, their order of
-// insertion (`spec/ast.md`, *Reading data*).
+// insertion, for integer segments to read (`spec/ast.md`, *Reading data*).
+// Its entries are still given back by key, like any map's.
 struct cr_value *cr_value_new_record(void);
 
 // A string, copied. Bytes that are not UTF-8 are a `CR_FORMAT_ERROR`.

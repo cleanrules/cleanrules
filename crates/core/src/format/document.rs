@@ -9,7 +9,7 @@ use crate::format::rules::{
     build_rule, build_ruleset, shape_rule, shape_ruleset, write_decision, write_rule, write_ruleset,
 };
 use crate::format::table::{read_table, write_table};
-use crate::json::{Json, JsonNumber, Limits, parse, pointer_token};
+use crate::json::{Json, JsonNumber, Limits, by_key, parse, pointer_token};
 use crate::rules::{Decision, Rule, RuleSet};
 use crate::table::DecisionTable;
 
@@ -201,8 +201,8 @@ fn top_level(members: &[(String, Json)], content: &str) -> Result<()> {
     {
         return Err(format_error("/$schema", "\"$schema\" must be a string"));
     }
-    match members
-        .iter()
+    match by_key(members)
+        .into_iter()
         .find(|(k, _)| !matches!(k.as_str(), "version" | "$schema") && k != content)
     {
         Some((key, _)) => Err(format_error(

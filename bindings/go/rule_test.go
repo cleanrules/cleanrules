@@ -13,7 +13,7 @@ func TestRuleOptions(t *testing.T) {
 		Then("discount", MustDecimal("0.15")),
 		Then("total", Field("order", "total").Mul(0.9)),
 		Then("label", "gold"),
-		Then("discount", MustDecimal("0.20")), // keeps its place
+		Then("discount", MustDecimal("0.20")), // takes the new value
 		WithPriority(10),
 		WithTags("loyalty", "b2c", "loyalty"),
 		WithDescription("loyal customers"),
@@ -27,8 +27,9 @@ func TestRuleOptions(t *testing.T) {
 		keys = append(keys, entry.Key)
 		values = append(values, entry.Value.String())
 	}
-	if !reflect.DeepEqual(keys, []string{"discount", "total", "label"}) ||
-		!reflect.DeepEqual(values, []string{"0.20", "order.total * 0.9e0", `"gold"`}) {
+	// A payload has no order: its keys come sorted by code point.
+	if !reflect.DeepEqual(keys, []string{"discount", "label", "total"}) ||
+		!reflect.DeepEqual(values, []string{"0.20", `"gold"`, "order.total * 0.9e0"}) {
 		t.Errorf("payload %v = %v", keys, values)
 	}
 	if r.Priority() != 10 || !reflect.DeepEqual(r.Tags(), []string{"b2c", "loyalty"}) ||

@@ -183,8 +183,9 @@ export declare class CleanRulesError extends Error {
    * The error's JSON form (`spec/errors.md`, *JSON form*), as an object for
    * `JSON.stringify`: a float that holds an integer is `{"$float": n}`, so the
    * text reads back as the same form, except that a float zero loses its sign
-   * (`JSON.stringify(-0)` is `0`) and integer-like keys, such as a payload key
-   * `"10"`, come first, as in any plain object. Its `node`, if any, is exact
+   * (`JSON.stringify(-0)` is `0`); integer-like keys, such as a payload key
+   * `"10"`, come first, as in any plain object, which changes nothing: members
+   * have no order. Its `node`, if any, is exact
    * in `dumps` of the node.
    */
   toJSON(): Record<string, unknown>
@@ -357,8 +358,9 @@ export declare class Expr {
    * The node in the JSON format (`spec/json-format.md`, *Conditions*), as an
    * object for `JSON.stringify`: a float that holds an integer is `{"$float":
    * n}`, so the text reads back as the same node, except that a float zero
-   * loses its sign (`JSON.stringify(-0)` is `0`) and integer-like keys, such
-   * as a payload key `"10"`, come first, as in any plain object. `dumps(node)`
+   * loses its sign (`JSON.stringify(-0)` is `0`); integer-like keys, such as a
+   * payload key `"10"`, come first, as in any plain object, which changes
+   * nothing: members have no order. `dumps(node)`
    * writes it exactly.
    */
   toJSON(): Record<string, unknown>
@@ -504,7 +506,7 @@ export declare function not(operand: Expr): Expr
 /** An action: called by `RuleSet.run` when its rule is selected; synchronous, its result ignored. */
 export type Action = (context: ActionContext) => void
 
-/** A rule's payload: keys with nodes or constants, in order. */
+/** A rule's payload: keys with nodes or constants, in any order (the core sorts them by code point). */
 export type Payload = Readonly<Record<string, Operand>> | ReadonlyMap<string, Operand>
 
 /** Data for a rule's metadata: null, booleans, numbers, strings, dates, arrays and objects. */
@@ -534,7 +536,10 @@ export declare class Rule {
   /** The rule's name, unique within a rule set; decisions and errors name the rule by it. */
   readonly name: string
   readonly when: Expr
-  /** The payload, in order: each key with its node. */
+  /**
+   * The payload: each key with its node, added by Unicode code point (a plain
+   * object still lists integer-like keys first; a payload has no order).
+   */
   readonly then: Readonly<Record<string, Expr>>
   readonly priority: number | bigint
   /** Sorted, without repeats. */
@@ -550,8 +555,9 @@ export declare class Rule {
    * The rule document of the JSON format (`{ version, rule }`), as an object
    * for `JSON.stringify`: a float that holds an integer is `{"$float": n}`, so
    * the text reads back as the same rule, except that a float zero loses its
-   * sign (`JSON.stringify(-0)` is `0`) and integer-like keys, such as a
-   * payload key `"10"`, come first, as in any plain object. `dumps(rule)`
+   * sign (`JSON.stringify(-0)` is `0`); integer-like keys, such as a payload
+   * key `"10"`, come first, as in any plain object, which changes nothing:
+   * members have no order. `dumps(rule)`
    * writes it exactly. An `UnsupportedError` for an action that is code
    * without a name.
    */
@@ -631,8 +637,9 @@ export declare class RuleSet implements Iterable<Rule> {
    * The rule set document of the JSON format (`{ version, ruleset }`), as an
    * object for `JSON.stringify`: a float that holds an integer is `{"$float":
    * n}`, so the text reads back as the same rule set, except that a float zero
-   * loses its sign (`JSON.stringify(-0)` is `0`) and integer-like keys, such
-   * as a payload key `"10"`, come first, as in any plain object.
+   * loses its sign (`JSON.stringify(-0)` is `0`); integer-like keys, such as a
+   * payload key `"10"`, come first, as in any plain object, which changes
+   * nothing: members have no order.
    * `dumps(ruleset)` writes it exactly. An `UnsupportedError` for an action
    * that is code without a name.
    */
@@ -698,9 +705,10 @@ export declare class Decision {
    * The decision document of the JSON format, as an object for
    * `JSON.stringify`: a float that holds an integer is `{"$float": n}`, so the
    * text reads back as the same decision (`RuleSet.readDecision` reads it),
-   * except that a float zero loses its sign (`JSON.stringify(-0)` is `0`) and
+   * except that a float zero loses its sign (`JSON.stringify(-0)` is `0`);
    * integer-like keys, such as a payload key `"10"`, come first, as in any
-   * plain object. The native layer's `Decision.write()` (`cleanrules/native`)
+   * plain object, which changes nothing: members have no order. The native
+   * layer's `Decision.write()` (`cleanrules/native`)
    * writes it exactly.
    */
   toJSON(): Record<string, unknown>
@@ -796,8 +804,9 @@ export declare class Explanation {
    * The explanation document of the JSON format, as an object for
    * `JSON.stringify`: a float that holds an integer is `{"$float": n}`, so the
    * text reads back as the same explanation, except that a float zero loses
-   * its sign (`JSON.stringify(-0)` is `0`) and integer-like keys, such as a
-   * payload key `"10"`, come first, as in any plain object. The native layer's
+   * its sign (`JSON.stringify(-0)` is `0`); integer-like keys, such as a
+   * payload key `"10"`, come first, as in any plain object, which changes
+   * nothing: members have no order. The native layer's
    * `Decision.explain('json')` writes it exactly.
    */
   toJSON(): Record<string, unknown>
@@ -810,6 +819,7 @@ export declare class RuleSummary {
   private constructor()
   readonly name: string
   readonly priority: number | bigint
+  /** The payload keys, sorted by Unicode code point. */
   readonly outputs: readonly string[]
   /** Whether the rule has an action (code, or a name). */
   readonly action: boolean
@@ -841,8 +851,9 @@ export declare class Summary {
    * The summary document of the JSON format, as an object for
    * `JSON.stringify`: a float that holds an integer is `{"$float": n}`, so the
    * text reads back as the same summary, except that a float zero loses its
-   * sign (`JSON.stringify(-0)` is `0`) and integer-like keys, such as a
-   * payload key `"10"`, come first, as in any plain object. Summaries hold no
+   * sign (`JSON.stringify(-0)` is `0`); integer-like keys, such as a payload
+   * key `"10"`, come first, as in any plain object, which changes nothing:
+   * members have no order. Summaries hold no
    * floats.
    */
   toJSON(): Record<string, unknown>
@@ -872,8 +883,9 @@ export declare class ResultTree {
    * The result tree in the JSON format (`spec/json-format.md`, *Result
    * trees*), as an object for `JSON.stringify`: a float that holds an integer
    * is `{"$float": n}`, so the text reads back as the same tree, except that a
-   * float zero loses its sign (`JSON.stringify(-0)` is `0`) and integer-like
-   * keys, such as a payload key `"10"`, come first, as in any plain object.
+   * float zero loses its sign (`JSON.stringify(-0)` is `0`); integer-like keys,
+   * such as a payload key `"10"`, come first, as in any plain object, which
+   * changes nothing: members have no order.
    * The native layer's `Node.evaluateTree` writes it exactly.
    */
   toJSON(): Record<string, unknown>
@@ -1006,8 +1018,9 @@ export declare class DecisionTable {
    * The decision table document of the JSON format, as an object for
    * `JSON.stringify`: a float that holds an integer is `{"$float": n}`, so the
    * text reads back as the same table, except that a float zero loses its sign
-   * (`JSON.stringify(-0)` is `0`) and integer-like keys, such as a payload key
-   * `"10"`, come first, as in any plain object. `dumps(table)` writes it
+   * (`JSON.stringify(-0)` is `0`); integer-like keys, such as a payload key
+   * `"10"`, come first, as in any plain object, which changes nothing: members
+   * have no order. `dumps(table)` writes it
    * exactly.
    */
   toJSON(): Record<string, unknown>

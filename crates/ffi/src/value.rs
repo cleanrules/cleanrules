@@ -225,7 +225,8 @@ pub extern "C" fn cr_value_new_map() -> *mut cr_value {
 }
 
 /// An empty record: a map whose entries also have positions, their order of
-/// insertion (`spec/ast.md`, *Reading data*).
+/// insertion, for integer segments to read (`spec/ast.md`, *Reading data*).
+/// Its entries are still given back by key, like any map's.
 #[unsafe(no_mangle)]
 pub extern "C" fn cr_value_new_record() -> *mut cr_value {
     boxed(Value::Map(Map::record()))
@@ -583,8 +584,9 @@ pub unsafe extern "C" fn cr_value_list_set(
     unsafe { call(error, body) }
 }
 
-/// Move `item` into `map` under `key`, replacing a value under the same key in
-/// place. `item` is consumed, even when the call fails, unless it is `map`
+/// Move `item` into `map` under `key`, replacing a value under the same key.
+/// The map keeps its keys sorted by Unicode code point, whatever the order
+/// they are inserted in (a record also keeps their positions). `item` is consumed, even when the call fails, unless it is `map`
 /// itself, which is refused. Pointers borrowed from `map` are no longer valid
 /// afterwards.
 ///
@@ -1208,7 +1210,9 @@ pub unsafe extern "C" fn cr_value_list_get(
     }
 }
 
-/// A map's entry by position: its key, borrowed and not NUL-terminated, and its
+/// A map's entry by position among its keys sorted by Unicode code point (a
+/// map has no order of its own, `spec/data-model.md`, *Lists and maps*; for a
+/// record too): its key, borrowed and not NUL-terminated, and its
 /// value, borrowed. Every out-parameter may be `NULL`.
 ///
 /// # Safety

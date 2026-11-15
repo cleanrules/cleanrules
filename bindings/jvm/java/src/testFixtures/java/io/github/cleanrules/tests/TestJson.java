@@ -10,8 +10,9 @@ import java.util.regex.Pattern;
 
 /**
  * A lossless JSON reader, writer and comparer for the conformance tests
- * (conformance/README.md, Comparing): objects keep their members in order
- * ({@link LinkedHashMap}; a repeated key is an error), numbers keep their text
+ * (conformance/README.md, Comparing): objects keep their members as read
+ * ({@link LinkedHashMap}; a repeated key is an error), though their order is
+ * never compared (spec/json-format.md, Objects), numbers keep their text
  * ({@link Num}), so nothing that the vectors compare is lost. The reader
  * checks the syntax of RFC 8259 and refuses text after the value. Nothing
  * here uses the library.
@@ -274,7 +275,7 @@ final class TestJson {
 
     /**
      * Whether {@code actual} matches {@code expected} (conformance/README.md,
-     * Comparing): object members in order, ints exact at any size, floats by
+     * Comparing): objects by their members whatever their order, ints exact at any size, floats by
      * exact double and sign of zero, an int never equal to a float, any two
      * opaque values equal, and {@code detail} in reasons ignored; with the
      * differences that {@code mode} allows.
@@ -320,10 +321,10 @@ final class TestJson {
             if (a.size() != e.size()) {
                 return false;
             }
-            for (int i = 0; i < e.size(); i++) {
-                Object key = e.get(i).getKey();
-                if (!key.equals(a.get(i).getKey())
-                        || !same(a.get(i).getValue(), e.get(i).getValue(), mode, "reason".equals(key))) {
+            // Members have no order: each expected key is found by name.
+            for (Map.Entry<?, ?> member : e) {
+                Object key = member.getKey();
+                if (!got.containsKey(key) || !same(got.get(key), member.getValue(), mode, "reason".equals(key))) {
                     return false;
                 }
             }

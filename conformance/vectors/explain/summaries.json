@@ -437,6 +437,123 @@
           "tags": []
         }
       }
+    },
+    {
+      "id": "explain/summaries/payload-keys-by-code-point",
+      "spec": [
+        "explain.md#summaries",
+        "rules.md#rules",
+        "json-format.md#objects"
+      ],
+      "description": "a rule's outputs are its payload keys sorted by code point; the rule set's, in order of first appearance, rule by rule",
+      "given": {
+        "kind": "summary",
+        "ruleset": {
+          "hit_policy": "collect",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "p",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "b": {
+                  "op": "const",
+                  "value": 1
+                },
+                "\u00e9": {
+                  "op": "const",
+                  "value": 2
+                },
+                "Z": {
+                  "op": "field",
+                  "path": [
+                    "z"
+                  ]
+                },
+                "10": {
+                  "op": "const",
+                  "value": 3
+                },
+                "2": {
+                  "op": "const",
+                  "value": 4
+                }
+              }
+            },
+            {
+              "name": "q",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "c": {
+                  "op": "const",
+                  "value": 5
+                },
+                "a": {
+                  "op": "const",
+                  "value": 6
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "summary": {
+          "hit_policy": "collect",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "p",
+              "priority": 0,
+              "outputs": [
+                "10",
+                "2",
+                "Z",
+                "b",
+                "\u00e9"
+              ]
+            },
+            {
+              "name": "q",
+              "priority": 0,
+              "outputs": [
+                "a",
+                "c"
+              ]
+            }
+          ],
+          "fields": [
+            {
+              "path": [
+                "z"
+              ],
+              "conditions": [],
+              "payloads": [
+                {
+                  "rule": "p",
+                  "key": "Z"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            "10",
+            "2",
+            "Z",
+            "b",
+            "\u00e9",
+            "a",
+            "c"
+          ],
+          "tags": []
+        }
+      }
     }
   ]
 }

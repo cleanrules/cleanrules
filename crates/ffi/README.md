@@ -234,7 +234,9 @@ The whole program, with explanations and errors, is
   `cr_decision_rule_tree` gives the tree of a rule's condition in a decision:
   `cr_tree_value` is the tree as a `cr_value` in the structure of the JSON
   result tree (opaque values keep their token; `cr_value_to_json` of it is the
-  JSON), and `cr_tree_len` and `cr_tree_node` give the node of each result, in
+  JSON with its members sorted by key, as every map's are), `cr_tree_to_json`
+  the canonical JSON of the tree or of the subtree at a pre-order index, and
+  `cr_tree_len` and `cr_tree_node` give the node of each result, in
   pre-order. Python calls a node `Expr`; C, Go and the JVM call it a
   node.
 - **Batches.** `cr_ruleset_evaluate_many` evaluates a list of inputs; the first

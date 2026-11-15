@@ -398,31 +398,6 @@
                   }
                 ]
               },
-              "flag": {
-                "description": "conditions of r1",
-                "anyOf": [
-                  {
-                    "type": "boolean"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "m": {
-                "description": "conditions of r1",
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
               "d": {
                 "description": "payloads of r1 (v)",
                 "anyOf": [
@@ -442,6 +417,17 @@
                 "anyOf": [
                   {
                     "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "flag": {
+                "description": "conditions of r1",
+                "anyOf": [
+                  {
+                    "type": "boolean"
                   },
                   {
                     "type": "null"
@@ -472,6 +458,31 @@
                   }
                 ]
               },
+              "k": {
+                "description": "conditions of r2",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "m": {
+                "description": "conditions of r1",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "name": {
                 "description": "conditions of r2",
                 "anyOf": [
@@ -483,11 +494,11 @@
                   }
                 ]
               },
-              "k": {
+              "note": {
                 "description": "conditions of r2",
                 "anyOf": [
                   {
-                    "type": "number"
+                    "type": "string"
                   },
                   {
                     "type": "null"
@@ -509,17 +520,6 @@
                       "$datetime"
                     ],
                     "additionalProperties": false
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "note": {
-                "description": "conditions of r2",
-                "anyOf": [
-                  {
-                    "type": "string"
                   },
                   {
                     "type": "null"
@@ -791,21 +791,14 @@
                       "$map": {
                         "type": "object",
                         "properties": {
-                          "placed": {
-                            "description": "conditions of early",
+                          "$ref": {
+                            "description": "payloads of early (note)"
+                          },
+                          "code": {
+                            "description": "conditions of pricey",
                             "anyOf": [
                               {
-                                "type": "object",
-                                "properties": {
-                                  "$date": {
-                                    "type": "string",
-                                    "pattern": "^(?!0000)[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
-                                  }
-                                },
-                                "required": [
-                                  "$date"
-                                ],
-                                "additionalProperties": false
+                                "type": "string"
                               },
                               {
                                 "type": "null"
@@ -852,35 +845,21 @@
                               }
                             ]
                           },
-                          "$ref": {
-                            "description": "payloads of early (note)"
-                          },
-                          "total": {
-                            "description": "conditions of pricey",
+                          "placed": {
+                            "description": "conditions of early",
                             "anyOf": [
                               {
                                 "type": "object",
                                 "properties": {
-                                  "$decimal": {
+                                  "$date": {
                                     "type": "string",
-                                    "pattern": "^(-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?|-?inf)$"
+                                    "pattern": "^(?!0000)[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
                                   }
                                 },
                                 "required": [
-                                  "$decimal"
+                                  "$date"
                                 ],
                                 "additionalProperties": false
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "code": {
-                            "description": "conditions of pricey",
-                            "anyOf": [
-                              {
-                                "type": "string"
                               },
                               {
                                 "type": "null"
@@ -907,14 +886,35 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "total": {
+                            "description": "conditions of pricey",
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "$decimal": {
+                                    "type": "string",
+                                    "pattern": "^(-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?|-?inf)$"
+                                  }
+                                },
+                                "required": [
+                                  "$decimal"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
-                          "placed",
-                          "items",
-                          "total",
                           "code",
-                          "shipped"
+                          "items",
+                          "placed",
+                          "shipped",
+                          "total"
                         ]
                       }
                     },
@@ -1680,6 +1680,17 @@
                   {
                     "type": "object",
                     "properties": {
+                      "flag": {
+                        "description": "conditions of near",
+                        "anyOf": [
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "k": {
                         "anyOf": [
                           {
@@ -2132,22 +2143,11 @@
                             "type": "null"
                           }
                         ]
-                      },
-                      "flag": {
-                        "description": "conditions of near",
-                        "anyOf": [
-                          {
-                            "type": "boolean"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
                       }
                     },
                     "required": [
-                      "k",
-                      "flag"
+                      "flag",
+                      "k"
                     ]
                   },
                   {

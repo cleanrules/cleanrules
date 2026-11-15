@@ -41,7 +41,7 @@ use crate::format::{
     Document, DocumentFormat, ValueContext, read_document_as, read_parsed_document, read_value,
     write_error, write_summary, write_value,
 };
-use crate::json::{Json, JsonNumber, Limits, parse, pointer_token};
+use crate::json::{Json, JsonNumber, Limits, by_key, parse, pointer_token};
 use crate::logic::Truth;
 use crate::rules::{Decision, RuleSet};
 use crate::value::{Map, Value};
@@ -512,8 +512,10 @@ impl<'j> Arguments<'j> {
                 ));
             }
         }
+        // Unknown and repeated members by key, by code point: the first error
+        // never depends on the order of the text (`spec/agents.md`, *Arguments*).
         let mut seen = BTreeSet::new();
-        for (key, _) in members {
+        for (key, _) in by_key(members) {
             let pointer = format!("/{}", pointer_token(key));
             if !table.iter().any(|m| m.key == key) {
                 let known: Vec<&str> = table.iter().map(|m| m.key).collect();

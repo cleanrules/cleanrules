@@ -999,9 +999,30 @@ function encodeData(value, rule = null) {
 }
 
 /**
+ * Strings by Unicode code point, as the core orders keys (`spec/json-format.md`,
+ * *Objects*): never by UTF-16 code unit, as `<` and the default sort do, so
+ * U+FF5A comes before U+1F600.
+ */
+function byCodePoint(a, b) {
+  let i = 0
+  let j = 0
+  while (i < a.length && j < b.length) {
+    const x = a.codePointAt(i)
+    const y = b.codePointAt(j)
+    if (x !== y) return x < y ? -1 : 1
+    i += x > 0xffff ? 2 : 1
+    j += y > 0xffff ? 2 : 1
+  }
+  if (i < a.length) return 1
+  return j < b.length ? -1 : 0
+}
+
+/**
  * The first form in `form` that is not data, with where it is: `[form, at]`,
  * `at` built from `root` like `metadata["key"][0]`; or `null`. Not data: a NaN,
  * an opaque value, an int beyond 64 bits and a value whose reading threw.
+ * Depth first in pre-order, a map's members by key, by code point, as the
+ * core visits them.
  */
 function notData(form, root) {
   if (form === null || typeof form !== 'object') return null
@@ -1018,7 +1039,7 @@ function notData(form, root) {
       }
       return null
     case 'O':
-      for (const [key, element] of form[1]) {
+      for (const [key, element] of [...form[1]].sort(([a], [b]) => byCodePoint(a, b))) {
         const found = notData(element, `${root}[${JSON.stringify(key)}]`)
         if (found !== null) return found
       }
@@ -1028,4 +1049,4 @@ function notData(form, root) {
   }
 }
 
-export { capture, describe, encodeData, notData, read, registerOpaque, typeName, useLimitError, useTypes }
+export { byCodePoint, capture, describe, encodeData, notData, read, registerOpaque, typeName, useLimitError, useTypes }
