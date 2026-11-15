@@ -22,7 +22,8 @@ use pyo3::prelude::*;
 
 /// The native module, imported by the `cleanrules` package.
 #[pymodule]
-fn _cleanrules(module: &Bound<'_, PyModule>) -> PyResult<()> {
+#[pyo3(name = "_cleanrules")]
+fn native_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("__version__", env!("CARGO_PKG_VERSION"))?;
     module.add("FORMAT_VERSION", cleanrules::FORMAT_VERSION)?;
     module.add_class::<node::PyNode>()?;
@@ -56,12 +57,12 @@ fn _cleanrules(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(documents::dump_ruleset, module)?)?;
     module.add_function(wrap_pyfunction!(trees::evaluate_condition, module)?)?;
     module.add_function(wrap_pyfunction!(trees::evaluate_value, module)?)?;
-    module.add_function(wrap_pyfunction!(json_api::_read_document, module)?)?;
-    module.add_function(wrap_pyfunction!(json_api::_read_decision, module)?)?;
-    module.add_function(wrap_pyfunction!(json_api::_evaluate, module)?)?;
-    module.add_function(wrap_pyfunction!(json_api::_evaluate_many, module)?)?;
-    module.add_function(wrap_pyfunction!(json_api::_explain, module)?)?;
-    module.add_function(wrap_pyfunction!(json_api::_summary, module)?)?;
-    module.add_function(wrap_pyfunction!(json_api::_evaluate_node, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::py_read_document, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::py_read_decision, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::py_evaluate, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::py_evaluate_many, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::py_explain, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::py_summary, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::py_evaluate_node, module)?)?;
     Ok(())
 }

@@ -47,7 +47,8 @@ fn input(py: Python<'_>, text: &str) -> PyResult<Value> {
 /// Read a document; its canonical form.
 #[pyfunction]
 #[pyo3(signature = (text, max_size=None, max_nesting=None, max_depth=None))]
-pub(crate) fn _read_document(
+#[pyo3(name = "_read_document")]
+pub(crate) fn py_read_document(
     py: Python<'_>,
     text: &str,
     max_size: Option<usize>,
@@ -63,7 +64,8 @@ pub(crate) fn _read_document(
 #[pyfunction]
 #[pyo3(signature = (ruleset_json, text, format="json", max_size=None, max_nesting=None, max_depth=None))]
 #[allow(clippy::too_many_arguments)] // The limits are keyword arguments in Python.
-pub(crate) fn _read_decision(
+#[pyo3(name = "_read_decision")]
+pub(crate) fn py_read_decision(
     py: Python<'_>,
     ruleset_json: &str,
     text: &str,
@@ -83,7 +85,12 @@ pub(crate) fn _read_decision(
 
 /// Evaluate one input given as a JSON value; the decision.
 #[pyfunction]
-pub(crate) fn _evaluate(py: Python<'_>, ruleset_json: &str, input_json: &str) -> PyResult<String> {
+#[pyo3(name = "_evaluate")]
+pub(crate) fn py_evaluate(
+    py: Python<'_>,
+    ruleset_json: &str,
+    input_json: &str,
+) -> PyResult<String> {
     let rules = ruleset(py, ruleset_json)?;
     let decision = rules.evaluate(&input(py, input_json)?).or_raise(py)?;
     Ok(to_string(&write_decision(&decision)))
@@ -91,7 +98,8 @@ pub(crate) fn _evaluate(py: Python<'_>, ruleset_json: &str, input_json: &str) ->
 
 /// Evaluate a batch given as a JSON array; the decisions, as an array.
 #[pyfunction]
-pub(crate) fn _evaluate_many(
+#[pyo3(name = "_evaluate_many")]
+pub(crate) fn py_evaluate_many(
     py: Python<'_>,
     ruleset_json: &str,
     inputs_json: &str,
@@ -116,7 +124,8 @@ pub(crate) fn _evaluate_many(
 
 /// Evaluate and explain; the decision and the explanation.
 #[pyfunction]
-pub(crate) fn _explain(
+#[pyo3(name = "_explain")]
+pub(crate) fn py_explain(
     py: Python<'_>,
     ruleset_json: &str,
     input_json: &str,
@@ -131,7 +140,8 @@ pub(crate) fn _explain(
 
 /// The summary of a rule set.
 #[pyfunction]
-pub(crate) fn _summary(py: Python<'_>, ruleset_json: &str) -> PyResult<String> {
+#[pyo3(name = "_summary")]
+pub(crate) fn py_summary(py: Python<'_>, ruleset_json: &str) -> PyResult<String> {
     Ok(to_string(&write_summary(&summary(&ruleset(
         py,
         ruleset_json,
@@ -140,7 +150,8 @@ pub(crate) fn _summary(py: Python<'_>, ruleset_json: &str) -> PyResult<String> {
 
 /// Evaluate one node given in JSON on an input given in JSON; its result tree.
 #[pyfunction]
-pub(crate) fn _evaluate_node(
+#[pyo3(name = "_evaluate_node")]
+pub(crate) fn py_evaluate_node(
     py: Python<'_>,
     node_json: &str,
     input_json: &str,

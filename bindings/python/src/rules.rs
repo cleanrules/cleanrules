@@ -293,15 +293,15 @@ impl PyRuleSet {
             .collect())
     }
 
-    /// The summary in the JSON format, as text; `actions` says which rules
-    /// have one, in rule order.
-    #[allow(clippy::needless_pass_by_value)] // PyO3 extracts lists by value.
     /// Check that every named action is registered (`spec/rules.md`, *Actions*).
     #[allow(clippy::needless_pass_by_value)] // PyO3 extracts lists by value.
     fn check_action_names(&self, py: Python<'_>, registered: Vec<String>) -> PyResult<()> {
         self.ruleset.check_action_names(&registered).or_raise(py)
     }
 
+    /// The summary in the JSON format, as text; `actions` says which rules
+    /// have one, in rule order.
+    #[allow(clippy::needless_pass_by_value)] // PyO3 extracts lists by value.
     fn summary_json(&self, actions: Vec<bool>) -> String {
         to_string(&write_summary(&self.overview(actions)))
     }
