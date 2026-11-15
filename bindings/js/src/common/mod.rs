@@ -81,7 +81,7 @@ impl Raw {
 pub(crate) const OBJECT: &str = "an object";
 
 /// The names of the limits, in the order of [`RawOptions::limits`].
-pub(crate) const LIMIT_NAMES: [&str; 7] = [
+pub(crate) const LIMIT_NAMES: [&str; LIMITS] = [
     "maxSize",
     "maxNesting",
     "maxDepth",
@@ -89,7 +89,11 @@ pub(crate) const LIMIT_NAMES: [&str; 7] = [
     "maxYamlSize",
     "maxTextSize",
     "maxValues",
+    "maxPathSegments",
 ];
+
+/// How many limits an options object may give.
+pub(crate) const LIMITS: usize = 8;
 
 /// An options object as JavaScript gives it: each known member, read once.
 /// Members that a call does not use are ignored.
@@ -111,7 +115,7 @@ pub(crate) enum RawLimits {
     /// `undefined` or `null`: the core's defaults.
     Absent,
     /// An object: its members, named by [`LIMIT_NAMES`].
-    Given(Box<[Raw; 7]>),
+    Given(Box<[Raw; LIMITS]>),
     /// Anything else.
     Wrong(&'static str),
 }
@@ -191,7 +195,7 @@ pub(crate) fn limits(raw: &RawLimits) -> Outcome<Limits> {
         }
         RawLimits::Given(values) => values,
     };
-    let [size_, nesting, depth, table, yaml, text, values_] = &**values;
+    let [size_, nesting, depth, table, yaml, text, values_, segments] = &**values;
     if let Some(value) = size(LIMIT_NAMES[0], size_)? {
         out = out.with_max_size(value);
     }
@@ -212,6 +216,9 @@ pub(crate) fn limits(raw: &RawLimits) -> Outcome<Limits> {
     }
     if let Some(value) = size(LIMIT_NAMES[6], values_)? {
         out.max_values = value;
+    }
+    if let Some(value) = size(LIMIT_NAMES[7], segments)? {
+        out.max_path_segments = value;
     }
     Ok(out)
 }

@@ -60,7 +60,7 @@ Each function is a thin call into the core.
 | Function | Scheduler | Returns |
 |---|---|---|
 | `version()`, `format_version()`, `default_limits()` | normal | the library's version (the application's), the JSON format's version (1), the default limits as a map |
-| `ruleset_read(Text, Format, Limits)` | dirty CPU | `{ok, RuleSet}`: a rule set, rule or decision table document in `json`, `yaml`, `text` or `csv`, with limits (`#{}` for the defaults; atom keys `max_size`, `max_nesting`, `max_depth`, `max_table_size`, `max_yaml_size`, `max_text_size`, `max_values`) |
+| `ruleset_read(Text, Format, Limits)` | dirty CPU | `{ok, RuleSet}`: a rule set, rule or decision table document in `json`, `yaml`, `text` or `csv`, with limits (`#{}` for the defaults; atom keys `max_size`, `max_nesting`, `max_depth`, `max_table_size`, `max_yaml_size`, `max_text_size`, `max_values`, `max_path_segments`: at most 256 segments in a field path by default) |
 | `ruleset_write(RuleSet, Format)` | dirty CPU | `{ok, Text}` |
 | `ruleset_info(RuleSet)` | dirty CPU | `#{hit_policy, aggregate, logic, strict, rules, field_paths}`: the policies as atoms, the rule names and the field paths read |
 | `ruleset_summary(RuleSet, Format)` | dirty CPU | `{ok, Summary}`: as a `term` (the summary document's content, maps with binary keys), a `json` or `yaml` document, or its `text` |

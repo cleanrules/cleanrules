@@ -251,7 +251,13 @@ default:
 - **Constants.** A native constant in a condition or payload, and rule
   metadata, are converted with the default `max_values` too (*Constants*):
   beyond it, building the node or rule raises `limit_exceeded`, with the
-  `rule` when the binding knows it.
+  `rule` when the binding knows it, and a hint that does not suggest raising
+  the limit, which the caller cannot do there.
+- **Depth.** The sparse tree is as deep as the longest path the rule set
+  reads, plus what a binding converts whole where a path ends (at most 256
+  containers, *Lists and maps*). The rule set's paths are at most
+  `max_path_segments` (256) segments long (`json-format.md`, *Errors and
+  limits*), so the tree stays within the stack the core promises there.
 
 The core gives the bindings the pieces, so the count, the wording and the
 error are the same in every language: the limit with the others, the count and

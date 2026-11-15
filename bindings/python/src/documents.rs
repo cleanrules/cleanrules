@@ -60,7 +60,8 @@ pub(crate) fn ruleset_parts<'py>(
 /// `("ruleset", (rules, hit_policy, aggregate, logic, strict))` or
 /// `("decision_table", DecisionTable)`; CSV holds a decision table.
 #[pyfunction]
-#[pyo3(signature = (text, format, max_size=None, max_nesting=None, max_depth=None, max_table_size=None))]
+#[pyo3(signature = (text, format, max_size=None, max_nesting=None, max_depth=None, max_table_size=None, max_path_segments=None))]
+#[allow(clippy::too_many_arguments)] // The limits are keyword arguments in Python.
 pub(crate) fn load_document<'py>(
     py: Python<'py>,
     text: &str,
@@ -69,10 +70,14 @@ pub(crate) fn load_document<'py>(
     max_nesting: Option<usize>,
     max_depth: Option<usize>,
     max_table_size: Option<usize>,
+    max_path_segments: Option<usize>,
 ) -> PyResult<(&'static str, Bound<'py, PyAny>)> {
     let mut limits = limits(max_size, max_nesting, max_depth);
     if let Some(size) = max_table_size {
         limits.max_table_size = size;
+    }
+    if let Some(segments) = max_path_segments {
+        limits.max_path_segments = segments;
     }
     let document =
         read_document_as(text.as_bytes(), document_format(format)?, &limits).or_raise(py)?;
@@ -95,14 +100,18 @@ pub(crate) fn load_document<'py>(
 
 /// Read a text that holds one rule (`cleanrules::text::parse_rule`).
 #[pyfunction]
-#[pyo3(signature = (text, max_size=None, max_depth=None))]
+#[pyo3(signature = (text, max_size=None, max_depth=None, max_path_segments=None))]
 pub(crate) fn load_rule(
     py: Python<'_>,
     text: &str,
     max_size: Option<usize>,
     max_depth: Option<usize>,
+    max_path_segments: Option<usize>,
 ) -> PyResult<PyRule> {
-    let limits = limits(max_size, None, max_depth);
+    let mut limits = limits(max_size, None, max_depth);
+    if let Some(segments) = max_path_segments {
+        limits.max_path_segments = segments;
+    }
     Ok(PyRule::from(
         cleanrules::text::parse_rule(text, &limits).or_raise(py)?,
     ))

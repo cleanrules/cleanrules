@@ -19,7 +19,7 @@ use js_sys::{Array, ArrayBuffer, Function, Object, RangeError, Reflect, TypeErro
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 
-use crate::common::{LIMIT_NAMES, OBJECT, Outcome, Problem, Raw, RawLimits, RawOptions};
+use crate::common::{LIMIT_NAMES, LIMITS, OBJECT, Outcome, Problem, Raw, RawLimits, RawOptions};
 
 /// The hooks of the JavaScript half: `read`, `error`, `call` and `actions`.
 struct Hooks {
@@ -257,7 +257,7 @@ pub(crate) fn raw_limits(value: &JsValue) -> Result<RawLimits, JsValue> {
     if !matches!(kind, Raw::Other(OBJECT)) {
         return Ok(RawLimits::Wrong(kind.describe()));
     }
-    let mut values: [Raw; 7] = Default::default();
+    let mut values: [Raw; LIMITS] = Default::default();
     for (slot, name) in values.iter_mut().zip(LIMIT_NAMES) {
         *slot = member(value, name)?;
     }

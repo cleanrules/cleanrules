@@ -14,7 +14,7 @@
 use std::fmt::{self, Write as _};
 use std::vec::Drain;
 
-use crate::ast::{ArithOp, Closed, CompareOp, Expr, Node, StringOp};
+use crate::ast::{ArithOp, Closed, CompareOp, Expr, Node, READ_PATH_HINT, StringOp, path_too_long};
 use crate::error::{Error, ErrorCode, Result, Segment};
 use crate::format::{Document, ValueContext, read_value, write_value};
 use crate::json::{Json, JsonNumber, Limits};
@@ -437,7 +437,8 @@ impl Head {
                 .ok_or_else(|| Error::new(ErrorCode::ExpressionError, "a node lacks an operand"))
         };
         match self.own {
-            Own::Field(path) => Node::field(path).map_err(at),
+            // The parser bounded the path as it read it.
+            Own::Field(path) => Node::field_unbounded(path).map_err(at),
             Own::Const(value) => Node::constant(value).map_err(at),
             Own::Compare(op) => {
                 let (a, b) = (next()?, next()?);
@@ -544,6 +545,7 @@ struct Parser<'a> {
     recursion: usize,
     max_recursion: usize,
     max_depth: usize,
+    max_path_segments: usize,
 }
 
 fn describe(kind: &Kind) -> String {
@@ -598,6 +600,7 @@ impl<'a> Parser<'a> {
             // parenthesis), so a text at `max_depth` is never refused.
             max_recursion: limits.max_depth.saturating_mul(2).saturating_add(2),
             max_depth: limits.max_depth,
+            max_path_segments: limits.max_path_segments,
         }
     }
 
@@ -1176,12 +1179,14 @@ impl<'a> Parser<'a> {
                 }
             }
             Kind::Name(name) => {
+                self.segment_allowed(0, &token)?;
                 self.next();
                 let mut path = vec![Segment::Key(name.clone())];
                 self.segments(&mut path)?;
                 Ok(located(Shape::Field(path)))
             }
             Kind::Symbol("[") => {
+                self.segment_allowed(0, &token)?;
                 self.next();
                 let mut path = vec![Segment::Index(self.index()?)];
                 self.segments(&mut path)?;
@@ -1209,8 +1214,22 @@ impl<'a> Parser<'a> {
         Ok(index)
     }
 
+    /// That a path holding `segments` segments may take one more, starting at
+    /// `token`: beyond `max_path_segments`, the error is located there.
+    fn segment_allowed(&self, segments: usize, token: &Token) -> Result<()> {
+        if segments >= self.max_path_segments {
+            return Err(path_too_long(self.max_path_segments)
+                .with_hint(READ_PATH_HINT)
+                .at_position(token.line, token.column));
+        }
+        Ok(())
+    }
+
     fn segments(&mut self, path: &mut Vec<Segment>) -> Result<()> {
         loop {
+            if self.is_symbol(".") || self.is_symbol("[") {
+                self.segment_allowed(path.len(), self.peek())?;
+            }
             if self.accept_symbol(".") {
                 // Only a key follows a dot, so a keyword is a key there.
                 let name = self
@@ -2387,6 +2406,39 @@ mod tests {
         let text = format!("{}x{}", "(".repeat(30), ")".repeat(30));
         let nesting = parse(&text, &limits).unwrap_err();
         assert!(nesting.message().contains("22 deep"));
+    }
+
+    #[test]
+    fn paths_beyond_max_path_segments_are_located_where_they_go_beyond() {
+        let at = |text: &str, limit: usize| {
+            let limits = Limits {
+                max_path_segments: limit,
+                ..Limits::default()
+            };
+            let error = parse(text, &limits).unwrap_err();
+            assert_eq!(error.code(), ErrorCode::LimitExceeded, "{text}");
+            assert_eq!(error.context().name.as_deref(), Some("max_path_segments"));
+            (
+                error.context().line.unwrap(),
+                error.context().column.unwrap(),
+            )
+        };
+        // With no segment allowed, at the field itself, a key or an index.
+        assert_eq!(at("a > 1", 0), (1, 1));
+        assert_eq!(at("x OR [0]", 0), (1, 1));
+        assert_eq!(at("x > 0 OR\n  [0][1]", 1), (2, 6));
+        assert_eq!(at("a.`b c`.d", 2), (1, 8));
+        // In JSON, at the first segment's pointer.
+        let json = r#"{"version": 1, "condition": {"op": "field", "path": ["a"]}}"#;
+        let limits = Limits {
+            max_path_segments: 0,
+            ..Limits::default()
+        };
+        let error = read_document(json, &limits).unwrap_err();
+        assert_eq!(
+            error.context().pointer.as_deref(),
+            Some("/condition/path/0")
+        );
     }
 
     #[test]

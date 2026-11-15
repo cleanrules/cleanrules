@@ -136,7 +136,7 @@ fn cell(item: &Bound<'_, PyAny>) -> PyResult<Cell> {
 /// each a sequence of cells (`str`, a node, or a constant). The rows are
 /// converted and pushed to the core one at a time.
 #[pyfunction]
-#[pyo3(signature = (header, rows, hit_policy, aggregate, logic, strict, max_size=None, max_depth=None, max_table_size=None))]
+#[pyo3(signature = (header, rows, hit_policy, aggregate, logic, strict, max_size=None, max_depth=None, max_table_size=None, max_path_segments=None))]
 #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 pub(crate) fn table_from_grid(
     py: Python<'_>,
@@ -149,6 +149,7 @@ pub(crate) fn table_from_grid(
     max_size: Option<usize>,
     max_depth: Option<usize>,
     max_table_size: Option<usize>,
+    max_path_segments: Option<usize>,
 ) -> PyResult<PyDecisionTable> {
     let config = TableConfig::from_names(hit_policy, aggregate, logic, strict).or_raise(py)?;
     let mut limits = Limits::default();
@@ -160,6 +161,9 @@ pub(crate) fn table_from_grid(
     }
     if let Some(size) = max_table_size {
         limits.max_table_size = size;
+    }
+    if let Some(segments) = max_path_segments {
+        limits.max_path_segments = segments;
     }
     let header = header
         .iter()

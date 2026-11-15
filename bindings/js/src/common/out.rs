@@ -107,10 +107,51 @@ fn aware(value: &AwareDateTime) -> Json {
     tagged("A", form)
 }
 
-/// A value in the encoding.
-pub(crate) fn value(value: &Value) -> Json {
+/// A value in the encoding: children before their parents, with an explicit
+/// stack, since a value given back may be as deep as data given as JSON and
+/// a worker's stack may be small.
+pub(crate) fn value(root: &Value) -> Json {
+    enum Task<'a> {
+        Visit(&'a Value),
+        List(usize),
+        Map(Vec<&'a str>),
+    }
+    let mut tasks = vec![Task::Visit(root)];
+    let mut done: Vec<Json> = Vec::new();
+    while let Some(task) = tasks.pop() {
+        match task {
+            Task::Visit(Value::List(items)) => {
+                tasks.push(Task::List(items.len()));
+                tasks.extend(items.iter().rev().map(Task::Visit));
+            }
+            Task::Visit(Value::Map(map)) => {
+                let entries: Vec<(&str, &Value)> = map.iter().collect();
+                tasks.push(Task::Map(entries.iter().map(|(key, _)| *key).collect()));
+                tasks.extend(entries.into_iter().rev().map(|(_, item)| Task::Visit(item)));
+            }
+            Task::Visit(scalar) => done.push(self::scalar(scalar)),
+            Task::List(len) => {
+                let items = done.split_off(done.len().saturating_sub(len));
+                done.push(tagged("l", vec![Json::Array(items)]));
+            }
+            Task::Map(keys) => {
+                let items = done.split_off(done.len().saturating_sub(keys.len()));
+                let entries = keys
+                    .into_iter()
+                    .zip(items)
+                    .map(|(key, item)| Json::Array(vec![string(key), item]))
+                    .collect();
+                done.push(tagged("O", vec![Json::Array(entries)]));
+            }
+        }
+    }
+    done.pop().unwrap_or(Json::Null)
+}
+
+/// A value that is not a list or a map, in the encoding.
+fn scalar(value: &Value) -> Json {
     match value {
-        Value::Null(_) => Json::Null,
+        Value::Null(_) | Value::List(_) | Value::Map(_) => Json::Null,
         Value::Bool(boolean) => Json::Bool(*boolean),
         Value::Int(int) => tagged("i", vec![string(&int.to_string())]),
         Value::Float(float) => tagged("f", vec![string(&float_text(*float))]),
@@ -126,11 +167,6 @@ pub(crate) fn value(value: &Value) -> Json {
         ),
         Value::NaiveDateTime(datetime) => tagged("N", civil(*datetime)),
         Value::AwareDateTime(datetime) => aware(datetime),
-        Value::List(items) => tagged(
-            "l",
-            vec![Json::Array(items.iter().map(self::value).collect())],
-        ),
-        Value::Map(map) => tagged("O", vec![entries(map.iter())]),
         Value::Opaque(opaque) => tagged(
             "X",
             vec![string(&opaque.type_name), string(&opaque.token.to_string())],

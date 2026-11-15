@@ -79,6 +79,26 @@ fn a_count_stops_at_the_limit_and_names_it() {
 }
 
 #[test]
+fn constants_are_counted_under_the_default_with_a_hint_of_their_own() {
+    let mut count = ValueCount::for_constants();
+    assert_eq!(count.limit(), 1_000_000);
+    let error = count.add(1_000_001).unwrap_err();
+    assert_eq!(error.context().name.as_deref(), Some("max_values"));
+    let hint = error.hint().unwrap();
+    assert!(
+        hint.contains("default max_values") && !hint.contains("raise"),
+        "{hint}"
+    );
+    assert!(
+        ValueCount::new(1)
+            .beyond()
+            .hint()
+            .unwrap()
+            .starts_with("raise max_values")
+    );
+}
+
+#[test]
 fn a_diamond_of_depth_30_is_refused_within_the_limit() {
     let data = diamond(30);
     let limits = Limits::default();

@@ -124,6 +124,8 @@ class DecisionTable:
         max_depth: The deepest header or cell, in nodes (256).
         max_table_size: The most cells and condition nodes the table may hold,
             column copies included (2,097,152; `spec/tables.md`, *Limits*).
+        max_path_segments: The most segments of a field path in a header or
+            cell (256).
 
     Raises:
         FormatError: For an empty or repeated column, a row with more cells
@@ -184,6 +186,7 @@ class DecisionTable:
         max_size: int | None = None,
         max_depth: int | None = None,
         max_table_size: int | None = None,
+        max_path_segments: int | None = None,
     ) -> None:
         native = _grid(
             header,
@@ -195,6 +198,7 @@ class DecisionTable:
             max_size=max_size,
             max_depth=max_depth,
             max_table_size=max_table_size,
+            max_path_segments=max_path_segments,
         )
         self._set(native)
 
@@ -210,6 +214,7 @@ class DecisionTable:
         max_size: int | None = None,
         max_depth: int | None = None,
         max_table_size: int | None = None,
+        max_path_segments: int | None = None,
     ) -> DecisionTable:
         """Build a table from a pandas or polars `DataFrame`.
 
@@ -238,6 +243,7 @@ class DecisionTable:
             max_size: As `DecisionTable`.
             max_depth: As `DecisionTable`.
             max_table_size: As `DecisionTable`.
+            max_path_segments: As `DecisionTable`.
 
         Raises:
             TypeError: For a frame of another kind, or a column whose name is
@@ -270,6 +276,7 @@ class DecisionTable:
                 max_size=max_size,
                 max_depth=max_depth,
                 max_table_size=max_table_size,
+                max_path_segments=max_path_segments,
             )
         )
         return table
@@ -383,6 +390,7 @@ def _grid(
     max_size: int | None,
     max_depth: int | None,
     max_table_size: int | None,
+    max_path_segments: int | None = None,
 ) -> _native.DecisionTable:
     """Check the settings and hand the grid to the core (`spec/tables.md`, *Grids*)."""
     try:
@@ -402,7 +410,12 @@ def _grid(
             ) from None
     if type(strict) is not bool:
         raise RuleDefinitionError(f"strict must be a bool, got {strict!r}")
-    limits = (("max_size", max_size), ("max_depth", max_depth), ("max_table_size", max_table_size))
+    limits = (
+        ("max_size", max_size),
+        ("max_depth", max_depth),
+        ("max_table_size", max_table_size),
+        ("max_path_segments", max_path_segments),
+    )
     for name, limit in limits:
         if limit is not None and limit < 1:
             raise ValueError(f"{name} must be at least 1, got {limit}")
@@ -432,4 +445,5 @@ def _grid(
         max_size,
         max_depth,
         max_table_size,
+        max_path_segments,
     )

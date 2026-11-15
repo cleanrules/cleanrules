@@ -5065,6 +5065,29 @@
           "pointer": "/header/0"
         }
       }
+    },
+    {
+      "id": "format/tables/csv-path-segments",
+      "spec": [
+        "tables.md#limits",
+        "text.md#errors-and-limits"
+      ],
+      "description": "A header's field path has the path limit, located in the CSV text where the first segment beyond starts",
+      "given": {
+        "kind": "read",
+        "table_csv": "x,a.b.c,THEN y\n> 1,-,2\n",
+        "limits": {
+          "max_path_segments": 2
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "line": 1,
+          "column": 6,
+          "name": "max_path_segments"
+        }
+      }
     }
   ]
 }

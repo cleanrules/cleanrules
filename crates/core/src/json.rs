@@ -111,6 +111,10 @@ pub struct Limits {
     pub max_nesting: usize,
     /// The deepest condition or payload value, in nodes (used by document readers).
     pub max_depth: usize,
+    /// The most segments a field's path may have, checked by the readers of
+    /// every format; [`crate::ast::Node::field`] checks the default
+    /// (`spec/json-format.md`, *Errors and limits*).
+    pub max_path_segments: usize,
     /// The largest YAML text, in bytes: lower than `max_size`, because the YAML
     /// parser holds a flow collection whole before reading it.
     pub max_yaml_size: usize,
@@ -153,6 +157,7 @@ impl Default for Limits {
             max_size: 16 * 1024 * 1024,
             max_nesting: 1024,
             max_depth: 256,
+            max_path_segments: 256,
             max_yaml_size: 1024 * 1024,
             max_text_size: 4 * 1024 * 1024,
             max_table_size: 2 * 1024 * 1024,

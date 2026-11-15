@@ -116,6 +116,9 @@ enum class limit : cr_limit {
     // `limit_exceeded`: carried for the bindings that read native data. The
     // values you build here are not counted.
     max_values = CR_LIMIT_MAX_VALUES,
+    // The most segments a field path may have, in every format (256 by
+    // default); `node::field` checks the default.
+    max_path_segments = CR_LIMIT_MAX_PATH_SEGMENTS,
 };
 
 // What a value is; `none` for an empty handle.
@@ -2090,7 +2093,10 @@ public:
     // Operands of `and_` and `or_`, in order: `{a, node::compare(...)}`.
     using refs = std::vector<ref>;
 
-    // A field: a list of strings (keys, never split at dots) and ints.
+    // A field: a list of strings (keys, never split at dots) and ints. More
+    // than 256 segments, the default `limit::max_path_segments`, throw a
+    // `format_error` with code `limit_exceeded`; read a longer path from a
+    // document with the limit raised.
     CLEANRULES_THROWING([[nodiscard]] static node field(value_ref path) {
         return make_(nullptr, [&](cr_node **o, cr_error **e) { return cr_node_new_field(path.c_ptr(), o, e); });
     })

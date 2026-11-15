@@ -1426,6 +1426,742 @@
           }
         }
       }
+    },
+    {
+      "id": "agents/input-schemas/depth-cap",
+      "spec": [
+        "agents.md#building-the-schema",
+        "agents.md#required-members"
+      ],
+      "description": "a place 32 path segments deep with fields below it is described in words and accepts anything, keeping its own field's description; what leads to it is still required",
+      "given": {
+        "kind": "tool",
+        "rulesets": {
+          "deep": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "far",
+                "when": {
+                  "op": "eq",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "x",
+                      "y"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "field",
+                    "path": [
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k",
+                      "k"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "near",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "k",
+                    "flag"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "tool": "summary",
+        "arguments": {
+          "ruleset": "deep"
+        }
+      },
+      "expect": {
+        "output": {
+          "ruleset": "deep",
+          "summary": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "far",
+                "priority": 0,
+                "outputs": [
+                  "v"
+                ]
+              },
+              {
+                "name": "near",
+                "priority": 0,
+                "outputs": []
+              }
+            ],
+            "fields": [
+              {
+                "path": [
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "x",
+                  "y"
+                ],
+                "conditions": [
+                  "far"
+                ],
+                "payloads": []
+              },
+              {
+                "path": [
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k",
+                  "k"
+                ],
+                "conditions": [],
+                "payloads": [
+                  {
+                    "rule": "far",
+                    "key": "v"
+                  }
+                ]
+              },
+              {
+                "path": [
+                  "k",
+                  "flag"
+                ],
+                "conditions": [
+                  "near"
+                ],
+                "payloads": []
+              }
+            ],
+            "outputs": [
+              "v"
+            ],
+            "tags": []
+          },
+          "input_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "k": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "k": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "k": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "k": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "k": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "k": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "k": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "object",
+                                                                    "properties": {
+                                                                      "k": {
+                                                                        "anyOf": [
+                                                                          {
+                                                                            "type": "object",
+                                                                            "properties": {
+                                                                              "k": {
+                                                                                "anyOf": [
+                                                                                  {
+                                                                                    "type": "object",
+                                                                                    "properties": {
+                                                                                      "k": {
+                                                                                        "anyOf": [
+                                                                                          {
+                                                                                            "type": "object",
+                                                                                            "properties": {
+                                                                                              "k": {
+                                                                                                "anyOf": [
+                                                                                                  {
+                                                                                                    "type": "object",
+                                                                                                    "properties": {
+                                                                                                      "k": {
+                                                                                                        "anyOf": [
+                                                                                                          {
+                                                                                                            "type": "object",
+                                                                                                            "properties": {
+                                                                                                              "k": {
+                                                                                                                "anyOf": [
+                                                                                                                  {
+                                                                                                                    "type": "object",
+                                                                                                                    "properties": {
+                                                                                                                      "k": {
+                                                                                                                        "anyOf": [
+                                                                                                                          {
+                                                                                                                            "type": "object",
+                                                                                                                            "properties": {
+                                                                                                                              "k": {
+                                                                                                                                "anyOf": [
+                                                                                                                                  {
+                                                                                                                                    "type": "object",
+                                                                                                                                    "properties": {
+                                                                                                                                      "k": {
+                                                                                                                                        "anyOf": [
+                                                                                                                                          {
+                                                                                                                                            "type": "object",
+                                                                                                                                            "properties": {
+                                                                                                                                              "k": {
+                                                                                                                                                "anyOf": [
+                                                                                                                                                  {
+                                                                                                                                                    "type": "object",
+                                                                                                                                                    "properties": {
+                                                                                                                                                      "k": {
+                                                                                                                                                        "anyOf": [
+                                                                                                                                                          {
+                                                                                                                                                            "type": "object",
+                                                                                                                                                            "properties": {
+                                                                                                                                                              "k": {
+                                                                                                                                                                "anyOf": [
+                                                                                                                                                                  {
+                                                                                                                                                                    "type": "object",
+                                                                                                                                                                    "properties": {
+                                                                                                                                                                      "k": {
+                                                                                                                                                                        "anyOf": [
+                                                                                                                                                                          {
+                                                                                                                                                                            "type": "object",
+                                                                                                                                                                            "properties": {
+                                                                                                                                                                              "k": {
+                                                                                                                                                                                "anyOf": [
+                                                                                                                                                                                  {
+                                                                                                                                                                                    "type": "object",
+                                                                                                                                                                                    "properties": {
+                                                                                                                                                                                      "k": {
+                                                                                                                                                                                        "anyOf": [
+                                                                                                                                                                                          {
+                                                                                                                                                                                            "type": "object",
+                                                                                                                                                                                            "properties": {
+                                                                                                                                                                                              "k": {
+                                                                                                                                                                                                "anyOf": [
+                                                                                                                                                                                                  {
+                                                                                                                                                                                                    "type": "object",
+                                                                                                                                                                                                    "properties": {
+                                                                                                                                                                                                      "k": {
+                                                                                                                                                                                                        "anyOf": [
+                                                                                                                                                                                                          {
+                                                                                                                                                                                                            "type": "object",
+                                                                                                                                                                                                            "properties": {
+                                                                                                                                                                                                              "k": {
+                                                                                                                                                                                                                "anyOf": [
+                                                                                                                                                                                                                  {
+                                                                                                                                                                                                                    "type": "object",
+                                                                                                                                                                                                                    "properties": {
+                                                                                                                                                                                                                      "k": {
+                                                                                                                                                                                                                        "anyOf": [
+                                                                                                                                                                                                                          {
+                                                                                                                                                                                                                            "type": "object",
+                                                                                                                                                                                                                            "properties": {
+                                                                                                                                                                                                                              "k": {
+                                                                                                                                                                                                                                "anyOf": [
+                                                                                                                                                                                                                                  {
+                                                                                                                                                                                                                                    "type": "object",
+                                                                                                                                                                                                                                    "properties": {
+                                                                                                                                                                                                                                      "k": {
+                                                                                                                                                                                                                                        "anyOf": [
+                                                                                                                                                                                                                                          {
+                                                                                                                                                                                                                                            "type": "object",
+                                                                                                                                                                                                                                            "properties": {
+                                                                                                                                                                                                                                              "k": {
+                                                                                                                                                                                                                                                "anyOf": [
+                                                                                                                                                                                                                                                  {
+                                                                                                                                                                                                                                                    "type": "object",
+                                                                                                                                                                                                                                                    "properties": {
+                                                                                                                                                                                                                                                      "k": {
+                                                                                                                                                                                                                                                        "anyOf": [
+                                                                                                                                                                                                                                                          {
+                                                                                                                                                                                                                                                            "type": "object",
+                                                                                                                                                                                                                                                            "properties": {
+                                                                                                                                                                                                                                                              "k": {
+                                                                                                                                                                                                                                                                "anyOf": [
+                                                                                                                                                                                                                                                                  {
+                                                                                                                                                                                                                                                                    "type": "object",
+                                                                                                                                                                                                                                                                    "properties": {
+                                                                                                                                                                                                                                                                      "k": {
+                                                                                                                                                                                                                                                                        "description": "payloads of far (v); fields below are not described (deeper than 32 path segments)"
+                                                                                                                                                                                                                                                                      }
+                                                                                                                                                                                                                                                                    },
+                                                                                                                                                                                                                                                                    "required": [
+                                                                                                                                                                                                                                                                      "k"
+                                                                                                                                                                                                                                                                    ]
+                                                                                                                                                                                                                                                                  },
+                                                                                                                                                                                                                                                                  {
+                                                                                                                                                                                                                                                                    "type": "null"
+                                                                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                                                                ]
+                                                                                                                                                                                                                                                              }
+                                                                                                                                                                                                                                                            },
+                                                                                                                                                                                                                                                            "required": [
+                                                                                                                                                                                                                                                              "k"
+                                                                                                                                                                                                                                                            ]
+                                                                                                                                                                                                                                                          },
+                                                                                                                                                                                                                                                          {
+                                                                                                                                                                                                                                                            "type": "null"
+                                                                                                                                                                                                                                                          }
+                                                                                                                                                                                                                                                        ]
+                                                                                                                                                                                                                                                      }
+                                                                                                                                                                                                                                                    },
+                                                                                                                                                                                                                                                    "required": [
+                                                                                                                                                                                                                                                      "k"
+                                                                                                                                                                                                                                                    ]
+                                                                                                                                                                                                                                                  },
+                                                                                                                                                                                                                                                  {
+                                                                                                                                                                                                                                                    "type": "null"
+                                                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                                                ]
+                                                                                                                                                                                                                                              }
+                                                                                                                                                                                                                                            },
+                                                                                                                                                                                                                                            "required": [
+                                                                                                                                                                                                                                              "k"
+                                                                                                                                                                                                                                            ]
+                                                                                                                                                                                                                                          },
+                                                                                                                                                                                                                                          {
+                                                                                                                                                                                                                                            "type": "null"
+                                                                                                                                                                                                                                          }
+                                                                                                                                                                                                                                        ]
+                                                                                                                                                                                                                                      }
+                                                                                                                                                                                                                                    },
+                                                                                                                                                                                                                                    "required": [
+                                                                                                                                                                                                                                      "k"
+                                                                                                                                                                                                                                    ]
+                                                                                                                                                                                                                                  },
+                                                                                                                                                                                                                                  {
+                                                                                                                                                                                                                                    "type": "null"
+                                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                                ]
+                                                                                                                                                                                                                              }
+                                                                                                                                                                                                                            },
+                                                                                                                                                                                                                            "required": [
+                                                                                                                                                                                                                              "k"
+                                                                                                                                                                                                                            ]
+                                                                                                                                                                                                                          },
+                                                                                                                                                                                                                          {
+                                                                                                                                                                                                                            "type": "null"
+                                                                                                                                                                                                                          }
+                                                                                                                                                                                                                        ]
+                                                                                                                                                                                                                      }
+                                                                                                                                                                                                                    },
+                                                                                                                                                                                                                    "required": [
+                                                                                                                                                                                                                      "k"
+                                                                                                                                                                                                                    ]
+                                                                                                                                                                                                                  },
+                                                                                                                                                                                                                  {
+                                                                                                                                                                                                                    "type": "null"
+                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                ]
+                                                                                                                                                                                                              }
+                                                                                                                                                                                                            },
+                                                                                                                                                                                                            "required": [
+                                                                                                                                                                                                              "k"
+                                                                                                                                                                                                            ]
+                                                                                                                                                                                                          },
+                                                                                                                                                                                                          {
+                                                                                                                                                                                                            "type": "null"
+                                                                                                                                                                                                          }
+                                                                                                                                                                                                        ]
+                                                                                                                                                                                                      }
+                                                                                                                                                                                                    },
+                                                                                                                                                                                                    "required": [
+                                                                                                                                                                                                      "k"
+                                                                                                                                                                                                    ]
+                                                                                                                                                                                                  },
+                                                                                                                                                                                                  {
+                                                                                                                                                                                                    "type": "null"
+                                                                                                                                                                                                  }
+                                                                                                                                                                                                ]
+                                                                                                                                                                                              }
+                                                                                                                                                                                            },
+                                                                                                                                                                                            "required": [
+                                                                                                                                                                                              "k"
+                                                                                                                                                                                            ]
+                                                                                                                                                                                          },
+                                                                                                                                                                                          {
+                                                                                                                                                                                            "type": "null"
+                                                                                                                                                                                          }
+                                                                                                                                                                                        ]
+                                                                                                                                                                                      }
+                                                                                                                                                                                    },
+                                                                                                                                                                                    "required": [
+                                                                                                                                                                                      "k"
+                                                                                                                                                                                    ]
+                                                                                                                                                                                  },
+                                                                                                                                                                                  {
+                                                                                                                                                                                    "type": "null"
+                                                                                                                                                                                  }
+                                                                                                                                                                                ]
+                                                                                                                                                                              }
+                                                                                                                                                                            },
+                                                                                                                                                                            "required": [
+                                                                                                                                                                              "k"
+                                                                                                                                                                            ]
+                                                                                                                                                                          },
+                                                                                                                                                                          {
+                                                                                                                                                                            "type": "null"
+                                                                                                                                                                          }
+                                                                                                                                                                        ]
+                                                                                                                                                                      }
+                                                                                                                                                                    },
+                                                                                                                                                                    "required": [
+                                                                                                                                                                      "k"
+                                                                                                                                                                    ]
+                                                                                                                                                                  },
+                                                                                                                                                                  {
+                                                                                                                                                                    "type": "null"
+                                                                                                                                                                  }
+                                                                                                                                                                ]
+                                                                                                                                                              }
+                                                                                                                                                            },
+                                                                                                                                                            "required": [
+                                                                                                                                                              "k"
+                                                                                                                                                            ]
+                                                                                                                                                          },
+                                                                                                                                                          {
+                                                                                                                                                            "type": "null"
+                                                                                                                                                          }
+                                                                                                                                                        ]
+                                                                                                                                                      }
+                                                                                                                                                    },
+                                                                                                                                                    "required": [
+                                                                                                                                                      "k"
+                                                                                                                                                    ]
+                                                                                                                                                  },
+                                                                                                                                                  {
+                                                                                                                                                    "type": "null"
+                                                                                                                                                  }
+                                                                                                                                                ]
+                                                                                                                                              }
+                                                                                                                                            },
+                                                                                                                                            "required": [
+                                                                                                                                              "k"
+                                                                                                                                            ]
+                                                                                                                                          },
+                                                                                                                                          {
+                                                                                                                                            "type": "null"
+                                                                                                                                          }
+                                                                                                                                        ]
+                                                                                                                                      }
+                                                                                                                                    },
+                                                                                                                                    "required": [
+                                                                                                                                      "k"
+                                                                                                                                    ]
+                                                                                                                                  },
+                                                                                                                                  {
+                                                                                                                                    "type": "null"
+                                                                                                                                  }
+                                                                                                                                ]
+                                                                                                                              }
+                                                                                                                            },
+                                                                                                                            "required": [
+                                                                                                                              "k"
+                                                                                                                            ]
+                                                                                                                          },
+                                                                                                                          {
+                                                                                                                            "type": "null"
+                                                                                                                          }
+                                                                                                                        ]
+                                                                                                                      }
+                                                                                                                    },
+                                                                                                                    "required": [
+                                                                                                                      "k"
+                                                                                                                    ]
+                                                                                                                  },
+                                                                                                                  {
+                                                                                                                    "type": "null"
+                                                                                                                  }
+                                                                                                                ]
+                                                                                                              }
+                                                                                                            },
+                                                                                                            "required": [
+                                                                                                              "k"
+                                                                                                            ]
+                                                                                                          },
+                                                                                                          {
+                                                                                                            "type": "null"
+                                                                                                          }
+                                                                                                        ]
+                                                                                                      }
+                                                                                                    },
+                                                                                                    "required": [
+                                                                                                      "k"
+                                                                                                    ]
+                                                                                                  },
+                                                                                                  {
+                                                                                                    "type": "null"
+                                                                                                  }
+                                                                                                ]
+                                                                                              }
+                                                                                            },
+                                                                                            "required": [
+                                                                                              "k"
+                                                                                            ]
+                                                                                          },
+                                                                                          {
+                                                                                            "type": "null"
+                                                                                          }
+                                                                                        ]
+                                                                                      }
+                                                                                    },
+                                                                                    "required": [
+                                                                                      "k"
+                                                                                    ]
+                                                                                  },
+                                                                                  {
+                                                                                    "type": "null"
+                                                                                  }
+                                                                                ]
+                                                                              }
+                                                                            },
+                                                                            "required": [
+                                                                              "k"
+                                                                            ]
+                                                                          },
+                                                                          {
+                                                                            "type": "null"
+                                                                          }
+                                                                        ]
+                                                                      }
+                                                                    },
+                                                                    "required": [
+                                                                      "k"
+                                                                    ]
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ]
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "k"
+                                                            ]
+                                                          },
+                                                          {
+                                                            "type": "null"
+                                                          }
+                                                        ]
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "k"
+                                                    ]
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              }
+                                            },
+                                            "required": [
+                                              "k"
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "k"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "k"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "flag": {
+                        "description": "conditions of near",
+                        "anyOf": [
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "k",
+                      "flag"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "k"
+            ]
+          }
+        }
+      }
     }
   ]
 }

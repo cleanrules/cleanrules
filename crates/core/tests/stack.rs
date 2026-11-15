@@ -2,8 +2,9 @@
 //! (`spec/json-format.md`, *Errors and limits*): 512 KiB in debug builds and
 //! 128 KiB in release builds, less than the threads of the bindings' hosts
 //! have (a JVM thread has 1 MiB). Conditions and payload values are as deep as
-//! `max_depth` allows, texts nest as deep as their reader allows, and data as
-//! deep as `max_nesting` allows.
+//! `max_depth` allows, texts nest as deep as their reader allows, data as
+//! deep as `max_nesting` allows, and field paths as long as
+//! `max_path_segments` allows, over data as deep.
 
 #![allow(clippy::unwrap_used, clippy::panic)]
 
@@ -21,6 +22,7 @@ use cleanrules::format::{
 };
 use cleanrules::json::{Limits, parse, to_string};
 use cleanrules::logic::Kleene;
+use cleanrules::visual::{DiagramFormat, draw_explanation};
 use cleanrules::{ErrorCode, Value};
 use common::on_small_stack;
 
@@ -293,6 +295,110 @@ fn data_at_the_nesting_limit() {
             };
             read_document_as(written.as_bytes(), format, &limits)
                 .unwrap_or_else(|e| panic!("the rule as {format:?}: {e}"));
+        }
+    });
+}
+
+/// A path of `segments` segments, keys and indexes in turns, as JSON.
+fn long_path(segments: usize) -> String {
+    let items: Vec<&str> = (0..segments)
+        .map(|i| if i % 2 == 0 { "\"k\"" } else { "0" })
+        .collect();
+    format!("[{}]", items.join(","))
+}
+
+/// The sparse tree a binding builds along `long_path(segments)`: as deep as
+/// the path, with `1` at its end.
+fn along(segments: usize) -> Value {
+    (0..segments).rev().fold(Value::Int(1), |inner, i| {
+        if i % 2 == 0 {
+            let mut map = cleanrules::Map::new();
+            map.insert("k", inner);
+            Value::Map(map)
+        } else {
+            Value::List(vec![inner])
+        }
+    })
+}
+
+/// Every operation on a rule set whose fields are `segments` segments long,
+/// on data as deep: reading in each format, evaluating, explaining, drawing,
+/// summarising, the agents' input schema, decision documents, and freeing
+/// the data with its derived, recursive `Drop`, as a binding does.
+fn every_operation_on_a_path(segments: usize, limits: &Limits) {
+    let path = long_path(segments);
+    let field = format!(r#"{{"op":"field","path":{path}}}"#);
+    let text = format!(
+        r#"{{"version":1,"ruleset":{{"rules":[{{"name":"r","when":{{"op":"eq","left":{field},"right":{}}},"then":{{"y":{field}}}}},{{"name":"s","when":{{"op":"is_null","operand":{field}}}}}]}}}}"#,
+        constant()
+    );
+    let document = read_document(&text, limits).unwrap();
+    for format in formats() {
+        let written = write_document_as(&document, format).unwrap();
+        read_document_as(written.as_bytes(), format, limits)
+            .unwrap_or_else(|e| panic!("{segments} segments as {format:?}: {e}"));
+    }
+    let ruleset = document.into_ruleset().unwrap();
+    let input = along(segments);
+    let decision = ruleset.evaluate(&input).unwrap();
+    assert_eq!(decision.selected().count(), 1);
+    let mut large = *limits;
+    large.max_yaml_size = 16 << 20;
+    for format in formats() {
+        let Ok(written) = write_decision_as(&decision, format) else {
+            continue;
+        };
+        read_decision_document_as(written.as_bytes(), format, &ruleset, &large)
+            .unwrap_or_else(|e| panic!("the decision as {format:?}: {e}"));
+    }
+    let explanation = explain(&decision);
+    assert_ne!(to_string(&write_explanation(&explanation)), "");
+    assert_ne!(explanation.to_string(), "");
+    drop(write_value(&explanation_value(&explanation)));
+    cleanrules::agents::compact_explanation(&explanation, 2000).unwrap();
+    for format in [DiagramFormat::Dot, DiagramFormat::Html] {
+        draw_explanation(&explanation, format, limits).unwrap();
+    }
+    let summary = summary(&ruleset);
+    assert_ne!(to_string(&write_summary(&summary)), "");
+    assert_ne!(summary.to_string(), "");
+    let schema = cleanrules::agents::input_schema(&summary);
+    assert_ne!(to_string(&schema), "");
+    drop(decision);
+    drop(input);
+}
+
+#[test]
+fn paths_at_the_segment_limit() {
+    on_small_stack(|| {
+        let limits = Limits::default();
+        every_operation_on_a_path(limits.max_path_segments, &limits);
+        // The text syntax reads and prints as long a path.
+        let text = format!("x{} > 0", "[0]".repeat(limits.max_path_segments - 1));
+        let document = cleanrules::text::parse(&text, &limits).unwrap();
+        assert_eq!(cleanrules::text::to_string(&document).unwrap(), text);
+    });
+}
+
+#[test]
+fn one_segment_more_is_an_error_in_every_reader() {
+    on_small_stack(|| {
+        let limits = Limits::default();
+        let path = long_path(limits.max_path_segments + 1);
+        let json = format!(r#"{{"version":1,"condition":{{"op":"field","path":{path}}}}}"#);
+        let text = format!("x{} > 0", "[0]".repeat(limits.max_path_segments));
+        let mut errors = vec![
+            read_document(&json, &limits).unwrap_err(),
+            cleanrules::text::parse(&text, &limits).unwrap_err(),
+        ];
+        if cfg!(feature = "yaml") {
+            errors.push(
+                read_document_as(json.as_bytes(), DocumentFormat::Yaml, &limits).unwrap_err(),
+            );
+        }
+        for error in errors {
+            assert_eq!(error.code(), ErrorCode::LimitExceeded, "{error}");
+            assert_eq!(error.context().name.as_deref(), Some("max_path_segments"));
         }
     });
 }

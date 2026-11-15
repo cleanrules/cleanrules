@@ -143,6 +143,7 @@ def _read_document(
     max_size: int | None = None,
     max_nesting: int | None = None,
     max_depth: int | None = None,
+    max_path_segments: int | None = None,
 ) -> str: ...
 def _read_decision(
     ruleset_json: str,
@@ -166,8 +167,14 @@ def load_document(
     max_nesting: int | None = None,
     max_depth: int | None = None,
     max_table_size: int | None = None,
+    max_path_segments: int | None = None,
 ) -> tuple[str, Any]: ...
-def load_rule(text: str, max_size: int | None = None, max_depth: int | None = None) -> Rule: ...
+def load_rule(
+    text: str,
+    max_size: int | None = None,
+    max_depth: int | None = None,
+    max_path_segments: int | None = None,
+) -> Rule: ...
 def dump_condition(node: Node, format: str) -> str: ...
 def dump_rule(rule: Rule, format: str) -> str: ...
 def dump_ruleset(ruleset: RuleSet, format: str) -> str: ...
@@ -182,6 +189,7 @@ def table_from_grid(
     max_size: int | None = None,
     max_depth: int | None = None,
     max_table_size: int | None = None,
+    max_path_segments: int | None = None,
 ) -> DecisionTable: ...
 
 @final

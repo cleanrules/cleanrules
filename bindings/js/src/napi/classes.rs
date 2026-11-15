@@ -44,6 +44,9 @@ pub struct Limits {
     /// The most values read from the native data of one input (1,000,000 by
     /// default; `spec/data-model.md`, *Reading native data*, *Limits*).
     pub max_values: Option<f64>,
+    /// The most segments a field path may have, in every format (256 by
+    /// default); `F` and `field` check the default.
+    pub max_path_segments: Option<f64>,
 }
 
 /// How a text is read: its format (JSON when left out) and limits.

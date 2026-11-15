@@ -134,6 +134,29 @@ fn fields_take_keys_and_indexes() {
         expression_error(&failure);
         assert_eq!(message(&failure), wanted);
     }
+    // At most 256 segments, the default max_path_segments.
+    let path = |n: usize| format!("[{}]", vec!["0"; n].join(","));
+    let long = field(&path(256));
+    assert_eq!(
+        write(&long, CR_FORMAT_TEXT),
+        format!("[0]{}", "[0]".repeat(255))
+    );
+    let longer = value(&path(257));
+    // SAFETY: a live value.
+    let failure = handle(|out, error| unsafe { cr_node_new_field(longer.0, out, error) })
+        .map(Node)
+        .err()
+        .unwrap();
+    assert_eq!(failure.status, CR_LIMIT_EXCEEDED);
+    assert!(message(&failure).contains("max_path_segments"));
+    let Json::Object(members) = &failure.json else {
+        panic!()
+    };
+    assert!(
+        members
+            .iter()
+            .any(|(k, v)| k == "name" && matches!(v, Json::String(n) if n == "max_path_segments"))
+    );
     let scalar = value("1");
     // SAFETY: a live value.
     let failure = handle(|out, error| unsafe { cr_node_new_field(scalar.0, out, error) })

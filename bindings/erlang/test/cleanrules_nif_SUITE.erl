@@ -428,7 +428,7 @@ deep_terms(_Config) ->
     {ok, _} = cleanrules_nif:evaluate_dirty(echo(), #{x => Huge}, ?MAX),
     {ok, _} = cleanrules_nif:evaluate_many(echo(), [#{x => Huge}], ?MAX),
     Path = iolist_to_binary(["x", lists:duplicate(5000, "[0]")]),
-    Long = ruleset(<<"RULE r IF ", Path/binary, " = 1">>),
+    {ok, Long} = cleanrules_nif:ruleset_read(<<"RULE r IF ", Path/binary, " = 1">>, text, #{max_path_segments => 5001}),
     {ok, #{selected := [<<"r">>]}} = cleanrules_nif:evaluate_dirty(Long, #{x => Nest(5000, 1)}, ?MAX),
     ok.
 
@@ -879,11 +879,21 @@ safe_depth_limits(_Config) ->
     ok.
 
 long_path_regression(_Config) ->
-    %% A path of 100,000 segments through data as deep: its sparse value tree
-    %% is dropped with an explicit stack (it crashed the VM before).
+    %% A path has at most max_path_segments segments, 256 by default
+    %% (spec/json-format.md, Errors and limits).
     Nest = fun Nest(0, Inner) -> Inner; Nest(N, Inner) -> Nest(N - 1, [Inner]) end,
+    AtLimit = iolist_to_binary(["x", lists:duplicate(255, "[0]")]),
+    {ok, #{selected := [<<"r">>]}} =
+        cleanrules_nif:evaluate_dirty(ruleset(<<"RULE r IF ", AtLimit/binary, " = 1">>), #{x => Nest(255, 1)}, ?MAX),
+    {error, #{code := limit_exceeded, name := <<"max_path_segments">>, line := 1, column := 777}} =
+        cleanrules_nif:ruleset_read(<<"RULE r IF ", AtLimit/binary, "[0] = 1">>, text, #{}),
+    {error, #{code := limit_exceeded, name := <<"max_path_segments">>}} =
+        cleanrules_nif:ruleset_read(<<"RULE r IF a.b.c">>, text, #{max_path_segments => 2}),
+    #{max_path_segments := 256} = cleanrules_nif:default_limits(),
+    %% Raised, a path of 100,000 segments through data as deep: its sparse
+    %% value tree is dropped with an explicit stack (it crashed the VM before).
     Path = iolist_to_binary(["x", lists:duplicate(100000, "[0]")]),
-    Long = ruleset(<<"RULE r IF ", Path/binary, " = 1">>),
+    {ok, Long} = cleanrules_nif:ruleset_read(<<"RULE r IF ", Path/binary, " = 1">>, text, #{max_path_segments => 100001}),
     Data = #{x => Nest(100000, 1)},
     {ok, #{selected := [<<"r">>]}} = cleanrules_nif:evaluate_dirty(Long, Data, ?MAX),
     {ok, #{selected := [<<"r">>]}} = cleanrules_nif:evaluate(Long, Data, ?MAX),

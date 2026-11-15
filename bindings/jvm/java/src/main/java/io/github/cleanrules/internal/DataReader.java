@@ -51,7 +51,8 @@ import java.util.TreeMap;
  * declared length, checked before the list is allocated); an object met
  * through several references counts each time. Beyond the limit, reading
  * stops at once and the input is refused with the core's
- * {@code limit_exceeded} ({@code cr_error_new_max_values}).
+ * {@code limit_exceeded} ({@code cr_error_new_max_values}; for constants and
+ * metadata, {@code cr_error_new_constant_max_values}).
  */
 public final class DataReader implements AutoCloseable {
     /** How deep containers are converted whole: the format's default node depth. */
@@ -81,6 +82,11 @@ public final class DataReader implements AutoCloseable {
     private long left;
     /** The rule whose metadata or constant this reads, for the error; or null. */
     private final String rule;
+    /**
+     * Whether this reads constants and metadata, under the default
+     * {@code maxValues}, which the caller cannot raise: their error says so.
+     */
+    private final boolean constant;
 
     /** Thrown through the reader's own frames to stop reading an input beyond the limit. */
     private static final class Beyond extends RuntimeException {
@@ -100,17 +106,19 @@ public final class DataReader implements AutoCloseable {
 
     /** A reader of the metadata or a constant of {@code rule}, under the default {@code maxValues}. */
     public DataReader(String rule) {
-        this(io.github.cleanrules.Limits.defaults().maxValues(), rule);
+        this(io.github.cleanrules.Limits.defaults().maxValues(), rule, true);
     }
 
     /** A reader within {@code limits}' {@code maxValues}, or the default's for null. */
     public static DataReader within(io.github.cleanrules.Limits limits) {
-        return new DataReader((limits == null ? io.github.cleanrules.Limits.defaults() : limits).maxValues(), null);
+        return new DataReader(
+                (limits == null ? io.github.cleanrules.Limits.defaults() : limits).maxValues(), null, false);
     }
 
-    private DataReader(long maxValues, String rule) {
+    private DataReader(long maxValues, String rule, boolean constant) {
         this.maxValues = maxValues;
         this.rule = rule;
+        this.constant = constant;
     }
 
     /** The objects of the opaque values, by token, and the reads that threw. */
@@ -140,7 +148,9 @@ public final class DataReader implements AutoCloseable {
             name = scope.scratch(bytes);
             length = bytes.length;
         }
-        scope.check(Native.errorNewMaxValues(maxValues, row, name, length, out, scope.error()));
+        scope.check(constant
+                ? Native.errorNewConstantMaxValues(name, length, out, scope.error())
+                : Native.errorNewMaxValues(maxValues, row, name, length, out, scope.error()));
         return Errors.of(Native.CR_LIMIT_EXCEEDED, taken(), null);
     }
 

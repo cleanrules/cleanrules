@@ -213,6 +213,7 @@ func vectorLimits(given *jsonObject) (Limits, bool) {
 		field := map[string]*int{
 			"max_size": &limits.MaxSize, "max_nesting": &limits.MaxNesting, "max_depth": &limits.MaxDepth,
 			"max_table_size": &limits.MaxTableSize, "max_values": &limits.MaxValues,
+			"max_path_segments": &limits.MaxPathSegments,
 		}[key]
 		if field == nil {
 			failf("the unknown limit %s", key)

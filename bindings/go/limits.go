@@ -24,6 +24,10 @@ import (
 //	cleanrules.Limits{MaxSize: 1 << 20, MaxYAMLSize: 4096} // JSON and text 1 MiB, YAML 4 KiB
 //	cleanrules.Limits{MaxDepth: 32}                        // sizes as by default
 //
+// Set the fields by name, as above: new limits are added as fields
+// (MaxPathSegments came after MaxValues), which an unkeyed literal would not
+// survive.
+//
 // DefaultLimits gives every field set, to the defaults, so a change of
 // MaxSize alone does not reach YAML and text there:
 //
@@ -54,6 +58,11 @@ type Limits struct {
 	// DecisionTable.Evaluate and EvaluateMany, and Expr.EvaluateTree and
 	// EvaluateValueTree; constants and metadata are read under the default.
 	MaxValues int
+	// MaxPathSegments is the most segments a field path may have, in every
+	// format, 256 by default: it keeps the data read along a path shallow.
+	// Field checks the default; beyond the limit, the error is a
+	// limit_exceeded whose Name is "max_path_segments".
+	MaxPathSegments int
 }
 
 // limitCodes are the limits in the order they are set: MaxSize first, since
@@ -61,12 +70,19 @@ type Limits struct {
 var limitCodes = []C.cr_limit{
 	C.CR_LIMIT_MAX_SIZE, C.CR_LIMIT_MAX_NESTING, C.CR_LIMIT_MAX_DEPTH,
 	C.CR_LIMIT_MAX_TABLE_SIZE, C.CR_LIMIT_MAX_YAML_SIZE, C.CR_LIMIT_MAX_TEXT_SIZE, C.CR_LIMIT_MAX_VALUES,
+	C.CR_LIMIT_MAX_PATH_SEGMENTS,
 }
 
-var limitNames = []string{"MaxSize", "MaxNesting", "MaxDepth", "MaxTableSize", "MaxYAMLSize", "MaxTextSize", "MaxValues"}
+var limitNames = []string{
+	"MaxSize", "MaxNesting", "MaxDepth", "MaxTableSize", "MaxYAMLSize", "MaxTextSize", "MaxValues",
+	"MaxPathSegments",
+}
 
 func (l *Limits) fields() []*int {
-	return []*int{&l.MaxSize, &l.MaxNesting, &l.MaxDepth, &l.MaxTableSize, &l.MaxYAMLSize, &l.MaxTextSize, &l.MaxValues}
+	return []*int{
+		&l.MaxSize, &l.MaxNesting, &l.MaxDepth, &l.MaxTableSize, &l.MaxYAMLSize, &l.MaxTextSize, &l.MaxValues,
+		&l.MaxPathSegments,
+	}
 }
 
 // DefaultLimits are the core's default limits, every field set (MaxSize

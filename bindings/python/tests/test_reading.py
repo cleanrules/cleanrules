@@ -504,5 +504,8 @@ def test_max_values_applies_to_runs_tables_trees_and_metadata() -> None:
     beyond(lambda: evaluate_value_tree(F.x, {"x": diamond(2)}, max_values=6))
     # Metadata is converted with the default limit, naming the rule.
     error = beyond(lambda: Rule("big", F.x == 1, metadata={"m": diamond(20)}))
+    # The hint does not suggest raising a limit the caller cannot raise.
+    assert error.hint is not None and "default max_values" in error.hint
+    assert "raise max_values" not in error.hint
     assert error.rule == "big"
     assert Rule("small", F.x == 1, metadata={"m": diamond(3)}).metadata["m"] is not None

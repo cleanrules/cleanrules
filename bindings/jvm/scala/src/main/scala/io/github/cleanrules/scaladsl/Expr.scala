@@ -251,6 +251,8 @@ object F extends Dynamic:
    * A field by its path of keys and indexes, outermost first.
    *
    * @throws io.github.cleanrules.ExpressionException for an empty path, an empty key or a negative index
+   * @throws io.github.cleanrules.FormatException with the code `limit_exceeded` for more than 256
+   *   segments, the default `Limits.maxPathSegments` (read a longer path from a document with the limit raised)
    */
   def apply(segments: Segment*): Field =
     new Field(Conditions.field(segments.map(Field.segment)*))

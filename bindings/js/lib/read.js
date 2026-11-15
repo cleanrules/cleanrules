@@ -239,6 +239,25 @@ const MAP = 2
 const OBJECT = 3
 const OPAQUE = 4
 
+// The containers a reader builds (`Reader#run`): walked along the paths, or
+// converted whole.
+const WALK_MAP = 0
+const WALK_LIST = 1
+const CONVERT_LIST = 2
+const CONVERT_MAP = 3
+const CONVERT_OBJECT = 4
+
+/** Keep the element just read in `frame`, under the key or index it was read at. */
+function place(frame, value) {
+  if (frame.kind === CONVERT_LIST) {
+    frame.items.push(value)
+  } else if (frame.kind === WALK_MAP || frame.kind === WALK_LIST) {
+    frame.entries.push([frame.key, value])
+  } else {
+    frame.items.push([frame.key, value])
+  }
+}
+
 /** The tree of `paths`: `{ end, keys: Map, indices: Map }`, in first-seen order. */
 function pathTree(paths) {
   const root = { end: false, keys: new Map(), indices: new Map() }
@@ -489,179 +508,264 @@ class Reader {
 
   /** Walk `value` along the path tree `node`. */
   walk(value, node) {
+    return this.run(this.walkStep(value, node))
+  }
+
+  /** The whole value, where a path ends; `known` is its shape, if computed. */
+  convert(value, known) {
+    return this.run(this.convertStep(value, known))
+  }
+
+  /**
+   * Finish what `first` starts: a step is `{ value }`, an encoded value, or
+   * `{ frame }`, a container whose elements come next. Depth first with an
+   * explicit stack, not recursion: the data along a path is as deep as the
+   * rule set's longest path, and a worker's stack may be small.
+   */
+  run(first) {
+    const stack = []
+    let step = first
+    try {
+      for (;;) {
+        if (step.frame !== undefined) {
+          stack.push(step.frame)
+        } else if (stack.length === 0) {
+          return step.value
+        } else {
+          place(stack[stack.length - 1], step.value)
+        }
+        const top = stack[stack.length - 1]
+        step = this.next(top)
+        if (step === null) {
+          stack.pop()
+          step = { value: this.finish(top) }
+        }
+      }
+    } finally {
+      // Reading stopped midway (beyond the limit): no container stays open.
+      for (const frame of stack) {
+        this.open.delete(frame.value)
+      }
+    }
+  }
+
+  /** The step of walking `value` along `node`. */
+  walkStep(value, node) {
     if (node.end || value === null || typeof value !== 'object') {
-      return this.convert(value)
+      return this.convertStep(value)
     }
     let shape
     try {
       shape = shapeOf(value)
     } catch (thrown) {
-      return this.placed(thrown)
+      return { value: this.placed(thrown) }
     }
     switch (shape[0]) {
       case MAP:
       case OBJECT: {
         const lookup = shape[0] === MAP ? mapLookup : objectLookup
-        const entries = []
-        for (const [key, sub] of node.keys) {
-          let found
-          try {
-            found = lookup(value, key)
-          } catch (thrown) {
-            entries.push([key, this.placed(thrown)])
-            continue
-          }
-          if (found !== MISSING) {
-            entries.push([key, this.walk(found.value, sub)])
-          }
-        }
-        return ['O', entries]
+        return { frame: { kind: WALK_MAP, value, lookup, paths: node.keys[Symbol.iterator](), key: null, entries: [] } }
       }
       case LIST: {
         const length = shape[1]
         // The core holds a value for each position of the declared length.
         this.tick(length)
-        const entries = []
-        for (const [index, sub] of node.indices) {
-          if (index >= length) {
-            continue
-          }
-          let found
-          try {
-            found = element(value, index)
-          } catch (thrown) {
-            entries.push([index, this.placed(thrown)])
-            continue
-          }
-          if (found === HOLE) {
-            // A hole read is a null placed at its position.
-            this.tick()
-            entries.push([index, ['M']])
-          } else {
-            entries.push([index, this.walk(found, sub)])
-          }
-        }
-        return ['L', length, entries]
+        return { frame: { kind: WALK_LIST, value, length, paths: node.indices[Symbol.iterator](), key: null, entries: [] } }
       }
       default:
-        return this.convert(value, shape)
+        return this.convertStep(value, shape)
     }
   }
 
-  /** The whole value, where a path ends; `known` is its shape, if computed. */
-  convert(value, known) {
+  /** The step of converting `value` whole; `known` is its shape, if computed. */
+  convertStep(value, known) {
     this.tick()
     switch (typeof value) {
       case 'boolean':
-        return value
+        return { value }
       case 'string':
         // A lone surrogate has no Unicode form.
-        return value.isWellFormed() ? value : this.opaque(value, 'string')
+        return { value: value.isWellFormed() ? value : this.opaque(value, 'string') }
       case 'number':
         if (Number.isNaN(value)) {
-          return this.nan
+          return { value: this.nan }
         }
         if (Number.isSafeInteger(value) && !Object.is(value, -0)) {
-          return ['i', String(value)]
+          return { value: ['i', String(value)] }
         }
         // Every other number, -0 and infinities included.
-        return ['f', floatText(value)]
+        return { value: ['f', floatText(value)] }
       case 'bigint':
-        return value >= I64_MIN && value <= I64_MAX ? ['i', value.toString()] : ['IO']
+        return { value: value >= I64_MIN && value <= I64_MAX ? ['i', value.toString()] : ['IO'] }
       case 'undefined':
-        return ['M']
+        return { value: ['M'] }
       case 'symbol':
       case 'function':
-        return this.opaque(value, typeName(value))
+        return { value: this.opaque(value, typeName(value)) }
       default:
         break
     }
     if (value === null) {
-      return null
+      return { value: null }
     }
     let shape = known
     if (shape === undefined) {
       try {
         shape = shapeOf(value)
       } catch (thrown) {
-        return this.raised(thrown)
+        return { value: this.raised(thrown) }
       }
     }
     if (shape[0] === SCALAR) {
       try {
-        return this.scalar(value, shape[1], shape[2])
+        return { value: this.scalar(value, shape[1], shape[2]) }
       } catch (thrown) {
-        return this.raised(thrown)
+        return { value: this.raised(thrown) }
       }
     }
     if (shape[0] === OPAQUE || this.open.has(value) || this.open.size >= MAX_DEPTH) {
-      return this.opaque(value, typeName(value))
+      return { value: this.opaque(value, typeName(value)) }
     }
-    this.open.add(value)
-    try {
-      return this.container(value, shape)
-    } finally {
-      this.open.delete(value)
-    }
-  }
-
-  container(value, shape) {
     if (shape[0] === LIST) {
       // Each element counts as it is converted: a declared length beyond what
       // is left is refused before anything is read.
       if (shape[1] > this.left) {
         throw BEYOND
       }
-      const items = []
-      for (let index = 0; index < shape[1]; index += 1) {
-        let found
-        try {
-          found = element(value, index)
-        } catch (thrown) {
-          this.tick()
-          items.push(this.raised(thrown))
-          continue
-        }
-        if (found === HOLE) {
-          this.tick()
-          items.push(['M'])
-        } else {
-          items.push(this.convert(found))
-        }
-      }
-      return ['l', items]
+      this.open.add(value)
+      return { frame: { kind: CONVERT_LIST, value, length: shape[1], index: 0, items: [] } }
     }
-    const entries = []
     if (shape[0] === MAP) {
-      for (const [key, item] of mapEntries.call(value)) {
-        // An entry whose key is not a string (or not Unicode) is left out
-        // (spec/data-model.md, *Lists and maps*).
-        if (typeof key === 'string' && key.isWellFormed() && item !== undefined) {
-          entries.push([key, this.convert(item)])
-        }
-      }
-      return ['O', entries]
+      this.open.add(value)
+      return { frame: { kind: CONVERT_MAP, value, entries: mapEntries.call(value), key: null, items: [] } }
     }
     let keys
     try {
       keys = objectKeys(value)
     } catch (thrown) {
-      return this.raised(thrown)
+      return { value: this.raised(thrown) }
     }
-    for (const key of keys) {
-      let found
-      try {
-        found = objectLookup(value, key)
-      } catch (thrown) {
-        this.tick()
-        entries.push([key, this.raised(thrown)])
-        continue
-      }
-      if (found !== MISSING) {
-        entries.push([key, this.convert(found.value)])
-      }
+    this.open.add(value)
+    return { frame: { kind: CONVERT_OBJECT, value, keys, index: 0, key: null, items: [] } }
+  }
+
+  /** The step of `frame`'s next element, or null when it has none left. */
+  next(frame) {
+    switch (frame.kind) {
+      case WALK_MAP:
+        for (;;) {
+          const path = frame.paths.next()
+          if (path.done) {
+            return null
+          }
+          const [key, sub] = path.value
+          let found
+          try {
+            found = frame.lookup(frame.value, key)
+          } catch (thrown) {
+            frame.entries.push([key, this.placed(thrown)])
+            continue
+          }
+          if (found !== MISSING) {
+            frame.key = key
+            return this.walkStep(found.value, sub)
+          }
+        }
+      case WALK_LIST:
+        for (;;) {
+          const path = frame.paths.next()
+          if (path.done) {
+            return null
+          }
+          const [index, sub] = path.value
+          if (index >= frame.length) {
+            continue
+          }
+          let found
+          try {
+            found = element(frame.value, index)
+          } catch (thrown) {
+            frame.entries.push([index, this.placed(thrown)])
+            continue
+          }
+          if (found === HOLE) {
+            // A hole read is a null placed at its position.
+            this.tick()
+            frame.entries.push([index, ['M']])
+            continue
+          }
+          frame.key = index
+          return this.walkStep(found, sub)
+        }
+      case CONVERT_LIST:
+        while (frame.index < frame.length) {
+          const index = frame.index
+          frame.index += 1
+          let found
+          try {
+            found = element(frame.value, index)
+          } catch (thrown) {
+            this.tick()
+            frame.items.push(this.raised(thrown))
+            continue
+          }
+          if (found === HOLE) {
+            this.tick()
+            frame.items.push(['M'])
+            continue
+          }
+          return this.convertStep(found)
+        }
+        return null
+      case CONVERT_MAP:
+        for (;;) {
+          const entry = frame.entries.next()
+          if (entry.done) {
+            return null
+          }
+          const [key, item] = entry.value
+          // An entry whose key is not a string (or not Unicode) is left out
+          // (spec/data-model.md, *Lists and maps*).
+          if (typeof key === 'string' && key.isWellFormed() && item !== undefined) {
+            frame.key = key
+            return this.convertStep(item)
+          }
+        }
+      default:
+        while (frame.index < frame.keys.length) {
+          const key = frame.keys[frame.index]
+          frame.index += 1
+          let found
+          try {
+            found = objectLookup(frame.value, key)
+          } catch (thrown) {
+            this.tick()
+            frame.items.push([key, this.raised(thrown)])
+            continue
+          }
+          if (found !== MISSING) {
+            frame.key = key
+            return this.convertStep(found.value)
+          }
+        }
+        return null
     }
-    return ['O', entries]
+  }
+
+  /** The encoded value of a container whose elements are all read. */
+  finish(frame) {
+    switch (frame.kind) {
+      case WALK_MAP:
+        return ['O', frame.entries]
+      case WALK_LIST:
+        return ['L', frame.length, frame.entries]
+      case CONVERT_LIST:
+        this.open.delete(frame.value)
+        return ['l', frame.items]
+      default:
+        this.open.delete(frame.value)
+        return ['O', frame.items]
+    }
   }
 
   /**

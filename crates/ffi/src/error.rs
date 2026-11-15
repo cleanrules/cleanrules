@@ -7,7 +7,7 @@ use std::ptr;
 use cleanrules::format::write_error;
 use cleanrules::json::{Json, to_string};
 use cleanrules::rules::{ActionFailure, action_error};
-use cleanrules::value::too_many_values;
+use cleanrules::value::{too_many_constant_values, too_many_values};
 use cleanrules::{ErrorCode, Value};
 
 use crate::boundary::{Failure, bytes, call, clear, free, give, utf8_arg};
@@ -262,6 +262,42 @@ pub unsafe extern "C" fn cr_error_new_max_values(
         };
         let mut failed = too_many_values(max_values);
         failed.context_mut().row = u64::try_from(row).ok();
+        failed.context_mut().rule = rule;
+        // SAFETY: `out` passed `clear`.
+        unsafe { give(out, cr_error::core(&failed, None)) };
+        Ok(())
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call(error, body) }
+}
+
+/// A new `limit_exceeded` for a native constant or rule metadata beyond the
+/// default `max_values`, under which they are always converted
+/// (`spec/data-model.md`, *Reading native data*, *Limits*): as
+/// `cr_error_new_max_values`, without a row, and with a hint that does not
+/// suggest raising the limit, which the caller cannot do. `rule` is the rule
+/// whose metadata or constant it is, or `NULL`.
+///
+/// # Safety
+///
+/// As `cr_error_new_max_values`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_error_new_constant_max_values(
+    rule: *const c_char,
+    rule_len: usize,
+    out: *mut *mut cr_error,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        let rule = if rule.is_null() {
+            None
+        } else {
+            // SAFETY: `rule` and `rule_len` (# Safety).
+            Some(utf8_arg(unsafe { bytes(rule, rule_len, "rule") }?, "rule")?.to_owned())
+        };
+        let mut failed = too_many_constant_values(cleanrules::json::Limits::default().max_values);
         failed.context_mut().rule = rule;
         // SAFETY: `out` passed `clear`.
         unsafe { give(out, cr_error::core(&failed, None)) };

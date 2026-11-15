@@ -140,11 +140,13 @@ public final class Scope implements AutoCloseable {
             limits.maxTableSize(),
             limits.maxYamlSize(),
             limits.maxTextSize(),
-            limits.maxValues()
+            limits.maxValues(),
+            limits.maxPathSegments()
         };
-        // The size first: it sets the YAML and text limits too.
+        // In the order of Native.LIMITS: the size first, since it sets the
+        // YAML and text limits too.
         for (int i = 0; i < values.length; i++) {
-            check(Native.limitsSet(native_, i + 1, values[i], error()));
+            check(Native.limitsSet(native_, Native.LIMITS[i], values[i], error()));
         }
         return native_;
     }

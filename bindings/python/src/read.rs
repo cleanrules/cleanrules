@@ -12,9 +12,10 @@
 //! *Reading native data*, *Limits*): beyond it, reading stops at once and the
 //! input is refused with the core's `limit_exceeded`.
 
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 
-use cleanrules::value::{ValueCount, too_many_values};
+use cleanrules::value::ValueCount;
 use cleanrules::{Error, Map, NullCause, Segment, Value};
 use pyo3::exceptions::{PyAttributeError, PyKeyError};
 use pyo3::prelude::*;
@@ -47,35 +48,35 @@ impl Paths {
     }
 
     fn add(&mut self, path: &[Segment]) {
-        let Some((first, rest)) = path.split_first() else {
-            self.end = true;
-            return;
-        };
-        let child = match first {
-            Segment::Key(key) => {
-                let at = self
-                    .keys
-                    .iter()
-                    .position(|(k, _)| k == key)
-                    .unwrap_or_else(|| {
-                        self.keys.push((key.clone(), Paths::default()));
-                        self.keys.len() - 1
-                    });
-                &mut self.keys[at].1
-            }
-            Segment::Index(index) => {
-                let at = self
-                    .indices
-                    .iter()
-                    .position(|(i, _)| i == index)
-                    .unwrap_or_else(|| {
-                        self.indices.push((*index, Paths::default()));
-                        self.indices.len() - 1
-                    });
-                &mut self.indices[at].1
-            }
-        };
-        child.add(rest);
+        // Segment by segment, not recursively: a path may be long.
+        let mut node = self;
+        for segment in path {
+            node = match segment {
+                Segment::Key(key) => {
+                    let at = node
+                        .keys
+                        .iter()
+                        .position(|(k, _)| k == key)
+                        .unwrap_or_else(|| {
+                            node.keys.push((key.clone(), Paths::default()));
+                            node.keys.len() - 1
+                        });
+                    &mut node.keys[at].1
+                }
+                Segment::Index(index) => {
+                    let at = node
+                        .indices
+                        .iter()
+                        .position(|(i, _)| i == index)
+                        .unwrap_or_else(|| {
+                            node.indices.push((*index, Paths::default()));
+                            node.indices.len() - 1
+                        });
+                    &mut node.indices[at].1
+                }
+            };
+        }
+        node.end = true;
     }
 
     /// Both trees at once: a record field read by key and by position.
@@ -212,96 +213,428 @@ fn identity(value: &Bound<'_, PyAny>) -> usize {
     value.as_ptr() as usize
 }
 
+/// What reading a value gives: the value, or a container whose elements are
+/// read next.
+enum Step<'py, 'p> {
+    Done(Value),
+    Open(Frame<'py, 'p>),
+}
+
+/// A container being read, with what is left of it and what it holds so far.
+/// The segment of the element being read is on the path `at` until the
+/// element is placed.
+enum Frame<'py, 'p> {
+    /// A map or an object walked along the keys of `paths`.
+    WalkKeys {
+        value: Bound<'py, PyAny>,
+        shape: Shape,
+        paths: Cow<'p, Paths>,
+        next: usize,
+        key: String,
+        map: Map,
+    },
+    /// A record walked along its components, by key or by position.
+    WalkRecord {
+        value: Bound<'py, PyAny>,
+        shape: Shape,
+        keys: Vec<String>,
+        paths: Cow<'p, Paths>,
+        next: usize,
+        key: String,
+        map: Map,
+    },
+    /// A sequence walked along the indices of `paths`; `items` has its
+    /// declared length.
+    WalkList {
+        value: Bound<'py, PyAny>,
+        paths: Cow<'p, Paths>,
+        next: usize,
+        slot: usize,
+        items: Vec<Value>,
+    },
+    /// A sequence converted whole.
+    ConvertList {
+        value: Bound<'py, PyAny>,
+        id: usize,
+        len: usize,
+        items: Vec<Value>,
+    },
+    /// A mapping, record or object converted whole.
+    ConvertMap {
+        value: Bound<'py, PyAny>,
+        id: usize,
+        shape: Shape,
+        keys: Vec<String>,
+        next: usize,
+        key: String,
+        map: Map,
+    },
+}
+
+/// The sub-tree that `pick` chooses in `paths`, borrowed when `paths` is.
+fn sub<'p>(
+    paths: &Cow<'p, Paths>,
+    pick: impl for<'a> Fn(&'a Paths) -> &'a Paths,
+) -> Cow<'p, Paths> {
+    match paths {
+        Cow::Borrowed(paths) => Cow::Borrowed(pick(paths)),
+        Cow::Owned(paths) => Cow::Owned(pick(paths).clone()),
+    }
+}
+
 impl Reader {
+    /// Walk `value` along `paths`: depth first with an explicit stack, not
+    /// recursion, since the data along a path is as deep as the rule set's
+    /// longest path plus what is converted whole where it ends, and a host
+    /// thread's stack may be small.
     fn walk(&mut self, value: &Bound<'_, PyAny>, paths: &Paths, at: &mut Vec<Segment>) -> Read {
-        let array = match convert::numpy_array_as_list(value) {
-            Ok(array) => array,
-            Err(error) => return self.placed_error(value.py(), error, at),
-        };
-        let value = array.as_ref().unwrap_or(value);
-        if paths.end {
-            return self.convert(value, at);
-        }
-        let shape = match shape(value) {
-            Ok(shape) => shape,
-            Err(error) => return self.placed_error(value.py(), error, at),
-        };
-        Ok(match &shape {
-            Shape::Scalar => self.convert(value, at)?,
-            Shape::Mapping | Shape::Object => {
-                let mut map = Map::new();
-                for (key, sub) in &paths.keys {
-                    at.push(Segment::Key(key.clone()));
-                    if let Some(item) = self.child(value, &shape, key, sub, at)? {
-                        map.insert(key.clone(), item);
-                    }
-                    at.pop();
-                }
-                Value::Map(map)
+        let first = self.walk_step(value.clone(), Cow::Borrowed(paths), at)?;
+        self.run(first, at)
+    }
+
+    fn run<'py, 'p>(&mut self, first: Step<'py, 'p>, at: &mut Vec<Segment>) -> Read {
+        let mut stack: Vec<Frame<'py, 'p>> = Vec::new();
+        let mut step = first;
+        loop {
+            match step {
+                Step::Open(frame) => stack.push(frame),
+                Step::Done(value) => match stack.last_mut() {
+                    None => return Ok(value),
+                    Some(top) => place(top, value, at),
+                },
             }
-            Shape::Record { keys, .. } => {
+            // A frame was pushed or given its element, so the stack is not
+            // empty; were it, the null below would end the loop.
+            let next = match stack.last_mut() {
+                Some(top) => self.next(top, at)?,
+                None => None,
+            };
+            step = match next {
+                Some(step) => step,
+                None => Step::Done(match stack.pop() {
+                    Some(done) => self.finish(done),
+                    None => Value::Null(NullCause::Null),
+                }),
+            };
+        }
+    }
+
+    /// The step of walking `value` along `paths`.
+    fn walk_step<'py, 'p>(
+        &mut self,
+        value: Bound<'py, PyAny>,
+        paths: Cow<'p, Paths>,
+        at: &[Segment],
+    ) -> Read<Step<'py, 'p>> {
+        let value = match convert::numpy_array_as_list(&value) {
+            Ok(array) => array.unwrap_or(value),
+            Err(error) => return Ok(Step::Done(self.placed_error(value.py(), error, at)?)),
+        };
+        if paths.end {
+            return self.convert_step(value, at);
+        }
+        let shape = match shape(&value) {
+            Ok(shape) => shape,
+            Err(error) => return Ok(Step::Done(self.placed_error(value.py(), error, at)?)),
+        };
+        Ok(match shape {
+            Shape::Scalar => return self.convert_step(value, at),
+            Shape::Mapping | Shape::Object => Step::Open(Frame::WalkKeys {
+                value,
+                shape,
+                paths,
+                next: 0,
+                key: String::new(),
+                map: Map::new(),
+            }),
+            Shape::Record { ref keys, .. } => {
                 // The core holds a value for each position, read or not.
                 self.count.add(keys.len())?;
-                let mut map = Map::record();
-                for (position, key) in keys.iter().enumerate() {
-                    let by_key = paths.keys.iter().find(|(k, _)| k == key).map(|(_, p)| p);
-                    let by_position = paths
-                        .indices
-                        .iter()
-                        .find(|(i, _)| usize::try_from(*i).is_ok_and(|i| i == position))
-                        .map(|(_, p)| p);
-                    let sub = match (by_key, by_position) {
-                        (Some(a), Some(b)) => a.merged(b),
-                        (Some(p), None) | (None, Some(p)) => p.clone(),
-                        // Unread components keep their position.
-                        (None, None) => {
-                            map.insert(key.clone(), Value::Null(NullCause::Null));
-                            continue;
-                        }
-                    };
-                    at.push(Segment::Key(key.clone()));
-                    let item = self
-                        .child(value, &shape, key, &sub, at)?
-                        .unwrap_or(Value::Null(NullCause::Null));
-                    at.pop();
-                    map.insert(key.clone(), item);
-                }
-                Value::Map(map)
+                let keys = keys.clone();
+                Step::Open(Frame::WalkRecord {
+                    value,
+                    shape,
+                    keys,
+                    paths,
+                    next: 0,
+                    key: String::new(),
+                    map: Map::record(),
+                })
             }
             Shape::Sequence(len) => {
                 // The list keeps its declared length, each position a value the
                 // core holds: counted before it is allocated.
-                self.count.add(*len)?;
-                let mut items = vec![Value::Null(NullCause::Null); *len];
-                for (index, sub) in &paths.indices {
-                    let Some(i) = usize::try_from(*index).ok().filter(|i| i < len) else {
-                        continue;
-                    };
-                    at.push(Segment::Index(*index));
-                    items[i] = match value.get_item(i) {
-                        Ok(item) => self.walk(&item, sub, at)?,
-                        Err(error) => self.placed_error(value.py(), error, at)?,
-                    };
-                    at.pop();
-                }
-                Value::List(items)
+                self.count.add(len)?;
+                Step::Open(Frame::WalkList {
+                    value,
+                    paths,
+                    next: 0,
+                    slot: 0,
+                    items: vec![Value::Null(NullCause::Null); len],
+                })
             }
         })
     }
 
-    /// Read the component `key` and walk it; `None` when it is missing.
-    fn child(
+    /// The step of converting the whole value, where a path ends
+    /// (`spec/data-model.md`, *Python*): it counts one, and so does everything
+    /// inside it.
+    fn convert_step<'py, 'p>(
         &mut self,
-        value: &Bound<'_, PyAny>,
-        shape: &Shape,
-        key: &str,
-        paths: &Paths,
+        value: Bound<'py, PyAny>,
         at: &[Segment],
-    ) -> Read<Option<Value>> {
-        match lookup(value, shape, key) {
-            Found::Value(item) => self.walk(&item, paths, &mut at.to_vec()).map(Some),
-            Found::Missing => Ok(None),
-            Found::Raised(error) => self.placed_error(value.py(), error, at).map(Some),
+    ) -> Read<Step<'py, 'p>> {
+        self.count.add(1)?;
+        let value = match convert::numpy_array_as_list(&value) {
+            Ok(array) => array.unwrap_or(value),
+            Err(error) => return Ok(Step::Done(self.raised(value.py(), error, at))),
+        };
+        let shape = match shape(&value) {
+            Ok(shape) => shape,
+            Err(error) => return Ok(Step::Done(self.raised(value.py(), error, at))),
+        };
+        if matches!(shape, Shape::Scalar) {
+            return Ok(Step::Done(self.scalar(&value)?));
+        }
+        let id = identity(&value);
+        if self.open.len() >= MAX_DEPTH || self.open.contains(&id) {
+            let name = convert::type_name(&value);
+            return Ok(Step::Done(self.opaque(&value, name)));
+        }
+        let keys = match &shape {
+            Shape::Sequence(len) => {
+                // Each element counts as it is converted; a declared length
+                // beyond what is left is refused before the list is allocated.
+                if *len > self.count.remaining() {
+                    return Err(self.count.beyond().into());
+                }
+                self.open.insert(id);
+                return Ok(Step::Open(Frame::ConvertList {
+                    value,
+                    id,
+                    len: *len,
+                    items: Vec::with_capacity(*len),
+                }));
+            }
+            Shape::Record { keys, .. } => keys.clone(),
+            Shape::Mapping => match mapping_keys(&value) {
+                Ok(keys) => keys,
+                Err(error) => return Ok(Step::Done(self.raised(value.py(), error, at))),
+            },
+            _ => match object_keys(&value) {
+                Ok(Some(keys)) => keys,
+                Ok(None) => {
+                    let name = convert::type_name(&value);
+                    return Ok(Step::Done(self.opaque(&value, name)));
+                }
+                Err(error) => return Ok(Step::Done(self.raised(value.py(), error, at))),
+            },
+        };
+        let map = if matches!(shape, Shape::Record { .. }) {
+            Map::record()
+        } else {
+            Map::new()
+        };
+        self.open.insert(id);
+        Ok(Step::Open(Frame::ConvertMap {
+            value,
+            id,
+            shape,
+            keys,
+            next: 0,
+            key: String::new(),
+            map,
+        }))
+    }
+
+    /// The step of `frame`'s next element, its segment pushed onto `at`; `None`
+    /// once every element is read. Elements read at once (missing, raised)
+    /// are placed here.
+    #[allow(clippy::too_many_lines)] // One arm per kind of container.
+    fn next<'py, 'p>(
+        &mut self,
+        frame: &mut Frame<'py, 'p>,
+        at: &mut Vec<Segment>,
+    ) -> Read<Option<Step<'py, 'p>>> {
+        match frame {
+            Frame::WalkKeys {
+                value,
+                shape,
+                paths,
+                next,
+                key,
+                map,
+            } => {
+                while *next < paths.keys.len() {
+                    let i = *next;
+                    *next += 1;
+                    let name = paths.keys[i].0.clone();
+                    at.push(Segment::Key(name.clone()));
+                    match lookup(value, shape, &name) {
+                        Found::Value(item) => {
+                            *key = name;
+                            let sub = sub(paths, |p| &p.keys[i].1);
+                            return self.walk_step(item, sub, at).map(Some);
+                        }
+                        Found::Missing => {
+                            at.pop();
+                        }
+                        Found::Raised(error) => {
+                            let item = self.placed_error(value.py(), error, at)?;
+                            at.pop();
+                            map.insert(name, item);
+                        }
+                    }
+                }
+                Ok(None)
+            }
+            Frame::WalkRecord {
+                value,
+                shape,
+                keys,
+                paths,
+                next,
+                key,
+                map,
+            } => {
+                while *next < keys.len() {
+                    let position = *next;
+                    *next += 1;
+                    let name = keys[position].clone();
+                    let by_key = paths.keys.iter().position(|(k, _)| *k == name);
+                    let by_position = paths
+                        .indices
+                        .iter()
+                        .position(|(i, _)| usize::try_from(*i).is_ok_and(|i| i == position));
+                    let sub = match (by_key, by_position) {
+                        (Some(a), Some(b)) => {
+                            Cow::Owned(paths.keys[a].1.merged(&paths.indices[b].1))
+                        }
+                        (Some(a), None) => sub(paths, |p| &p.keys[a].1),
+                        (None, Some(b)) => sub(paths, |p| &p.indices[b].1),
+                        // Unread components keep their position.
+                        (None, None) => {
+                            map.insert(name, Value::Null(NullCause::Null));
+                            continue;
+                        }
+                    };
+                    at.push(Segment::Key(name.clone()));
+                    match lookup(value, shape, &name) {
+                        Found::Value(item) => {
+                            *key = name;
+                            return self.walk_step(item, sub, at).map(Some);
+                        }
+                        Found::Missing => {
+                            at.pop();
+                            map.insert(name, Value::Null(NullCause::Null));
+                        }
+                        Found::Raised(error) => {
+                            let item = self.placed_error(value.py(), error, at)?;
+                            at.pop();
+                            map.insert(name, item);
+                        }
+                    }
+                }
+                Ok(None)
+            }
+            Frame::WalkList {
+                value,
+                paths,
+                next,
+                slot,
+                items,
+            } => {
+                while *next < paths.indices.len() {
+                    let at_index = *next;
+                    *next += 1;
+                    let index = paths.indices[at_index].0;
+                    let Some(i) = usize::try_from(index).ok().filter(|i| *i < items.len()) else {
+                        continue;
+                    };
+                    at.push(Segment::Index(index));
+                    match value.get_item(i) {
+                        Ok(item) => {
+                            *slot = i;
+                            let sub = sub(paths, |p| &p.indices[at_index].1);
+                            return self.walk_step(item, sub, at).map(Some);
+                        }
+                        Err(error) => {
+                            items[i] = self.placed_error(value.py(), error, at)?;
+                            at.pop();
+                        }
+                    }
+                }
+                Ok(None)
+            }
+            Frame::ConvertList {
+                value, len, items, ..
+            } => {
+                while items.len() < *len {
+                    let i = items.len();
+                    at.push(Segment::Index(i as u64));
+                    match value.get_item(i) {
+                        Ok(item) => return self.convert_step(item, at).map(Some),
+                        Err(error) => {
+                            let item = self.placed_error(value.py(), error, at)?;
+                            at.pop();
+                            items.push(item);
+                        }
+                    }
+                }
+                Ok(None)
+            }
+            Frame::ConvertMap {
+                value,
+                shape,
+                keys,
+                next,
+                key,
+                map,
+                ..
+            } => {
+                let record = matches!(shape, Shape::Record { .. });
+                while *next < keys.len() {
+                    let name = keys[*next].clone();
+                    *next += 1;
+                    at.push(Segment::Key(name.clone()));
+                    match lookup(value, shape, &name) {
+                        Found::Value(item) => {
+                            *key = name;
+                            return self.convert_step(item, at).map(Some);
+                        }
+                        Found::Missing if record => {
+                            self.count.add(1)?;
+                            at.pop();
+                            map.insert(name, Value::Null(NullCause::Null));
+                        }
+                        Found::Missing => {
+                            at.pop();
+                        }
+                        Found::Raised(error) => {
+                            let item = self.placed_error(value.py(), error, at)?;
+                            at.pop();
+                            map.insert(name, item);
+                        }
+                    }
+                }
+                Ok(None)
+            }
+        }
+    }
+
+    /// The value of a container whose elements are all read.
+    fn finish(&mut self, frame: Frame<'_, '_>) -> Value {
+        match frame {
+            Frame::WalkKeys { map, .. } | Frame::WalkRecord { map, .. } => Value::Map(map),
+            Frame::WalkList { items, .. } => Value::List(items),
+            Frame::ConvertList { id, items, .. } => {
+                self.open.remove(&id);
+                Value::List(items)
+            }
+            Frame::ConvertMap { id, map, .. } => {
+                self.open.remove(&id);
+                Value::Map(map)
+            }
         }
     }
 
@@ -330,93 +663,6 @@ impl Reader {
         Value::Opaque(cleanrules::value::Opaque { type_name, token })
     }
 
-    /// The whole value, where a path ends (`spec/data-model.md`, *Python*):
-    /// it counts one, and so does everything inside it.
-    fn convert(&mut self, value: &Bound<'_, PyAny>, at: &mut Vec<Segment>) -> Read {
-        self.count.add(1)?;
-        let array = match convert::numpy_array_as_list(value) {
-            Ok(array) => array,
-            Err(error) => return Ok(self.raised(value.py(), error, at)),
-        };
-        let value = array.as_ref().unwrap_or(value);
-        let shape = match shape(value) {
-            Ok(shape) => shape,
-            Err(error) => return Ok(self.raised(value.py(), error, at)),
-        };
-        if matches!(shape, Shape::Scalar) {
-            return Ok(self.scalar(value)?);
-        }
-        let id = identity(value);
-        if self.open.len() >= MAX_DEPTH || self.open.contains(&id) {
-            return Ok(self.opaque(value, convert::type_name(value)));
-        }
-        self.open.insert(id);
-        let converted = self.convert_container(value, &shape, at);
-        self.open.remove(&id);
-        converted
-    }
-
-    fn convert_container(
-        &mut self,
-        value: &Bound<'_, PyAny>,
-        shape: &Shape,
-        at: &mut Vec<Segment>,
-    ) -> Read {
-        Ok(match shape {
-            Shape::Scalar => self.scalar(value)?,
-            Shape::Sequence(len) => {
-                // Each element counts as it is converted; a declared length
-                // beyond what is left is refused before the list is allocated.
-                if *len > self.count.remaining() {
-                    return Err(too_many_values(self.count.limit()).into());
-                }
-                let mut items = Vec::with_capacity(*len);
-                for i in 0..*len {
-                    at.push(Segment::Index(i as u64));
-                    items.push(match value.get_item(i) {
-                        Ok(item) => self.convert(&item, at)?,
-                        Err(error) => self.placed_error(value.py(), error, at)?,
-                    });
-                    at.pop();
-                }
-                Value::List(items)
-            }
-            Shape::Mapping | Shape::Record { .. } | Shape::Object => {
-                let keys = match shape {
-                    Shape::Record { keys, .. } => keys.clone(),
-                    Shape::Mapping => match mapping_keys(value) {
-                        Ok(keys) => keys,
-                        Err(error) => return Ok(self.raised(value.py(), error, at)),
-                    },
-                    _ => match object_keys(value) {
-                        Ok(Some(keys)) => keys,
-                        Ok(None) => return Ok(self.opaque(value, convert::type_name(value))),
-                        Err(error) => return Ok(self.raised(value.py(), error, at)),
-                    },
-                };
-                let record = matches!(shape, Shape::Record { .. });
-                let mut map = if record { Map::record() } else { Map::new() };
-                for key in keys {
-                    at.push(Segment::Key(key.clone()));
-                    let item = match lookup(value, shape, &key) {
-                        Found::Value(item) => Some(self.convert(&item, at)?),
-                        Found::Missing if record => {
-                            self.count.add(1)?;
-                            Some(Value::Null(NullCause::Null))
-                        }
-                        Found::Missing => None,
-                        Found::Raised(error) => Some(self.placed_error(value.py(), error, at)?),
-                    };
-                    at.pop();
-                    if let Some(item) = item {
-                        map.insert(key, item);
-                    }
-                }
-                Value::Map(map)
-            }
-        })
-    }
-
     fn scalar(&mut self, value: &Bound<'_, PyAny>) -> PyResult<Value> {
         Ok(match convert::scalar(value)? {
             Ok(converted) => converted,
@@ -427,6 +673,18 @@ impl Reader {
             Err(Problem::TooPrecise) => convert::truncated(value)?,
             Err(Problem::Opaque(type_name)) => self.opaque(value, type_name),
         })
+    }
+}
+
+/// Keep the element just read in `frame`, and take its segment off `at`.
+fn place(frame: &mut Frame<'_, '_>, value: Value, at: &mut Vec<Segment>) {
+    at.pop();
+    match frame {
+        Frame::WalkKeys { key, map, .. }
+        | Frame::WalkRecord { key, map, .. }
+        | Frame::ConvertMap { key, map, .. } => map.insert(std::mem::take(key), value),
+        Frame::WalkList { slot, items, .. } => items[*slot] = value,
+        Frame::ConvertList { items, .. } => items.push(value),
     }
 }
 

@@ -294,6 +294,7 @@ class Limits(TypedDict, total=False):
     max_nesting: int
     max_depth: int
     max_table_size: int
+    max_path_segments: int
 
 
 def run_text(given: dict[str, Any], expect: dict[str, Any], limits: Limits) -> None:
@@ -346,6 +347,7 @@ def run_table(given: dict[str, Any], expect: dict[str, Any], limits: Limits) -> 
             [[native(cell) for cell in row] for row in grid["rows"]],
             **settings,
             max_table_size=limits.get("max_table_size"),
+            max_path_segments=limits.get("max_path_segments"),
         )
 
     def read_and_write() -> dict[str, Any]:

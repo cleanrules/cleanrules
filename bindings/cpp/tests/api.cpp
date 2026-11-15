@@ -167,6 +167,30 @@ void documents_and_limits() {
     CHECK(cr::limits().get(cr::limit::max_values) == 1000000);
     l.set(cr::limit::max_values, 12);
     CHECK(l.get(cr::limit::max_values) == 12);
+    // max_path_segments: 256 by default, checked by node::field and the readers.
+    CHECK(cr::limits().get(cr::limit::max_path_segments) == 256);
+    {
+        auto path = [](std::size_t n) {
+            cr::value out = cr::value::list_of_size(n);
+            for (std::size_t i = 0; i < n; ++i) {
+                out.set(i, cr::value(0));
+            }
+            return out;
+        };
+        (void)cr::node::field(path(256));
+        try {
+            (void)cr::node::field(path(257));
+            CHECK(false);
+        } catch (const cr::format_error &e) {
+            CHECK(e.code() == cr::errc::limit_exceeded);
+            CHECK(e.info().json().find("\"name\":\"max_path_segments\"") != std::string_view::npos);
+        }
+        cr::limits two;
+        two.set(cr::limit::max_path_segments, 2);
+        CHECK(two.get(cr::limit::max_path_segments) == 2);
+        CHECK_THROWS(cr::ruleset::read("IF a.b.c THEN y = 1", cr::format::text, two),
+                     cr::format_error);
+    }
     // Messages of the C ABI never name its functions.
     try {
         l.set(static_cast<cr::limit>(99), 1);

@@ -968,3 +968,36 @@ fn a_binding_refuses_an_input_beyond_max_values_with_the_cores_error() {
     let mut left = 6;
     assert!(convert(&diamond(2), &mut left).is_none());
 }
+
+#[test]
+fn constants_beyond_max_values_have_a_hint_of_their_own() {
+    let make = |rule: Option<&str>| {
+        let (p, n) = rule.map_or((ptr::null(), 0), |r| arg(r.as_bytes()));
+        let mut out = ptr::null_mut();
+        common::ok(|e| {
+            // SAFETY: the rule's name outlives the call; `out` is writable.
+            unsafe { cr_error_new_constant_max_values(p, n, &raw mut out, e) }
+        });
+        common::take(out)
+    };
+    let failure = make(Some("vip"));
+    assert_eq!(failure.status, CR_LIMIT_EXCEEDED);
+    let json = cleanrules::json::to_string(&failure.json);
+    assert!(
+        json.contains(r#""name":"max_values""#) && json.contains(r#""rule":"vip""#),
+        "{json}"
+    );
+    assert!(json.contains("more than 1000000 values"), "{json}");
+    assert!(
+        json.contains("default max_values") && !json.contains(r#""row""#),
+        "{json}"
+    );
+    let input = cleanrules::json::to_string(&beyond(5, -1, None).json);
+    assert!(input.contains("raise max_values"), "{input}");
+    assert!(!cleanrules::json::to_string(&make(None).json).contains(r#""rule""#));
+    // SAFETY: a NULL out-parameter is refused.
+    let status = unsafe {
+        cr_error_new_constant_max_values(ptr::null(), 0, ptr::null_mut(), ptr::null_mut())
+    };
+    assert_eq!(status, CR_INVALID_ARGUMENT);
+}

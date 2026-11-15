@@ -73,6 +73,7 @@ const LIMITS = {
   max_depth: 'maxDepth',
   max_table_size: 'maxTableSize',
   max_values: 'maxValues',
+  max_path_segments: 'maxPathSegments',
 }
 
 const MAX_SAFE = 2n ** 53n - 1n

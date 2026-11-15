@@ -49,7 +49,12 @@ errors and in every language.
 
 - **`field`**: the path is non-empty. Each segment is a non-empty string, which
   looks up a key or attribute, or an integer ≥ 0, which indexes a sequence. A
-  boolean is not an index.
+  boolean is not an index. The path has at most **256** segments, the default
+  `max_path_segments` (`json-format.md`, *Errors and limits*): a constructor
+  refuses a longer one with `limit_exceeded` (`name` `max_path_segments`).
+  Readers check the limit they are given, so a longer path is read from a
+  document with the limit raised; the Rust core also has a constructor that
+  takes the limits.
 - **`const`**: the value is a scalar of `data-model.md`: null, boolean, int,
   float, decimal, string, date or datetime. A native constant is converted with
   the tables of `data-model.md` (*Constants*), keeping decimals exact

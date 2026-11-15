@@ -158,7 +158,13 @@ limits*):
 - parentheses, `NOT`, unary `-` and `ABS` nested at most `2 × max_depth + 2`
   deep (514), beyond which the reader stops with `limit_exceeded` at the token
   that goes deeper. Each node costs at most two levels, so a canonical text
-  within the depth limit is never refused.
+  within the depth limit is never refused;
+- field paths at most `max_path_segments` (256) segments long, the first
+  name or `[index]` included: the reader stops with `limit_exceeded` (`name`
+  `max_path_segments`) at the `.` or `[` that starts the first segment beyond
+  the limit, or, with a limit of 0, at the field's first token. The headers
+  and cells of decision tables, read with this syntax, have the same limit
+  (`tables.md`).
 
 ## Printing
 

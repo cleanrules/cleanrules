@@ -16,7 +16,7 @@ use napi::bindgen_prelude::{
 use napi::{Env, Result, ValueType};
 use napi_derive::napi;
 
-use crate::common::{LIMIT_NAMES, OBJECT, Outcome, Problem, Raw, RawLimits, RawOptions};
+use crate::common::{LIMIT_NAMES, LIMITS, OBJECT, Outcome, Problem, Raw, RawLimits, RawOptions};
 use hooks::{range_error, throw, type_error};
 
 /// The version of the JSON format this build reads and writes
@@ -110,7 +110,7 @@ pub(crate) fn raw_limits(value: &Unknown<'_>) -> Result<RawLimits> {
         return Ok(RawLimits::Wrong(kind.describe()));
     }
     let object = Object::from_unknown(*value)?;
-    let mut values: [Raw; 7] = Default::default();
+    let mut values: [Raw; LIMITS] = Default::default();
     for (slot, name) in values.iter_mut().zip(LIMIT_NAMES) {
         *slot = member(&object, name)?;
     }

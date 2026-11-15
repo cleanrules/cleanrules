@@ -6,7 +6,6 @@
 
 use cleanrules::jiff::civil::{Date, DateTime, Time};
 use cleanrules::jiff::tz::{Offset, TimeZone};
-use cleanrules::json::Limits;
 use cleanrules::value::{AwareDateTime, DecimalError, ValueCount, Zone};
 use cleanrules::{Decimal, Map, NullCause, Value};
 use pyo3::prelude::*;
@@ -424,7 +423,7 @@ pub(crate) const MAX_DEPTH: usize = 256;
 /// A message naming the key path of the first value that is not data;
 /// `Stop::Limit` beyond `max_values`.
 pub(crate) fn metadata(value: &Bound<'_, PyAny>) -> Result<Result<Value, String>, Stop> {
-    let mut count = ValueCount::new(Limits::default().max_values);
+    let mut count = ValueCount::for_constants();
     metadata_at(value, "metadata", &mut Vec::new(), &mut count)
 }
 

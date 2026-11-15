@@ -132,7 +132,8 @@
                   "max_size",
                   "max_nesting",
                   "max_depth",
-                  "max_table_size"
+                  "max_table_size",
+                  "max_path_segments"
                 ]
               },
               "additionalProperties": {

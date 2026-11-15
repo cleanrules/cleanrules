@@ -191,7 +191,12 @@ every mode, with a `FormatError` whose code is `limit_exceeded` and whose
 the default limit too, naming the rule. Raise it
 where large inputs are expected: `rules.evaluate(data, max_values=5_000_000)`
 (also `evaluate_many`, `run`, `DecisionTable.evaluate`, `evaluate_tree` and
-`evaluate_value_tree`).
+`evaluate_value_tree`). A field path has at most `max_path_segments` segments,
+256 by default, so the data read along it stays shallow: `F` and `Field` check
+the default, and `loads`, `load`, `rule_from_text` and `DecisionTable` take
+`max_path_segments=` (beyond it, a `FormatError` with code `limit_exceeded`
+and `name` `max_path_segments`). Raise it only for trusted rules:
+`cleanrules.load("deep.rules", max_path_segments=1024)`.
 
 For AI agents, a `cleanrules.Catalog` of rule sets by name answers the tools
 of [`spec/agents.md`](../../spec/agents.md) (`list_rulesets`, `summary`,

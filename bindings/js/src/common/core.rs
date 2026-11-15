@@ -219,9 +219,13 @@ pub(crate) fn max_values_error(
     error
 }
 
-/// [`max_values_error`] in its JSON form, for `fromNative`.
+/// The core's `limit_exceeded` for a constant or metadata beyond the default
+/// `max_values`, in its JSON form, for `fromNative`: its hint does not
+/// suggest raising a limit the caller cannot raise.
 pub(crate) fn max_values_error_json(max_values: usize, rule: Option<String>) -> String {
-    let mut json = cleanrules::format::write_error(&max_values_error(max_values, rule, None));
+    let mut error = cleanrules::value::too_many_constant_values(max_values);
+    error.context_mut().rule = rule;
+    let mut json = cleanrules::format::write_error(&error);
     super::out::stringifiable(&mut json);
     to_string(&json)
 }

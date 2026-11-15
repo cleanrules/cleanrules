@@ -56,6 +56,7 @@ def loads(
     max_nesting: int | None = None,
     max_depth: int | None = None,
     max_table_size: int | None = None,
+    max_path_segments: int | None = None,
     actions: Mapping[str, Action] | None = None,
 ) -> Expr | Rule | RuleSet | DecisionTable:
     """Read a condition, rule, rule set or decision table document.
@@ -74,6 +75,9 @@ def loads(
         max_table_size: The most cells and condition nodes a decision table
             may hold, column copies included (2,097,152; `spec/tables.md`,
             *Limits*).
+        max_path_segments: The most segments a field path may have (256), so
+            that the data read along a path stays shallow; `F` checks the
+            default.
         actions: An action registry, each name with its callable: a rule or
             rule set read is bound to it (`RuleSet.bind`). Without it, rules
             keep the names of their actions, unbound: they evaluate, explain
@@ -102,9 +106,10 @@ def loads(
         max_nesting=max_nesting,
         max_depth=max_depth,
         max_table_size=max_table_size,
+        max_path_segments=max_path_segments,
     )
     kind, content = _native.load_document(
-        text, format, max_size, max_nesting, max_depth, max_table_size
+        text, format, max_size, max_nesting, max_depth, max_table_size, max_path_segments
     )
     if kind == "condition":
         return _wrap(content)
@@ -224,6 +229,7 @@ def rule_from_text(
     actions: Mapping[str, Action] | None = None,
     max_size: int | None = None,
     max_depth: int | None = None,
+    max_path_segments: int | None = None,
 ) -> Rule:
     """Read one rule written in the text syntax (`spec/text.md`).
 
@@ -240,6 +246,7 @@ def rule_from_text(
         actions: An action registry, as `loads` takes; not with `do`.
         max_size: As `loads`.
         max_depth: As `loads`.
+        max_path_segments: As `loads`.
 
     Raises:
         RuleSyntaxError: If the text does not follow the syntax, or holds a
@@ -250,8 +257,8 @@ def rule_from_text(
     """
     if do is not None and actions is not None:
         raise TypeError("rule_from_text takes do or actions, not both")
-    text = _text(text, max_size=max_size, max_depth=max_depth)
-    rule = _rule(_native.load_rule(text, max_size, max_depth))
+    text = _text(text, max_size=max_size, max_depth=max_depth, max_path_segments=max_path_segments)
+    rule = _rule(_native.load_rule(text, max_size, max_depth, max_path_segments))
     if actions is not None:
         return RuleSet([rule]).bind(actions)[0]
     if do is None:
@@ -277,6 +284,7 @@ def load(
     max_nesting: int | None = None,
     max_depth: int | None = None,
     max_table_size: int | None = None,
+    max_path_segments: int | None = None,
     actions: Mapping[str, Action] | None = None,
 ) -> Expr | Rule | RuleSet | DecisionTable:
     """Read a document from a file, as `loads` does.
@@ -291,6 +299,7 @@ def load(
         max_nesting: As `loads`.
         max_depth: As `loads`.
         max_table_size: As `loads`.
+        max_path_segments: As `loads`.
         actions: As `loads`.
 
     Raises:
@@ -321,6 +330,7 @@ def load(
         max_nesting=max_nesting,
         max_depth=max_depth,
         max_table_size=max_table_size,
+        max_path_segments=max_path_segments,
         actions=actions,
     )
 

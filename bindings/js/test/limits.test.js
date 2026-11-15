@@ -132,7 +132,12 @@ describe('max_values', () => {
     // Metadata and constants, under the default limit, naming the rule when known.
     beyond(
       () => new Rule('big', F.x.eq(1), {}, { metadata: { m: diamond(20) } }),
-      (error) => assert.equal(error.context.rule, 'big'),
+      (error) => {
+        assert.equal(error.context.rule, 'big')
+        // The hint does not suggest raising a limit the caller cannot raise.
+        assert.match(error.hint, /default max_values/)
+        assert.doesNotMatch(error.hint, /raise max_values/)
+      },
     )
     beyond(() => constant(diamond(20)))
     beyond(

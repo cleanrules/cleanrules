@@ -97,7 +97,9 @@ pub(crate) unsafe fn build(
 /// split at dots) and ints from 0 (indexes), as `cr_node_field_paths` gives
 /// them; it stays the caller's. An empty path, an empty key, or a segment of
 /// another kind (a negative int, a boolean...) is a `CR_EXPRESSION_ERROR`; a
-/// `path` that is not a list is `CR_INVALID_ARGUMENT`.
+/// path of more than 256 segments (the default `CR_LIMIT_MAX_PATH_SEGMENTS`)
+/// is a `CR_LIMIT_EXCEEDED`; a `path` that is not a list is
+/// `CR_INVALID_ARGUMENT`.
 ///
 /// # Safety
 ///

@@ -177,8 +177,10 @@ fn format_arg(term: Term<'_>) -> Outcome<DocumentFormat> {
 }
 
 /// Limits from a map with any of the atom keys `max_size`, `max_nesting`,
-/// `max_depth`, `max_table_size`, `max_yaml_size`, `max_text_size` and
-/// `max_values`; `max_size` sets the largest text of every format first.
+/// `max_depth`, `max_table_size`, `max_yaml_size`, `max_text_size`,
+/// `max_values` and `max_path_segments`; `max_size` sets the largest text of
+/// every format first. Paths have no cap of their own: the NIF reads, builds
+/// and frees the data along them with explicit stacks.
 /// `max_nesting` and `max_depth` above [`MAX_SAFE_DEPTH`] are refused.
 fn limits_arg(term: Term<'_>) -> Outcome<Limits> {
     let mut given: Vec<(String, usize)> = Vec::new();
@@ -202,6 +204,7 @@ fn limits_arg(term: Term<'_>) -> Outcome<Limits> {
             "max_yaml_size" => limits.max_yaml_size = value,
             "max_text_size" => limits.max_text_size = value,
             "max_values" => limits.max_values = value,
+            "max_path_segments" => limits.max_path_segments = value,
             _ => return Err(Failure::BadArg),
         }
     }
@@ -238,6 +241,7 @@ fn default_limits(env: Env<'_>) -> Term<'_> {
         ("max_yaml_size", limits.max_yaml_size),
         ("max_text_size", limits.max_text_size),
         ("max_values", limits.max_values),
+        ("max_path_segments", limits.max_path_segments),
     ];
     let keys: Vec<Term<'_>> = pairs.iter().map(|(k, _)| atoms::key(env, k)).collect();
     let values: Vec<Term<'_>> = pairs.iter().map(|(_, v)| v.encode(env)).collect();

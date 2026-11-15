@@ -15,9 +15,9 @@ use cleanrules::json::{Json, same, to_string};
 use cleanrules_ffi::{
     CR_DIAGRAM_DOT, CR_DIAGRAM_HTML, CR_DIAGRAM_HTML_FRAGMENT, CR_DIAGRAM_MERMAID, CR_FORMAT_CSV,
     CR_FORMAT_JSON, CR_FORMAT_TEXT, CR_FORMAT_YAML, CR_LIMIT_MAX_DEPTH, CR_LIMIT_MAX_DIAGRAM_SIZE,
-    CR_LIMIT_MAX_NESTING, CR_LIMIT_MAX_SIZE, CR_LIMIT_MAX_TABLE_SIZE, cr_decision_draw,
-    cr_document_condition, cr_document_draw, cr_document_rule, cr_node_draw, cr_rule_draw,
-    cr_ruleset_draw,
+    CR_LIMIT_MAX_NESTING, CR_LIMIT_MAX_PATH_SEGMENTS, CR_LIMIT_MAX_SIZE, CR_LIMIT_MAX_TABLE_SIZE,
+    cr_decision_draw, cr_document_condition, cr_document_draw, cr_document_rule, cr_node_draw,
+    cr_rule_draw, cr_ruleset_draw,
 };
 use common::{Failure, Limits_, json, on_small_stack};
 
@@ -166,6 +166,7 @@ fn limits_of(given: &Json) -> Option<Limits_> {
                 "max_depth" => CR_LIMIT_MAX_DEPTH,
                 "max_table_size" => CR_LIMIT_MAX_TABLE_SIZE,
                 "max_diagram_size" => CR_LIMIT_MAX_DIAGRAM_SIZE,
+                "max_path_segments" => CR_LIMIT_MAX_PATH_SEGMENTS,
                 other => panic!("unknown limit {other}"),
             };
             let Json::Number(n) = v else { panic!() };
