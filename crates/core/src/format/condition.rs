@@ -7,7 +7,7 @@
 
 use std::vec::Drain;
 
-use crate::ast::{ArithOp, Closed, CompareOp, Expr, Node, StringOp};
+use crate::ast::{ArithOp, Closed, CompareOp, Expr, Node, READ_PATH_HINT, StringOp, path_too_long};
 use crate::error::{Error, ErrorCode, Result, Segment};
 use crate::format::value::{ValueContext, read_value, write_value};
 use crate::json::{Json, JsonNumber, Limits, pointer_token};
@@ -195,7 +195,10 @@ fn open<'j>(
         "field" => {
             let path = object.required("path")?;
             let at = child(&object.pointer, "path");
-            (Shape::Field(read_path(path, &at)?), Children::Keys(&[]))
+            (
+                Shape::Field(read_path(path, &at, limits.max_path_segments)?),
+                Children::Keys(&[]),
+            )
         }
         "const" => {
             let value = object.required("value")?;
@@ -302,14 +305,20 @@ fn close(checking: Checking<'_>, children: Drain<'_, Raw>) -> Result<Raw> {
 }
 
 /// A path: strings, and integer literals in the int range (negative ones are a
-/// construction error, reported later).
-fn read_path(json: &Json, pointer: &str) -> Result<Vec<RawSegment>> {
+/// construction error, reported later), at most `max_segments` of them: the
+/// first segment beyond is a `limit_exceeded` at its pointer.
+fn read_path(json: &Json, pointer: &str, max_segments: usize) -> Result<Vec<RawSegment>> {
     let Json::Array(items) = json else {
         return Err(format_error(pointer, "\"path\" must be an array"));
     };
-    let mut path = Vec::with_capacity(items.len());
+    let mut path = Vec::with_capacity(items.len().min(max_segments));
     for (i, item) in items.iter().enumerate() {
         let at = format!("{pointer}/{i}");
+        if i == max_segments {
+            return Err(path_too_long(max_segments)
+                .with_hint(READ_PATH_HINT)
+                .at_pointer(at));
+        }
         match item {
             Json::String(key) => path.push(RawSegment::Key(key.clone())),
             Json::Number(n) if n.is_integer_literal() => {
@@ -368,7 +377,8 @@ fn construct(pointer: &str, shape: Shape, mut nodes: Drain<'_, Node>) -> Result<
                     }
                 });
             }
-            Node::field(segments).map_err(at)
+            // `read_path` bounded the path.
+            Node::field_unbounded(segments).map_err(at)
         }
         Shape::Const(value) => Node::constant(value).map_err(at),
         Shape::Compare(op) => {

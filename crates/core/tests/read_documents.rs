@@ -250,14 +250,17 @@ fn check(vector: &Json) -> Option<String> {
                     || context.pointer.as_deref() == text(get(wanted, "pointer")))
                 && (get(wanted, "line").is_none() || context.line == int(get(wanted, "line")))
                 && (get(wanted, "column").is_none()
-                    || context.column == int(get(wanted, "column")));
+                    || context.column == int(get(wanted, "column")))
+                && (get(wanted, "name").is_none()
+                    || context.name.as_deref() == text(get(wanted, "name")));
             (!ok).then(|| {
                 format!(
-                    "got {} pointer={:?} line={:?} column={:?} ({error}), expected {}",
+                    "got {} pointer={:?} line={:?} column={:?} name={:?} ({error}), expected {}",
                     error.code(),
                     context.pointer,
                     context.line,
                     context.column,
+                    context.name,
                     to_string(wanted)
                 )
             })

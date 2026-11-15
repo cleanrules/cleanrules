@@ -102,7 +102,8 @@
     max_table_size => non_neg_integer(),
     max_yaml_size => non_neg_integer(),
     max_text_size => non_neg_integer(),
-    max_values => non_neg_integer()
+    max_values => non_neg_integer(),
+    max_path_segments => non_neg_integer()
 }.
 
 -define(NOT_LOADED, erlang:nif_error({not_loaded, ?MODULE})).

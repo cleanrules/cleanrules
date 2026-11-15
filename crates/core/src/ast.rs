@@ -6,6 +6,7 @@ use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
 use crate::error::{Error, ErrorCode, Result, Segment};
+use crate::json::Limits;
 use crate::value::{Group, NullCause, Value};
 use crate::walk::post_order;
 
@@ -297,6 +298,25 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::new(ErrorCode::ExpressionError, message)
 }
 
+/// The `limit_exceeded` of a field path with more than `limit` segments
+/// (`spec/json-format.md`, *Errors and limits*), without a hint: readers add
+/// where it is and how to read it, constructors how to build a longer one.
+pub(crate) fn path_too_long(limit: usize) -> Error {
+    let mut error = Error::new(
+        ErrorCode::LimitExceeded,
+        format!("a field path has more than {limit} segments (max_path_segments)"),
+    );
+    error.context_mut().name = Some("max_path_segments".to_owned());
+    error
+}
+
+/// The hint of a reader's [`path_too_long`].
+pub(crate) const READ_PATH_HINT: &str =
+    "shorten the path, or raise max_path_segments if the rules are trusted";
+
+/// How many segments of a path too long a constructor's message shows.
+const SHOWN_SEGMENTS: usize = 8;
+
 impl Node {
     /// The node's shape.
     #[must_use]
@@ -341,12 +361,52 @@ impl Node {
         matches!(self.expr, Expr::Const(Value::Null(_)))
     }
 
-    /// A field. Each segment is a non-empty key or an index.
+    /// A field. Each segment is a non-empty key or an index, and the path has
+    /// at most the default `max_path_segments` (256) segments: a longer path
+    /// is read from a document with that limit raised, or built with
+    /// [`Node::field_within`].
     ///
     /// # Errors
     ///
-    /// `expression_error` for an empty path or an empty key.
+    /// `limit_exceeded` for a path longer than the limit (`name`
+    /// `max_path_segments`); `expression_error` for an empty path or an empty
+    /// key.
     pub fn field(path: Vec<Segment>) -> Result<Self> {
+        Self::field_within(path, &Limits::default())
+    }
+
+    /// A field whose path has at most `limits.max_path_segments` segments.
+    ///
+    /// # Errors
+    ///
+    /// As [`Node::field`], with the limit given.
+    pub fn field_within(path: Vec<Segment>, limits: &Limits) -> Result<Self> {
+        if path.len() > limits.max_path_segments {
+            let shown = path.len().min(SHOWN_SEGMENTS);
+            let start = crate::text::path(&path[..shown]);
+            let more = if shown < path.len() { "…" } else { "" };
+            let mut error = Error::new(
+                ErrorCode::LimitExceeded,
+                format!(
+                    "the field path {start}{more} has {} segments, more than {} \
+                     (max_path_segments)",
+                    path.len(),
+                    limits.max_path_segments
+                ),
+            )
+            .with_hint(
+                "a longer path is read from a document with max_path_segments raised, or built \
+                 in Rust with Node::field_within",
+            );
+            error.context_mut().name = Some("max_path_segments".to_owned());
+            return Err(error);
+        }
+        Self::field_unbounded(path)
+    }
+
+    /// A field whose path the caller has already checked against its
+    /// `max_path_segments`, as the readers do while they read it.
+    pub(crate) fn field_unbounded(path: Vec<Segment>) -> Result<Self> {
         if path.is_empty() {
             return Err(invalid("a field path cannot be empty"));
         }
@@ -952,6 +1012,7 @@ impl Hash for Node {
 mod tests {
     use super::{ArithOp, Closed, CompareOp, Expr, Kind, Node};
     use crate::error::{ErrorCode, Segment};
+    use crate::json::Limits;
     use crate::value::{Decimal, NullCause, Value};
 
     fn f(name: &str) -> Node {
@@ -983,6 +1044,58 @@ mod tests {
         let text = c(Value::String("x".into()));
         let error = Node::abs(text.clone()).unwrap_err();
         assert_eq!(*error.context().node.clone().unwrap(), text);
+    }
+
+    #[test]
+    fn a_field_path_has_at_most_max_path_segments() {
+        let path = |n: usize| -> Vec<Segment> {
+            (0..n)
+                .map(|i| {
+                    if i % 2 == 0 {
+                        Segment::Key("k".into())
+                    } else {
+                        Segment::Index(0)
+                    }
+                })
+                .collect()
+        };
+        assert_eq!(Node::field(path(256)).unwrap().tag(), "field");
+        let error = Node::field(path(257)).unwrap_err();
+        assert_eq!(error.code(), ErrorCode::LimitExceeded);
+        assert_eq!(error.context().name.as_deref(), Some("max_path_segments"));
+        assert!(error.message().contains("256"), "{error}");
+        assert!(
+            error
+                .message()
+                .starts_with("the field path k[0].k[0].k[0].k[0]… has 257 segments"),
+            "{error}"
+        );
+        assert!(error.hint().is_some_and(|h| h.contains("field_within")));
+        assert!(
+            error
+                .hint()
+                .is_some_and(|h| h.contains("max_path_segments"))
+        );
+        // The limit comes before the construction rules, as in the readers.
+        let mut empty_key = path(257);
+        empty_key[0] = Segment::Key(String::new());
+        assert_eq!(code(Node::field(empty_key)), ErrorCode::LimitExceeded);
+        // Raised, or lowered, by the caller.
+        let mut limits = Limits {
+            max_path_segments: 1000,
+            ..Limits::default()
+        };
+        assert!(Node::field_within(path(1000), &limits).is_ok());
+        assert_eq!(
+            code(Node::field_within(path(1001), &limits)),
+            ErrorCode::LimitExceeded
+        );
+        limits.max_path_segments = 1;
+        assert!(Node::field_within(path(1), &limits).is_ok());
+        assert_eq!(
+            code(Node::field_within(path(2), &limits)),
+            ErrorCode::LimitExceeded
+        );
     }
 
     #[test]

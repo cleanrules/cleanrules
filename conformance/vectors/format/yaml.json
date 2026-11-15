@@ -1034,6 +1034,28 @@
           }
         }
       }
+    },
+    {
+      "id": "format/yaml/path-segments",
+      "spec": [
+        "json-format.md#yaml",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "YAML documents have the path limit, located by pointer",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncondition: {op: field, path: [a, 0, b]}\n",
+        "limits": {
+          "max_path_segments": 2
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded",
+          "pointer": "/condition/path/2",
+          "name": "max_path_segments"
+        }
+      }
     }
   ]
 }

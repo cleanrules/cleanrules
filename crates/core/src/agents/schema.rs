@@ -16,6 +16,15 @@ const DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
 /// that a rule reading `items[1000000000]` cannot make a huge schema.
 pub const MAX_PREFIX_ITEMS: u64 = 256;
 
+/// The deepest place an input schema describes, in path segments: below it,
+/// fields are not described and the place accepts anything, so that a long
+/// path cannot make a deep schema (`spec/agents.md`, *Building the schema*).
+pub const MAX_SCHEMA_DEPTH: usize = 32;
+
+/// What the description of a place at [`MAX_SCHEMA_DEPTH`] says of the fields
+/// below it.
+const DEEPER: &str = "fields below are not described (deeper than 32 path segments)";
+
 /// The type a place that reads a field expects (`spec/agents.md`, *Types of a
 /// field*).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -177,6 +186,9 @@ struct Place {
     field: Option<usize>,
     /// Whether a field read by a condition is here or below.
     condition: bool,
+    /// Whether fields are read below this place, deeper than
+    /// [`MAX_SCHEMA_DEPTH`]: they are not in the tree.
+    deeper: bool,
 }
 
 /// The tree of the fields' paths, in an arena: the root first, and a child
@@ -187,7 +199,7 @@ fn tree(summary: &Summary<'_>) -> Vec<Place> {
     for (at, usage) in summary.fields.iter().enumerate() {
         let condition = !usage.conditions.is_empty();
         let mut here = 0;
-        for segment in &usage.path {
+        for segment in usage.path.iter().take(MAX_SCHEMA_DEPTH) {
             let next = tree.len();
             let child = *lookup.entry((here, segment.clone())).or_insert(next);
             if child == next {
@@ -200,7 +212,11 @@ fn tree(summary: &Summary<'_>) -> Vec<Place> {
             tree[child].condition |= condition;
             here = child;
         }
-        tree[here].field = Some(at);
+        if usage.path.len() > MAX_SCHEMA_DEPTH {
+            tree[here].deeper = true;
+        } else {
+            tree[here].field = Some(at);
+        }
     }
     tree
 }
@@ -274,8 +290,18 @@ pub fn input_schema(summary: &Summary<'_>) -> Json {
     let mut schemas: Vec<Option<Json>> = vec![None; tree.len()];
     for at in (0..tree.len()).rev() {
         let place = &tree[at];
-        let mut alternatives: Vec<Json> = Vec::new();
         let usage = place.field.map(|f| &summary.fields[f]);
+        if place.deeper {
+            // The place accepts anything: its fields and those below are
+            // described in words only.
+            let description = match usage {
+                Some(usage) => format!("{}; {DEEPER}", places(usage)),
+                None => DEEPER.to_owned(),
+            };
+            schemas[at] = Some(object(vec![("description", string(&description))]));
+            continue;
+        }
+        let mut alternatives: Vec<Json> = Vec::new();
         if let Some(usage) = usage
             && let Some(found) = types.get(&usage.path)
         {

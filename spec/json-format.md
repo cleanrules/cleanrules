@@ -857,18 +857,22 @@ it would have (`/condition/right`), and an unknown or extra key by its own
 | `registry_error` | a name that should be registered (a logic) is not |
 | `decision_mismatch` | a decision does not belong to, or is not consistent with, the rule set it is read with |
 | `unsupported` | this build of the core, or this version of the format, cannot do the operation: a logic built out by a Cargo feature, a rule set or decision table under a graded logic, a writer given an action, reading an output-only document, or explaining a decision made with a graded logic |
-| `limit_exceeded` | the document is larger, or nested deeper, than the reader allows; also native data beyond `max_values` (below) |
+| `limit_exceeded` | the document is larger, or nested deeper, than the reader allows, or a field path is longer; also native data beyond `max_values` (below) |
 
 A reader reports **one** error, the first it finds in this order:
 
 1. size, JSON nesting and syntax (duplicate keys included), in text order;
 2. `version`, before any other key, so a document from a newer format version
    gets `unsupported_version` even if it uses new keys;
-3. shape (`format_error`) and node depth (`limit_exceeded`), depth first in
-   pre-order: an object's known keys in the order of that object's table
-   (*Conditions*, *Rules*, *Rule sets*, *Decisions*, *Result trees*), whatever
-   their order in the text, then its unknown keys in text order. The node too
-   deep is the first node at depth limit + 1 met this way. A document whose content
+3. shape (`format_error`), node depth and path length (`limit_exceeded`),
+   depth first in pre-order: an object's known keys in the order of that
+   object's table (*Conditions*, *Rules*, *Rule sets*, *Decisions*, *Result
+   trees*), whatever their order in the text, then its unknown keys in text
+   order; within a `path`, its segments in order. The node too deep is the
+   first node at depth limit + 1 met this way. A path that is too long is
+   reported at its segment of (0-based) index `max_path_segments`, the first
+   one beyond the limit, unless a segment before it is malformed, which is
+   then reported instead. A document whose content
    key is `explanation` or `summary` is rejected with `unsupported` after the
    top-level keys are checked and before its content;
 4. construction rules, in depth-first post-order: children
@@ -878,7 +882,7 @@ A reader reports **one** error, the first it finds in this order:
    rule set's own rules. A decision has no construction rules; its checks
    against the rule set come here, as listed in *Reading a decision*.
 
-Readers enforce three limits, so a hostile file cannot exhaust memory or the
+Readers enforce four limits, so a hostile file cannot exhaust memory or the
 stack (`CLAUDE.md`, invariant 9):
 
 - **document size**: at most **16 MiB** of JSON text;
@@ -886,7 +890,17 @@ stack (`CLAUDE.md`, invariant 9):
   top-level object as 1, checked while parsing, before any tree is built. This also bounds lists and maps in data given as JSON, and in values built through the C ABI; native data read by a binding is bounded by `max_values` instead (below);
 - **node depth**: a condition or payload value at most **256** nodes deep,
   counting the root as depth 1 and counting before `and`/`or` flattening. A
-  result tree may be one level deeper, for the `between` halves.
+  result tree may be one level deeper, for the `between` halves;
+- **path length** (`max_path_segments`): a field's path at most **256**
+  segments long, in conditions, payload values and the headers and cells of
+  decision tables, in every format. The first segment beyond is a
+  `limit_exceeded` with `name` `max_path_segments`, at its pointer
+  (`/condition/path/256`), or in text where it starts (`text.md`). A
+  constructor checks the default (`ast.md`, *Construction rules*). A path
+  is a flat list, but the data a binding reads along it is a tree as deep as
+  the path (`data-model.md`, *Reading native data*), and this limit bounds
+  that tree. The paths of a decision are compared with its rule set's
+  (*Reading a decision*) and not checked again.
 
 A condition 256 nodes deep needs well under 1024 levels of JSON nesting, so
 every condition within the node limit can be read. Data in a decision can
@@ -917,6 +931,17 @@ most **128 KiB** of stack in a release build and **512 KiB** in a debug build,
 less than the threads of the hosts the bindings serve have (a JVM thread has
 1 MiB on Linux and Windows). Freeing is the exception: it takes stack in
 proportion to the nesting, most for lists and maps (about 64 bytes a level in
-a release build, 240 in a debug build), so a caller that raises `max_nesting`
-or `max_depth` far beyond its default gives the threads that use the core a
-larger stack.
+a release build, 270 in a debug build). At the default limits, the deepest
+values the core frees are data given as JSON, up to `max_nesting` (1024)
+levels, about 276 KiB of stack in a debug build; and the tree a binding reads
+along a path, up to `max_path_segments` (256) levels plus a value converted
+whole where the path ends, up to 256 containers more (`data-model.md`, *Lists
+and maps*), so 512 levels and about 138 KiB in a debug build at worst. A path
+of 256 segments over data as deep needs about 52 KiB, freeing included, and
+one of 2048 segments more than 512 KiB. Documents the core builds from a rule
+set stay shallow too: an input schema describes paths up to 32 segments
+(`agents.md`, *Building the schema*), well within `max_nesting`. So a caller that raises `max_nesting`,
+`max_depth` or `max_path_segments` far beyond its default gives the threads
+that use the core a larger stack. Bindings that run on a very small stack (a
+BEAM scheduler has 320 KiB) also free the data they read with an explicit
+stack (`Value::drop_iteratively` in Rust).

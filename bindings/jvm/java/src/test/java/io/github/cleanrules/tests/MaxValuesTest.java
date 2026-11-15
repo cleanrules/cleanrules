@@ -83,7 +83,7 @@ class MaxValuesTest {
         assertEquals(1_000_000, Limits.defaults().maxValues());
         Limits few = at(5);
         assertEquals(5, few.maxValues());
-        assertTrue(few.toString().endsWith("maxValues=5]"), few.toString());
+        assertTrue(few.toString().endsWith("maxValues=5, maxPathSegments=256]"), few.toString());
         assertThrows(IllegalArgumentException.class, () -> few.withMaxValues(-1));
     }
 
@@ -196,6 +196,9 @@ class MaxValuesTest {
         FormatException metadata = beyond(
                 () -> Rule.named("big").when(field("x").eq(1)).metadata(Map.of("m", diamond(20))));
         assertEquals("big", metadata.rule().orElseThrow());
+        // Its hint does not suggest raising a limit the caller cannot raise.
+        assertTrue(metadata.hint().orElseThrow().contains("default max_values"), metadata.hint().toString());
+        assertFalse(metadata.hint().orElseThrow().contains("raise max_values"), metadata.hint().toString());
         assertEquals(
                 1, Rule.named("small").when(field("x").eq(1)).metadata(Map.of("m", 1)).metadata().size());
     }

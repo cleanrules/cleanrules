@@ -108,6 +108,9 @@ pub fn limits_of(given: &Json) -> Limits {
         if let Some(size) = int(get(custom, "max_table_size")) {
             limits.max_table_size = usize::try_from(size).unwrap();
         }
+        if let Some(segments) = int(get(custom, "max_path_segments")) {
+            limits.max_path_segments = usize::try_from(segments).unwrap();
+        }
     }
     limits
 }

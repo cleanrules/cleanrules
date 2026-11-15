@@ -359,6 +359,7 @@ class Conformance {
                 case "max_yaml_size" -> made.withMaxYamlSize(n);
                 case "max_text_size" -> made.withMaxTextSize(n);
                 case "max_values" -> made.withMaxValues(n);
+                case "max_path_segments" -> made.withMaxPathSegments(n);
                 default -> throw new VectorError("unknown limit " + limit.getKey());
             };
         }

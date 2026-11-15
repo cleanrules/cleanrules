@@ -33,6 +33,9 @@ pub const CR_LIMIT_MAX_VALUES: cr_limit = 7;
 /// and cells of a decision table's grid (`spec/visual.md`, *Limits*; 20,000
 /// by default).
 pub const CR_LIMIT_MAX_DIAGRAM_SIZE: cr_limit = 8;
+/// The most segments a field's path may have, in every format (256 by
+/// default). `cr_node_new_field` checks the default.
+pub const CR_LIMIT_MAX_PATH_SEGMENTS: cr_limit = 9;
 
 /// Limits for reading documents and inputs, and for drawing diagrams. Functions that take a
 /// `const cr_limits *` use the defaults for `NULL`. Unlike the other handles,
@@ -50,12 +53,12 @@ pub extern "C" fn cr_limits_new() -> *mut cr_limits {
 }
 
 fn which(limit: cr_limit) -> Outcome<cr_limit> {
-    if (CR_LIMIT_MAX_SIZE..=CR_LIMIT_MAX_DIAGRAM_SIZE).contains(&limit) {
+    if (CR_LIMIT_MAX_SIZE..=CR_LIMIT_MAX_PATH_SEGMENTS).contains(&limit) {
         Ok(limit)
     } else {
         Err(Failure::Invalid(
             format!("limit {limit} is not a CR_LIMIT_* constant"),
-            "use CR_LIMIT_MAX_SIZE (1) to CR_LIMIT_MAX_DIAGRAM_SIZE (8)",
+            "use CR_LIMIT_MAX_SIZE (1) to CR_LIMIT_MAX_PATH_SEGMENTS (9)",
         ))
     }
 }
@@ -85,7 +88,8 @@ pub unsafe extern "C" fn cr_limits_set(
             CR_LIMIT_MAX_YAML_SIZE => l.max_yaml_size = value,
             CR_LIMIT_MAX_TEXT_SIZE => l.max_text_size = value,
             CR_LIMIT_MAX_VALUES => l.max_values = value,
-            _ => l.max_diagram_size = value,
+            CR_LIMIT_MAX_DIAGRAM_SIZE => l.max_diagram_size = value,
+            _ => l.max_path_segments = value,
         }
         Ok(())
     };
@@ -118,7 +122,8 @@ pub unsafe extern "C" fn cr_limits_get(
             CR_LIMIT_MAX_YAML_SIZE => l.max_yaml_size,
             CR_LIMIT_MAX_TEXT_SIZE => l.max_text_size,
             CR_LIMIT_MAX_VALUES => l.max_values,
-            _ => l.max_diagram_size,
+            CR_LIMIT_MAX_DIAGRAM_SIZE => l.max_diagram_size,
+            _ => l.max_path_segments,
         };
         // SAFETY: `value` is NULL or writable (# Safety).
         unsafe { write_out(value, read, "value") }

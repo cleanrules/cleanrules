@@ -275,7 +275,8 @@ texts, and the grid the limits below.
 ## Limits
 
 Tables have the limits of documents (`json-format.md`, *Errors and limits*):
-size, nesting, and the depth of every header and cell. A table also expands as
+size, nesting, the depth of every header and cell, and the length of every
+field path in them (`max_path_segments`). A table also expands as
 it is read: every row has a cell per column, even when CSV leaves them out, and
 the condition of every input cell that is not `-` holds a copy of its column's
 expression. So readers count, as they read, one for every cell and the nodes of

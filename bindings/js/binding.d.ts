@@ -653,6 +653,11 @@ export interface Limits {
    * default; `spec/data-model.md`, *Reading native data*, *Limits*).
    */
   maxValues?: number
+  /**
+   * The most segments a field path may have, in every format (256 by
+   * default); `F` and `field` check the default.
+   */
+  maxPathSegments?: number
 }
 
 /**

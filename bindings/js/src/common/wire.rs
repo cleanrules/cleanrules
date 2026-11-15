@@ -56,9 +56,13 @@ const FRESH_TOKENS: u64 = 1 << 53;
 /// are checked against `max_values` before they are allocated, so that a
 /// short text never makes a long list.
 pub(crate) fn decode(text: &str, max_values: usize) -> Result<Read, String> {
-    // The reader nests at most 256 containers, three arrays each.
+    // The text is the reader's own: three arrays for each container of the
+    // sparse tree, which is as deep as the rule set's longest path (at most
+    // its `max_path_segments`) plus a value converted whole (at most 256
+    // containers). The parser and the decoder use explicit stacks, so the
+    // nesting needs no bound of its own here.
     let mut limits = Limits::default().with_max_size(usize::MAX);
-    limits.max_nesting = 1024;
+    limits.max_nesting = usize::MAX;
     let json = parse(text, &limits).map_err(|error| error.to_string())?;
     let mut decoder = Decoder {
         errors: Vec::new(),
@@ -119,16 +123,135 @@ fn pair(json: &Json) -> Result<(&Json, &Json), String> {
     }
 }
 
+/// A list or map being decoded: what is left of its elements, and what it
+/// holds so far.
+enum Frame<'j> {
+    /// `l`: every element given.
+    List {
+        elements: std::slice::Iter<'j, Json>,
+        list: Vec<Value>,
+    },
+    /// `L`: a list of a given length, and the elements a path reads.
+    Sparse {
+        entries: std::slice::Iter<'j, Json>,
+        list: Vec<Value>,
+        slot: usize,
+    },
+    /// `O`: a map, in order.
+    Map {
+        entries: std::slice::Iter<'j, Json>,
+        map: Map,
+        key: String,
+    },
+}
+
+/// What a form starts: a value, or a container whose elements come next.
+enum Start<'j> {
+    Value(Value),
+    Container(Frame<'j>),
+}
+
+impl<'j> Frame<'j> {
+    /// Keep the element just decoded.
+    fn place(&mut self, value: Value) {
+        match self {
+            Frame::List { list, .. } => list.push(value),
+            Frame::Sparse { list, slot, .. } => list[*slot] = value,
+            Frame::Map { map, key, .. } => map.insert(std::mem::take(key), value),
+        }
+    }
+
+    /// The next element to decode, with its segment pushed onto `at`; `None`
+    /// once every element is decoded.
+    fn next(&mut self, at: &mut Vec<Segment>) -> Result<Option<&'j Json>, String> {
+        Ok(match self {
+            Frame::List { elements, list } => elements.next().inspect(|_| {
+                at.push(Segment::Index(list.len() as u64));
+            }),
+            Frame::Sparse {
+                entries,
+                list,
+                slot,
+            } => match entries.next() {
+                None => None,
+                Some(entry) => {
+                    let (index, element) = pair(entry)?;
+                    let index: usize = small(Some(index))?;
+                    if index >= list.len() {
+                        return Err(format!("index {index} is beyond {}", list.len()));
+                    }
+                    *slot = index;
+                    at.push(Segment::Index(index as u64));
+                    Some(element)
+                }
+            },
+            Frame::Map { entries, key, .. } => match entries.next() {
+                None => None,
+                Some(entry) => {
+                    let (name, element) = pair(entry)?;
+                    text(Some(name))?.clone_into(key);
+                    at.push(Segment::Key(key.clone()));
+                    Some(element)
+                }
+            },
+        })
+    }
+
+    fn finish(self) -> Value {
+        match self {
+            Frame::List { list, .. } | Frame::Sparse { list, .. } => Value::List(list),
+            Frame::Map { map, .. } => Value::Map(map),
+        }
+    }
+}
+
 impl Decoder {
-    fn value(&mut self, json: &Json) -> Result<Value, String> {
-        Ok(match json {
+    /// The value of a form, depth first with an explicit stack: the sparse
+    /// tree is as deep as the rule set's longest path, and a host thread's
+    /// stack (a worker's) may be small.
+    fn value<'j>(&mut self, root: &'j Json) -> Result<Value, String> {
+        let mut stack: Vec<Frame<'j>> = Vec::new();
+        let mut pending = Some(root);
+        loop {
+            let mut done = match pending.take() {
+                Some(json) => match self.start(json)? {
+                    Start::Value(value) => Some(value),
+                    Start::Container(frame) => {
+                        stack.push(frame);
+                        None
+                    }
+                },
+                None => None,
+            };
+            // Give the value to its container, then find the container's next
+            // element, closing the containers that have none left.
+            loop {
+                let Some(top) = stack.last_mut() else {
+                    return done.ok_or_else(|| "nothing was decoded".to_owned());
+                };
+                if let Some(value) = done.take() {
+                    top.place(value);
+                    self.at.pop();
+                }
+                if let Some(json) = top.next(&mut self.at)? {
+                    pending = Some(json);
+                    break;
+                }
+                done = stack.pop().map(Frame::finish);
+            }
+        }
+    }
+
+    /// A scalar value, or a container to fill.
+    fn start<'j>(&mut self, json: &'j Json) -> Result<Start<'j>, String> {
+        Ok(Start::Value(match json {
             Json::Null => Value::Null(NullCause::Null),
             Json::Bool(boolean) => Value::Bool(*boolean),
             Json::String(text) => Value::String(text.clone()),
-            Json::Array(form) => self.form(form)?,
+            Json::Array(form) => return self.form(form),
             Json::Number(number) => return Err(format!("a bare number {}", number.text())),
             Json::Object(_) => return Err("an object".to_owned()),
-        })
+        }))
     }
 
     /// An opaque value: with `token` (the reader's, for the native object),
@@ -197,10 +320,10 @@ impl Decoder {
         })
     }
 
-    fn form(&mut self, form: &[Json]) -> Result<Value, String> {
+    fn form<'j>(&mut self, form: &'j [Json]) -> Result<Start<'j>, String> {
         let tag = text(form.first())?;
         let arg = |i: usize| form.get(i);
-        Ok(match tag {
+        Ok(Start::Value(match tag {
             "i" => Value::Int(small(arg(1))?),
             "f" => {
                 let repr = text(arg(1))?;
@@ -218,13 +341,10 @@ impl Decoder {
             "D" | "N" | "A" => self.datetime(tag, form)?,
             "l" => {
                 let elements = items(arg(1))?;
-                let mut list = Vec::with_capacity(elements.len());
-                for (index, element) in elements.iter().enumerate() {
-                    self.at.push(Segment::Index(index as u64));
-                    list.push(self.value(element)?);
-                    self.at.pop();
-                }
-                Value::List(list)
+                return Ok(Start::Container(Frame::List {
+                    list: Vec::with_capacity(elements.len()),
+                    elements: elements.iter(),
+                }));
             }
             "L" => {
                 let len: usize = small(arg(1))?;
@@ -233,33 +353,21 @@ impl Decoder {
                     .checked_sub(len)
                     .ok_or_else(|| format!("a list of {len} is beyond max_values"))?;
                 // The list keeps its length; holes stand for elements no path reads.
-                let mut list = vec![Value::Null(NullCause::Null); len];
-                for entry in items(arg(2))? {
-                    let (index, element) = pair(entry)?;
-                    let index: usize = small(Some(index))?;
-                    let slot = list
-                        .get_mut(index)
-                        .ok_or_else(|| format!("index {index} is beyond {len}"))?;
-                    self.at.push(Segment::Index(index as u64));
-                    *slot = self.value(element)?;
-                    self.at.pop();
-                }
-                Value::List(list)
+                return Ok(Start::Container(Frame::Sparse {
+                    entries: items(arg(2))?.iter(),
+                    list: vec![Value::Null(NullCause::Null); len],
+                    slot: 0,
+                }));
             }
             // A hole or an `undefined` element: null, as a list cannot hold a
             // missing element (`spec/data-model.md`, *Lists and maps*).
             "M" => Value::Null(NullCause::Null),
             "O" => {
-                let mut map = Map::new();
-                for entry in items(arg(1))? {
-                    let (key, element) = pair(entry)?;
-                    let key = text(Some(key))?.to_owned();
-                    self.at.push(Segment::Key(key.clone()));
-                    let element = self.value(element)?;
-                    self.at.pop();
-                    map.insert(key, element);
-                }
-                Value::Map(map)
+                return Ok(Start::Container(Frame::Map {
+                    entries: items(arg(1))?.iter(),
+                    map: Map::new(),
+                    key: String::new(),
+                }));
             }
             "X" => Value::Opaque(Opaque {
                 type_name: text(arg(1))?.to_owned(),
@@ -273,6 +381,6 @@ impl Decoder {
             "IO" => Value::Null(NullCause::IntOverflow),
             "DO" => Value::Null(NullCause::DecimalOverflow),
             other => return Err(format!("an unknown form {other:?}")),
-        })
+        }))
     }
 }

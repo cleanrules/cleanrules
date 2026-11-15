@@ -316,8 +316,12 @@ Formats are `"json"`, `"yaml"`, `"text"` (the rule syntax) and `"csv"`
 (decision tables). Texts are strings or bytes (`Uint8Array`, `Buffer`); bytes
 that are not UTF-8 are a `FormatError` at their line and column. `limits` is an
 object with any of `maxSize` (bytes, for every format), `maxNesting`,
-`maxDepth`, `maxTableSize`, `maxYamlSize`, `maxTextSize` and `maxValues`. The
-defaults (explanations and summaries as text) are those of C++. `maxValues`
+`maxDepth`, `maxTableSize`, `maxYamlSize`, `maxTextSize`, `maxPathSegments`
+and `maxValues`. The defaults (explanations and summaries as text) are those
+of C++. `maxPathSegments` (256 by default) bounds the segments of a field path
+in every format, so the data read along a path stays shallow; `F` and `field`
+check the default, and beyond it the error is a `FormatError` with code
+`limit_exceeded` and `context.name` `max_path_segments`. `maxValues`
 (1,000,000 by default) bounds what is read from native data, the only limit
 that applies to it: each value placed where a path ends or stops counts, with
 everything inside it, an object referenced from several places each time, and
@@ -475,8 +479,8 @@ Formats are `'json'` (the default for `loads` and `dumps`), `'yaml'`, `'text'`
 `.csv`) gives its format unless `format` says, and an unknown one is a
 `RangeError`. Reading is the core's, strict and bounded: errors have a JSON
 Pointer or a line and column, and `limits` are the native layer's (`maxSize`,
-`maxNesting`, `maxDepth`, `maxTableSize`, `maxYamlSize`, `maxTextSize`). A
-file larger than its format's limit is not read. A rule's action is the name
+`maxNesting`, `maxDepth`, `maxTableSize`, `maxYamlSize`, `maxTextSize`,
+`maxPathSegments`). A file larger than its format's limit is not read. A rule's action is the name
 the document gives it, unbound unless `actions` (an object or a `Map` of
 functions) binds it, as `RuleSet.bind` does; `ruleFromText` also takes `do`, a
 function, which a name in the text (`DO notify`) is bound to. Rules and rule

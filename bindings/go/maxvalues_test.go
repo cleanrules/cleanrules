@@ -330,6 +330,12 @@ func TestMaxValuesConstants(t *testing.T) {
 	limitError(t, "metadata by With", err, 1_000_000, -1, "other")
 	_, err = NewRule("tagged", Const(true), WithTags(make([]string, 1_000_000)...))
 	limitError(t, "tags", err, 1_000_000, -1, "tagged")
+	// Their hint does not suggest raising a limit the caller cannot raise.
+	var constant *Error
+	if !errors.As(err, &constant) || !strings.Contains(constant.Hint, "default max_values") ||
+		strings.Contains(constant.Hint, "raise max_values") {
+		t.Errorf("constant hint: %v", err)
+	}
 
 	// Within the default, as before; the evaluation's limit does not reach
 	// them.
@@ -397,11 +403,16 @@ func TestNoABINames(t *testing.T) {
 		nested = []any{nested}
 	}
 	var data any = nested
-	for range 900 {
+	text := "RULE far IF TRUE THEN v = k"
+	for i := range 900 {
 		path = append(path, "k")
 		data = map[string]any{"k": data}
+		if i > 0 {
+			text += ".k"
+		}
 	}
-	far := ruleSet(t, nil, rule(t, "far", Const(true), Then("v", Field(path...))))
+	// A path longer than max_path_segments, read with the limit raised.
+	far := ruleSet(t, nil, must(RuleFromText(text, WithLimits(Limits{MaxPathSegments: 900})))(t))
 	for name, err := range map[string]error{
 		"max_values": func() error { _, err := rs.Evaluate(map[string]any{"a": []int{1, 2}}, maxValues(2)); return err }(),
 		"batch max_values": func() error {
@@ -419,6 +430,7 @@ func TestNoABINames(t *testing.T) {
 		"nesting":        func() error { _, err := far.Evaluate(data); return err }(),
 		"NaN":            Const(math.NaN()).Err(),
 		"empty path":     Field().Err(),
+		"long path":      Field(path...).Err(),
 		"bad document":   func() error { _, err := Loads("{"); return err }(),
 		"deep document":  func() error { _, err := Loads(`[[[1]]]`, WithLimits(Limits{MaxNesting: 1})); return err }(),
 		"text not UTF-8": func() error { _, err := RuleFromText("\xff"); return err }(),

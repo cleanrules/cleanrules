@@ -34,6 +34,9 @@ public final class Conditions {
      * @return the field
      * @throws ExpressionException for an empty path, an empty key, a negative
      *     index or a segment of another kind
+     * @throws FormatException with the code {@code limit_exceeded} for a path
+     *     of more than 256 segments, the default
+     *     {@link Limits#maxPathSegments()}
      */
     public static Field field(Object... path) {
         Objects.requireNonNull(path, "path");

@@ -17,7 +17,8 @@ import java.util.Arrays;
  */
 public final class Limits {
     private static final String[] NAMES = {
-        "maxSize", "maxNesting", "maxDepth", "maxTableSize", "maxYamlSize", "maxTextSize", "maxValues"
+        "maxSize", "maxNesting", "maxDepth", "maxTableSize", "maxYamlSize", "maxTextSize", "maxValues",
+        "maxPathSegments"
     };
     private static final int SIZE = 0;
     private static final int NESTING = 1;
@@ -26,6 +27,7 @@ public final class Limits {
     private static final int YAML_SIZE = 4;
     private static final int TEXT_SIZE = 5;
     private static final int VALUES = 6;
+    private static final int PATH_SEGMENTS = 7;
 
     private static final class Defaults {
         static final Limits LIMITS = new Limits(Native.defaultLimits());
@@ -130,6 +132,31 @@ public final class Limits {
      */
     public long maxValues() {
         return values[VALUES];
+    }
+
+    /**
+     * The most segments a field path may have, in every format: 256 by
+     * default. It keeps the data read along a path shallow
+     * ({@code spec/json-format.md}, <i>Errors and limits</i>). Beyond it, a
+     * reader throws a {@link FormatException} with the code
+     * {@code limit_exceeded} and the name {@code max_path_segments};
+     * {@link Conditions#field(Object...)} checks the default.
+     *
+     * @return the limit
+     */
+    public long maxPathSegments() {
+        return values[PATH_SEGMENTS];
+    }
+
+    /**
+     * These limits with another limit on the segments of a field path.
+     *
+     * @param segments the most segments, 0 or more
+     * @return the new limits
+     * @throws IllegalArgumentException if {@code segments} is negative
+     */
+    public Limits withMaxPathSegments(long segments) {
+        return with(segments, "maxPathSegments", PATH_SEGMENTS);
     }
 
     /**

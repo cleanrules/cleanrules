@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Path length limit (task B.12; `spec/json-format.md`, *Errors and limits*):
+  a field path has at most `max_path_segments` segments, 256 by default, in
+  conditions, payload values and the headers and cells of decision tables, in
+  every format. Readers report the first segment beyond with
+  `limit_exceeded` (`name` `max_path_segments`), at its JSON Pointer or, in
+  text and CSV, where it starts; constructors check the default. The limit
+  bounds the sparse value tree that a binding reads along a path, which was
+  as deep as the longest path a rule set reads and was freed recursively, so
+  a few hundred KiB of untrusted rules could overflow a host thread's stack.
+  12 conformance vectors (JSON, YAML, text and CSV, at the limit and beyond).
+  Constructors' errors show the start of the path and say how to get a
+  longer one (a document read with the limit raised, or `Node::field_within`
+  in Rust).
+- Agents (`spec/agents.md`, *Building the schema*): an input schema describes
+  paths up to `MAX_SCHEMA_DEPTH` (32) segments; a place that deep with fields
+  below it is `{"description": ...}` and accepts anything, so a long path
+  cannot make a deep schema. One vector. Core: `agents::MAX_SCHEMA_DEPTH`.
+- Core: `value::too_many_constant_values` and `ValueCount::for_constants` /
+  `ValueCount::beyond`: a native constant or rule metadata beyond the default
+  `max_values` gets a hint that does not suggest raising a limit the caller
+  cannot raise (Python, JavaScript, Java and Go use it). C ABI:
+  `cr_error_new_constant_max_values(rule, rule_len, out, error)`.
+- Core: `Limits::max_path_segments` and `Node::field_within(path, &limits)`;
+  `Node::field` and `build::field(..).get(..)`/`.index(..)` refuse more than
+  256 segments. `Value::drop_iteratively` stays for very small stacks.
+- C ABI: `CR_LIMIT_MAX_PATH_SEGMENTS` (9); `cr_node_new_field` checks the
+  default. C++: `cr::limit::max_path_segments`. Go: `Limits.MaxPathSegments`
+  (a new field: `Limits` literals must name their fields).
+  Java: `Limits.maxPathSegments()` and `withMaxPathSegments(n)`. JavaScript:
+  `limits.maxPathSegments`. Python: `max_path_segments=` in `loads`, `load`,
+  `rule_from_text`, `DecisionTable` and `DecisionTable.from_dataframe`.
+  Erlang NIF: `max_path_segments` in the limits map and in
+  `default_limits()`.
+
 - Tools for AI agents (`spec/agents.md`, task O.1): the contract that the MCP
   server (O.2) and the agent guardrails (O.3) implement. Five tools,
   `list_rulesets`, `summary`, `evaluate`, `explain` and `validate`, with
@@ -1199,6 +1233,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Field paths longer than 256 segments are refused by default (task B.12):
+  by every reader unless `max_path_segments` is raised, and by the field
+  constructors of every language (`Node::field`, `cr_node_new_field`, `F` and
+  `Field` in Python, `field` in JavaScript, `Conditions.field` on the JVM,
+  `Field` in Go, `node::field` in C++), with `limit_exceeded`.
 - `registry_error` is also raised for a rule set or a tool that a tool call
   for agents names (`spec/errors.md`, `spec/agents.md`), with the pointer
   `/ruleset` for a rule set.
@@ -1385,6 +1424,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already did (task D.5).
 ### Fixed
 
+- JavaScript (task B.12): the sparse value tree of an input was decoded
+  recursively, with large frames in a debug build, so a rule set reading a
+  path of 256 segments crashed a worker thread with a 1 MiB stack; and a
+  value converted whole at the end of a long path went beyond the decoder's
+  nesting bound (an internal error). The decoder now uses an explicit stack
+  and has no nesting bound of its own. The reader of JavaScript data
+  (`lib/read.js`), the encoding of values given back (`out::value`) and their
+  decoding (`lib/output.js`) were recursive too, and failed in a worker with
+  a small stack (Windows, 0.5 MiB); they now use explicit stacks.
+- Python (task B.12): the reader of Python data was recursive, so a path of
+  256 segments ending at a deeply nested value crashed Python 3.11 on a
+  512 KiB thread; it now uses an explicit stack.
 - Java (task G.4): `maxNesting` and the other document limits given to an
   evaluation bounded the Java (and Scala) data read for it, which only
   `maxValues` should do, as in Python, JavaScript and Go

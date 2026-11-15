@@ -78,9 +78,14 @@ The whole program, with explanations and errors, is
   count the values they read for one input and, beyond the limit, stop and
   refuse the input with the core's error, `cr_error_new_max_values(limit, row,
   rule, len, ...)` (`CR_LIMIT_EXCEEDED`, `name` `max_values`; `spec/data-model.md`,
-  *Reading native data*, *Limits*). The ABI does not count the values a
+  *Reading native data*, *Limits*), or, for a constant or metadata read under
+  the default, `cr_error_new_constant_max_values(rule, len, ...)`, whose hint
+  does not suggest raising the limit. The ABI does not count the values a
   program builds itself. `CR_LIMIT_MAX_DIAGRAM_SIZE` (20,000 by default)
-  bounds the elements of a diagram.
+  bounds the elements of a diagram. `CR_LIMIT_MAX_PATH_SEGMENTS` (256 by
+  default) bounds the segments of a field path in every format, so the data a
+  binding reads along a path stays shallow; `cr_node_new_field` checks the
+  default (`CR_LIMIT_EXCEEDED`, `name` `max_path_segments`).
 - **Diagrams.** `cr_node_draw`, `cr_rule_draw`, `cr_ruleset_draw`,
   `cr_decision_draw` (its explanation) and `cr_document_draw` (any document;
   a decision table's HTML grid, with an optional decision) write a diagram in

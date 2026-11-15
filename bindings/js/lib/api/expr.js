@@ -448,7 +448,10 @@ function expressions(native, build) {
     return wrap(native.Node.read(text))
   }
 
-  /** A field by its path: keys (strings) and indices (whole numbers from 0). */
+  /**
+   * A field by its path: keys (strings) and indices (whole numbers from 0); at
+   * most 256 of them, the default `maxPathSegments` (`limit_exceeded` beyond).
+   */
   function field(...path) {
     return wrap(native.nodeField(path))
   }

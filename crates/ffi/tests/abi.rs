@@ -175,7 +175,7 @@ fn null_and_unknown_arguments_are_invalid() {
     let limits = common::limits(&[]);
     let mut error = ptr::null_mut();
     // SAFETY: a live handle and a writable error.
-    let status = unsafe { cr_limits_set(limits.0, 9, 1, &raw mut error) };
+    let status = unsafe { cr_limits_set(limits.0, 10, 1, &raw mut error) };
     assert_eq!(status, CR_INVALID_ARGUMENT);
     invalid(common::take(error));
     // NULL handles and out-parameters.
@@ -249,6 +249,7 @@ fn limits_are_set_and_read() {
         (CR_LIMIT_MAX_TABLE_SIZE, 3),
         (CR_LIMIT_MAX_VALUES, 12),
         (CR_LIMIT_MAX_DIAGRAM_SIZE, 9),
+        (CR_LIMIT_MAX_PATH_SEGMENTS, 4),
     ]);
     for (which, wanted) in [
         (CR_LIMIT_MAX_SIZE, 10),
@@ -259,6 +260,7 @@ fn limits_are_set_and_read() {
         (CR_LIMIT_MAX_TEXT_SIZE, 10),
         (CR_LIMIT_MAX_VALUES, 12),
         (CR_LIMIT_MAX_DIAGRAM_SIZE, 9),
+        (CR_LIMIT_MAX_PATH_SEGMENTS, 4),
     ] {
         let mut value = 0;
         // SAFETY: a live handle and a writable value.
@@ -283,8 +285,8 @@ fn limits_are_set_and_read() {
         .unwrap();
     assert_eq!(failure.status, CR_LIMIT_EXCEEDED);
     assert!(common::read_document(RULES.as_bytes(), CR_FORMAT_JSON, Some(&limits)).is_ok());
-    // max_values defaults to a million, and max_diagram_size, the last limit,
-    // to 20,000.
+    // max_values defaults to a million, max_diagram_size to 20,000, and
+    // max_path_segments, the last limit, to 256.
     let mut value = 0;
     // SAFETY: a live handle and a writable value.
     let status = unsafe {
@@ -306,16 +308,26 @@ fn limits_are_set_and_read() {
         )
     };
     assert_eq!((status, value), (CR_OK, 20_000));
+    // SAFETY: a live handle and a writable value.
+    let status = unsafe {
+        cr_limits_get(
+            limits.0,
+            CR_LIMIT_MAX_PATH_SEGMENTS,
+            &raw mut value,
+            ptr::null_mut(),
+        )
+    };
+    assert_eq!((status, value), (CR_OK, 256));
     let mut error = ptr::null_mut();
     // SAFETY: a live handle and a writable value and error.
-    let status = unsafe { cr_limits_get(limits.0, 9, &raw mut value, &raw mut error) };
+    let status = unsafe { cr_limits_get(limits.0, 10, &raw mut value, &raw mut error) };
     assert_eq!(status, CR_INVALID_ARGUMENT);
     let failure = common::take(error);
     let Json::Object(members) = &failure.json else {
         panic!()
     };
     assert!(members.iter().any(|(k, v)| k == "hint"
-        && matches!(v, Json::String(h) if h.contains("CR_LIMIT_MAX_DIAGRAM_SIZE (8)"))));
+        && matches!(v, Json::String(h) if h.contains("CR_LIMIT_MAX_PATH_SEGMENTS (9)"))));
 }
 
 #[test]

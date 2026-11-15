@@ -182,6 +182,9 @@ type reader struct {
 	// the rule whose metadata this reads ("" for none), for the error.
 	maxValues, left, row int
 	rule                 string
+	// constant is set for constants and metadata, read under the default
+	// max_values, which the caller cannot raise: their error says so.
+	constant bool
 }
 
 type memoKey struct {
@@ -215,6 +218,7 @@ func newReader(maxValues int) *reader {
 func dataReader(rule string) *reader {
 	r := newReader(defaultMaxValues())
 	r.rule = rule
+	r.constant = true
 	return r
 }
 
@@ -296,7 +300,11 @@ func (r *reader) recoverRead(value **C.cr_value, err *error) {
 		case readFailure:
 			*value, *err = nil, p.err
 		case beyondLimit:
-			*value, *err = nil, maxValuesError(r.maxValues, r.row, r.rule)
+			if r.constant {
+				*value, *err = nil, constantMaxValuesError(r.rule)
+			} else {
+				*value, *err = nil, maxValuesError(r.maxValues, r.row, r.rule)
+			}
 		default:
 			panic(p)
 		}
@@ -310,6 +318,18 @@ func maxValuesError(maxValues, row int, rule string) error {
 	p, n := text(rule)
 	var out, e *C.cr_error
 	if err := check(C.cr_error_new_max_values(C.size_t(maxValues), C.int64_t(row), p, n, &out, &e), e); err != nil {
+		return err
+	}
+	return check(C.CR_LIMIT_EXCEEDED, out)
+}
+
+// constantMaxValuesError is the core's limit_exceeded for a constant or
+// metadata beyond the default max_values, with the rule whose metadata it is
+// (or "").
+func constantMaxValuesError(rule string) error {
+	p, n := text(rule)
+	var out, e *C.cr_error
+	if err := check(C.cr_error_new_constant_max_values(p, n, &out, &e), e); err != nil {
 		return err
 	}
 	return check(C.CR_LIMIT_EXCEEDED, out)

@@ -281,6 +281,14 @@ their paths first appear among the fields. Each node gets a schema:
    `anyOf` with its alternatives followed by `{"type": "null"}`, when it has
    alternatives. A field without alternatives (read only by `is_null` or as a
    payload value, say) accepts anything: it has the `description` alone.
+4. A node **32 path segments deep** (`MAX_SCHEMA_DEPTH`) below which fields
+   are read is not described further, so that a long path (up to
+   `max_path_segments`, 256 by default) cannot make a deep schema: it is
+   `{"description": ...}` alone and accepts anything. The description is
+   `fields below are not described (deeper than 32 path segments)`, after the
+   node's own description and `; ` when the node is also a field. The nodes
+   below it are left out; *Required members* still counts the conditions that
+   read them, so the node may be required.
 
 The `description` says where the field is read, as the summary's text does
 (`explain.md`, *Summaries*): `conditions of vip, loyal; payloads of loyal

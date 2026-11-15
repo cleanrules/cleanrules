@@ -33,7 +33,7 @@ use compact::budget_error;
 pub use compact::{
     CompactExplanation, DEFAULT_BUDGET, MAX_BUDGET, MAX_LINE, MIN_BUDGET, compact_explanation,
 };
-pub use schema::{MAX_PREFIX_ITEMS, input_schema};
+pub use schema::{MAX_PREFIX_ITEMS, MAX_SCHEMA_DEPTH, input_schema};
 
 use crate::error::{Error, ErrorCode, Result, Segment};
 use crate::explain::{Summary, explain, summary};

@@ -20,9 +20,7 @@ use std::collections::HashMap;
 
 use cleanrules::jiff::civil::{Date, DateTime};
 use cleanrules::jiff::tz::Offset;
-use cleanrules::value::{
-    AwareDateTime, Decimal, DecimalError, Opaque, ValueCount, Zone, too_many_values,
-};
+use cleanrules::value::{AwareDateTime, Decimal, DecimalError, Opaque, ValueCount, Zone};
 use cleanrules::{Error, Map, NullCause, Value};
 use rustler::types::map::MapIterator;
 use rustler::types::tuple::get_tuple;
@@ -278,7 +276,7 @@ impl<'a> Reader<'a> {
                             // beyond what is left is refused before the list is
                             // allocated.
                             if len > self.count.remaining() {
-                                return Err(too_many_values(self.count.limit()).into());
+                                return Err(self.count.beyond().into());
                             }
                             self.work(len)?;
                             tasks.push(Task::List(len));

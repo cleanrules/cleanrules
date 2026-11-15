@@ -277,6 +277,10 @@ typedef int32_t cr_value_type;
 // by default).
 #define CR_LIMIT_MAX_DIAGRAM_SIZE 8
 
+// The most segments a field's path may have, in every format (256 by
+// default). `cr_node_new_field` checks the default.
+#define CR_LIMIT_MAX_PATH_SEGMENTS 9
+
 // A null, with its reason.
 #define CR_VALUE_NULL 1
 
@@ -924,6 +928,21 @@ cr_status cr_error_new_action(const char *rule,
                               struct cr_error **out,
                               struct cr_error **error);
 
+// A new `limit_exceeded` for a native constant or rule metadata beyond the
+// default `max_values`, under which they are always converted
+// (`spec/data-model.md`, *Reading native data*, *Limits*): as
+// `cr_error_new_max_values`, without a row, and with a hint that does not
+// suggest raising the limit, which the caller cannot do. `rule` is the rule
+// whose metadata or constant it is, or `NULL`.
+//
+// # Safety
+//
+// As `cr_error_new_max_values`.
+cr_status cr_error_new_constant_max_values(const char *rule,
+                                           size_t rule_len,
+                                           struct cr_error **out,
+                                           struct cr_error **error);
+
 // A new `limit_exceeded` for native data beyond `max_values`
 // (`spec/data-model.md`, *Reading native data*, *Limits*), made by the core
 // for the bindings that read native data on this ABI and count what they
@@ -1382,7 +1401,9 @@ cr_status cr_node_new_constant(const struct cr_value *value,
 // split at dots) and ints from 0 (indexes), as `cr_node_field_paths` gives
 // them; it stays the caller's. An empty path, an empty key, or a segment of
 // another kind (a negative int, a boolean...) is a `CR_EXPRESSION_ERROR`; a
-// `path` that is not a list is `CR_INVALID_ARGUMENT`.
+// path of more than 256 segments (the default `CR_LIMIT_MAX_PATH_SEGMENTS`)
+// is a `CR_LIMIT_EXCEEDED`; a `path` that is not a list is
+// `CR_INVALID_ARGUMENT`.
 //
 // # Safety
 //

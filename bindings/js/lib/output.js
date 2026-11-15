@@ -27,12 +27,47 @@ function plainObject(entries) {
   return object
 }
 
+/** Where a list or map of `decode` closes: its length, or its keys. */
+class Close {
+  constructor(length, keys = null) {
+    this.length = length
+    this.keys = keys
+  }
+}
+
 /**
  * The JavaScript value of `form`; an opaque value is its object in
  * `objects` (by token), or `null` when there is none (a recorded decision
- * keeps only the type's name).
+ * keeps only the type's name). Children before their parents, with an
+ * explicit stack: a value given back may be as deep as data given as JSON.
  */
 function decode(form, objects) {
+  const tasks = [form]
+  const done = []
+  while (tasks.length > 0) {
+    const task = tasks.pop()
+    if (task instanceof Close) {
+      const items = done.splice(done.length - task.length, task.length)
+      done.push(task.keys === null ? items : plainObject(task.keys.map((key, i) => [key, items[i]])))
+    } else if (Array.isArray(task) && task[0] === 'l') {
+      tasks.push(new Close(task[1].length))
+      for (let i = task[1].length - 1; i >= 0; i -= 1) {
+        tasks.push(task[1][i])
+      }
+    } else if (Array.isArray(task) && task[0] === 'O') {
+      tasks.push(new Close(task[1].length, task[1].map(([key]) => key)))
+      for (let i = task[1].length - 1; i >= 0; i -= 1) {
+        tasks.push(task[1][i][1])
+      }
+    } else {
+      done.push(scalar(task, objects))
+    }
+  }
+  return done[0]
+}
+
+/** The JavaScript value of a form that is not a list or a map. */
+function scalar(form, objects) {
   if (form === null || typeof form !== 'object') {
     return form
   }
@@ -49,10 +84,6 @@ function decode(form, objects) {
       return new NaiveDateTime(form[1], form[2], form[3], form[4], form[5], form[6], form[7])
     case 'A':
       return zoned(form.slice(1))
-    case 'l':
-      return form[1].map((item) => decode(item, objects))
-    case 'O':
-      return plainObject(form[1].map(([key, item]) => [key, decode(item, objects)]))
     case 'X': {
       const token = Number(form[2])
       return Number.isSafeInteger(token) && token < objects.length ? objects[token] : null

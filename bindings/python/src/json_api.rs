@@ -46,7 +46,7 @@ fn input(py: Python<'_>, text: &str) -> PyResult<Value> {
 
 /// Read a document; its canonical form.
 #[pyfunction]
-#[pyo3(signature = (text, max_size=None, max_nesting=None, max_depth=None))]
+#[pyo3(signature = (text, max_size=None, max_nesting=None, max_depth=None, max_path_segments=None))]
 #[pyo3(name = "_read_document")]
 pub(crate) fn py_read_document(
     py: Python<'_>,
@@ -54,8 +54,13 @@ pub(crate) fn py_read_document(
     max_size: Option<usize>,
     max_nesting: Option<usize>,
     max_depth: Option<usize>,
+    max_path_segments: Option<usize>,
 ) -> PyResult<String> {
-    let document = read_document(text, &limits(max_size, max_nesting, max_depth)).or_raise(py)?;
+    let mut limits = limits(max_size, max_nesting, max_depth);
+    if let Some(segments) = max_path_segments {
+        limits.max_path_segments = segments;
+    }
+    let document = read_document(text, &limits).or_raise(py)?;
     Ok(to_string(&write_document(&document)))
 }
 

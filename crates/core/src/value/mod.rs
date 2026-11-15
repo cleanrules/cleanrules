@@ -64,20 +64,37 @@ pub enum NullCause {
 
 /// The error of native data beyond `max_values`: `limit_exceeded`, with the
 /// context `name` set to `max_values` (`spec/data-model.md`, *Reading native
-/// data*, *Limits*). Bindings add the `row` of a batch, or the `rule` whose
-/// metadata or payload constant it is.
-#[must_use]
-pub fn too_many_values(limit: usize) -> Error {
+/// data*, *Limits*), without a hint: [`too_many_values`] and
+/// [`too_many_constant_values`] add the one for inputs or constants.
+fn beyond_max_values(limit: usize) -> Error {
     let mut error = Error::new(
         ErrorCode::LimitExceeded,
         format!("the native data holds more than {limit} values (max_values)"),
-    )
-    .with_hint(
-        "raise max_values, or pass data that shares fewer objects: an object referenced from \
-         several places counts once per reference",
     );
     error.context_mut().name = Some("max_values".to_owned());
     error
+}
+
+/// The error of an input's native data beyond `max_values`. Bindings add the
+/// `row` of a batch.
+#[must_use]
+pub fn too_many_values(limit: usize) -> Error {
+    beyond_max_values(limit).with_hint(
+        "raise max_values, or pass data that shares fewer objects: an object referenced from \
+         several places counts once per reference",
+    )
+}
+
+/// The error of a native constant or rule metadata beyond the default
+/// `max_values`, under which they are always converted: the caller cannot
+/// raise it. Bindings add the `rule` whose metadata or constant it is.
+#[must_use]
+pub fn too_many_constant_values(limit: usize) -> Error {
+    beyond_max_values(limit).with_hint(
+        "constants and rule metadata are converted under the default max_values: pass smaller \
+         metadata, or data that shares fewer objects (an object referenced from several places \
+         counts once per reference)",
+    )
 }
 
 /// Counts the values a binding reads from the native data of one input,
@@ -100,13 +117,41 @@ pub fn too_many_values(limit: usize) -> Error {
 pub struct ValueCount {
     limit: usize,
     count: usize,
+    /// Whether it counts a constant or metadata, under the default limit.
+    constant: bool,
 }
 
 impl ValueCount {
-    /// A count of none, against `limit` (`Limits::max_values`).
+    /// A count of none, against `limit` (`Limits::max_values`), for an input.
     #[must_use]
     pub fn new(limit: usize) -> Self {
-        Self { limit, count: 0 }
+        Self {
+            limit,
+            count: 0,
+            constant: false,
+        }
+    }
+
+    /// A count of none for a native constant or rule metadata, against the
+    /// default `max_values`; beyond it, [`too_many_constant_values`].
+    #[must_use]
+    pub fn for_constants() -> Self {
+        Self {
+            limit: crate::json::Limits::default().max_values,
+            count: 0,
+            constant: true,
+        }
+    }
+
+    /// The error of going beyond this count's limit: [`too_many_values`] for
+    /// an input, [`too_many_constant_values`] for a constant.
+    #[must_use]
+    pub fn beyond(&self) -> Error {
+        if self.constant {
+            too_many_constant_values(self.limit)
+        } else {
+            too_many_values(self.limit)
+        }
     }
 
     /// Count `n` more values. Check before building them, so that a list's
@@ -114,11 +159,11 @@ impl ValueCount {
     ///
     /// # Errors
     ///
-    /// [`too_many_values`] when the count would pass the limit; the count is
-    /// then left as it was.
+    /// [`ValueCount::beyond`] when the count would pass the limit; the count
+    /// is then left as it was.
     pub fn add(&mut self, n: usize) -> Result<(), Error> {
         if n > self.remaining() {
-            return Err(too_many_values(self.limit));
+            return Err(self.beyond());
         }
         self.count += n;
         Ok(())

@@ -238,6 +238,8 @@ std::optional<cr::limits> limits_of(const json::value &given) {
             which = cr::limit::max_depth;
         } else if (member.first == "max_table_size") {
             which = cr::limit::max_table_size;
+        } else if (member.first == "max_path_segments") {
+            which = cr::limit::max_path_segments;
         } else {
             throw vector_error("unknown limit " + member.first);
         }

@@ -65,7 +65,7 @@ import {
   type Truth,
 } from 'cleanrules/native'
 
-const limits: Limits = { maxSize: 1_000_000, maxDepth: 64 }
+const limits: Limits = { maxSize: 1_000_000, maxDepth: 64, maxPathSegments: 32 }
 const format: Format = 'text'
 const ruleset: RuleSet = RuleSet.read('RULE vip\nIF customer.years > 5\nTHEN discount = 0.15\nDO notify', { format, limits })
 const names: string[] = ruleset.ruleNames()

@@ -35,6 +35,8 @@ struct BuildError {
     code: ErrorCode,
     message: String,
     hint: Option<String>,
+    /// The limit exceeded, for `limit_exceeded` (`max_path_segments`).
+    name: Option<String>,
 }
 
 impl From<Error> for BuildError {
@@ -43,17 +45,19 @@ impl From<Error> for BuildError {
             code: error.code(),
             message: error.message().to_owned(),
             hint: error.hint().map(str::to_owned),
+            name: error.context().name.clone(),
         }
     }
 }
 
 impl From<BuildError> for Error {
     fn from(error: BuildError) -> Self {
-        let built = Error::new(error.code, error.message);
-        match error.hint {
-            Some(hint) => built.with_hint(hint),
-            None => built,
+        let mut built = Error::new(error.code, error.message);
+        if let Some(hint) = error.hint {
+            built = built.with_hint(hint);
         }
+        built.context_mut().name = error.name;
+        built
     }
 }
 
@@ -94,6 +98,7 @@ impl Build {
                     code: ErrorCode::ExpressionError,
                     message: format!("only a field has keys and indexes, not '{}'", node.tag()),
                     hint: None,
+                    name: None,
                 })),
             },
             Err(error) => Build(Err(error)),
@@ -232,6 +237,7 @@ impl From<f64> for Build {
                 code: ErrorCode::ExpressionError,
                 message: "NaN cannot be a constant".into(),
                 hint: Some("NaN in the data is null: test it with is_null".into()),
+                name: None,
             }));
         }
         Value::Float(value).into()
@@ -389,6 +395,16 @@ mod tests {
                 Segment::Key("price".into())
             ]
         );
+    }
+
+    #[test]
+    fn a_path_has_at_most_max_path_segments() {
+        let long = |n: usize| (1..n).fold(field("a"), |path, i| path.index(i as u64));
+        assert!(long(256).build().is_ok());
+        let error = long(257).get("b").build().unwrap_err();
+        assert_eq!(error.code(), ErrorCode::LimitExceeded);
+        assert_eq!(error.context().name.as_deref(), Some("max_path_segments"));
+        assert!(error.hint().is_some());
     }
 
     #[test]

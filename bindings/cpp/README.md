@@ -275,7 +275,9 @@ value it comes from changes, moves or is destroyed; `clone()` makes it a
 limits, for the bindings that read native data, count what they convert and
 refuse an input beyond it with `limit_exceeded` (`spec/data-model.md`,
 *Reading native data*, *Limits*). A value you build here is not counted,
-since you build every part of it.
+since you build every part of it. `limit::max_path_segments` (256 by default)
+bounds the segments of a field path in every format; `node::field` checks
+the default and throws a `format_error` with code `limit_exceeded` beyond it.
 
 ## Decisions
 

@@ -487,9 +487,13 @@ and result trees;
 `rule_definition_error` whose hint lists the function's options.
 
 `Limits` mirrors the C ABI's limits (`MaxSize`, `MaxNesting`, `MaxDepth`,
-`MaxTableSize`, `MaxYAMLSize`, `MaxTextSize`, and `MaxValues` for the Go data
-of evaluations, above). A field left at 0 keeps the core's default, and a
-negative one is a `format_error` that names it.
+`MaxTableSize`, `MaxYAMLSize`, `MaxTextSize`, `MaxPathSegments`, and
+`MaxValues` for the Go data of evaluations, above). A field left at 0 keeps
+the core's default, and a negative one is a `format_error` that names it.
+`MaxPathSegments` (256 by default) bounds the segments of a field path in
+every format, so the Go data read along a path stays shallow; `Field` checks
+the default, and beyond the limit the error is a `limit_exceeded` whose `Name`
+is `"max_path_segments"`.
 `MaxSize` is the size limit of every format at once, and `MaxYAMLSize` and
 `MaxTextSize`, when set, change those of YAML and of text and CSV:
 

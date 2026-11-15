@@ -123,7 +123,9 @@ func operand(v any) *Expr {
 
 // Field reads the input along a path of string keys and int indexes, never
 // split at dots: Field("items", 0, "price") is items[0].price, and
-// Field("a.b") the key "a.b".
+// Field("a.b") the key "a.b". A path of more than 256 segments, the default
+// Limits.MaxPathSegments, is a limit_exceeded error (Expr.Err); read a
+// longer one from a document with the limit raised.
 func Field(path ...any) *Expr {
 	value, err := segments(path)
 	if err != nil {

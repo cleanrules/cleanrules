@@ -107,6 +107,22 @@ public final class Native {
     public static final int CR_LIMIT_MAX_YAML_SIZE = 5;
     public static final int CR_LIMIT_MAX_TEXT_SIZE = 6;
     public static final int CR_LIMIT_MAX_VALUES = 7;
+    public static final int CR_LIMIT_MAX_PATH_SEGMENTS = 9;
+
+    /**
+     * The limits that {@code Limits} carries, in its order: the size first,
+     * since it sets the YAML and text limits too.
+     */
+    public static final int[] LIMITS = {
+        CR_LIMIT_MAX_SIZE,
+        CR_LIMIT_MAX_NESTING,
+        CR_LIMIT_MAX_DEPTH,
+        CR_LIMIT_MAX_TABLE_SIZE,
+        CR_LIMIT_MAX_YAML_SIZE,
+        CR_LIMIT_MAX_TEXT_SIZE,
+        CR_LIMIT_MAX_VALUES,
+        CR_LIMIT_MAX_PATH_SEGMENTS
+    };
 
     /** The native linker, or null on a Java runtime that has none for this platform. */
     private static final Linker LINKER;
@@ -460,6 +476,8 @@ public final class Native {
             bind("cr_error_new_action", fn(I, P, SIZE_T, P, SIZE_T, P, SIZE_T, P, P, P));
     private static final MethodHandle ERROR_NEW_MAX_VALUES =
             bind("cr_error_new_max_values", fn(I, SIZE_T, L, P, SIZE_T, P, P));
+    private static final MethodHandle ERROR_NEW_CONSTANT_MAX_VALUES =
+            bind("cr_error_new_constant_max_values", fn(I, P, SIZE_T, P, P));
     private static final MethodHandle DECISION_EXPLANATION = bind("cr_decision_explain_value", fn(I, P, P, P));
 
     // Documents, rules, decision tables and result trees (G.1d).
@@ -655,15 +673,15 @@ public final class Native {
         };
     }
 
-    /** The core's default limits, in the order of {@code CR_LIMIT_*}. */
+    /** The core's default limits, in the order of {@link #LIMITS}. */
     public static long[] defaultLimits() {
         ensureLoaded();
-        long[] values = new long[CR_LIMIT_MAX_VALUES];
+        long[] values = new long[LIMITS.length];
         MemorySegment limits = limitsNew();
         try (Scope scope = new Scope()) {
             for (int i = 0; i < values.length; i++) {
                 MemorySegment value = scope.size();
-                scope.check(limitsGet(limits, i + 1, value, scope.error()));
+                scope.check(limitsGet(limits, LIMITS[i], value, scope.error()));
                 values[i] = value.get(JAVA_LONG, 0);
             }
         } finally {
@@ -1898,6 +1916,15 @@ public final class Native {
             MemorySegment error) {
         try {
             return (int) ERROR_NEW_ACTION.invokeExact(rule, ruleLen, action, actionLen, detail, detailLen, executed, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int errorNewConstantMaxValues(
+            MemorySegment rule, long ruleLen, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) ERROR_NEW_CONSTANT_MAX_VALUES.invokeExact(rule, ruleLen, out, error);
         } catch (Throwable thrown) {
             throw rethrow(thrown);
         }

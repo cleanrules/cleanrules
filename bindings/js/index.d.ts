@@ -484,7 +484,11 @@ export type FieldsOf<T> = T extends FieldLeaf
  */
 export type Fields<T> = FieldsOf<T> & FieldRoot
 
-/** A field by its path: `field('items', 0, 'price')`. */
+/**
+ * A field by its path: `field('items', 0, 'price')`. A path of more than 256
+ * segments, the default `limits.maxPathSegments`, throws a `FormatError` with
+ * code `limit_exceeded`; read a longer one from a document with the limit raised.
+ */
 export declare function field(...path: Array<string | number>): FieldRef
 /** A constant, where no node is involved: `constant(true)`. */
 export declare function constant(value: Constant): Const

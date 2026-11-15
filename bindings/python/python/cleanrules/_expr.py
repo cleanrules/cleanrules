@@ -383,6 +383,12 @@ class Field(Expr):
     Args:
         *path: Keys or attribute names (`str`) and sequence indices (`int` >= 0),
             outermost first.
+
+    Raises:
+        ExpressionError: For an empty path or an invalid segment.
+        FormatError: With code `limit_exceeded`, for a path of more than 256
+            segments, the default `max_path_segments`; `loads` reads longer
+            ones when given a larger `max_path_segments`.
     """
 
     __slots__ = ()
