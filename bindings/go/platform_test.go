@@ -124,16 +124,20 @@ func TestLinkFiles(t *testing.T) {
 			t.Errorf("%s: the constraint must start with cleanrules_prebuilt &&", p.file)
 		}
 	}
-	// The repository's link.go links the same system libraries.
+	// The repository's link.go links the same system libraries, plus, on
+	// Windows, the synchronization library that Rust 1.100's standard library
+	// needs (WaitOnAddress); the prebuilt libraries are built with Rust 1.97.
 	link, err := os.ReadFile("link.go")
 	if err != nil {
 		t.Fatal(err)
 	}
+	const synchronization = " -lsynchronization"
 	for _, line := range []string{
 		"#cgo linux LDFLAGS: ${SRCDIR}/../../target/debug/libcleanrules_ffi.a " + platformLibs[2].libs,
 		"#cgo darwin LDFLAGS: ${SRCDIR}/../../target/debug/libcleanrules_ffi.a " + platformLibs[0].libs,
-		"#cgo windows,amd64 LDFLAGS: ${SRCDIR}/../../target/x86_64-pc-windows-gnu/debug/libcleanrules_ffi.a " + platformLibs[6].libs,
-		"#cgo windows,arm64 LDFLAGS: ${SRCDIR}/../../target/aarch64-pc-windows-gnullvm/debug/libcleanrules_ffi.a " + platformLibs[7].libs,
+		"#cgo windows,amd64 LDFLAGS: ${SRCDIR}/../../target/x86_64-pc-windows-gnu/debug/libcleanrules_ffi.a " + platformLibs[6].libs + synchronization,
+		"#cgo windows,arm64 LDFLAGS: ${SRCDIR}/../../target/aarch64-pc-windows-gnullvm/debug/libcleanrules_ffi.a " +
+			strings.Replace(platformLibs[7].libs, " -lunwind", synchronization+" -lunwind", 1),
 	} {
 		if !strings.Contains(string(link), line+"\n") {
 			t.Errorf("link.go lacks %q", line)
