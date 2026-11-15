@@ -12,7 +12,9 @@ package cleanrules
 //
 //	cargo rustc -p cleanrules-ffi --lib --crate-type staticlib -- --print native-static-libs
 //
-// prints them on each platform. Build the library first:
+// prints them on each platform (Rust 1.100 added -lsynchronization on Windows,
+// for WaitOnAddress; the prebuilt libraries keep Rust 1.97's list). Build the
+// library first:
 //
 //	cargo build -p cleanrules-ffi                       # Linux and macOS
 //	cargo rustc -p cleanrules-ffi --lib --crate-type staticlib --target x86_64-pc-windows-gnu
@@ -34,7 +36,7 @@ package cleanrules
 /*
 #cgo linux LDFLAGS: ${SRCDIR}/../../target/debug/libcleanrules_ffi.a -lgcc_s -lutil -lrt -lpthread -lm -ldl
 #cgo darwin LDFLAGS: ${SRCDIR}/../../target/debug/libcleanrules_ffi.a -lm
-#cgo windows,amd64 LDFLAGS: ${SRCDIR}/../../target/x86_64-pc-windows-gnu/debug/libcleanrules_ffi.a -lkernel32 -lntdll -luserenv -lws2_32 -ldbghelp
-#cgo windows,arm64 LDFLAGS: ${SRCDIR}/../../target/aarch64-pc-windows-gnullvm/debug/libcleanrules_ffi.a -lkernel32 -lntdll -luserenv -lws2_32 -ldbghelp -lunwind
+#cgo windows,amd64 LDFLAGS: ${SRCDIR}/../../target/x86_64-pc-windows-gnu/debug/libcleanrules_ffi.a -lkernel32 -lntdll -luserenv -lws2_32 -ldbghelp -lsynchronization
+#cgo windows,arm64 LDFLAGS: ${SRCDIR}/../../target/aarch64-pc-windows-gnullvm/debug/libcleanrules_ffi.a -lkernel32 -lntdll -luserenv -lws2_32 -ldbghelp -lsynchronization -lunwind
 */
 import "C"
