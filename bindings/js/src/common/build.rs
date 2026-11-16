@@ -201,6 +201,8 @@ pub(crate) struct RuleArgs {
     /// The metadata in the reader's encoding, or `None` for none.
     pub(crate) metadata: Option<String>,
     pub(crate) action: Option<String>,
+    /// The id (`spec/rules.md`, *Identity*), or `None` for none.
+    pub(crate) id: Option<String>,
 }
 
 fn definition(rule: &str, message: impl Into<String>, hint: &str) -> Problem {
@@ -220,6 +222,7 @@ pub(crate) fn rule(args: RuleArgs) -> Outcome<Rule> {
         description,
         metadata,
         action,
+        id,
     } = args;
     let priority: i64 = priority.parse().map_err(|_| {
         definition(
@@ -231,6 +234,10 @@ pub(crate) fn rule(args: RuleArgs) -> Outcome<Rule> {
     let mut rule = Rule::with_payload(name.clone(), when, then)?
         .priority(priority)
         .tags(tags);
+    if let Some(id) = id {
+        // The core refuses an empty id.
+        rule = rule.id(id)?;
+    }
     if let Some(description) = description {
         rule = rule.description(description);
     }
@@ -254,8 +261,9 @@ pub(crate) fn rule(args: RuleArgs) -> Outcome<Rule> {
 }
 
 /// A rule's tags as the core holds them (sorted, without repeats), its
-/// metadata (in `out`'s encoding) and its action's name: `[tags, metadata,
-/// action]`.
+/// metadata (in `out`'s encoding), its action's name, its id and its
+/// effective id (`spec/rules.md`, *Identity*): `[tags, metadata, action, id,
+/// effective id]`, with `null` for no action or id.
 pub(crate) fn rule_details(rule: &Rule) -> String {
     let tags = rule
         .get_tags()
@@ -265,10 +273,15 @@ pub(crate) fn rule_details(rule: &Rule) -> String {
     let action = rule
         .get_action_name()
         .map_or(Json::Null, |name| Json::String(name.to_owned()));
+    let id = rule
+        .get_id()
+        .map_or(Json::Null, |id| Json::String(id.to_owned()));
     to_string(&Json::Array(vec![
         Json::Array(tags),
         out::map(rule.get_metadata()),
         action,
+        id,
+        Json::String(rule.effective_id().to_owned()),
     ]))
 }
 

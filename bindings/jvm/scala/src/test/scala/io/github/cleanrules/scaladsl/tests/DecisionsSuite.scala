@@ -96,6 +96,56 @@ class DecisionsSuite extends munit.FunSuite:
     intercept[RuleDefinitionException](RuleSet(Rule("r", F.a), Rule("r", F.b)))
     intercept[RuleDefinitionException](RuleSet(Seq(Rule("r", F.a)), aggregate = Some(Aggregate.SUM)))
 
+  test("rules have an id, or their name as their effective id"):
+    assertEquals(loyal.id, None)
+    assertEquals(loyal.effectiveId, "loyal")
+    val named = Rule("vip", F.a, priority = 2, id = Some("PRICING-1"))
+    assertEquals(named.id, Some("PRICING-1"))
+    assertEquals(named.effectiveId, "PRICING-1")
+    assertEquals(named.name, "vip")
+    val stepped = loyal.withId("PRICING-2").withPriority(1).withDescription("d")
+    assertEquals(stepped.id, Some("PRICING-2"))
+    assertEquals(stepped.effectiveId, "PRICING-2")
+    assertEquals(loyal.withId("loyal").id, Some("loyal"))
+    // A rule set keeps the ids, and still finds and names rules by name.
+    val set = RuleSet(Seq(vip.withId("PRICING-1"), loyal), hitPolicy = HitPolicy.FIRST)
+    assertEquals(set("vip").id, Some("PRICING-1"))
+    assertEquals(set.rules.map(_.effectiveId), Seq("PRICING-1", "loyal"))
+    assertEquals(set.evaluate(order(3, "10")).fired, Seq("loyal"))
+
+  test("ids that break the core's checks"):
+    assertEquals(intercept[RuleDefinitionException](loyal.withId("")).code(), "rule_definition_error")
+    intercept[RuleDefinitionException](Rule("r", F.a, id = Some("")))
+    // Two equal effective ids: the error names the second rule.
+    val twice = intercept[RuleDefinitionException](RuleSet(vip.withId("same"), loyal.withId("same")))
+    assertEquals(twice.rule().orElse(null), "loyal")
+    val name = intercept[RuleDefinitionException](RuleSet(vip, loyal.withId("vip")))
+    assertEquals(name.rule().orElse(null), "loyal")
+    val earlier = intercept[RuleDefinitionException](RuleSet(vip.withId("loyal"), loyal))
+    assertEquals(earlier.rule().orElse(null), "loyal")
+    // Swapped ids are unique.
+    val swapped = RuleSet(Rule("a", F.x, id = Some("b")), Rule("b", F.y, id = Some("a")))
+    assertEquals(swapped.rules.map(_.effectiveId), Seq("b", "a"))
+
+  test("ids are written and read in each format"):
+    val rule = loyal.withId("PRICING 12")
+    assert(dumps(rule, Format.TEXT).startsWith("RULE loyal ID \"PRICING 12\""), dumps(rule, Format.TEXT))
+    for format <- Seq(Format.JSON, Format.YAML, Format.TEXT) do
+      loads(dumps(rule, format), format) match
+        case back: Rule =>
+          assertEquals(back.id, Some("PRICING 12"), s"$format")
+          assertEquals(back.effectiveId, "PRICING 12", s"$format")
+          assertEquals(dumps(back, format), dumps(rule, format))
+        case other => fail(s"not a rule: $other")
+    assertEquals(ruleFromText("RULE gold_customer ID vip\nIF vip").id, Some("vip"))
+    val set = RuleSet(vip.withId("PRICING-1"), loyal)
+    for format <- Seq(Format.JSON, Format.TEXT) do
+      loads(dumps(set, format), format) match
+        case back: RuleSet =>
+          assertEquals(back("vip").id, Some("PRICING-1"))
+          assertEquals(back("loyal").id, None)
+        case other => fail(s"not a rule set: $other")
+
   test("rule sets: lookup, settings and field paths"):
     assertEquals(rules.size, 3)
     assertEquals(rules.rules.map(_.name), Seq("blocked", "vip", "loyal"))

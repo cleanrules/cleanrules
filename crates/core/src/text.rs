@@ -103,6 +103,9 @@ struct Token {
     kind: Kind,
     line: u64,
     column: u64,
+    /// A word as written, not between backticks: the contextual keyword `ID`
+    /// is one (`spec/text.md`, *Rules and rule sets*).
+    bare: bool,
 }
 
 fn syntax(line: u64, column: u64, message: impl Into<String>) -> Error {
@@ -163,6 +166,7 @@ impl Lexer<'_> {
             }
         }
         let (line, column) = (self.line, self.column);
+        let bare = !self.done && matches!(self.get(self.i), Some('a'..='z' | 'A'..='Z' | '_'));
         let kind = match self.get(self.i) {
             _ if self.done => Kind::End,
             None => Kind::End,
@@ -176,7 +180,12 @@ impl Lexer<'_> {
         if matches!(kind, Kind::Invalid(..)) {
             self.done = true;
         }
-        Token { kind, line, column }
+        Token {
+            kind,
+            line,
+            column,
+            bare,
+        }
     }
 
     fn word(&mut self) -> Kind {
@@ -641,6 +650,22 @@ impl<'a> Parser<'a> {
 
     fn accept_keyword(&mut self, word: &str) -> bool {
         let found = self.is_keyword(word);
+        if found {
+            self.next();
+        }
+        found
+    }
+
+    /// Whether the next token is the word `id`, in any case, not between
+    /// backticks.
+    fn is_bare_id(&self) -> bool {
+        let token = self.peek();
+        token.bare && matches!(&token.kind, Kind::Name(word) if word.eq_ignore_ascii_case("id"))
+    }
+
+    /// `ID`, a keyword only after a rule's name: elsewhere `id` is a name.
+    fn accept_id(&mut self) -> bool {
+        let found = self.is_bare_id();
         if found {
             self.next();
         }
@@ -1334,8 +1359,13 @@ impl<'a> Parser<'a> {
         let start = self.peek().clone();
         let mut name = format!("rule_{position}");
         let (mut priority, mut tags, mut description) = (0i64, Vec::new(), None);
+        let mut id = None;
         if self.accept_keyword("RULE") {
             name = self.label("a rule name")?;
+            if self.accept_id() {
+                let token = self.peek().clone();
+                id = Some((self.label("a rule id")?, token));
+            }
             if self.accept_keyword("PRIORITY") {
                 priority = self.priority()?;
             }
@@ -1348,6 +1378,11 @@ impl<'a> Parser<'a> {
             if self.accept_keyword("DESCRIPTION") {
                 description = Some(self.string()?);
             }
+        }
+        if self.is_bare_id() {
+            return Err(self.unexpected("IF").with_hint(
+                "ID goes right after the rule's name, once: RULE <name> ID <id> PRIORITY ...",
+            ));
         }
         self.expect_keyword("IF")?;
         let when = self.expr(OR)?;
@@ -1395,6 +1430,7 @@ impl<'a> Parser<'a> {
             .into_iter()
             .map(|(key, value)| value.build().map(|node| (key, node)))
             .collect::<Result<Vec<_>>>()?;
+        check_empty_id(id.as_ref(), &name, &when)?;
         // A rule error is located at the condition or payload value it is
         // about, else at the rule: of two payload values that are
         // conditions, the first by key.
@@ -1415,6 +1451,9 @@ impl<'a> Parser<'a> {
             .tags(tags);
         if let Some(description) = description {
             rule = rule.description(description);
+        }
+        if let Some((id, token)) = id {
+            rule = rule.id(id).map_err(|e| locate(e, &token))?;
         }
         if let Some((action, token)) = action {
             rule = rule.action_name(action).map_err(|e| locate(e, &token))?;
@@ -1619,6 +1658,21 @@ const PREDICATE: u8 = 4;
 const SUM: u8 = 5;
 const PRODUCT: u8 = 6;
 const UNARY: u8 = 7;
+
+/// An empty id, located at it, in the order of JSON's rules for a rule: after
+/// every node is built (`expression_error`), and after an empty name and
+/// before a value as the condition (`spec/json-format.md`, *Rules*).
+fn check_empty_id(id: Option<&(String, Token)>, name: &str, when: &Node) -> Result<()> {
+    match id {
+        Some((id, token)) if id.is_empty() && !name.is_empty() && !when.is_null_constant() => {
+            let mut error = Error::new(ErrorCode::RuleDefinitionError, "a rule id cannot be empty")
+                .with_hint("leave ID out to identify the rule by its name");
+            error.context_mut().rule = Some(name.to_owned());
+            Err(locate(error, token))
+        }
+        _ => Ok(()),
+    }
+}
 
 /// `error` located at `token`, unless it already has a position.
 fn locate(error: Error, token: &Token) -> Error {
@@ -2169,6 +2223,9 @@ fn rule_text(rule: &Rule) -> Result<String> {
         check_keys(value)?;
     }
     let mut out = format!("RULE {}", key(rule.name(), '"'));
+    if let Some(id) = rule.get_id() {
+        let _ = write!(out, " ID {}", key(id, '"'));
+    }
     if rule.get_priority() != 0 {
         let _ = write!(out, " PRIORITY {}", rule.get_priority());
     }
@@ -2285,6 +2342,20 @@ mod tests {
 
     fn error(text: &str) -> crate::Error {
         parse(text, &Limits::default()).unwrap_err()
+    }
+
+    #[test]
+    fn a_misplaced_id_says_where_it_goes() {
+        for text in ["RULE r PRIORITY 1 ID x IF y", "RULE r ID x id y IF z"] {
+            let e = error(text);
+            assert_eq!(e.code(), ErrorCode::RuleSyntaxError);
+            assert_eq!(
+                e.hint(),
+                Some("ID goes right after the rule's name, once: RULE <name> ID <id> PRIORITY ...")
+            );
+        }
+        // Between backticks, `id` is a name: no hint about ID.
+        assert_eq!(error("RULE a `id` x IF y").hint(), None);
     }
 
     #[test]

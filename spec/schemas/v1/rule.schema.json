@@ -28,6 +28,11 @@
           "type": "string",
           "minLength": 1
         },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The rule's id, which identifies it across versions of its rule set; without it, the name does (rules.md, Identity). Effective ids are unique within a rule set, which a schema cannot check."
+        },
         "when": {
           "$ref": "condition.schema.json#/$defs/condition"
         },

@@ -69,7 +69,11 @@ strictness, and one rule per row, in row order unless the policy is
 `output_order`:
 
 - the rule's **name** is the row's, or `row_<n>` for the `n`-th row, from 1.
-  Names must be unique, as in any rule set (`rule_definition_error`);
+  Names must be unique, as in any rule set (`rule_definition_error`). Rows
+  have no id in this version, so a rule's effective id is its name
+  (`rules.md`, *Identity*): `row_<n>` changes when rows are inserted or
+  removed above it, so name the rows whose identity matters when versions of
+  a table are compared;
 - its **condition** is the conjunction (`and`) of the conditions of the input
   cells that are not `-`, in input order; one alone is itself; with none, the
   condition is `TRUE`;

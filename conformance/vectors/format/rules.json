@@ -1798,6 +1798,365 @@
           }
         }
       }
+    },
+    {
+      "id": "format/rules/id",
+      "spec": [
+        "json-format.md#rules",
+        "rules.md#identity"
+      ],
+      "description": "An id is kept and written with the rule",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "priority": 2,
+            "id": "PRICING-12",
+            "name": "vip"
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "vip",
+            "id": "PRICING-12",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "a"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "priority": 2
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rules/id-equal-to-name",
+      "spec": [
+        "json-format.md#rules",
+        "rules.md#identity"
+      ],
+      "description": "An id equal to the rule's own name is kept and written",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "vip",
+            "id": "vip",
+            "when": {
+              "op": "field",
+              "path": [
+                "vip"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "vip",
+            "id": "vip",
+            "when": {
+              "op": "field",
+              "path": [
+                "vip"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rules/id-any-text",
+      "spec": [
+        "json-format.md#rules",
+        "rules.md#identity"
+      ],
+      "description": "An id is any non-empty string, read literally",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "id": " a/b.c ~ é ",
+            "when": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "id": " a/b.c ~ é ",
+            "when": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rules/id-absent",
+      "spec": [
+        "json-format.md#rules",
+        "rules.md#identity"
+      ],
+      "description": "Without an id nothing is written: the effective id is the name",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "vip",
+            "when": {
+              "op": "field",
+              "path": [
+                "vip"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "vip",
+            "when": {
+              "op": "field",
+              "path": [
+                "vip"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rules/id-empty",
+      "spec": [
+        "json-format.md#rules",
+        "rules.md#identity"
+      ],
+      "description": "An empty id",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "id": "",
+            "when": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/rule/id"
+        }
+      }
+    },
+    {
+      "id": "format/rules/id-not-string",
+      "spec": [
+        "json-format.md#rules",
+        "rules.md#identity"
+      ],
+      "description": "An id is a string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "id": 12,
+            "when": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/id"
+        }
+      }
+    },
+    {
+      "id": "format/rules/id-shape-before-when",
+      "spec": [
+        "json-format.md#rules",
+        "rules.md#identity",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "The shape of id is checked after the name and before the condition",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "id": [
+              "x"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/rule/id"
+        }
+      }
+    },
+    {
+      "id": "format/rules/name-before-id",
+      "spec": [
+        "json-format.md#rules",
+        "rules.md#identity"
+      ],
+      "description": "The rule's own rules in order: an empty name before an empty id",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "",
+            "id": "",
+            "when": {
+              "op": "field",
+              "path": [
+                "a"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/rule/name"
+        }
+      }
+    },
+    {
+      "id": "format/rules/id-before-when",
+      "spec": [
+        "json-format.md#rules",
+        "rules.md#identity"
+      ],
+      "description": "The rule's own rules in order: an empty id before a value as the condition",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "id": "",
+            "when": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/rule/id"
+        }
+      }
+    },
+    {
+      "id": "format/rules/payload-expression-error-before-empty-id",
+      "spec": [
+        "json-format.md#rules",
+        "json-format.md#errors-and-limits",
+        "rules.md#identity"
+      ],
+      "description": "The construction errors of a rule's nodes come before its own rules, an empty id included",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "id": "",
+            "when": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "then": {
+              "y": {
+                "op": "add",
+                "left": {
+                  "op": "const",
+                  "value": "a"
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "pointer": "/rule/then/y"
+        }
+      }
     }
   ]
 }

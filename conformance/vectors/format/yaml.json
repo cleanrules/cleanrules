@@ -1056,6 +1056,33 @@
           "name": "max_path_segments"
         }
       }
+    },
+    {
+      "id": "format/yaml/rule-id",
+      "spec": [
+        "json-format.md#yaml",
+        "rules.md#identity"
+      ],
+      "description": "A rule's id reads from YAML as from JSON",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\nrule:\n  name: gold_customer\n  id: vip\n  when: {op: field, path: [vip]}\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "gold_customer",
+            "id": "vip",
+            "when": {
+              "op": "field",
+              "path": [
+                "vip"
+              ]
+            }
+          }
+        }
+      }
     }
   ]
 }

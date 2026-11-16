@@ -464,6 +464,7 @@ public final class Native {
     private static final MethodHandle RULE_WITH_DESCRIPTION =
             bind("cr_rule_with_description", fn(I, P, P, SIZE_T, P, P));
     private static final MethodHandle RULE_WITH_ACTION = bind("cr_rule_with_action", fn(I, P, P, SIZE_T, P, P));
+    private static final MethodHandle RULE_WITH_ID = bind("cr_rule_with_id", fn(I, P, P, SIZE_T, P, P));
     private static final MethodHandle RULE_TAGS = bind("cr_rule_tags", fn(I, P, P, P));
     private static final MethodHandle RULE_METADATA = bind("cr_rule_metadata", fn(I, P, P, P));
     private static final MethodHandle RULE_FREE = bind("cr_rule_free", proc(P));
@@ -487,6 +488,8 @@ public final class Native {
     private static final MethodHandle RULE_FROM_TEXT = bind("cr_rule_from_text", fn(I, P, SIZE_T, P, P, P));
     private static final MethodHandle RULE_NAME = bind("cr_rule_name", fn(I, P, P, P, P));
     private static final MethodHandle RULE_DESCRIPTION = bind("cr_rule_description", fn(I, P, P, P, P));
+    private static final MethodHandle RULE_ID = bind("cr_rule_id", fn(I, P, P, P, P));
+    private static final MethodHandle RULE_EFFECTIVE_ID = bind("cr_rule_effective_id", fn(I, P, P, P, P));
     private static final MethodHandle RULE_ACTION = bind("cr_rule_action", fn(I, P, P, P, P));
     private static final MethodHandle RULE_PRIORITY = bind("cr_rule_priority", fn(L, P));
     private static final MethodHandle RULE_WHEN = bind("cr_rule_when", fn(I, P, P, P));
@@ -1847,6 +1850,15 @@ public final class Native {
         }
     }
 
+    public static int ruleWithId(
+            MemorySegment rule, MemorySegment id, long len, MemorySegment out, MemorySegment error) {
+        try {
+            return (int) RULE_WITH_ID.invokeExact(rule, id, len, out, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
     public static int ruleWithAction(
             MemorySegment rule, MemorySegment name, long len, MemorySegment out, MemorySegment error) {
         try {
@@ -1970,6 +1982,22 @@ public final class Native {
     public static int ruleDescription(MemorySegment rule, MemorySegment text, MemorySegment len, MemorySegment error) {
         try {
             return (int) RULE_DESCRIPTION.invokeExact(rule, text, len, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleId(MemorySegment rule, MemorySegment id, MemorySegment len, MemorySegment error) {
+        try {
+            return (int) RULE_ID.invokeExact(rule, id, len, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int ruleEffectiveId(MemorySegment rule, MemorySegment id, MemorySegment len, MemorySegment error) {
+        try {
+            return (int) RULE_EFFECTIVE_ID.invokeExact(rule, id, len, error);
         } catch (Throwable thrown) {
             throw rethrow(thrown);
         }

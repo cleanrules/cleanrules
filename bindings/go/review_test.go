@@ -170,6 +170,7 @@ func TestNoInvalidArgument(t *testing.T) {
 		"closed":      Field("x").BetweenClosed(1, 2, "sides").Err(),
 		"rule name":   func() error { _, err := NewRule(bad, x); return err }(),
 		"key":         func() error { _, err := NewRule("r", x, Then(bad, 1)); return err }(),
+		"id":          func() error { _, err := NewRule("r", x, WithID(bad)); return err }(),
 		"description": func() error { _, err := NewRule("r", x, WithDescription(bad)); return err }(),
 		"action":      func() error { _, err := NewRule("r", x, WithAction(bad)); return err }(),
 		"logic":       func() error { _, err := NewRuleSet(nil, WithLogic(bad)); return err }(),

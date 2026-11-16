@@ -17,7 +17,7 @@ type Rule struct {
 	name string
 }
 
-// RuleOption sets a part of a rule in NewRule and Rule.With: Then,
+// RuleOption sets a part of a rule in NewRule and Rule.With: WithID, Then,
 // WithPriority, WithTags, WithDescription, WithMetadata and WithAction.
 type RuleOption interface {
 	applyRule(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error
@@ -126,6 +126,24 @@ func Then(key string, value any) RuleOption {
 	})
 }
 
+// WithID sets the rule's id, which identifies it across versions of its rule
+// set; without one, its name does (spec/rules.md, Identity). An id is any
+// non-empty string, taken literally, and may equal the rule's name; an empty
+// one is a rule_definition_error naming the rule. The id changes nothing in
+// evaluation: decisions, explanations and summaries name rules by their names.
+//
+// A rule renamed without an id becomes another rule when two versions are
+// compared, so a rule whose name may change is best given an id, such as the
+// old name or a ticket ("PRICING-12"):
+//
+//	gold, err := cleanrules.NewRule("gold_customer", cond, cleanrules.WithID("vip"))
+func WithID(id string) RuleOption {
+	return ruleOption(func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
+		p, n := text(id)
+		return check(C.cr_rule_with_id(rule, p, n, out, e), *e)
+	})
+}
+
 // WithPriority sets the priority, for HitPolicyPriority.
 func WithPriority(priority int64) RuleOption {
 	return ruleOption(func(rule *C.cr_rule, out **C.cr_rule, e **C.cr_error) error {
@@ -201,6 +219,34 @@ func (r *Rule) Name() string {
 		return ""
 	}
 	return r.name
+}
+
+// ID is the rule's id, or "" when it has none (an id is never empty).
+func (r *Rule) ID() string {
+	var id string
+	_ = r.use(func(rule *C.cr_rule) error {
+		var p *C.char
+		var n C.size_t
+		C.cr_rule_id(rule, &p, &n, nil)
+		id = goString(p, n)
+		return nil
+	})
+	return id
+}
+
+// EffectiveID is what identifies the rule within its rule set and across
+// its versions: its id when it has one, and its name otherwise
+// (spec/rules.md, Identity). A rule set's effective ids are unique.
+func (r *Rule) EffectiveID() string {
+	var id string
+	_ = r.use(func(rule *C.cr_rule) error {
+		var p *C.char
+		var n C.size_t
+		C.cr_rule_effective_id(rule, &p, &n, nil)
+		id = goString(p, n)
+		return nil
+	})
+	return id
 }
 
 // When is the rule's condition.

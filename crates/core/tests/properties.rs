@@ -191,10 +191,14 @@ fn odd_ruleset() -> impl Strategy<Value = RuleSet> {
         any::<i64>(),
         prop::collection::vec(label(), 0..3),
         proptest::option::of(r#"[a"\n\\é]{0,4}"#),
+        // Ids, some of them keywords, `id` itself or another rule's name.
+        proptest::option::of(prop::sample::select(vec![
+            "id", "ID", "a b", "if", "rule_1", "é", "_", "q\"\n",
+        ])),
     )
         .prop_filter_map(
             "valid rule",
-            |(name, when, then, priority, tags, description)| {
+            |(name, when, then, priority, tags, description, id)| {
                 let then = then.into_iter().map(|(k, v)| (k.to_owned(), v)).collect();
                 let mut rule = Rule::with_payload(name, when, then)
                     .ok()?
@@ -202,6 +206,9 @@ fn odd_ruleset() -> impl Strategy<Value = RuleSet> {
                     .tags(tags.into_iter().map(str::to_owned).collect::<Vec<String>>());
                 if let Some(description) = description {
                     rule = rule.description(description);
+                }
+                if let Some(id) = id {
+                    rule = rule.id(id).ok()?;
                 }
                 Some(rule)
             },

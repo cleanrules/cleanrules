@@ -139,6 +139,13 @@ class Rule:
             expressions such as `F.total * 0.1`. A payload is an association:
             its keys are kept, evaluated and given back sorted by Unicode code
             point, whatever their order here.
+        id: What identifies the rule across versions of its rule set: a
+            non-empty string, taken literally. Without one, the name does
+            (`effective_id`). Effective ids are unique within a rule set. A
+            rule renamed without an id becomes another rule when two versions
+            are compared, so give it its old name as id
+            (`Rule("gold_customer", F.vip, id="vip")`). Evaluation never reads
+            the id: decisions, explanations and summaries name rules by name.
         priority: Used by the `PRIORITY` hit policy; higher wins.
         tags: Labels for grouping and filtering.
         description: A human-readable description.
@@ -174,6 +181,7 @@ class Rule:
         when: Expr,
         then: Mapping[str, object] | None = None,
         *,
+        id: str | None = None,
         priority: int = 0,
         tags: Iterable[str] = (),
         description: str | None = None,
@@ -187,6 +195,12 @@ class Rule:
                 f"when must be a condition node, got {type(when).__name__} {when!r}",
                 rule=name,
                 hint="build conditions with F, e.g. F.total > 100",
+            )
+        if id is not None and not isinstance(id, str):  # pyright: ignore[reportUnnecessaryIsInstance]
+            raise RuleDefinitionError(
+                f"id must be a string, got {type(id).__name__} {id!r}",
+                rule=name,
+                hint="leave the id out to identify the rule by its name",
             )
         if type(priority) is not int:
             raise RuleDefinitionError(
@@ -218,6 +232,7 @@ class Rule:
             )
         payload = _payload(name, then)
         frozen_metadata = _mapping(name, "metadata", metadata)
+        # The core refuses an empty id (`spec/rules.md`, *Identity*).
         native = _native.rule(
             name,
             when._node,  # pyright: ignore[reportPrivateUsage]
@@ -227,6 +242,7 @@ class Rule:
             description,
             frozen_metadata,
             action,
+            id,
         )
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "_when", when)
@@ -238,6 +254,16 @@ class Rule:
 
     def __setattr__(self, name: str, value: object) -> None:
         raise AttributeError(f"rules are immutable: cannot set {name!r}")
+
+    @property
+    def id(self) -> str | None:
+        """The id the rule was given, if any (`spec/rules.md`, *Identity*)."""
+        return self._native.id
+
+    @property
+    def effective_id(self) -> str:
+        """What identifies the rule across versions: its id, or its name when it has none."""
+        return self._native.effective_id
 
     @property
     def when(self) -> Expr:
@@ -300,13 +326,15 @@ class Rule:
                 dict(self.metadata),
                 self._do,
                 self.action_name,
+                self.id,
             ),
         )
 
     def __repr__(self) -> str:
         then = "" if not self._then else f", {dict(self._then)!r}"
+        identity = "" if self.id is None else f", id={self.id!r}"
         do = "" if self.action_name is None else f", do={self.action_name!r}"
-        return f"Rule({self.name!r}, {self._when!r}{then}{do})"
+        return f"Rule({self.name!r}, {self._when!r}{then}{identity}{do})"
 
 
 # Pickles store these functions by name: keep the names.
@@ -320,11 +348,14 @@ def _make_rule(
     metadata: dict[str, object],
     do: Action | None,
     action: str | None = None,
+    id: str | None = None,
 ) -> Rule:
+    # `action` and `id` come last, with defaults: older pickles lack them.
     rule = Rule(
         name,
         when,
         then,
+        id=id,
         priority=priority,
         tags=tags,
         description=description,
@@ -418,7 +449,8 @@ class RuleSet(Sequence[Rule]):
     A rule set is an immutable sequence of rules, indexed by position or by name.
 
     Args:
-        rules: The rules, in order; names must be unique.
+        rules: The rules, in order; names must be unique, and so must effective
+            ids (`Rule.effective_id`).
         hit_policy: How the rules that fired become a decision (`HitPolicy` or its
             name).
         aggregate: With `COLLECT`, combine the outputs: `"sum"`, `"min"`, `"max"`
@@ -428,8 +460,9 @@ class RuleSet(Sequence[Rule]):
             missing fields and type mismatches.
 
     Raises:
-        RuleDefinitionError: For repeated names, an aggregate without `COLLECT`, or
-            an unknown hit policy or aggregate.
+        RuleDefinitionError: For repeated names, then repeated effective ids
+            (naming the second rule), an aggregate without `COLLECT`, or an
+            unknown hit policy or aggregate.
         RegistryError: For an unknown logic.
     """
 

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "ruleset": {
+    "hit_policy": "first",
+    "logic": "boolean",
+    "rules": [
+      {
+        "name": "gold_customer",
+        "id": "vip",
+        "when": {
+          "op": "field",
+          "path": [
+            "vip"
+          ]
+        }
+      },
+      {
+        "name": "default",
+        "when": {
+          "op": "const",
+          "value": true
+        }
+      }
+    ]
+  }
+}

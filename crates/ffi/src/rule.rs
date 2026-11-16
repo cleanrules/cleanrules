@@ -281,6 +281,34 @@ pub unsafe extern "C" fn cr_rule_with_action(
     unsafe { step(rule, out, error, make) }
 }
 
+/// The rule with an id, which identifies it across versions of its rule set;
+/// without one, its name does (`spec/rules.md`, *Identity*). An id is any
+/// non-empty string, and may equal the rule's name; an empty one is a
+/// `CR_RULE_DEFINITION_ERROR`. A rule set rejects two rules with the same
+/// effective id (`cr_rule_effective_id`).
+///
+/// # Safety
+///
+/// `rule` is `NULL` or a live `cr_rule`; `id` is `NULL` or points to `len`
+/// readable bytes; `out` is `NULL` or points to a writable `cr_rule *`;
+/// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_rule_with_id(
+    rule: *const cr_rule,
+    id: *const c_char,
+    len: usize,
+    out: *mut *mut cr_rule,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let make = |rule: &Rule| {
+        // SAFETY: `id` and `len` (# Safety).
+        let id = unsafe { text(id, len, "id") }?;
+        Ok(rule.clone().id(id)?)
+    };
+    // SAFETY: the caller's promises are `step`'s.
+    unsafe { step(rule, out, error, make) }
+}
+
 /// The rule's tags as the core keeps them, sorted and without repeats: a new
 /// list of strings, freed with `cr_value_free`.
 ///
@@ -416,6 +444,41 @@ pub unsafe extern "C" fn cr_rule_name(
 ) -> cr_status {
     // SAFETY: the caller's promises are `lend`'s.
     unsafe { lend(rule, name, len, error, |r| Ok(Some(r.name()))) }
+}
+
+/// The rule's id (`spec/rules.md`, *Identity*), borrowed from the rule and
+/// not NUL-terminated; `NULL` with a length of 0 when it has none.
+///
+/// # Safety
+///
+/// As `cr_rule_name`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_rule_id(
+    rule: *const cr_rule,
+    id: *mut *const c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    // SAFETY: the caller's promises are `lend`'s.
+    unsafe { lend(rule, id, len, error, |r| Ok(r.get_id())) }
+}
+
+/// The rule's effective id: its id when it has one, and its name otherwise
+/// (`spec/rules.md`, *Identity*); borrowed from the rule and not
+/// NUL-terminated.
+///
+/// # Safety
+///
+/// As `cr_rule_name`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_rule_effective_id(
+    rule: *const cr_rule,
+    id: *mut *const c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    // SAFETY: the caller's promises are `lend`'s.
+    unsafe { lend(rule, id, len, error, |r| Ok(Some(r.effective_id()))) }
 }
 
 /// The rule's description, borrowed from the rule and not NUL-terminated;

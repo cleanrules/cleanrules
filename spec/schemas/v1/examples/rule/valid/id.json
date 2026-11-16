@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "rule": {
+    "name": "gold_customer",
+    "id": "vip",
+    "when": {
+      "op": "field",
+      "path": [
+        "vip"
+      ]
+    }
+  }
+}

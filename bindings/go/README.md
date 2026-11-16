@@ -286,6 +286,7 @@ an error:
 
 ```go
 vip, err := cr.NewRule("vip", cond,
+    cr.WithID("PRICING-12"),                         // optional: identifies the rule across versions
     cr.Then("discount", cr.MustDecimal("0.15")),    // a constant or an *Expr
     cr.WithPriority(10),
     cr.WithTags("loyalty"),
@@ -297,6 +298,29 @@ rules, err := cr.NewRuleSet([]*cr.Rule{vip, loyal},
     cr.WithAggregate(cr.AggregateSum),                // with HitPolicyCollect: AggregateSum, ...Min, ...Max, ...Count
     cr.WithLogic("boolean"),
     cr.WithStrict(true))
+```
+
+A rule's **id** (`WithID`) identifies it across versions of its rule set
+(`spec/rules.md`, *Identity*). It is any non-empty string, taken literally; an
+empty one is a `rule_definition_error`. `ID()` gives it, or `""` when the rule
+has none, and `EffectiveID()` gives the id, or the name when there is none.
+Effective ids are unique within a rule set, as names are: `NewRuleSet` refuses
+two equal ids, and an id equal to the name of another rule without an id, with
+a `rule_definition_error` naming the later rule (`a` with the id `b` next to
+`b` with the id `a` is allowed). The id changes nothing in evaluation:
+decisions, explanations, summaries and `RuleSet.Rule` name rules by their
+names. It is read and written with the rule, after its name in JSON and YAML
+(`"id": "PRICING-12"`) and in the rule syntax's header
+(`RULE vip ID "PRICING-12"`).
+
+A rule without an id is identified by its name, so **a renamed rule needs an
+explicit id to stay the same rule** when two versions of a rule set are
+compared (comparison comes in a later phase): give it its old name as id, or
+give rules whose names may change an id from the start.
+
+```go
+// version 1: cr.NewRule("vip", cond)                        effective id "vip"
+// version 2: cr.NewRule("gold_customer", cond, cr.WithID("vip"))  effective id "vip"
 ```
 
 `rule.With(options...)` gives a changed copy; a rule never changes. For rules

@@ -110,6 +110,23 @@ print(cleanrules.dumps(rules["loyal"], format="text"))
 # THEN discount = 0.05
 ```
 
+A rule can carry an `id`, which identifies it across versions of its rule set;
+without one, its name does (`rule.effective_id`). Effective ids are unique
+within a rule set, as names are, and the id changes nothing in evaluation:
+decisions, explanations and summaries name rules by name. Renaming a rule
+without an id makes it another rule when two versions are compared (comparison
+arrives in a later release), so give a renamed rule its old name as id, or give
+rules whose names may change an id from the start, such as a ticket:
+
+```python
+gold = Rule("gold_customer", F.vip, id="vip")  # was Rule("vip", F.vip)
+gold.id, gold.effective_id
+# ('vip', 'vip')
+print(cleanrules.dumps(gold, format="text"))
+# RULE gold_customer ID vip
+# IF vip
+```
+
 `evaluate` never has side effects; `run` evaluates and then calls the actions
 of the selected rules. An action is a function given to `Rule(do=...)`, or a
 name that a rule file gives (`DO notify_sales` in text, `"do"` in JSON) and the

@@ -274,7 +274,7 @@ pub fn node_same_as(left: &Node, right: &Node) -> bool {
 ///
 /// `RuleDefinitionError` or `ExpressionError`, as the core reports them.
 #[napi(
-    ts_args_type = "name: string, when: Node, then: NodeList, priority: string, tags: string[], description?: string | null, metadata?: string | null, action?: string | null"
+    ts_args_type = "name: string, when: Node, then: NodeList, priority: string, tags: string[], description?: string | null, metadata?: string | null, action?: string | null, id?: string | null"
 )]
 #[allow(clippy::too_many_arguments)] // A rule's parts, as `RuleArgs` holds them.
 pub fn rule_new(
@@ -287,6 +287,7 @@ pub fn rule_new(
     description: Option<String>,
     metadata: Option<String>,
     action: Option<String>,
+    id: Option<String>,
 ) -> Result<NativeRule> {
     let tags = strings(raw_list(env, &tags, "tags")?, "tags").or_fail(env)?;
     let args = RuleArgs {
@@ -298,13 +299,14 @@ pub fn rule_new(
         description,
         metadata,
         action,
+        id,
     };
     build::rule(args)
         .map(|rule| NativeRule { rule })
         .or_fail(env)
 }
 
-/// A rule's tags, metadata and action name, as JSON.
+/// A rule's tags, metadata, action name, id and effective id, as JSON.
 #[napi]
 #[must_use]
 pub fn rule_details(rule: &NativeRule) -> String {

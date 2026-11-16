@@ -346,6 +346,9 @@ final class ScalaConformance extends Conformance:
     val action = source.get("do") match
       case name: String => Some(name)
       case _ => None
+    val id = source.get("id") match
+      case text: String => Some(text)
+      case _ => None
     if turn(2) == 0 then
       Rule(
         name,
@@ -356,9 +359,11 @@ final class ScalaConformance extends Conformance:
         description = description,
         metadata = metadata.getOrElse(SeqMap.empty),
         actionName = action,
+        id = id,
       )
     else
       var rule = Rule(name, when)
+      id.foreach(i => rule = rule.withId(i))
       for (key, value) <- payload do rule = rule.withPayload(key, value)
       priority.foreach(p => rule = rule.withPriority(p))
       tags.foreach(t => rule = rule.withTags(t*))
@@ -841,6 +846,9 @@ final class ScalaConformance extends Conformance:
     if !TestJson.same(back(rule.priority), priority, Mode.GIVEN) then break(s"${rule.name}: priority ${rule.priority}")
     if rule.actionName != Option(source.get("do")) then break(s"${rule.name}: actionName ${rule.actionName}")
     if rule.description != Option(source.get("description")) then break(s"${rule.name}: description ${rule.description}")
+    if rule.id != Option(source.get("id")) then break(s"${rule.name}: id ${rule.id}")
+    val effectiveId = if source.containsKey("id") then source.get("id") else source.get("name")
+    if rule.effectiveId != effectiveId then break(s"${rule.name}: effectiveId ${rule.effectiveId}")
     // Metadata's keys are literal, even those that start with $ (spec/json-format.md, Rules).
     val metadata = java.util.LinkedHashMap[String, AnyRef]()
     rule.metadata.foreach((key, value) => metadata.set(key, back(value)))

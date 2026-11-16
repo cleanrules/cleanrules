@@ -8,6 +8,8 @@ serialized form is defined in `json-format.md` (*Rules*, *Rule sets*).
 A rule has:
 
 - a unique, non-empty **name**;
+- an optional **id**: a non-empty string, which identifies the rule across
+  versions of its rule set (*Identity*);
 - a **condition** (`when`): a node of kind `condition` or `any` (`ast.md`, *Node
   kinds*), such as a comparison, a field, or a boolean constant. Value nodes,
   such as number or string constants and arithmetic, are rejected when the rule
@@ -28,6 +30,55 @@ A rule has:
   (strings), a **description** (a string) and **metadata** (string keys mapped
   to data values, so it can be serialized; `json-format.md`), none
   of which affects evaluation except the priority, through `PRIORITY`.
+
+## Identity
+
+A rule's **effective id** is its id when it has one, and its name otherwise.
+It is what says that a rule of one version of a rule set and a rule of another
+version are the same rule, as comparing two versions (phase T) and bundles
+(phase R) do.
+
+- An id is any non-empty string, as a name is: it is taken literally, compared
+  exactly and never normalized.
+- Within a rule set, **effective ids are unique**, as names are: two rules
+  cannot have the same effective id. That includes one rule's id equal to
+  another rule's name when that other rule has no id, since the name is then
+  its effective id. A rule's id may equal its own name; and one rule's id may
+  equal another rule's name when that other rule has an id of its own (`a`
+  with the id `b` next to `b` with the id `a`), because neither names nor
+  effective ids repeat.
+- Building a rule set first finds the first rule, in rule order, whose name
+  repeats an earlier rule's name, and then the first rule whose effective id
+  repeats an earlier rule's effective id; either is a `rule_definition_error`
+  naming it
+  (`rule`) when the rule set is built in code or read from text, and located
+  by its pointer when it is read from a document (`json-format.md`, *Rule
+  sets*). An empty id is a
+  `rule_definition_error` when the rule is built.
+- The id changes nothing else. Evaluation never reads it, and outputs name
+  rules by their names, which are unique too: decisions, explanations,
+  summaries, diagrams, errors and the tools for agents. A decision is always
+  read with its rule set (`json-format.md`, *Decisions*), which gives each
+  named rule's id. The id is read and written with the rule (`json-format.md`,
+  *Rules*; `text.md`, *Rules and rule sets*).
+
+**Renaming a rule.** A rule without an id is identified by its name, so
+renaming it makes it another rule: comparing the two versions shows one rule
+removed and another added. To rename a rule and keep it the same rule, give it
+an explicit id, the old name for a rule that had none:
+
+```text
+version 1:  { "name": "vip", ... }                         effective id "vip"
+version 2:  { "name": "gold_customer", "id": "vip", ... }  effective id "vip"
+```
+
+Adding an id to a rule that had none, or changing its id, changes its
+effective id unless the new id equals the old effective id: comparing the two
+versions then shows one rule removed and another added. Rules whose names may
+change are best given an id from the start, such as a
+ticket or a policy reference (`"id": "PRICING-12"`). Decision tables give their
+rules no id in this version: a table's rules are identified by their names
+(`tables.md`, *Compiling*).
 
 ## Evaluation
 

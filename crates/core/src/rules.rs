@@ -12,6 +12,7 @@ use crate::value::{ExactSum, Map, NullCause, Number, Value};
 #[derive(Clone, Debug)]
 pub struct Rule {
     name: String,
+    id: Option<String>,
     when: Node,
     then: Vec<(String, Node)>,
     priority: i64,
@@ -141,6 +142,7 @@ impl Rule {
         }
         Ok(Self {
             name,
+            id: None,
             when,
             then: payload,
             priority: 0,
@@ -230,10 +232,53 @@ impl Rule {
         Ok(self)
     }
 
+    /// Give the rule an id, which identifies it across versions of its rule
+    /// set; without one, its name does (`spec/rules.md`, *Identity*). An id is
+    /// any non-empty string, taken literally, and may equal the rule's name.
+    ///
+    /// # Errors
+    ///
+    /// `rule_definition_error` when the id is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cleanrules::{Segment, ast::Node, rules::Rule};
+    ///
+    /// let vip = Node::field(vec![Segment::Key("vip".into())])?;
+    /// // Renamed from `vip`: the id keeps it the same rule.
+    /// let rule = Rule::new("gold_customer", vip)?.id("vip")?;
+    /// assert_eq!(rule.get_id(), Some("vip"));
+    /// assert_eq!(rule.effective_id(), "vip");
+    /// # Ok::<(), cleanrules::Error>(())
+    /// ```
+    pub fn id(mut self, id: impl Into<String>) -> Result<Self> {
+        let id = id.into();
+        if id.is_empty() {
+            return Err(rule_error(&self.name, "a rule id cannot be empty")
+                .with_hint("leave the id out to identify the rule by its name"));
+        }
+        self.id = Some(id);
+        Ok(self)
+    }
+
     /// The name.
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// The id, if the rule has one (`spec/rules.md`, *Identity*).
+    #[must_use]
+    pub fn get_id(&self) -> Option<&str> {
+        self.id.as_deref()
+    }
+
+    /// The effective id: the id when the rule has one, and its name
+    /// otherwise. Unique within a rule set (`spec/rules.md`, *Identity*).
+    #[must_use]
+    pub fn effective_id(&self) -> &str {
+        self.id.as_deref().unwrap_or(&self.name)
     }
 
     /// The condition.
@@ -485,6 +530,54 @@ pub fn action_error(
     error
 }
 
+/// The position of the first rule whose name repeats an earlier rule's.
+pub(crate) fn repeated_name(rules: &[Rule]) -> Option<usize> {
+    let mut names = std::collections::BTreeSet::new();
+    rules
+        .iter()
+        .position(|rule| !names.insert(rule.name.as_str()))
+}
+
+/// The position of the first rule whose effective id repeats an earlier
+/// rule's, and the position of that earlier rule.
+pub(crate) fn repeated_id(rules: &[Rule]) -> Option<(usize, usize)> {
+    let mut ids = std::collections::BTreeMap::new();
+    rules.iter().enumerate().find_map(|(i, rule)| {
+        ids.insert(rule.effective_id(), i)
+            .map(|earlier| (i, earlier))
+    })
+}
+
+/// The `rule_definition_error` of `rule`, whose effective id is already that
+/// of `earlier` (`spec/rules.md`, *Identity*).
+pub(crate) fn repeated_id_error(rule: &Rule, earlier: &Rule) -> Error {
+    let id = rule.effective_id();
+    let whose = |r: &Rule| {
+        if r.id.is_some() {
+            format!("the id of rule {:?}", r.name)
+        } else {
+            format!("the name of rule {:?}, which has no id", r.name)
+        }
+    };
+    let what = if rule.id.is_some() {
+        format!("the id {id:?} of rule {:?}", rule.name)
+    } else {
+        format!("rule {:?}, which has no id,", rule.name)
+    };
+    rule_error(
+        &rule.name,
+        format!(
+            "{what} repeats {}: effective ids must be unique",
+            whose(earlier)
+        ),
+    )
+    .with_hint(if rule.id.is_some() {
+        "give the rule another id; a rule without an id is identified by its name"
+    } else {
+        "give the rule an id of its own; without one, it is identified by its name"
+    })
+}
+
 /// Rules evaluated together under a hit policy.
 #[derive(Clone, Debug)]
 pub struct RuleSet {
@@ -500,18 +593,18 @@ impl RuleSet {
     ///
     /// # Errors
     ///
-    /// `rule_definition_error` for a repeated rule name (naming it), or an
-    /// aggregate without the `collect` policy; then `unsupported` for a graded
-    /// logic.
+    /// `rule_definition_error` for a repeated rule name, then for a repeated
+    /// effective id (`spec/rules.md`, *Identity*), each naming the second rule;
+    /// or for an aggregate without the `collect` policy; then `unsupported` for
+    /// a graded logic.
     pub fn new(rules: Vec<Rule>, config: Config) -> Result<Self> {
-        let mut names = std::collections::BTreeSet::new();
-        for rule in &rules {
-            if !names.insert(rule.name.as_str()) {
-                return Err(
-                    rule_error(&rule.name, format!("two rules are named {:?}", rule.name))
-                        .with_hint("rule names must be unique"),
-                );
-            }
+        if let Some(i) = repeated_name(&rules) {
+            let name = &rules[i].name;
+            return Err(rule_error(name, format!("two rules are named {name:?}"))
+                .with_hint("rule names must be unique"));
+        }
+        if let Some((i, earlier)) = repeated_id(&rules) {
+            return Err(repeated_id_error(&rules[i], &rules[earlier]));
         }
         if config.aggregate.is_some() && config.hit_policy != HitPolicy::Collect {
             return Err(rule_error("", "an aggregate needs the collect hit policy"));
@@ -1201,6 +1294,60 @@ mod tests {
             RuleSet::new(vec![], config).unwrap_err().code(),
             ErrorCode::RuleDefinitionError
         );
+    }
+
+    #[test]
+    fn rule_ids() {
+        let when = || field("x").gt(0).build().unwrap();
+        let rule = |name: &str| Rule::new(name, when()).unwrap();
+        let with_id = |name: &str, id: &str| rule(name).id(id).unwrap();
+        // Without an id, the name is the effective id.
+        assert_eq!(rule("a").get_id(), None);
+        assert_eq!(rule("a").effective_id(), "a");
+        assert_eq!(with_id("a", "x").get_id(), Some("x"));
+        assert_eq!(with_id("a", "x").effective_id(), "x");
+        assert_eq!(with_id("a", "a").effective_id(), "a");
+        let error = rule("a").id("").unwrap_err();
+        assert_eq!(error.code(), ErrorCode::RuleDefinitionError);
+        assert_eq!(error.context().rule.as_deref(), Some("a"));
+        assert_eq!(error.message(), "a rule id cannot be empty");
+        // Unique effective ids, names first.
+        let ok = |rules: Vec<Rule>| RuleSet::new(rules, Config::default()).map(|_| ());
+        ok(vec![with_id("a", "b"), with_id("b", "a")]).unwrap();
+        ok(vec![with_id("a", "a"), rule("b")]).unwrap();
+        let fails = |rules: Vec<Rule>| RuleSet::new(rules, Config::default()).unwrap_err();
+        let error = fails(vec![with_id("a", "x"), with_id("b", "x")]);
+        assert_eq!(error.code(), ErrorCode::RuleDefinitionError);
+        assert_eq!(error.context().rule.as_deref(), Some("b"));
+        assert_eq!(
+            error.message(),
+            "the id \"x\" of rule \"b\" repeats the id of rule \"a\": effective ids must be unique"
+        );
+        let error = fails(vec![rule("x"), with_id("b", "x")]);
+        assert_eq!(error.context().rule.as_deref(), Some("b"));
+        assert_eq!(
+            error.message(),
+            "the id \"x\" of rule \"b\" repeats the name of rule \"x\", which has no id: \
+             effective ids must be unique"
+        );
+        let error = fails(vec![with_id("a", "x"), rule("x")]);
+        assert_eq!(error.context().rule.as_deref(), Some("x"));
+        assert_eq!(
+            error.message(),
+            "rule \"x\", which has no id, repeats the id of rule \"a\": effective ids must be unique"
+        );
+        assert_eq!(
+            error.hint(),
+            Some("give the rule an id of its own; without one, it is identified by its name")
+        );
+        // A repeated name is found before a repeated id that comes earlier.
+        let error = fails(vec![
+            with_id("a", "x"),
+            with_id("b", "x"),
+            with_id("a", "y"),
+        ]);
+        assert_eq!(error.message(), "two rules are named \"a\"");
+        assert_eq!(error.context().rule.as_deref(), Some("a"));
     }
 
     #[test]

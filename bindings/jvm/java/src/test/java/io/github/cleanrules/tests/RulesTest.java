@@ -10,7 +10,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.cleanrules.Aggregate;
 import io.github.cleanrules.CleanRulesException;
+import io.github.cleanrules.Decision;
+import io.github.cleanrules.Documents;
 import io.github.cleanrules.ExpressionException;
+import io.github.cleanrules.Format;
 import io.github.cleanrules.HitPolicy;
 import io.github.cleanrules.RegistryException;
 import io.github.cleanrules.Rule;
@@ -194,5 +197,86 @@ class RulesTest {
         assertThrows(NullPointerException.class, () -> RuleSet.of(loyal(), null));
         CleanRulesException any = assertThrows(CleanRulesException.class, () -> RuleSet.of(vip(), vip()));
         assertEquals("rule_definition_error", any.code());
+    }
+
+    @Test
+    void rulesHaveAnIdOrTheirName() {
+        assertEquals(Optional.empty(), loyal().id());
+        assertEquals("loyal", loyal().effectiveId());
+        Rule rule = loyal().id("PRICING-1");
+        assertEquals(Optional.of("PRICING-1"), rule.id());
+        assertEquals("PRICING-1", rule.effectiveId());
+        assertEquals("loyal", rule.name());
+        // The id is kept through the other steps, and a later id replaces it.
+        Rule more = rule.priority(3).description("loyal customers").action("notify").then("tier", "silver");
+        assertEquals(Optional.of("PRICING-1"), more.id());
+        assertEquals("PRICING-1", more.effectiveId());
+        assertEquals(Optional.of("PRICING-2"), more.id("PRICING-2").id());
+        // Any non-empty string, also the rule's own name.
+        assertEquals(Optional.of("loyal"), loyal().id("loyal").id());
+        assertEquals(" a/b.c ~ é ", loyal().id(" a/b.c ~ é ").effectiveId());
+        // A rule set keeps the ids, and still finds and names rules by name.
+        RuleSet rules = RuleSet.of(vip().id("PRICING-1"), loyal());
+        assertEquals(Optional.of("PRICING-1"), rules.rule("vip").id());
+        assertEquals("PRICING-1", rules.rules().get(0).effectiveId());
+        assertEquals(Optional.empty(), rules.rule("loyal").id());
+        assertEquals("loyal", rules.rules().get(1).effectiveId());
+        Decision decision = rules.evaluate(Map.of("customer", Map.of("years", 3)));
+        assertEquals(List.of("loyal"), decision.fired());
+    }
+
+    @Test
+    void idsThatAreErrors() {
+        RuleDefinitionException empty = assertThrows(RuleDefinitionException.class, () -> loyal().id(""));
+        assertEquals("rule_definition_error", empty.code());
+        assertThrows(NullPointerException.class, () -> loyal().id(null));
+        // Two equal ids: the error names the second rule.
+        RuleDefinitionException twice = assertThrows(RuleDefinitionException.class,
+                () -> RuleSet.of(vip().id("same"), loyal().id("same")));
+        assertEquals(Optional.of("loyal"), twice.rule());
+        // An id equal to the name of a rule without one, either way round.
+        RuleDefinitionException name = assertThrows(RuleDefinitionException.class,
+                () -> RuleSet.of(vip(), loyal().id("vip")));
+        assertEquals(Optional.of("loyal"), name.rule());
+        RuleDefinitionException earlier = assertThrows(RuleDefinitionException.class,
+                () -> RuleSet.of(vip().id("loyal"), loyal()));
+        assertEquals(Optional.of("loyal"), earlier.rule());
+        // Swapped ids are unique, and so is an id equal to the rule's own name.
+        Rule a = Rule.named("a").when(field("x")).id("b");
+        Rule b = Rule.named("b").when(field("y")).id("a");
+        RuleSet swapped = RuleSet.of(a, b);
+        assertEquals(List.of("b", "a"), swapped.rules().stream().map(Rule::effectiveId).toList());
+        assertEquals(2, RuleSet.of(vip().id("vip"), loyal()).size());
+    }
+
+    @Test
+    void idsAreWrittenAndReadInEachFormat() {
+        Rule rule = loyal().id("PRICING 12");
+        String json = Documents.dumps(rule, Format.JSON);
+        assertTrue(json.contains("\"id\""), json);
+        assertTrue(json.indexOf("\"name\"") < json.indexOf("\"id\""), json);
+        String text = Documents.dumps(rule, Format.TEXT);
+        assertTrue(text.startsWith("RULE loyal ID \"PRICING 12\""), text);
+        for (Format format : List.of(Format.JSON, Format.YAML, Format.TEXT)) {
+            Rule back = (Rule) Documents.loads(Documents.dumps(rule, format), format);
+            assertEquals(Optional.of("PRICING 12"), back.id(), format.toString());
+            assertEquals("PRICING 12", back.effectiveId(), format.toString());
+            assertEquals("loyal", back.name(), format.toString());
+            assertEquals(Documents.dumps(rule, format), Documents.dumps(back, format));
+        }
+        Rule none = (Rule) Documents.loads(Documents.dumps(loyal(), Format.JSON), Format.JSON);
+        assertEquals(Optional.empty(), none.id());
+        assertFalse(Documents.dumps(loyal(), Format.JSON).contains("\"id\""));
+        assertEquals(Optional.of("vip"), Documents.ruleFromText("RULE gold_customer ID vip\nIF vip").id());
+        // A rule set's rules, through JSON and text, keep their ids.
+        RuleSet rules = RuleSet.of(vip().metadata(Map.of()).id("PRICING-1"), loyal());
+        for (Format format : List.of(Format.JSON, Format.TEXT)) {
+            RuleSet back = (RuleSet) Documents.loads(Documents.dumps(rules, format), format);
+            assertEquals(Optional.of("PRICING-1"), back.rule("vip").id());
+            assertEquals(Optional.empty(), back.rule("loyal").id());
+        }
+        // A document with a repeated effective id is an error.
+        String repeated = "RULE a ID x\nIF p\n\nRULE b ID x\nIF q";
+        assertThrows(RuleDefinitionException.class, () -> Documents.loads(repeated, Format.TEXT));
     }
 }

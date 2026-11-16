@@ -4295,6 +4295,308 @@
           "column": 1
         }
       }
+    },
+    {
+      "id": "format/text/rule-id",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#identity",
+        "text.md#printing"
+      ],
+      "description": "ID after the rule's name gives the rule its id, printed before PRIORITY",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE gold_customer ID vip PRIORITY 2\nIF vip"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "gold_customer",
+            "id": "vip",
+            "when": {
+              "op": "field",
+              "path": [
+                "vip"
+              ]
+            },
+            "priority": 2
+          }
+        },
+        "printed": "RULE gold_customer ID vip PRIORITY 2\nIF vip"
+      }
+    },
+    {
+      "id": "format/text/id-only-after-name",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#identity",
+        "text.md#printing"
+      ],
+      "description": "ID is a keyword in any case, and only after a rule's name: elsewhere id is a name, and an id that is not a name prints as a string",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE id id \"PRICING 12\"\nIF id > 5\nTHEN id = id"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "id",
+            "id": "PRICING 12",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "id"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 5
+              }
+            },
+            "then": {
+              "id": {
+                "op": "field",
+                "path": [
+                  "id"
+                ]
+              }
+            }
+          }
+        },
+        "printed": "RULE id ID \"PRICING 12\"\nIF id > 5\nTHEN id = id"
+      }
+    },
+    {
+      "id": "format/text/id-written",
+      "spec": [
+        "text.md#printing",
+        "rules.md#identity"
+      ],
+      "description": "A rule's id is printed in its RULE header",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "a",
+                "id": "x-1",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "p"
+                  ]
+                },
+                "priority": 1,
+                "tags": [
+                  "t"
+                ]
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "q"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "write": "text"
+      },
+      "expect": {
+        "printed": "HIT POLICY first\n\nRULE a ID \"x-1\" PRIORITY 1 TAGS t\nIF p\n\nRULE b\nIF q"
+      }
+    },
+    {
+      "id": "format/text/id-empty",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#identity"
+      ],
+      "description": "An empty id is a rule definition error located at it",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE a ID \"\" IF x"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 1,
+          "column": 11
+        }
+      }
+    },
+    {
+      "id": "format/text/duplicate-id",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#identity",
+        "text.md#errors-and-limits"
+      ],
+      "description": "A rule whose name repeats an earlier rule's id: the error is located at that rule",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE a ID x IF p\nRULE x IF q"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "line": 2,
+          "column": 1
+        }
+      }
+    },
+    {
+      "id": "format/text/id-needs-a-value",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#identity"
+      ],
+      "description": "ID needs a name or a string",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE a ID IF x"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 11
+        }
+      }
+    },
+    {
+      "id": "format/text/payload-expression-error-before-empty-id",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#identity",
+        "text.md#errors-and-limits"
+      ],
+      "description": "The errors of a rule's nodes come before an empty id, as in JSON",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE r ID \"\" IF x THEN y = \"a\" + 1"
+      },
+      "expect": {
+        "error": {
+          "code": "expression_error",
+          "line": 1,
+          "column": 28
+        }
+      }
+    },
+    {
+      "id": "format/text/id-after-priority",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#identity"
+      ],
+      "description": "ID comes right after the rule's name, before PRIORITY",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE r PRIORITY 1 ID x IF y"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 19
+        }
+      }
+    },
+    {
+      "id": "format/text/id-twice",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#identity"
+      ],
+      "description": "A rule has one ID",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE r ID x ID y IF z"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 13
+        }
+      }
+    },
+    {
+      "id": "format/text/id-in-backticks",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#identity"
+      ],
+      "description": "An id between backticks is a name, not the keyword ID",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE a `id` x IF y"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 8
+        }
+      }
+    },
+    {
+      "id": "format/text/id-is-not-a-keyword",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#identity"
+      ],
+      "description": "An id that is a keyword is a syntax error",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE a ID if IF x"
+      },
+      "expect": {
+        "error": {
+          "code": "rule_syntax_error",
+          "line": 1,
+          "column": 11
+        }
+      }
+    },
+    {
+      "id": "format/text/quoted-keyword-id",
+      "spec": [
+        "text.md#rules-and-rule-sets",
+        "rules.md#identity",
+        "text.md#printing"
+      ],
+      "description": "An id that is a keyword is written as a string, and prints as one",
+      "given": {
+        "kind": "read",
+        "rules_text": "RULE a ID \"if\" IF x"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "a",
+            "id": "if",
+            "when": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            }
+          }
+        },
+        "printed": "RULE a ID \"if\"\nIF x"
+      }
     }
   ]
 }

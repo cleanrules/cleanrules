@@ -413,7 +413,7 @@ JavaScript operators are refused rather than silently wrong: `F.age >= 18` and
 ## Rules, rule sets and decisions
 
 ```js
-new Rule(name, when, then?, { priority, tags, description, metadata, do }?)
+new Rule(name, when, then?, { id, priority, tags, description, metadata, do }?)
 new RuleSet(rules, { hitPolicy, aggregate, logic, strict }?)
 ```
 
@@ -432,9 +432,38 @@ case. `toJSON()` of a rule or rule set is its document of the JSON format
 given as a name is written as its name, and one given as code is an
 `UnsupportedError` (pass `{ omitActions: true }` to `dumps`).
 
+`id` identifies a rule across versions of its rule set
+([`spec/rules.md`](../../spec/rules.md), *Identity*): a non-empty string,
+taken literally (`RuleDefinitionError` otherwise). A rule without one is
+identified by its name; `rule.effectiveId` is the id, or the name. Effective
+ids are unique within a rule set, so `new RuleSet` refuses two rules with the
+same id, or an id equal to the name of a rule without one, with a
+`RuleDefinitionError` naming the second rule (two rules may swap ids: `a` with
+id `b` and `b` with id `a`). The id changes nothing else: decisions,
+explanations and summaries name rules by name, and `get(name)` and
+`rule(name)` look them up by name. A renamed rule needs an explicit id (its
+old name, if it had none) to stay the same rule: comparing two versions of a
+rule set, which comes in a later release, shows a renamed rule without an id
+as one rule removed and another added.
+
+```js
+// Renamed from `vip`: the id keeps it the same rule.
+const gold = new Rule('gold_customer', F.customer.years.gt(5), { discount: 0.15 }, { id: 'vip' })
+gold.id           // 'vip'
+gold.effectiveId  // 'vip'
+const loyal = new Rule('loyal', F.customer.years.gt(2), { discount: 0.05 })
+loyal.id           // null
+loyal.effectiveId  // 'loyal'
+new RuleSet([gold, new Rule('vip', F.customer.vip)])  // RuleDefinitionError: rule "vip", which has no id, repeats the id of rule "gold_customer"
+```
+
+Documents keep the id: the key `id` right after `name` in JSON and YAML, and
+`ID` after the rule's name in the text syntax (`RULE gold_customer ID vip
+PRIORITY 10`).
+
 | Name | What |
 |---|---|
-| `rule.name`, `when`, `then`, `priority`, `tags`, `description`, `metadata`, `do`, `actionName` | the rule, as the core keeps it (tags sorted, without repeats) |
+| `rule.name`, `id`, `effectiveId`, `when`, `then`, `priority`, `tags`, `description`, `metadata`, `do`, `actionName` | the rule, as the core keeps it (tags sorted, without repeats; `id` is `null` without one) |
 | `ruleset.rules`, `length`, iteration, `get(name)`, `has(name)`, `rule(name)` | the rules; `get` gives `undefined` for an unknown name, like `Map`, and `rule` throws a `RuleNotFoundError` listing them |
 | `ruleset.hitPolicy`, `aggregate`, `logic`, `strict`, `fieldPaths()` | its configuration and what it reads |
 | `ruleset.evaluate(data, { limits }?)`, `evaluateMany(rows, { limits }?)`, `readDecision(text, { format, limits }?)` | decisions; `limits.maxValues` bounds the values read from each input (above) |

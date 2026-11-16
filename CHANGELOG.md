@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Rule identity (task R.3; `spec/rules.md`, *Identity*): a rule may have an
+  optional `id`, a non-empty string; its **effective id** is the id, or the
+  name when it has none, and effective ids are unique within a rule set
+  (`rule_definition_error`, checked after the names: two equal ids, or an id
+  equal to the name of another rule without an id; one rule's id may still
+  equal another rule's name when that rule has an id of its own). The id
+  changes nothing in evaluation, and decisions, explanations, summaries and
+  diagrams still name rules by name. To rename a rule and keep it the same
+  rule when two versions are compared (phase T), give it an explicit id, its
+  old name if it had none. Additive in format version 1: the JSON and YAML key
+  `id`, written right after `name` (older readers reject it); the text syntax
+  `RULE <name> ID <id>`, where `ID` is a keyword only right after a rule's
+  name, so a field `id` needs no backticks. Decision table rows have no id in
+  this version. 33 conformance vectors (reading and writing, errors and their
+  order, YAML, text, and a decision and a summary that name rules by name),
+  JSON Schema examples, and the example `docs/examples/rule_ids.rs`.
+  - Core: `Rule::id(id)` (an empty id is a `rule_definition_error`),
+    `Rule::get_id()` and `Rule::effective_id()`.
+  - C ABI: `cr_rule_with_id`, `cr_rule_id` (`NULL` when none) and
+    `cr_rule_effective_id`. C++: `rule::with_id`, `rule::id()`
+    (`std::optional`) and `rule::effective_id()`.
+  - Python: `Rule(..., id=...)`, `Rule.id` (`None` when none) and
+    `Rule.effective_id`. JavaScript and wasm: the `Rule` option `id`, and
+    `rule.id` (`null` when none) and `rule.effectiveId`.
+  - Java: `Rule.id(String)`, `Optional<String> id()` and `effectiveId()`.
+    Scala: `Rule(..., id = Some(...))`, `withId`, `id` (`Option`) and
+    `effectiveId`. Go: the option `WithID`, `Rule.ID()` (`""` when none) and
+    `Rule.EffectiveID()`.
+
 - Path length limit (task B.12; `spec/json-format.md`, *Errors and limits*):
   a field path has at most `max_path_segments` segments, 256 by default, in
   conditions, payload values and the headers and cells of decision tables, in

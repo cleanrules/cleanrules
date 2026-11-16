@@ -23,7 +23,7 @@ import java.util.function.Function;
 
 /**
  * A rule ({@code spec/rules.md}, <i>Rules</i>): a name, a condition, a payload,
- * and a priority, tags, a description, metadata and an action.
+ * and a priority, tags, a description, metadata, an action and an id.
  *
  * <pre>{@code
  * Rule vip = Rule.named("vip")
@@ -31,12 +31,13 @@ import java.util.function.Function;
  *         .then("discount", new BigDecimal("0.15"))
  *         .priority(10)
  *         .tags("loyalty")
- *         .action("notify_sales");
+ *         .action("notify_sales")
+ *         .id("loyalty-discount");
  * }</pre>
  *
  * <p>Rules are immutable: each step gives a new rule, which the core checks
  * (an empty name, a value as the condition, a condition in the payload, an
- * empty action name are a {@link RuleDefinitionException}). Payload values are
+ * empty action name, an empty id are a {@link RuleDefinitionException}). Payload values are
  * nodes, or Java constants as in {@link Expr}. Rules compare by identity, and
  * may be shared between threads.
  */
@@ -61,6 +62,7 @@ public final class Rule implements DocumentContent {
 
     private final Core core;
     private final String name;
+    private final String id;
     private final Expr when;
     private final SequencedMap<String, Expr> then;
     private final long priority;
@@ -71,6 +73,7 @@ public final class Rule implements DocumentContent {
     private Rule(
             Core core,
             String name,
+            String id,
             Expr when,
             SequencedMap<String, Expr> then,
             long priority,
@@ -79,6 +82,7 @@ public final class Rule implements DocumentContent {
             Action action) {
         this.core = core;
         this.name = name;
+        this.id = id;
         this.when = when;
         this.then = then;
         this.priority = priority;
@@ -108,7 +112,7 @@ public final class Rule implements DocumentContent {
             byte[] bytes = Text.name(name);
             MemorySegment made = condition.with(pointer ->
                     step((out, error, scope) -> Native.ruleNew(scope.bytes(bytes), bytes.length, pointer, out, error)));
-            return new Rule(new Core(made), name, condition, payloadMap(), 0, null, null, null);
+            return new Rule(new Core(made), name, null, condition, payloadMap(), 0, null, null, null);
         }
     }
 
@@ -148,7 +152,7 @@ public final class Rule implements DocumentContent {
 
     private Rule copy(MemorySegment made, SequencedMap<String, Expr> payload, long newPriority,
             String newDescription, String newActionName, Action newAction) {
-        return new Rule(new Core(made), name, when, payload, newPriority, newDescription, newActionName, newAction);
+        return new Rule(new Core(made), name, id, when, payload, newPriority, newDescription, newActionName, newAction);
     }
 
     // ---- Steps.
@@ -298,8 +302,26 @@ public final class Rule implements DocumentContent {
      * @return the new rule
      */
     public Rule action(Action action) {
-        return new Rule(core, name, when, then, priority, description, actionName,
+        return new Rule(core, name, id, when, then, priority, description, actionName,
                 Objects.requireNonNull(action, "action"));
+    }
+
+    /**
+     * This rule with an id ({@code spec/rules.md}, <i>Identity</i>): what
+     * names it as the same rule across versions of a rule set, so that a
+     * renamed rule keeps its identity. Without one, its name is its id
+     * ({@link #effectiveId()}). The id changes nothing in evaluation:
+     * decisions, explanations and summaries name rules by name.
+     *
+     * @param id the id, any non-empty string (it may equal the name)
+     * @return the new rule
+     * @throws RuleDefinitionException for an empty id
+     */
+    public Rule id(String id) {
+        byte[] bytes = Text.name(Objects.requireNonNull(id, "id"));
+        MemorySegment made = next((rule, out, error, scope) ->
+                Native.ruleWithId(rule, scope.bytes(bytes), bytes.length, out, error));
+        return new Rule(new Core(made), name, id, when, then, priority, description, actionName, action);
     }
 
     // ---- What the rule holds.
@@ -311,6 +333,25 @@ public final class Rule implements DocumentContent {
      */
     public String name() {
         return name;
+    }
+
+    /**
+     * The id given to the rule ({@code spec/rules.md}, <i>Identity</i>).
+     *
+     * @return the id, or empty when the rule has none
+     */
+    public Optional<String> id() {
+        return Optional.ofNullable(id);
+    }
+
+    /**
+     * The rule's effective id: its id, or its name when it has none. Effective
+     * ids are unique within a rule set.
+     *
+     * @return the effective id
+     */
+    public String effectiveId() {
+        return core.with(pointer -> lend((text, len, error) -> Native.ruleEffectiveId(pointer, text, len, error)));
     }
 
     /**
@@ -412,6 +453,7 @@ public final class Rule implements DocumentContent {
         Core core = new Core(owned);
         return core.with(pointer -> {
             String name = lend((text, len, error) -> Native.ruleName(pointer, text, len, error));
+            String id = lend((text, len, error) -> Native.ruleId(pointer, text, len, error));
             Expr when = Expr.make((out, error, scope) -> Native.ruleWhen(pointer, out, error));
             SequencedMap<String, Expr> payload = payloadMap();
             long entries = Native.rulePayloadLen(pointer);
@@ -422,7 +464,8 @@ public final class Rule implements DocumentContent {
             }
             String description = lend((text, len, error) -> Native.ruleDescription(pointer, text, len, error));
             String actionName = lend((text, len, error) -> Native.ruleAction(pointer, text, len, error));
-            return new Rule(core, name, when, payload, Native.rulePriority(pointer), description, actionName, null);
+            return new Rule(
+                    core, name, id, when, payload, Native.rulePriority(pointer), description, actionName, null);
         });
     }
 

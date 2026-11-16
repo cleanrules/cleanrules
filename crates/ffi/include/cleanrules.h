@@ -1609,6 +1609,18 @@ cr_status cr_rule_draw(const struct cr_rule *rule,
                        size_t *len,
                        struct cr_error **error);
 
+// The rule's effective id: its id when it has one, and its name otherwise
+// (`spec/rules.md`, *Identity*); borrowed from the rule and not
+// NUL-terminated.
+//
+// # Safety
+//
+// As `cr_rule_name`.
+cr_status cr_rule_effective_id(const struct cr_rule *rule,
+                               const char **id,
+                               size_t *len,
+                               struct cr_error **error);
+
 // Free a rule. `NULL` is ignored. Rule sets made with it keep their own copy.
 //
 // # Safety
@@ -1633,6 +1645,17 @@ cr_status cr_rule_from_text(const char *text,
                             const struct cr_limits *limits,
                             struct cr_rule **out,
                             struct cr_error **error);
+
+// The rule's id (`spec/rules.md`, *Identity*), borrowed from the rule and
+// not NUL-terminated; `NULL` with a length of 0 when it has none.
+//
+// # Safety
+//
+// As `cr_rule_name`.
+cr_status cr_rule_id(const struct cr_rule *rule,
+                     const char **id,
+                     size_t *len,
+                     struct cr_error **error);
 
 // The rule's metadata as the core keeps it: a new map, freed with
 // `cr_value_free`.
@@ -1766,6 +1789,23 @@ cr_status cr_rule_with_description(const struct cr_rule *rule,
                                    size_t len,
                                    struct cr_rule **out,
                                    struct cr_error **error);
+
+// The rule with an id, which identifies it across versions of its rule set;
+// without one, its name does (`spec/rules.md`, *Identity*). An id is any
+// non-empty string, and may equal the rule's name; an empty one is a
+// `CR_RULE_DEFINITION_ERROR`. A rule set rejects two rules with the same
+// effective id (`cr_rule_effective_id`).
+//
+// # Safety
+//
+// `rule` is `NULL` or a live `cr_rule`; `id` is `NULL` or points to `len`
+// readable bytes; `out` is `NULL` or points to a writable `cr_rule *`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_rule_with_id(const struct cr_rule *rule,
+                          const char *id,
+                          size_t len,
+                          struct cr_rule **out,
+                          struct cr_error **error);
 
 // The rule with this metadata instead of its own: `metadata` is a map of
 // data values (copied); like every map, its keys have no order. An opaque value or a null with a

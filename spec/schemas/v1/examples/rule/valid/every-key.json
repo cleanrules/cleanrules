@@ -2,6 +2,7 @@
   "version": 1,
   "rule": {
     "name": "vip",
+    "id": "PRICING-12",
     "when": {
       "op": "gt",
       "left": {

@@ -271,6 +271,7 @@ pub fn rule_new(
     description: Option<String>,
     metadata: Option<String>,
     action: Option<String>,
+    id: Option<String>,
 ) -> Result<NativeRule, JsValue> {
     let tags = strings(raw_list(tags, "tags")?, "tags").or_fail()?;
     let args = RuleArgs {
@@ -282,11 +283,12 @@ pub fn rule_new(
         description,
         metadata,
         action,
+        id,
     };
     build::rule(args).map(|rule| NativeRule { rule }).or_fail()
 }
 
-/// A rule's tags, metadata and action name, as JSON.
+/// A rule's tags, metadata, action name, id and effective id, as JSON.
 #[wasm_bindgen(js_name = ruleDetails)]
 #[must_use]
 pub fn rule_details(rule: &NativeRule) -> String {

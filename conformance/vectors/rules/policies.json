@@ -1562,6 +1562,177 @@
           ]
         }
       }
+    },
+    {
+      "id": "rules/policies/ids-name-the-rules-by-name",
+      "spec": [
+        "rules.md#identity",
+        "json-format.md#decisions"
+      ],
+      "description": "Ids change nothing in a decision, which names rules by their names",
+      "given": {
+        "kind": "evaluate",
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "vip",
+              "id": "R-1",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "customer",
+                    "years"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "big",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "order",
+                    "total"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1000
+                }
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.10"
+                  }
+                }
+              },
+              "priority": 10
+            },
+            {
+              "name": "base",
+              "id": "R-3",
+              "when": {
+                "op": "const",
+                "value": true
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.00"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "input": {
+          "customer": {
+            "years": 7
+          },
+          "order": {
+            "total": 1500
+          }
+        }
+      },
+      "expect": {
+        "decision": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "results": [
+            {
+              "rule": "vip",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "years"
+                    ],
+                    "value": 7
+                  },
+                  {
+                    "op": "const",
+                    "value": 5
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": {
+                    "$decimal": "0.15"
+                  }
+                }
+              }
+            },
+            {
+              "rule": "big",
+              "fired": true,
+              "when": {
+                "op": "gt",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ],
+                    "value": 1500
+                  },
+                  {
+                    "op": "const",
+                    "value": 1000
+                  }
+                ]
+              }
+            },
+            {
+              "rule": "base",
+              "fired": true,
+              "when": {
+                "op": "const",
+                "truth": true,
+                "children": [
+                  {
+                    "op": "const",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          ],
+          "selected": [
+            "vip"
+          ]
+        }
+      }
     }
   ]
 }

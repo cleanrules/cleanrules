@@ -322,6 +322,7 @@ A rule is an object with these keys (`rules.md`, *Rules*):
 | Key | Required | JSON type | Default |
 |---|---|---|---|
 | `name` | yes | string | |
+| `id` | no | string, not empty: the rule's id (`rules.md`, *Identity*) | none: the effective id is the name |
 | `when` | yes | condition node | |
 | `then` | no | object: payload key → value node | `{}` |
 | `priority` | no | int | `0` |
@@ -359,6 +360,10 @@ A rule is an object with these keys (`rules.md`, *Rules*):
 - **`do`** names the rule's action, which a binding resolves in its action
   registry (`rules.md`, *Actions*). An action given as code has no name, and
   cannot be written (*Writing errors*).
+- **`id`** identifies the rule across versions of its rule set; without it,
+  the name does (`rules.md`, *Identity*). It is taken literally. Writers write
+  it when the rule has one, even when it equals the name. It was added to
+  version 1 (*Versioning*): older readers reject it with `format_error`.
 
 Reading a rule checks its shape (`format_error`), builds its condition and
 payload values with the rules of *Reading* (`expression_error`), and then
@@ -366,9 +371,10 @@ applies the rule's own construction rules, which give
 `rule_definition_error`, in this order:
 
 1. `name` is not empty (pointer to `…/name`);
-2. `when` is not a node of kind value (pointer to `…/when`; a `const` holding
+2. `id`, when given, is not empty (pointer to `…/id`);
+3. `when` is not a node of kind value (pointer to `…/when`; a `const` holding
    `null` there is already an `expression_error`);
-3. no payload value is a node of kind condition (pointer to `…/then/<key>`,
+4. no payload value is a node of kind condition (pointer to `…/then/<key>`,
    with the key escaped as RFC 6901 requires, so `a/b` becomes `a~1b`), the
    first by key, by Unicode code point.
 
@@ -422,9 +428,13 @@ in this order:
 
 1. rule names are unique: `rule_definition_error`, pointing to the `name` of
    the second rule with that name;
-2. `aggregate` is only given with `"collect"`: `rule_definition_error`,
+2. effective ids are unique (`rules.md`, *Identity*): `rule_definition_error`,
+   pointing to the `id` of the second rule with that effective id, or to its
+   `name` when it has no id. So `{"name": "a", "id": "x"}` followed by
+   `{"name": "x"}` points to the second rule's `name`;
+3. `aggregate` is only given with `"collect"`: `rule_definition_error`,
    pointing to `/ruleset/aggregate`;
-3. `logic` is a logic a rule set takes: `registry_error` for an unknown one,
+4. `logic` is a logic a rule set takes: `registry_error` for an unknown one,
    or `unsupported` for a graded one, pointing to `/ruleset/logic`.
 
 Writers write the keys in the order of the table and omit `aggregate` when

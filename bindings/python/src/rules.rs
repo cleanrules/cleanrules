@@ -66,6 +66,18 @@ impl PyRule {
         self.rule.name()
     }
 
+    /// The rule's id, if it has one (`spec/rules.md`, *Identity*).
+    #[getter]
+    fn id(&self) -> Option<&str> {
+        self.rule.get_id()
+    }
+
+    /// The effective id: the id, or the name when the rule has none.
+    #[getter]
+    fn effective_id(&self) -> &str {
+        self.rule.effective_id()
+    }
+
     /// The condition.
     #[getter]
     fn when(&self) -> PyNode {
@@ -116,8 +128,9 @@ impl PyRule {
 }
 
 /// A rule: `then` holds the payload (the core sorts its keys); `metadata` is converted as data.
+/// The core checks the id (`spec/rules.md`, *Identity*).
 #[pyfunction]
-#[pyo3(signature = (name, when, then, priority, tags, description, metadata, action=None))]
+#[pyo3(signature = (name, when, then, priority, tags, description, metadata, action=None, id=None))]
 #[allow(clippy::needless_pass_by_value, clippy::too_many_arguments)] // PyO3 extracts lists by value; the arguments are `Rule`'s.
 pub(crate) fn rule(
     py: Python<'_>,
@@ -129,6 +142,7 @@ pub(crate) fn rule(
     description: Option<&str>,
     metadata: &Bound<'_, PyDict>,
     action: Option<&str>,
+    id: Option<&str>,
 ) -> PyResult<PyRule> {
     let payload = then
         .iter()
@@ -138,6 +152,9 @@ pub(crate) fn rule(
         .or_raise(py)?
         .priority(priority)
         .tags(tags);
+    if let Some(id) = id {
+        rule = rule.id(id).or_raise(py)?;
+    }
     if let Some(description) = description {
         rule = rule.description(description);
     }

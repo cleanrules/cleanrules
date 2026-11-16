@@ -834,6 +834,412 @@
           "pointer": "/ruleset/rules/1"
         }
       }
+    },
+    {
+      "id": "format/rulesets/ids",
+      "spec": [
+        "json-format.md#rule-sets",
+        "rules.md#identity"
+      ],
+      "description": "Rules with and without ids round-trip: each id is kept, and a rule without one is written without it",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "gold_customer",
+                "id": "vip",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "vip"
+                  ]
+                }
+              },
+              {
+                "name": "default",
+                "when": {
+                  "op": "const",
+                  "value": true
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "gold_customer",
+                "id": "vip",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "vip"
+                  ]
+                }
+              },
+              {
+                "name": "default",
+                "when": {
+                  "op": "const",
+                  "value": true
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/ids-swapped",
+      "spec": [
+        "json-format.md#rule-sets",
+        "rules.md#identity"
+      ],
+      "description": "One rule's id may be another rule's name when that rule has an id of its own",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "a",
+                "id": "b",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                }
+              },
+              {
+                "name": "b",
+                "id": "a",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "y"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "id": "b",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                }
+              },
+              {
+                "name": "b",
+                "id": "a",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "y"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/duplicate-ids",
+      "spec": [
+        "json-format.md#rule-sets",
+        "rules.md#identity"
+      ],
+      "description": "Two rules with the same id: the error points to the second rule's id",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "a",
+                "id": "x",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "p"
+                  ]
+                }
+              },
+              {
+                "name": "b",
+                "id": "x",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "q"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/ruleset/rules/1/id"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/id-repeats-earlier-name",
+      "spec": [
+        "json-format.md#rule-sets",
+        "rules.md#identity"
+      ],
+      "description": "A rule's id equal to the name of an earlier rule without an id repeats that rule's effective id",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "x",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "p"
+                  ]
+                }
+              },
+              {
+                "name": "b",
+                "id": "x",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "q"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/ruleset/rules/1/id"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/name-repeats-earlier-id",
+      "spec": [
+        "json-format.md#rule-sets",
+        "rules.md#identity"
+      ],
+      "description": "A rule without an id whose name is an earlier rule's id: the error points to the second rule's name",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "a",
+                "id": "x",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "p"
+                  ]
+                }
+              },
+              {
+                "name": "x",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "q"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/ruleset/rules/1/name"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/names-before-ids",
+      "spec": [
+        "json-format.md#rule-sets",
+        "rules.md#identity",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "Repeated names are checked before repeated effective ids, even when the repeated id comes first",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "a",
+                "id": "x",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "p"
+                  ]
+                }
+              },
+              {
+                "name": "b",
+                "id": "x",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "q"
+                  ]
+                }
+              },
+              {
+                "name": "a",
+                "id": "y",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "r"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/ruleset/rules/2/name"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/duplicate-ids-before-aggregate",
+      "spec": [
+        "json-format.md#rule-sets",
+        "rules.md#identity",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "Repeated effective ids are checked before the aggregate",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "aggregate": "sum",
+            "rules": [
+              {
+                "name": "a",
+                "id": "x",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "p"
+                  ]
+                }
+              },
+              {
+                "name": "b",
+                "id": "x",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "q"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/ruleset/rules/1/id"
+        }
+      }
+    },
+    {
+      "id": "format/rulesets/id-errors-before-ruleset",
+      "spec": [
+        "json-format.md#rule-sets",
+        "rules.md#identity"
+      ],
+      "description": "An empty id is the rule's error, before the rule set's own rules",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "p"
+                  ]
+                }
+              },
+              {
+                "name": "a",
+                "id": "",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "q"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "rule_definition_error",
+          "pointer": "/ruleset/rules/1/id"
+        }
+      }
     }
   ]
 }

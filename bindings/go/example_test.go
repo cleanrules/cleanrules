@@ -70,6 +70,28 @@ func ExampleDecision_WhyNot() {
 	// 2
 }
 
+// An id identifies a rule across versions of its rule set; without one, its
+// name does. A renamed rule keeps its identity with an explicit id, the old
+// name for a rule that had none. Outputs name rules by their names.
+func ExampleWithID() {
+	gold := cr.Must(cr.NewRule("gold_customer", cr.Field("vip"), cr.WithID("vip")))
+	base := cr.Must(cr.NewRule("base", cr.Const(true)))
+	fmt.Println(gold.ID(), gold.EffectiveID(), base.ID() == "", base.EffectiveID())
+
+	// Effective ids are unique within a rule set.
+	vip := cr.Must(cr.NewRule("vip", cr.Field("years").Gt(5)))
+	_, err := cr.NewRuleSet([]*cr.Rule{vip, gold})
+	fmt.Println(errors.Is(err, cr.ErrRuleDefinition))
+
+	text := cr.Must(cr.Dumps(gold, cr.WithFormat(cr.FormatText)))
+	fmt.Println(text)
+	// Output:
+	// vip vip true base
+	// true
+	// RULE gold_customer ID vip
+	// IF vip
+}
+
 // Run calls the Go functions bound to the actions the selected rules name.
 func ExampleRuleSet_Run() {
 	notify := cr.Must(cr.NewRule("notify", cr.Field("total").Gt(100), cr.WithAction("email")))

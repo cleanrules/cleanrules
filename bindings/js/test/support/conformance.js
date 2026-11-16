@@ -861,6 +861,7 @@ export function conformance(R, N) {
     const rules = need(content, 'rules').map((rule) => {
       const then = rule.get('then')
       const options = {}
+      if (rule.has('id')) options.id = rule.get('id')
       if (rule.has('priority')) options.priority = nativeOf(rule.get('priority'))
       if (rule.has('tags')) options.tags = rule.get('tags')
       if (rule.has('description')) options.description = rule.get('description')

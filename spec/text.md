@@ -38,7 +38,8 @@ Rule files written as text use the suffix `.rules`.
   `TAGS`, `DESCRIPTION`, `HIT`, `POLICY`, `AGGREGATE`, `LOGIC`, `STRICT`, `AND`, `OR`,
   `NOT`, `IN`, `BETWEEN`, `CLOSED`, `IS`, `NULL`, `TRUE`, `FALSE`, `MATCHES`,
   `STARTS`, `ENDS`, `WITH`, `CONTAINS`, `ABS`, `ROUND`, `DATE`, `DATETIME`,
-  `DECIMAL`, `FLOAT`.
+  `DECIMAL`, `FLOAT`. `ID` is a keyword only right after a rule's name, not
+  between backticks (*Rules and rule sets*); elsewhere `id` is a name.
 - **Names** are ASCII identifiers (`[A-Za-z_][A-Za-z0-9_]*`) that are not
   keywords, or any text between backticks (`` `first name` ``, `` `and` ``), in
   which a backtick is written twice. Names are case-sensitive.
@@ -102,7 +103,7 @@ and `or`, and sorts `in` values (`ast.md`), so `a AND (b AND c)` reads as one
 ## Rules and rule sets
 
 ```text
-RULE <name> [PRIORITY <int>] [TAGS <name or string>, …] [DESCRIPTION <string>]
+RULE <name> [ID <name or string>] [PRIORITY <int>] [TAGS <name or string>, …] [DESCRIPTION <string>]
 IF <condition>
 [THEN <key> = <value>, …]
 [DO <name or string>]
@@ -111,6 +112,14 @@ IF <condition>
 - The name is a name or a string. Without a `RULE` header, a rule is named
   `rule_<n>` by its position in the text, from 1: `IF a > 1 THEN x = 1` alone
   is the rule `rule_1`.
+- `ID` gives the rule its id (`rules.md`, *Identity*), a name or a non-empty
+  string: `RULE gold_customer ID vip`, `RULE vip ID "PRICING-12"`. `ID` is a
+  keyword only there, right after the rule's name, in any case and not
+  between backticks; anywhere else `id` is a name, so a field `id` needs no
+  backticks (`id > 5`). The id itself follows the rules of names: `ID if` is
+  a syntax error, `ID "if"` the id `if`. An empty id (`ID ""`) is a
+  `rule_definition_error` located at it, after the errors of the rule's
+  nodes, as in JSON.
 - The payload is optional; its keys are names or strings, and its values are
   value expressions (`THEN tax = order.total * 0.21`). A payload is an
   association (`rules.md`, *Rules*): its keys are kept, and printed, sorted by
@@ -148,7 +157,12 @@ unexpected end. The error says what was expected.
 
 Texts are read in order, and the first error found is reported: a syntax error
 where it is met; the construction errors of a rule once the rule is read, before
-the next rule; those of a condition once it is read.
+the next rule; those of a condition once it is read. A logic in the header is
+checked where it is read; the rule set's other errors (`json-format.md`,
+*Rule sets*: a repeated name, then a repeated effective id, then an aggregate
+without `collect`) come after its last rule is read, and are located at the
+`RULE` (or `IF`) that starts the rule they name, or else at the start of the
+text.
 
 Texts have the limits of JSON documents (`json-format.md`, *Errors and
 limits*):
@@ -190,11 +204,11 @@ which reads back as the same model:
   `1e16`), and `FLOAT "…"` when infinite; a negative constant
   with its sign (`-5`), and the negation of a number constant with parentheses
   (`-(5)`, `-(-5)`); strings between double quotes with JSON escapes;
-- field keys, rule names, tags and payload keys as names when they are names,
+- field keys, rule names, ids, tags and payload keys as names when they are names,
   and keys after a `.` when they are identifiers; field keys between backticks
   and the others as strings otherwise;
-- a rule as its `RULE` header (with `PRIORITY` when it is not 0, `TAGS` and
-  `DESCRIPTION` when there are any), its `IF` line, its `THEN` line and its `DO` line
+- a rule as its `RULE` header (with `ID` when it has an id, `PRIORITY` when
+  it is not 0, and `TAGS` and `DESCRIPTION` when there are any), its `IF` line, its `THEN` line and its `DO` line
   when it has a named action, each on its own line; a rule set as its header lines (`HIT POLICY`, then `AGGREGATE`,
   `LOGIC` when it is not `boolean`, and `STRICT` when set), a blank line, and its
   rules separated by blank lines;

@@ -32,6 +32,7 @@ package cleanrules
 // written to build/reports/conformance.txt).
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"os"
@@ -764,6 +765,9 @@ func (c *conformance) buildRuleSet(v any) *RuleSet {
 	for _, item := range o.list("rules") {
 		r := item.(*jsonObject)
 		var options []RuleOption
+		if r.has("id") {
+			options = append(options, WithID(r.str("id")))
+		}
 		if then := r.obj("then"); then != nil {
 			for _, key := range then.keys {
 				value := then.values[key].(*jsonObject)
@@ -882,6 +886,10 @@ func checkRule(r *Rule, source *jsonObject) string {
 		return fmt.Sprintf("%s: Priority() %d", name, r.Priority())
 	case r.ActionName() != source.str("do"):
 		return fmt.Sprintf("%s: ActionName() %q", name, r.ActionName())
+	case r.ID() != source.str("id"):
+		return fmt.Sprintf("%s: ID() %q", name, r.ID())
+	case r.EffectiveID() != cmp.Or(source.str("id"), name):
+		return fmt.Sprintf("%s: EffectiveID() %q", name, r.EffectiveID())
 	case r.Description() != source.str("description"):
 		return fmt.Sprintf("%s: Description() %q", name, r.Description())
 	case !slices.Equal(r.Tags(), stringsOf(source.list("tags"))):

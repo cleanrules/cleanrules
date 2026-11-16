@@ -21,6 +21,11 @@
 //	rules, err := cleanrules.NewRuleSet([]*cleanrules.Rule{vip},
 //		cleanrules.WithHitPolicy(cleanrules.HitPolicyPriority))
 //
+// WithID gives a rule an id, which identifies it across versions of its rule
+// set; without one, its name does (Rule.EffectiveID), so a renamed rule needs
+// an explicit id to stay the same rule. Effective ids are unique within a
+// rule set, and outputs name rules by their names.
+//
 // # Deciding
 //
 // RuleSet.Evaluate reads Go data (maps by their string keys, slices,

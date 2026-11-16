@@ -887,6 +887,9 @@ class Conformance {
         for (Object item : array(need(content, "rules"))) {
             Map<String, Object> source = object(item);
             Rule rule = Rule.named(text(source, "name")).when(build(need(source, "when")));
+            if (source.get("id") instanceof String id) {
+                rule = rule.id(id);
+            }
             if (source.get("then") instanceof Map<?, ?> then) {
                 for (Map.Entry<?, ?> entry : then.entrySet()) {
                     rule = rule.then((String) entry.getKey(), build(entry.getValue()));
@@ -1495,6 +1498,13 @@ class Conformance {
         }
         if (!rule.description().equals(Optional.ofNullable(source.get("description")))) {
             return rule.name() + ": description() " + rule.description();
+        }
+        if (!rule.id().equals(Optional.ofNullable(source.get("id")))) {
+            return rule.name() + ": id() " + rule.id();
+        }
+        Object effectiveId = source.containsKey("id") ? source.get("id") : source.get("name");
+        if (!rule.effectiveId().equals(effectiveId)) {
+            return rule.name() + ": effectiveId() " + rule.effectiveId();
         }
         // Metadata's keys are literal, even those that start with $ (spec/json-format.md, Rules).
         Map<String, Object> metadata = new LinkedHashMap<>();

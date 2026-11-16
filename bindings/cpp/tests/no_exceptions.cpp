@@ -4,6 +4,7 @@
 
 #include <cleanrules.hpp>
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -57,6 +58,18 @@ int main() {
     CHECK(kept.fired(0, error));
     CHECK(!error);
     CHECK(seen == std::vector<std::string>{"vip"});
+
+    // A rule's id, and a repeated effective id.
+    auto vip = rules.rule_at(0, error);
+    CHECK(!vip.id(error) && !error);
+    CHECK(vip.effective_id(error) == "vip");
+    auto gold = vip.with_id("gold", error);
+    CHECK(gold.id(error) == std::optional<std::string>("gold"));
+    CHECK(gold.effective_id(error) == "gold");
+    CHECK(!vip.with_id("", error));
+    CHECK(error.code() == cr::errc::rule_definition_error);
+    CHECK(!cr::ruleset::make({gold, vip.with_id("gold", error)}, error));
+    CHECK(error.code() == cr::errc::rule_definition_error);
 
     // What a constructor cannot build is a null that keeps the message.
     cr::value broken(std::string("\xff"));

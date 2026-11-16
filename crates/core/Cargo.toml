@@ -52,3 +52,8 @@ path = "../../docs/examples/fuzzy.rs"
 [[example]]
 name = "decimals"
 path = "../../docs/examples/decimals.rs"
+
+# The example of rule identity in the documentation (task R.3).
+[[example]]
+name = "rule_ids"
+path = "../../docs/examples/rule_ids.rs"

@@ -522,6 +522,12 @@ export type Payload = Readonly<Record<string, Operand>> | ReadonlyMap<string, Op
 export type Metadata = Readonly<Record<string, unknown>> | ReadonlyMap<string, unknown>
 
 export interface RuleOptions {
+  /**
+   * Identifies the rule across versions of its rule set (`spec/rules.md`,
+   * *Identity*); without one, its name does. A non-empty string, taken
+   * literally. A renamed rule keeps its identity only with an id.
+   */
+  id?: string | null
   /** Used by the `priority` hit policy; higher wins. 0 by default. */
   priority?: number | bigint
   /** Labels; kept sorted and without repeats. */
@@ -544,6 +550,10 @@ export declare class Rule {
   constructor(name: string, when: Expr, then?: Payload | null, options?: RuleOptions)
   /** The rule's name, unique within a rule set; decisions and errors name the rule by it. */
   readonly name: string
+  /** The id given to the rule, or `null` for none. */
+  readonly id: string | null
+  /** The id, or the name when the rule has no id; unique within a rule set. */
+  readonly effectiveId: string
   readonly when: Expr
   /**
    * The payload: each key with its node, added by Unicode code point (a plain
@@ -610,6 +620,10 @@ export interface ReadDecisionOptions {
  * rules.evaluate({ customer: { years: 7 } }).output
  */
 export declare class RuleSet implements Iterable<Rule> {
+  /**
+   * A `RuleDefinitionError` naming the second rule when two rules share a
+   * name, then when two share an effective id (`Rule.effectiveId`).
+   */
   constructor(rules: Iterable<Rule>, options?: RuleSetOptions)
   readonly rules: readonly Rule[]
   /** How many rules there are (a rule set is a sequence, as in Python). */

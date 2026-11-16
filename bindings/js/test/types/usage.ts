@@ -183,6 +183,7 @@ const notify = (context: ActionContext): void => {
   void [rule, result, payload, decision, context.data]
 }
 const vip = new Rule('vip', F.customer.years.gt(5), { discount: decimal('0.15'), base: F.price }, {
+  id: 'PRICING-12',
   priority: 10,
   tags: ['loyalty'],
   description: 'long-standing customers',
@@ -203,6 +204,11 @@ for (const rule of rules) void rule.name
 const ruleThen: Readonly<Record<string, Expr>> = vip.then
 const priority: number | bigint = loyal.priority
 const action: string | null = loyal.actionName
+const ruleId: string | null = vip.id
+const effectiveId: string = loyal.effectiveId
+const noId: Rule = new Rule('plain', F.x, null, { id: null })
+// @ts-expect-error: an id is a string.
+void new Rule('numbered', F.x, null, { id: 12 })
 const decided: RootDecision = bound.run({ customer: { years: 6 }, price: 10 })
 const many: RootDecision[] = rules.evaluateMany([{ customer: { years: 1 } }])
 const replay: RootDecision = rules.readDecision(JSON.stringify(decided.toJSON()), { format: 'json' })
@@ -252,7 +258,7 @@ new RootDecision()
 new RootRuleSet([], { hitPolicy: 'last' })
 
 void [adult, age, deeper, clash, segments, value, total, tests, constants, tag, nodeKind, children, same, text, json]
-void [maybe, first, has, count, ruleThen, priority, action, many, replay, outs, firedNames, truthOf, aggregated, status, note]
+void [maybe, first, has, count, ruleThen, priority, action, ruleId, effectiveId, noId, many, replay, outs, firedNames, truthOf, aggregated, status, note]
 void [ruleSummaries, usage, tags, rulePolicy, ruleAggregate]
 
 // --- After the API review ---

@@ -250,7 +250,7 @@ func nilOption(options string) *Error {
 
 // The options of each function, for nilOption.
 const (
-	ruleOptions      = "Then, WithPriority, WithTags, WithDescription, WithMetadata and WithAction"
+	ruleOptions      = "WithID, Then, WithPriority, WithTags, WithDescription, WithMetadata and WithAction"
 	ruleSetOptions   = "WithHitPolicy, WithAggregate, WithLogic and WithStrict"
 	tableOptions     = "WithTablePolicy, WithAggregate, WithLogic, WithStrict and WithLimits"
 	evaluateOptions  = "WithLimits"

@@ -7,7 +7,7 @@ import scala.jdk.OptionConverters.*
 
 /**
  * A rule (`spec/rules.md`, *Rules*): a name, a condition, a payload, and a
- * priority, tags, a description, metadata and an action.
+ * priority, tags, a description, metadata, an action and an id.
  *
  * {{{
  * val vip = Rule(
@@ -17,12 +17,13 @@ import scala.jdk.OptionConverters.*
  *   priority = 10,
  *   tags = Seq("loyalty"),
  *   actionName = Some("notify_sales"),
+ *   id = Some("loyalty-discount"),
  * )
  * }}}
  *
  * Rules are immutable: each `with...` step gives a new rule, which the core
- * checks (an empty name, a value as the condition, a condition in the payload
- * are an `io.github.cleanrules.RuleDefinitionException`). Payload values are
+ * checks (an empty name, a value as the condition, a condition in the payload,
+ * an empty id are an `io.github.cleanrules.RuleDefinitionException`). Payload values are
  * nodes or Scala constants. A payload is an association: whatever the map
  * and its order, its keys are kept sorted by Unicode code point. Rules
  * compare by identity (that of the Java rule), and may be shared between
@@ -33,6 +34,12 @@ import scala.jdk.OptionConverters.*
 final class Rule private (val asJava: io.github.cleanrules.Rule):
   /** The name. */
   def name: String = asJava.name()
+
+  /** The id given to the rule (`spec/rules.md`, *Identity*), if any. */
+  def id: Option[String] = asJava.id().toScala
+
+  /** The effective id: the id, or the name when the rule has none; unique within a rule set. */
+  def effectiveId: String = asJava.effectiveId()
 
   /** The condition. */
   def when: Expr = Expr.fromJava(asJava.when())
@@ -92,6 +99,16 @@ final class Rule private (val asJava: io.github.cleanrules.Rule):
   /** This rule running `action` when it is selected by [[RuleSet.run]]; a name it has stays. */
   def withAction(action: Action): Rule = Rule(asJava.action(Rule.ScalaAction(action)))
 
+  /**
+   * This rule with an id (`spec/rules.md`, *Identity*): what names it as the
+   * same rule across versions of a rule set, so that a renamed rule keeps its
+   * identity. Without one, its name is its id. The id changes nothing in
+   * evaluation: decisions, explanations and summaries name rules by name.
+   *
+   * @throws io.github.cleanrules.RuleDefinitionException for an empty id
+   */
+  def withId(id: String): Rule = Rule(asJava.id(id))
+
   /** Identity: that of the Java rule. */
   override def equals(other: Any): Boolean = other match
     case rule: Rule => asJava eq rule.asJava
@@ -115,8 +132,10 @@ object Rule:
    * @param metadata any Scala values, also lists and maps
    * @param actionName the name of its action, which [[RuleSet.bind]] resolves
    * @param action the code [[RuleSet.run]] runs when the rule is selected
+   * @param id what names the rule across versions of a rule set (`spec/rules.md`, *Identity*);
+   *   without one, its name is its id
    * @throws io.github.cleanrules.RuleDefinitionException for an empty name, a value as the
-   *   condition or a condition in the payload
+   *   condition, a condition in the payload or an empty id
    */
   def apply(
       name: String,
@@ -128,8 +147,10 @@ object Rule:
       metadata: collection.Map[String, Any] = SeqMap.empty,
       actionName: Option[String] = None,
       action: Option[Action] = None,
+      id: Option[String] = None,
   ): Rule =
     var rule = io.github.cleanrules.Rule.named(name).when(when.asJava)
+    id.foreach(text => rule = rule.id(text))
     if payload.nonEmpty then rule = rule.`then`(javaPayload(payload))
     if priority != 0 then rule = rule.priority(priority)
     if tags.nonEmpty then rule = rule.tags(tags.asJava)

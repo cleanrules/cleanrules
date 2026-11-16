@@ -88,6 +88,29 @@ rules.bind(Map.of("notify_sales", context -> System.out.println(context.output()
   step gives a new immutable rule, checked by the core
   (`RuleDefinitionException`). `tags()` and `metadata()` are what the core
   keeps (tags sorted, without repeats).
+- **Rule identity** (`spec/rules.md`, *Identity*): `id(text)` gives a rule an
+  id, any non-empty string (an empty one is a `RuleDefinitionException`);
+  `id()` gives it back as an `Optional<String>`, and `effectiveId()` is the
+  id, or the name when the rule has none, as the core computes it. Effective
+  ids are unique within a rule set: two equal ids, or an id equal to the name
+  of a rule without one, are a `RuleDefinitionException` naming the second
+  rule (`a` with id `b` next to `b` with id `a` is fine). The id is written
+  after the name (`"id"` in JSON and YAML, `RULE gold_customer ID vip` in
+  text) and read back from documents, and changes nothing else: decisions,
+  explanations, summaries and `rule(name)` still name rules by name.
+  Comparing two versions of a rule set (coming in a later release) matches
+  rules by effective id, so a rule renamed without an id counts as one rule
+  removed and another added. To rename a rule and keep it the same rule,
+  give it its old name as id (if it had none), as `vip` renamed
+  `gold_customer` here; changing an id changes the rule's identity too.
+
+  ```java
+  Rule gold = Rule.named("gold_customer").when(field("vip")).id("vip");
+  gold.id();                            // Optional[vip]
+  gold.effectiveId();                   // vip
+  Rule plain = Rule.named("loyal").when(field("loyal"));
+  plain.effectiveId();                  // loyal
+  ```
 - **Rule sets** (`RuleSet`): `RuleSet.of(rules...)`, or
   `RuleSet.builder().add(...).hitPolicy(...).aggregate(...).logic(...).strict(...).build()`;
   an immutable `Iterable<Rule>` with `rules()`, `size()`, `get(name)` (an
@@ -331,14 +354,18 @@ A key that is not an identifier takes backquotes (`` F.`type` ``) or
 `apply`.
 
 **Rules and rule sets.** `Rule(name, when, payload, priority, tags,
-description, metadata, actionName, action)`, with every argument after `when`
+description, metadata, actionName, action, id)`, with every argument after `when`
 named and optional, and the steps `withPayload`, `withPriority`, `withTags`
 (varargs or a collection),
-`withDescription`, `withMetadata`, `withActionName` and `withAction`, each a
+`withDescription`, `withMetadata`, `withActionName`, `withAction` and
+`withId`, each a
 new rule (`then` is a keyword in Scala 3, hence `payload`). A payload's keys
 are kept sorted by Unicode code point, whatever the map. A rule gives back `name`, `when`, `payload` (a `SeqMap` of nodes),
-`priority`, `tags`, `description` and `actionName` (`Option`s), `metadata`
-and `action` (the very function). `RuleSet(rules*)`, or `RuleSet(rules,
+`priority`, `tags`, `description`, `actionName` and `id` (`Option`s),
+`effectiveId` (the id, or the name without one), `metadata`
+and `action` (the very function). Ids follow the Java binding's rules
+(*Rule identity*, above): give a rule that may be renamed an explicit id, so
+that two versions of a rule set still see it as the same rule. `RuleSet(rules*)`, or `RuleSet(rules,
 hitPolicy, aggregate, logic, strict)` with named arguments, gives `rules`,
 `size`, `get(name)` (`Option`), `apply(name)` (`RuleNotFoundException`),
 `contains`, `hitPolicy`, `aggregate`, `logic`, `strict`, `fieldPaths`,

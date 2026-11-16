@@ -2426,6 +2426,15 @@ public:
     [[nodiscard]] rule with_action(std::string_view name, error_info &error) const {
         return text_step_(cr_rule_with_action, name, &error);
     }
+    // With an id, which identifies it across versions of its rule set; without
+    // one, its name does (spec/rules.md, *Identity*). Any non-empty string,
+    // possibly the name; an empty one is a `rule_definition_error`.
+    CLEANRULES_THROWING([[nodiscard]] rule with_id(std::string_view id) const {
+        return text_step_(cr_rule_with_id, id, nullptr);
+    })
+    [[nodiscard]] rule with_id(std::string_view id, error_info &error) const {
+        return text_step_(cr_rule_with_id, id, &error);
+    }
 
     // One rule written in the rule syntax (spec/text.md), as fuzzytool's
     // `rule_from_text` reads it: without a RULE line it is named `rule_1`; a
@@ -2448,8 +2457,24 @@ public:
     std::string_view name(error_info &error) const & { return name_(&error); }
     CLEANRULES_THROWING(std::string name() && { return std::string(name_(nullptr)); })
     std::string name(error_info &error) && { return std::string(name_(&error)); }
-    // The description and the action's name, copied; `std::nullopt` when the
+    // The effective id: the id when the rule has one, the name otherwise;
+    // borrowed like the name. A rule set holds no two rules with the same one.
+    CLEANRULES_THROWING(std::string_view effective_id() const & {
+        return borrow_(cr_rule_effective_id, nullptr);
+    })
+    std::string_view effective_id(error_info &error) const & {
+        return borrow_(cr_rule_effective_id, &error);
+    }
+    CLEANRULES_THROWING(std::string effective_id() && {
+        return std::string(borrow_(cr_rule_effective_id, nullptr));
+    })
+    std::string effective_id(error_info &error) && {
+        return std::string(borrow_(cr_rule_effective_id, &error));
+    }
+    // The id, the description and the action's name, copied; `std::nullopt` when the
     // rule has none (and after a failure reported through `error`).
+    CLEANRULES_THROWING(std::optional<std::string> id() const { return lend_(cr_rule_id, nullptr); })
+    std::optional<std::string> id(error_info &error) const { return lend_(cr_rule_id, &error); }
     CLEANRULES_THROWING(std::optional<std::string> description() const {
         return lend_(cr_rule_description, nullptr);
     })
@@ -2492,10 +2517,13 @@ private:
             return cr_rule_from_text(text.data(), text.size(), detail::limits_of(l), o, e);
         });
     }
-    std::string_view name_(error_info *sink) const {
+    std::string_view name_(error_info *sink) const { return borrow_(cr_rule_name, sink); }
+    std::string_view borrow_(cr_status (*read)(const cr_rule *, const char **, std::size_t *,
+                                               cr_error **),
+                             error_info *sink) const {
         const char *text = nullptr;
         std::size_t len = 0;
-        detail::check(sink, [&](cr_error **e) { return cr_rule_name(c_ptr(), &text, &len, e); });
+        detail::check(sink, [&](cr_error **e) { return read(c_ptr(), &text, &len, e); });
         return detail::view(text, len);
     }
     std::optional<std::string> lend_(cr_status (*read)(const cr_rule *, const char **,

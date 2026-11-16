@@ -683,6 +683,75 @@ void rules_and_documents() {
           syntax.code() == cr::errc::rule_syntax_error);
 }
 
+void identity() {
+    // A rule's id and its effective id (spec/rules.md, *Identity*).
+    auto when = cr::node::field(cr::value::list({"vip"}));
+    auto plain = cr::rule::make("gold_customer", when);
+    CHECK(!plain.id());
+    CHECK(plain.effective_id() == "gold_customer");
+    auto vip = plain.with_id("vip");
+    CHECK(vip.id() == std::optional<std::string>("vip"));
+    CHECK(vip.effective_id() == "vip");
+    CHECK(vip.name() == "gold_customer");
+    CHECK(!plain.id());  // each step gives a new rule
+    CHECK(cr::rule::make("same", when).with_id("same").effective_id() == "same");
+    CHECK(cr::rule::make("t", when).with_id("ü d").effective_id() == "ü d");  // owned from a temporary
+    CHECK(vip.with_description("big").id() == std::optional<std::string>("vip"));
+    CHECK(vip.with_id("gold").id() == std::optional<std::string>("gold"));
+
+    // An empty id is a rule definition error.
+    CHECK_THROWS(plain.with_id(""), cr::rule_definition_error);
+    cr::error_info empty_id;
+    CHECK(!plain.with_id("", empty_id) && empty_id.code() == cr::errc::rule_definition_error);
+    cr::rule none;
+    CHECK_THROWS(none.effective_id(), cr::invalid_argument_error);
+    CHECK_THROWS(none.id(), cr::invalid_argument_error);
+    CHECK_THROWS(none.with_id("x"), cr::invalid_argument_error);
+    cr::error_info missing;
+    CHECK(none.effective_id(missing).empty() && missing.code() == cr::errc::invalid_argument);
+    cr::error_info missing_id;
+    CHECK(!none.id(missing_id) && missing_id.code() == cr::errc::invalid_argument);
+
+    // Effective ids are unique within a rule set; the error names the second rule.
+    auto a = cr::rule::make("a", when);
+    auto b = cr::rule::make("b", when);
+    CHECK_THROWS(cr::ruleset::make({a.with_id("x"), b.with_id("x")}), cr::rule_definition_error);
+    cr::error_info twice;
+    CHECK(!cr::ruleset::make({a.with_id("x"), b.with_id("x")}, twice));
+    CHECK(twice.code() == cr::errc::rule_definition_error);
+    CHECK(twice.message().find("rule \"b\"") != std::string_view::npos);
+    CHECK_THROWS(cr::ruleset::make({a.with_id("b"), b}), cr::rule_definition_error);
+    CHECK_THROWS(cr::ruleset::make({a, b.with_id("a")}), cr::rule_definition_error);
+    auto swapped = cr::ruleset::make({a.with_id("b"), b.with_id("a")});
+    CHECK(swapped.rule_at(0).effective_id() == "b");
+    CHECK(swapped.rule_at(1).effective_id() == "a");
+    CHECK(cr::ruleset::make({a.with_id("a"), b}).rule_at(0).id() == std::optional<std::string>("a"));
+
+    // The id round-trips through JSON and text, and changes nothing in a decision.
+    auto rules = cr::ruleset::make({vip, cr::rule::make("default", cr::node::constant(true))});
+    std::string json = rules.write();
+    CHECK(json.find(R"("name":"gold_customer","id":"vip")") != std::string::npos);
+    auto from_json = cr::ruleset::read(json, cr::format::json);
+    CHECK(from_json.rule_at(0).id() == std::optional<std::string>("vip"));
+    CHECK(!from_json.rule_at(1).id());
+    CHECK(from_json.rule_at(1).effective_id() == "default");
+    std::string text = rules.write(cr::format::text);
+    CHECK(text.find("RULE gold_customer ID vip") != std::string::npos);
+    CHECK(cr::ruleset::read(text, cr::format::text).rule_at(0).effective_id() == "vip");
+    auto read = cr::rule::from_text("RULE gold_customer ID vip PRIORITY 2\nIF vip");
+    CHECK(read.id() == std::optional<std::string>("vip"));
+    CHECK(read.priority() == 2);
+    CHECK(cr::document::from_rule(read).write(cr::format::text) ==
+          "RULE gold_customer ID vip PRIORITY 2\nIF vip");
+    CHECK(cr::document::read(cr::document::from_rule(read).write(), cr::format::json).as_rule().id() ==
+          std::optional<std::string>("vip"));
+    CHECK_THROWS(cr::ruleset::read("RULE a ID x IF p\nRULE x IF q", cr::format::text),
+                 cr::rule_definition_error);
+    auto decision = rules.evaluate(cr::value::map({{"vip", true}}));
+    CHECK(decision.selected() == std::vector<std::size_t>{0});
+    CHECK(decision.rule_name(0) == "gold_customer");
+}
+
 }  // namespace
 
 int main() {
@@ -695,5 +764,6 @@ int main() {
     grids_nodes_and_batches();
     building();
     rules_and_documents();
+    identity();
     return check::report("api");
 }

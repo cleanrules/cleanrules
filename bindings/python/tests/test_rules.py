@@ -4,8 +4,10 @@ The semantics are the core's and its conformance vectors check them; these tests
 check the Python API: construction, validation, results and errors.
 """
 
+import copy
 import datetime as dt
 import json
+import pickle
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, cast
@@ -142,6 +144,109 @@ def test_duplicate_names_are_rejected_by_the_core() -> None:
         RuleSet([Rule("a", F.x > 1), Rule("a", F.x > 2)])
     assert info.value.rule == "a"
     assert info.value.code == "rule_definition_error"
+
+
+def test_ids_identify_rules_and_default_to_their_names() -> None:
+    renamed = Rule("gold_customer", F.vip, id="vip")
+    assert (renamed.name, renamed.id, renamed.effective_id) == ("gold_customer", "vip", "vip")
+    plain = Rule("vip", F.vip)
+    assert (plain.id, plain.effective_id) == (None, "vip")
+    assert Rule("a", F.x > 1, id="a").effective_id == "a"
+    # Taken literally, never normalized.
+    assert Rule("a", F.x > 1, id=" A ").id == " A "
+    assert repr(renamed) == "Rule('gold_customer', F.vip, id='vip')"
+    assert repr(Rule("a", F.x > 1, {"y": 1}, id="b", do="notify")).endswith(
+        ", {'y': Const(1)}, id='b', do='notify')"
+    )
+    with pytest.raises(AttributeError):
+        renamed.id = "other"  # type: ignore[misc]
+
+
+def test_an_empty_id_is_refused_by_the_core() -> None:
+    with pytest.raises(RuleDefinitionError) as info:
+        Rule("a", F.x > 1, id="")
+    assert info.value.rule == "a"
+    assert info.value.message == "a rule id cannot be empty"
+    assert info.value.hint == "leave the id out to identify the rule by its name"
+
+
+@pytest.mark.parametrize("bad", [1, b"vip", ["vip"], 1.5])
+def test_an_id_is_a_string(bad: Any) -> None:
+    with pytest.raises(RuleDefinitionError, match="id must be a string") as info:
+        Rule("a", F.x > 1, id=bad)
+    assert info.value.rule == "a"
+
+
+def test_effective_ids_are_unique_in_a_rule_set() -> None:
+    with pytest.raises(RuleDefinitionError) as info:
+        RuleSet([Rule("a", F.x > 1, id="x"), Rule("b", F.x > 2, id="x")])
+    assert info.value.rule == "b"
+    assert info.value.message == (
+        'the id "x" of rule "b" repeats the id of rule "a": effective ids must be unique'
+    )
+    # An id equal to the name of a rule without an id, in either order.
+    with pytest.raises(RuleDefinitionError) as info:
+        RuleSet([Rule("x", F.x > 1), Rule("b", F.x > 2, id="x")])
+    assert info.value.rule == "b"
+    with pytest.raises(RuleDefinitionError) as info:
+        RuleSet([Rule("a", F.x > 1, id="x"), Rule("x", F.x > 2)])
+    assert info.value.rule == "x"
+    # Names are checked first.
+    with pytest.raises(RuleDefinitionError, match="two rules are named"):
+        RuleSet(
+            [Rule("a", F.x > 1, id="x"), Rule("b", F.x > 2, id="x"), Rule("a", F.x > 3, id="y")]
+        )
+    # Swapped ids repeat neither names nor effective ids.
+    swapped = RuleSet([Rule("a", F.x > 1, id="b"), Rule("b", F.x > 2, id="a")])
+    assert [rule.effective_id for rule in swapped] == ["b", "a"]
+    # Rules are still found by name, and decisions name them by name.
+    assert swapped["a"].id == "b"
+    decision = swapped.evaluate({"x": 5})
+    assert decision.selected[0].rule.name == "a"
+    assert decision.to_dict()["decision"]["selected"] == ["a"]
+
+
+def test_ids_round_trip_through_documents() -> None:
+    rules = RuleSet([Rule("gold_customer", F.vip, id="vip"), Rule("loyal", F.years > 2)])
+    document = json.loads(cleanrules.dumps(rules))
+    assert document["ruleset"]["rules"][0]["id"] == "vip"
+    assert list(document["ruleset"]["rules"][0])[:2] == ["name", "id"]
+    assert "id" not in document["ruleset"]["rules"][1]
+    for fmt in ("json", "yaml", "text"):
+        read = cleanrules.loads(cleanrules.dumps(rules, format=fmt), format=fmt)
+        assert isinstance(read, RuleSet)
+        assert [(r.name, r.id) for r in read] == [("gold_customer", "vip"), ("loyal", None)]
+    text = cleanrules.dumps(rules[0], format="text")
+    assert text == "RULE gold_customer ID vip\nIF vip"  # as the README shows
+    read_rule = cleanrules.rule_from_text('RULE gold_customer ID "PRICING-12" IF vip')
+    assert (read_rule.id, read_rule.effective_id) == ("PRICING-12", "PRICING-12")
+    bound = cleanrules.rule_from_text("RULE a ID b IF vip", do=lambda context: None)
+    assert bound.id == "b"
+
+
+def notify(context: object) -> None:
+    """An action that pickles by name."""
+
+
+def test_ids_survive_pickling_copying_and_binding() -> None:
+    rule = Rule("gold_customer", F.vip, id="vip", do="notify")
+    for clone in (pickle.loads(pickle.dumps(rule)), copy.deepcopy(rule), copy.copy(rule)):
+        assert (clone.name, clone.id, clone.effective_id) == ("gold_customer", "vip", "vip")
+    bound = RuleSet([rule]).bind({"notify": notify})
+    assert bound[0].id == "vip"
+    assert pickle.loads(pickle.dumps(bound))[0].id == "vip"
+    assert pickle.loads(pickle.dumps(Rule("a", F.x > 1))).id is None
+    # A pickle written before ids were added calls `_make_rule` without one.
+    from cleanrules._rules import _make_rule  # pyright: ignore[reportPrivateUsage]
+
+    old = _make_rule("a", F.x > 1, {}, 0, (), None, {}, None, None)
+    assert (old.id, old.effective_id) == (None, "a")
+
+
+def test_a_repeated_id_in_a_document_is_a_definition_error() -> None:
+    with pytest.raises(RuleDefinitionError) as info:
+        cleanrules.loads("RULE a ID x\nIF v\n\nRULE b ID x\nIF w", format="text")
+    assert info.value.rule == "b"
 
 
 def test_invalid_configurations() -> None:

@@ -578,6 +578,61 @@ fn rules_are_built_step_by_step() {
     assert!(same(&json(&written), &json(wanted)), "{written}");
 }
 
+fn with_id(rule: &Rule, id: &str) -> Result<Rule, Failure> {
+    let (p, n) = arg(id.as_bytes());
+    // SAFETY: a live rule; the id outlives the call.
+    handle(|out, error| unsafe { cr_rule_with_id(rule.0, p, n, out, error) }).map(Rule)
+}
+
+/// A rule's id, or `None`, and its effective id.
+fn ids(rule: &Rule) -> (Option<String>, String) {
+    let lend = |call: unsafe extern "C" fn(
+        *const cr_rule,
+        *mut *const c_char,
+        *mut usize,
+        *mut *mut cr_error,
+    ) -> cr_status| {
+        let (mut text, mut len) = (ptr::null(), 0);
+        // SAFETY: a live rule and writable out-parameters.
+        common::ok(|e| unsafe { call(rule.0, &raw mut text, &raw mut len, e) });
+        (!text.is_null()).then(|| {
+            // SAFETY: the library lends `len` bytes that live as long as the rule.
+            let bytes = unsafe { std::slice::from_raw_parts(text.cast::<u8>(), len) };
+            String::from_utf8(bytes.to_vec()).unwrap()
+        })
+    };
+    (lend(cr_rule_id), lend(cr_rule_effective_id).unwrap())
+}
+
+#[test]
+fn rules_have_ids() {
+    let x = field(r#"["x"]"#);
+    let plain = rule("vip", &x).unwrap();
+    assert_eq!(ids(&plain), (None, "vip".to_owned()));
+    let renamed = with_id(&rule("gold_customer", &x).unwrap(), "vip").unwrap();
+    assert_eq!(ids(&renamed), (Some("vip".to_owned()), "vip".to_owned()));
+    let failure = with_id(&plain, "").err().unwrap();
+    assert_eq!(failure.status, CR_RULE_DEFINITION_ERROR);
+    assert_eq!(member(&failure, "rule"), Some(&Json::String("vip".into())));
+    // Effective ids are unique in a rule set: an id may not repeat the name
+    // of a rule without one.
+    let failure = ruleset(&[&plain, &renamed], None, None).err().unwrap();
+    assert_eq!(failure.status, CR_RULE_DEFINITION_ERROR);
+    assert_eq!(
+        member(&failure, "rule"),
+        Some(&Json::String("gold_customer".into()))
+    );
+    let swapped = with_id(&rule("vip", &x).unwrap(), "gold_customer").unwrap();
+    let set = ruleset(&[&swapped, &renamed], None, None).unwrap();
+    let written = common::write_ruleset(&set, CR_FORMAT_JSON).unwrap();
+    let wanted = r#"{"version":1,"ruleset":{"hit_policy":"first","logic":"boolean","rules":[
+        {"name":"vip","id":"gold_customer","when":{"op":"field","path":["x"]}},
+        {"name":"gold_customer","id":"vip","when":{"op":"field","path":["x"]}}]}}"#;
+    assert!(same(&json(&written), &json(wanted)), "{written}");
+    let text = common::write_ruleset(&set, CR_FORMAT_TEXT).unwrap();
+    assert!(text.contains("RULE vip ID gold_customer\n"), "{text}");
+}
+
 #[test]
 fn rules_report_the_core_errors() {
     let x = field(r#"["x"]"#);

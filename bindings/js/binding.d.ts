@@ -793,7 +793,7 @@ export interface ReadOptions {
   limits?: Limits
 }
 
-/** A rule's tags, metadata and action name, as JSON. */
+/** A rule's tags, metadata, action name, id and effective id, as JSON. */
 export declare function ruleDetails(rule: NativeRule): string
 
 /**
@@ -803,7 +803,7 @@ export declare function ruleDetails(rule: NativeRule): string
  *
  * `RuleDefinitionError` or `ExpressionError`, as the core reports them.
  */
-export declare function ruleNew(name: string, when: Node, then: NodeList, priority: string, tags: string[], description?: string | null, metadata?: string | null, action?: string | null): NativeRule
+export declare function ruleNew(name: string, when: Node, then: NodeList, priority: string, tags: string[], description?: string | null, metadata?: string | null, action?: string | null, id?: string | null): NativeRule
 
 /** A rule's condition and payload values. */
 export declare function ruleNodes(rule: NativeRule): Array<Node>

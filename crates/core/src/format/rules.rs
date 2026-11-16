@@ -8,7 +8,10 @@ use crate::format::result::write_result;
 use crate::format::value::{ValueContext, read_value, write_value};
 use crate::json::{Json, Limits, by_key, pointer_token};
 use crate::logic::LogicName;
-use crate::rules::{Aggregate, Aggregated, Config, Decision, HitPolicy, Rule, RuleSet};
+use crate::rules::{
+    Aggregate, Aggregated, Config, Decision, HitPolicy, Rule, RuleSet, repeated_id,
+    repeated_id_error, repeated_name,
+};
 use crate::value::{Map, Value};
 use crate::walk::Walk;
 
@@ -47,6 +50,7 @@ pub(crate) fn no_unknown_keys(
 pub(crate) struct RawRule {
     pointer: String,
     name: String,
+    id: Option<String>,
     when: Raw,
     then: Vec<(String, Raw)>,
     priority: i64,
@@ -56,8 +60,9 @@ pub(crate) struct RawRule {
     action: Option<String>,
 }
 
-const RULE_KEYS: [&str; 8] = [
+const RULE_KEYS: [&str; 9] = [
     "name",
+    "id",
     "when",
     "then",
     "priority",
@@ -86,6 +91,16 @@ pub(crate) fn shape_rule(json: &Json, pointer: &str, limits: &Limits) -> Result<
             return Err(format_error(
                 &at(pointer, "name"),
                 "the key \"name\" is missing",
+            ));
+        }
+    };
+    let id = match get(members, "id") {
+        None => None,
+        Some(Json::String(id)) => Some(id.clone()),
+        Some(_) => {
+            return Err(format_error(
+                &at(pointer, "id"),
+                "\"id\" must be a string: the rule's id",
             ));
         }
     };
@@ -192,6 +207,7 @@ pub(crate) fn shape_rule(json: &Json, pointer: &str, limits: &Limits) -> Result<
     Ok(RawRule {
         pointer: pointer.to_owned(),
         name,
+        id,
         when,
         then,
         priority,
@@ -224,6 +240,13 @@ pub(crate) fn build_rule(raw: RawRule) -> Result<Rule> {
         )
         .at_pointer(at(&pointer, "name")));
     }
+    if raw.id.as_deref() == Some("") {
+        return Err(
+            Error::new(ErrorCode::RuleDefinitionError, "a rule id cannot be empty")
+                .with_hint("leave the id out to identify the rule by its name")
+                .at_pointer(at(&pointer, "id")),
+        );
+    }
     if when.kind() == Kind::Value {
         return Err(Error::new(
             ErrorCode::RuleDefinitionError,
@@ -247,6 +270,11 @@ pub(crate) fn build_rule(raw: RawRule) -> Result<Rule> {
         .metadata(raw.metadata);
     if let Some(description) = raw.description {
         rule = rule.description(description);
+    }
+    if let Some(id) = raw.id {
+        // Cannot fail: an empty id is rejected above, in the order of the
+        // rule's own rules.
+        rule = rule.id(id).map_err(|e| e.at_pointer(at(&pointer, "id")))?;
     }
     match raw.action {
         Some(action) => rule
@@ -361,14 +389,26 @@ pub(crate) fn build_ruleset(raw: RawRuleSet) -> Result<RuleSet> {
     for raw_rule in raw.rules {
         rules.push(build_rule(raw_rule)?);
     }
-    for (i, rule) in rules.iter().enumerate() {
-        if rules[..i].iter().any(|r| r.name() == rule.name()) {
-            return Err(Error::new(
-                ErrorCode::RuleDefinitionError,
-                format!("two rules are named {:?}", rule.name()),
-            )
-            .at_pointer(format!("{pointer}/rules/{i}/name")));
-        }
+    if let Some(i) = repeated_name(&rules) {
+        return Err(Error::new(
+            ErrorCode::RuleDefinitionError,
+            format!("two rules are named {:?}", rules[i].name()),
+        )
+        .with_hint("rule names must be unique")
+        .at_pointer(format!("{pointer}/rules/{i}/name")));
+    }
+    if let Some((i, earlier)) = repeated_id(&rules) {
+        // Located at the id, or at the name that stands for it; the rule is
+        // named by the pointer, as for a repeated name.
+        let key = if rules[i].get_id().is_some() {
+            "id"
+        } else {
+            "name"
+        };
+        let mut error = repeated_id_error(&rules[i], &rules[earlier])
+            .at_pointer(format!("{pointer}/rules/{i}/{key}"));
+        error.context_mut().rule = None;
+        return Err(error);
     }
     if raw.aggregate.is_some() && raw.hit_policy != HitPolicy::Collect {
         return Err(Error::new(
@@ -396,10 +436,11 @@ pub fn write_rule(rule: &Rule) -> Json {
 
 /// [`write_rule`], with the stacks of `walk` for its nodes.
 fn write_rule_in<'n>(walk: &mut Walk<&'n Node, Json>, rule: &'n Rule) -> Json {
-    let mut members = vec![
-        ("name".to_owned(), Json::String(rule.name().into())),
-        ("when".to_owned(), write_node_in(walk, rule.when())),
-    ];
+    let mut members = vec![("name".to_owned(), Json::String(rule.name().into()))];
+    if let Some(id) = rule.get_id() {
+        members.push(("id".into(), Json::String(id.into())));
+    }
+    members.push(("when".into(), write_node_in(walk, rule.when())));
     if !rule.then().is_empty() {
         let then = rule
             .then()

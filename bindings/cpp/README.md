@@ -331,6 +331,38 @@ no order). `document::from_condition(node)` and `document::from_rule(rule)`
 make documents to `write`, and `document::as_condition()` reads a condition
 document's node.
 
+### Rule identity
+
+A rule may have an id (spec/rules.md, *Identity*): `with_id(id)` gives it
+one, any non-empty string, possibly equal to the name (an empty id is a
+`rule_definition_error`). `id()` gives the explicit id (copied, `std::nullopt`
+when it has none) and `effective_id()` the id, or the name when the rule has
+no id (borrowed, like `name()`). In JSON the id is the key `id` after `name`,
+and in the rule syntax `RULE <name> ID <id>`.
+
+```cpp
+auto gold = cr::rule::make("gold_customer", cr::node::field(cr::value::list({"vip"}))).with_id("vip");
+gold.id();            // std::optional<std::string>("vip")
+gold.effective_id();  // "vip"
+auto other = cr::rule::make("default", cr::node::constant(true));
+other.effective_id(); // "default": no id, so the name
+```
+
+Effective ids are unique within a rule set: `ruleset::make` (and reading a
+rule set) rejects two rules with the same id, or a rule whose id is another
+id-less rule's name, with a `rule_definition_error` that names the second
+rule. Two rules may swap names as ids (`a` with the id `b`, `b` with the id
+`a`), since neither falls back to its name. The id changes nothing in
+evaluation, decisions, explanations or summaries; rules are still reported
+by name.
+
+The effective id is what identifies a rule across two versions of its rule
+set, so a rule renamed without an id becomes a different rule. To rename a
+rule and keep it the same one when two versions are compared (a later
+phase), give it an explicit id: its old name if it had none, or its old id.
+Adding a different id, or changing the id, changes the effective id, so the
+two versions show one rule removed and another added.
+
 ## Actions
 
 ```cpp

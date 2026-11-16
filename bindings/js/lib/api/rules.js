@@ -30,7 +30,7 @@ const PRIVATE = Symbol('cleanrules.rules')
 /** Rules and rule sets made of the core's own, read from a document. */
 const NATIVE = Symbol('cleanrules.native')
 
-const RULE_OPTIONS = ['priority', 'tags', 'description', 'metadata', 'do']
+const RULE_OPTIONS = ['id', 'priority', 'tags', 'description', 'metadata', 'do']
 const RULESET_OPTIONS = ['hitPolicy', 'aggregate', 'logic', 'strict']
 const EVALUATE_OPTIONS = ['limits']
 
@@ -161,8 +161,10 @@ function rules(native, expressions, trees, build) {
      * @param name Unique within a rule set.
      * @param when The condition: the rule fires when it is true.
      * @param then The payload: keys whose values are constants or value expressions.
-     * @param options `priority`, `tags`, `description`, `metadata` and `do` (an
-     *   action: a function, or the name of one that `RuleSet.bind` resolves).
+     * @param options `id` (identifies the rule across versions of its rule
+     *   set; its name does without one), `priority`, `tags`, `description`,
+     *   `metadata` and `do` (an action: a function, or the name of one that
+     *   `RuleSet.bind` resolves).
      */
     constructor(name, when, then, ruleOptions) {
       if (name === NATIVE) {
@@ -202,7 +204,10 @@ function rules(native, expressions, trees, build) {
         throw definition(`when must be a condition node, not ${show(when)}`, name, 'build conditions with F, e.g. F.total.gt(100)')
       }
       const given = options(ruleOptions, RULE_OPTIONS, '{ priority: 10 }')
-      const { priority = 0, tags = [], description = null, metadata = null, do: action = null } = given
+      const { id = null, priority = 0, tags = [], description = null, metadata = null, do: action = null } = given
+      if (id !== null && typeof id !== 'string') {
+        throw definition(`id must be a string, not ${show(id)}`, name, 'leave the id out to identify the rule by its name')
+      }
       let digits
       if (typeof priority === 'bigint') {
         if (priority < I64_MIN || priority > I64_MAX) {
@@ -246,7 +251,7 @@ function rules(native, expressions, trees, build) {
       let made
       try {
         for (const [key, value] of items) list.push(nodeOf(value), key)
-        made = native.ruleNew(name, nodeOf(when), list, digits, tagList, description, wire, actionName)
+        made = native.ruleNew(name, nodeOf(when), list, digits, tagList, description, wire, actionName, id)
       } finally {
         list.free?.()
       }
@@ -264,10 +269,23 @@ function rules(native, expressions, trees, build) {
 
     #read() {
       if (this.#details === undefined) {
-        const [tags, metadata, action] = JSON.parse(native.ruleDetails(natives.get(this)))
-        this.#details = [Object.freeze(tags), Object.freeze(decode(metadata, [])), action]
+        const [tags, metadata, action, id, effectiveId] = JSON.parse(native.ruleDetails(natives.get(this)))
+        this.#details = [Object.freeze(tags), Object.freeze(decode(metadata, [])), action, id, effectiveId]
       }
       return this.#details
+    }
+
+    /**
+     * The id, which identifies the rule across versions of its rule set
+     * (`spec/rules.md`, *Identity*), or `null` for none.
+     */
+    get id() {
+      return this.#read()[3]
+    }
+
+    /** The id, or the name when the rule has no id; unique within a rule set. */
+    get effectiveId() {
+      return this.#read()[4]
     }
 
     /** The condition. */
@@ -339,7 +357,9 @@ function rules(native, expressions, trees, build) {
     #byName
 
     /**
-     * @param ruleList The rules, in order; names are unique.
+     * @param ruleList The rules, in order; names are unique, and then
+     *   effective ids (`Rule.effectiveId`): a `RuleDefinitionError` names the
+     *   second rule.
      * @param options `hitPolicy` (`'first'` by default), `aggregate` (with
      *   `'collect'`), `logic` (`'boolean'`) and `strict` (`false`).
      */

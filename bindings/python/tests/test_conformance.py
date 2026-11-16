@@ -271,6 +271,7 @@ def build_ruleset(content: dict[str, Any]) -> RuleSet:
             rule["name"],
             build(rule["when"]),
             {key: build(value) for key, value in rule.get("then", {}).items()},
+            id=rule.get("id"),
             priority=typed(rule.get("priority", Number("0"))),
             tags=rule.get("tags", ()),
             description=rule.get("description"),

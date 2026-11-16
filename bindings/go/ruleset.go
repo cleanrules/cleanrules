@@ -53,8 +53,11 @@ type RuleSet struct {
 }
 
 // NewRuleSet makes a rule set of rules, in order, and options. An unknown
-// hit policy or aggregate, a repeated rule name or an aggregate without
-// HitPolicyCollect is a rule_definition_error; an unknown logic, a registry_error.
+// hit policy or aggregate, a repeated rule name, a repeated effective id
+// (Rule.EffectiveID: two equal ids, or an id equal to the name of another
+// rule without one) or an aggregate without HitPolicyCollect is a
+// rule_definition_error, which names the later rule of a repeat (names are
+// checked before effective ids); an unknown logic, a registry_error.
 func NewRuleSet(rules []*Rule, options ...RuleSetOption) (*RuleSet, error) {
 	var settings ruleSetSettings
 	for _, option := range options {

@@ -463,7 +463,7 @@
                   "op": "const",
                   "value": 1
                 },
-                "\u00e9": {
+                "é": {
                   "op": "const",
                   "value": 2
                 },
@@ -516,7 +516,7 @@
                 "2",
                 "Z",
                 "b",
-                "\u00e9"
+                "é"
               ]
             },
             {
@@ -547,11 +547,219 @@
             "2",
             "Z",
             "b",
-            "\u00e9",
+            "é",
             "a",
             "c"
           ],
           "tags": []
+        }
+      }
+    },
+    {
+      "id": "explain/summaries/ids-not-shown",
+      "spec": [
+        "rules.md#identity",
+        "explain.md#summaries"
+      ],
+      "description": "A summary names rules by their names, whatever their ids",
+      "given": {
+        "kind": "summary",
+        "ruleset": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "strict": true,
+          "rules": [
+            {
+              "name": "vip",
+              "id": "PRICING-1",
+              "when": {
+                "op": "and",
+                "operands": [
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "customer",
+                        "years"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 5
+                    }
+                  },
+                  {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "order",
+                        "total"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1000
+                    }
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": 0.15
+                },
+                "total": {
+                  "op": "mul",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "order",
+                      "total"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0.85
+                  }
+                }
+              },
+              "tags": [
+                "loyalty",
+                "pricing"
+              ]
+            },
+            {
+              "name": "blocked",
+              "id": "PRICING-2",
+              "when": {
+                "op": "or",
+                "operands": [
+                  {
+                    "op": "field",
+                    "path": [
+                      "customer",
+                      "blocked"
+                    ]
+                  },
+                  {
+                    "op": "is_null",
+                    "operand": {
+                      "op": "field",
+                      "path": [
+                        "customer"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "then": {
+                "discount": {
+                  "op": "const",
+                  "value": 0
+                }
+              },
+              "priority": 10,
+              "tags": [
+                "risk"
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "summary": {
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "strict": true,
+          "rules": [
+            {
+              "name": "vip",
+              "priority": 0,
+              "outputs": [
+                "discount",
+                "total"
+              ]
+            },
+            {
+              "name": "blocked",
+              "priority": 10,
+              "outputs": [
+                "discount"
+              ]
+            }
+          ],
+          "fields": [
+            {
+              "path": [
+                "customer",
+                "years"
+              ],
+              "conditions": [
+                "vip"
+              ],
+              "payloads": []
+            },
+            {
+              "path": [
+                "order",
+                "total"
+              ],
+              "conditions": [
+                "vip"
+              ],
+              "payloads": [
+                {
+                  "rule": "vip",
+                  "key": "total"
+                }
+              ]
+            },
+            {
+              "path": [
+                "customer",
+                "blocked"
+              ],
+              "conditions": [
+                "blocked"
+              ],
+              "payloads": []
+            },
+            {
+              "path": [
+                "customer"
+              ],
+              "conditions": [
+                "blocked"
+              ],
+              "payloads": []
+            }
+          ],
+          "outputs": [
+            "discount",
+            "total"
+          ],
+          "tags": [
+            {
+              "tag": "loyalty",
+              "rules": [
+                "vip"
+              ]
+            },
+            {
+              "tag": "pricing",
+              "rules": [
+                "vip"
+              ]
+            },
+            {
+              "tag": "risk",
+              "rules": [
+                "blocked"
+              ]
+            }
+          ]
         }
       }
     }
