@@ -17,7 +17,8 @@ import scala.jdk.CollectionConverters.*
  *   case condition: Expr => condition.evaluateTree(order)
  * }}}
  *
- * and [[dumps]] and [[dump]] write one.
+ * and [[dumps]] and [[dump]] write one; [[canonicalBytes]] and [[digest]]
+ * give its canonical bytes and their SHA-256 digest.
  */
 type DocumentContent = Expr | Rule | RuleSet | DecisionTable
 
@@ -144,6 +145,44 @@ private def registry(actions: collection.Map[String, Action]): java.util.Map[Str
  */
 def dumps(value: DocumentContent, format: Format = Format.JSON, omitActions: Boolean = false): String =
   Documents.dumps(DocumentContent.asJava(value), format, omitActions)
+
+/**
+ * The canonical bytes of a condition, rule, rule set or decision table
+ * (`spec/json-format.md`, *Canonical bytes*): the UTF-8 JSON text of its
+ * document in canonical form, every object's members sorted by key by Unicode
+ * code point, without whitespace. The same document gives the same bytes in
+ * every language, whatever the layout, member order or escapes of the text it
+ * was read from.
+ *
+ * @param value what to write
+ * @param omitActions leave out the actions that are code without a name, instead of refusing them, as for
+ *   [[dumps]]
+ * @throws io.github.cleanrules.UnsupportedException for a rule whose action is code without a name
+ *   (at `/rule/do` or `/ruleset/rules/<i>/do`)
+ * @throws io.github.cleanrules.ExpressionException if `value` is a value node, not a condition
+ */
+def canonicalBytes(value: DocumentContent, omitActions: Boolean = false): Array[Byte] =
+  Documents.canonicalBytes(DocumentContent.asJava(value), omitActions)
+
+/**
+ * The digest of a condition, rule, rule set or decision table
+ * (`spec/json-format.md`, *Digests*): `sha256:` and the 64 lowercase
+ * hexadecimal digits of the SHA-256 hash of its [[canonicalBytes]].
+ *
+ * A digest identifies one concrete canonical artifact, not equivalence:
+ * `F.x > 5` and `5 < F.x` decide alike but have different digests, and so do
+ * the decimals `1.0` and `1.00`, equal but of another scale. A rule set's
+ * digest is the rule set digest that a decision's `ruleset_digest` holds. A
+ * decision table's is the digest of the table's own document; the rule set it
+ * compiles to has its own, `digest(table.ruleSet)`. For a rule, the rule set
+ * digest is `digest(RuleSet(rule))`.
+ *
+ * @param value what to digest
+ * @param omitActions as for [[canonicalBytes]]
+ * @throws io.github.cleanrules.CleanRulesException as [[canonicalBytes]]
+ */
+def digest(value: DocumentContent, omitActions: Boolean = false): String =
+  Documents.digest(DocumentContent.asJava(value), omitActions)
 
 /**
  * Write a condition, rule, rule set or decision table to a file, in the format

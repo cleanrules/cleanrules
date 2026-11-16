@@ -16,8 +16,9 @@ use cleanrules_ffi::{
     CR_DIAGRAM_DOT, CR_DIAGRAM_HTML, CR_DIAGRAM_HTML_FRAGMENT, CR_DIAGRAM_MERMAID, CR_FORMAT_CSV,
     CR_FORMAT_JSON, CR_FORMAT_TEXT, CR_FORMAT_YAML, CR_LIMIT_MAX_DEPTH, CR_LIMIT_MAX_DIAGRAM_SIZE,
     CR_LIMIT_MAX_NESTING, CR_LIMIT_MAX_PATH_SEGMENTS, CR_LIMIT_MAX_SIZE, CR_LIMIT_MAX_TABLE_SIZE,
-    cr_decision_draw, cr_document_condition, cr_document_draw, cr_document_rule, cr_node_draw,
-    cr_rule_draw, cr_ruleset_draw,
+    cr_decision_draw, cr_document_canonical_bytes, cr_document_condition, cr_document_digest,
+    cr_document_draw, cr_document_rule, cr_node_draw, cr_rule_draw, cr_ruleset_canonical_bytes,
+    cr_ruleset_digest, cr_ruleset_draw,
 };
 use common::{Failure, Limits_, json, on_small_stack};
 
@@ -417,6 +418,65 @@ fn run_draw(given: &Json, expect: &Json) -> Result<(), String> {
     compare_diagram(drawn, expect)
 }
 
+/// Canonical bytes and digests (`spec/json-format.md`, *Canonical bytes*,
+/// *Digests*): `cr_document_canonical_bytes` and `cr_document_digest`, and
+/// `cr_ruleset_digest` (with `cr_ruleset_canonical_bytes`) of the rule set the
+/// document gives.
+fn run_canonical(given: &Json, expect: &Json) -> Result<(), String> {
+    let source = string(get(given, "text"))
+        .map_or_else(|| to_string(get(given, "document").unwrap()), str::to_owned);
+    let document = common::read_document(source.as_bytes(), CR_FORMAT_JSON, None)
+        .map_err(|f| to_string(&f.json))?;
+    let wanted = |key| string(get(expect, key)).map(str::to_owned);
+    // SAFETY: a live document.
+    let canonical = common::text(|out, len, error| unsafe {
+        cr_document_canonical_bytes(document.0, out, len, error)
+    })
+    .map_err(|f| to_string(&f.json))?;
+    // SAFETY: a live document.
+    let digest =
+        common::text(|out, len, error| unsafe { cr_document_digest(document.0, out, len, error) })
+            .map_err(|f| to_string(&f.json))?;
+    if Some(&canonical) != wanted("canonical").as_ref()
+        || Some(&digest) != wanted("digest").as_ref()
+    {
+        return Err(format!("canonical {canonical} digest {digest}"));
+    }
+    let ruleset_digest = match common::ruleset_of(&document) {
+        Ok(ruleset) => {
+            // SAFETY: a live rule set.
+            let bytes = common::text(|out, len, error| unsafe {
+                cr_ruleset_canonical_bytes(ruleset.0, out, len, error)
+            })
+            .map_err(|f| to_string(&f.json))?;
+            if get(&source_of(given)?, "ruleset").is_some() && bytes != canonical {
+                return Err(format!("rule set canonical bytes {bytes}"));
+            }
+            // SAFETY: a live rule set.
+            Some(
+                common::text(|out, len, error| unsafe {
+                    cr_ruleset_digest(ruleset.0, out, len, error)
+                })
+                .map_err(|f| to_string(&f.json))?,
+            )
+        }
+        Err(_) => None,
+    };
+    if ruleset_digest != wanted("ruleset_digest") {
+        return Err(format!("rule set digest {ruleset_digest:?}"));
+    }
+    Ok(())
+}
+
+/// The document a `canonical` vector gives, parsed.
+fn source_of(given: &Json) -> Result<Json, String> {
+    match (get(given, "document"), string(get(given, "text"))) {
+        (Some(document), _) => Ok(document.clone()),
+        (None, Some(text)) => Ok(json(text)),
+        _ => Err("nothing given".into()),
+    }
+}
+
 fn run(vector: &Json) -> Result<(), String> {
     let given = get(vector, "given").unwrap();
     let expect = get(vector, "expect").unwrap();
@@ -428,6 +488,7 @@ fn run(vector: &Json) -> Result<(), String> {
         "evaluate" => run_evaluate(given, expect, false),
         "explain" => run_evaluate(given, expect, true),
         "draw" => run_draw(given, expect),
+        "canonical" => run_canonical(given, expect),
         "summary" => {
             let summary = common::summary(&ruleset(given), CR_FORMAT_JSON)
                 .map(|text| content(&text, "summary"));

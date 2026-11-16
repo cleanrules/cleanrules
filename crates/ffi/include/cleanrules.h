@@ -672,6 +672,21 @@ cr_status cr_decision_write(const struct cr_decision *decision,
                             size_t *len,
                             struct cr_error **error);
 
+// The document's canonical bytes (`spec/json-format.md`, *Canonical bytes*):
+// the UTF-8 JSON text of its canonical form, every object's members sorted by
+// key, by Unicode code point, without whitespace. The text holds no NUL byte
+// (a NUL character in a string is escaped), so it is also a C string.
+//
+// # Safety
+//
+// `document` is `NULL` or a live `cr_document`; `out` is `NULL` or points to
+// a writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_document_canonical_bytes(const struct cr_document *document,
+                                      char **out,
+                                      size_t *len,
+                                      struct cr_error **error);
+
 // A copy of the condition a `CR_DOCUMENT_CONDITION` document holds, freed
 // with `cr_node_free`. A document of another kind is `CR_INVALID_ARGUMENT`.
 //
@@ -683,6 +698,21 @@ cr_status cr_decision_write(const struct cr_decision *decision,
 cr_status cr_document_condition(const struct cr_document *document,
                                 struct cr_node **out,
                                 struct cr_error **error);
+
+// The document's digest (`spec/json-format.md`, *Digests*): the SHA-256 hash
+// of its canonical bytes, as `sha256:` and 64 lowercase hexadecimal digits.
+// For a decision table, the digest of the table's own document; the rule set
+// it compiles to has its own (`cr_ruleset_digest` of `cr_ruleset_read`).
+//
+// # Safety
+//
+// `document` is `NULL` or a live `cr_document`; `out` is `NULL` or points to
+// a writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_document_digest(const struct cr_document *document,
+                             char **out,
+                             size_t *len,
+                             struct cr_error **error);
 
 // A document's diagram, in `format` (`CR_DIAGRAM_*`): a condition's, a
 // rule's, a rule set's (from its summary) or a decision table's grid, which
@@ -1877,6 +1907,19 @@ cr_status cr_rule_with_tags(const struct cr_rule *rule,
 // `ruleset` is `NULL` or a live `cr_ruleset`.
 const char *cr_ruleset_aggregate(const struct cr_ruleset *ruleset);
 
+// The canonical bytes of the rule set's document (`spec/json-format.md`,
+// *Canonical bytes*), as `cr_document_canonical_bytes` gives them.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`; `out` is `NULL` or points to a
+// writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_ruleset_canonical_bytes(const struct cr_ruleset *ruleset,
+                                     char **out,
+                                     size_t *len,
+                                     struct cr_error **error);
+
 // Check that every action the rule set names is registered, in rule order
 // (`spec/rules.md`, *Actions*): the first that is not is a
 // `CR_REGISTRY_ERROR` with the rule, the name and the registered names. `NULL`
@@ -1891,6 +1934,21 @@ const char *cr_ruleset_aggregate(const struct cr_ruleset *ruleset);
 cr_status cr_ruleset_check_actions(const struct cr_ruleset *ruleset,
                                    const struct cr_actions *actions,
                                    struct cr_error **error);
+
+// The rule set digest (`spec/json-format.md`, *Rule set digests*): the digest
+// of the rule set's document, as `sha256:` and 64 lowercase hexadecimal
+// digits. A rule set read from a rule or a decision table has the digest of
+// the rule set it gives. This is what a decision's `ruleset_digest` holds.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`; `out` is `NULL` or points to a
+// writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_ruleset_digest(const struct cr_ruleset *ruleset,
+                            char **out,
+                            size_t *len,
+                            struct cr_error **error);
 
 // A rule set's diagram, from its summary (`spec/visual.md`, *Rule sets*), in
 // `format` (`CR_DIAGRAM_*`), with the rules whose action is code of the

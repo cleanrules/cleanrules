@@ -155,7 +155,7 @@ The system libraries of each platform are those of `link.go` and of the
 `cargo rustc -p cleanrules-ffi --lib --crate-type staticlib -- --print native-static-libs`
 prints with Rust 1.97 (without the C library, which the compiler links
 anyway): Linux with glibc `-lgcc_s -lutil -lrt -lpthread -lm -ldl`, with musl
-`-lgcc_s`, macOS `-lm`, Windows x64 `-lkernel32 -lntdll -luserenv -lws2_32
+`-lgcc_s`, macOS `-lm` (and `-liconv` on arm64), Windows x64 `-lkernel32 -lntdll -luserenv -lws2_32
 -ldbghelp`, and Windows arm64 the same and `-lunwind`. Link the static
 library by its path rather than with `-L` and `-l`: cargo writes the shared
 library next to it, which the linkers of Linux and macOS would prefer, and
@@ -548,6 +548,41 @@ is always written as its name, so writing never refuses a rule for its
 action and Go has no `omit_actions` option (`spec/json-format.md`, *Writing
 errors*).
 
+### Canonical bytes and digests
+
+`CanonicalBytes` gives the canonical bytes of a condition, rule, rule set or
+decision table (`spec/json-format.md`, *Canonical bytes*): the UTF-8 JSON
+text of its canonical form, every object's members sorted by key, without
+whitespace. `Digest` gives its digest (*Digests*): `sha256:` and the 64
+lowercase hexadecimal digits of the SHA-256 hash of those bytes. The core
+computes both, so they are the same in every language, whatever format or
+layout the document was read from.
+
+```go
+canonical, err := cr.CanonicalBytes(rules)   // []byte
+digest, err := cr.Digest(rules)              // "sha256:5a0e590c..."
+compiled, err := table.RuleSet()
+ruleSetDigest, err := cr.Digest(compiled)    // a table's rule set digest
+```
+
+The digest of a `*RuleSet` is its rule set digest (*Rule set digests*), the
+one a decision's `ruleset_digest` holds; `ReadDecision` checks a decision that
+carries one against its rule set (`decision_mismatch` at
+`/decision/ruleset_digest` for other rules) and writes it back with it;
+decisions made in Go carry none. A decision table has two digests: `Digest(table)`, of its own document, and the
+digest of `table.RuleSet()`, of the rule set it compiles to, which two tables
+that compile alike share. The rule set digest of a rule is that of a rule set
+of it alone with the default settings (`cr.NewRuleSet([]*cr.Rule{rule})`).
+The errors are those of `Dumps`: a value node is an `expression_error`, and a
+nil `Document` is `unsupported`. A Go rule only names its action, so nothing
+is refused for it and there is no `omit_actions` here either.
+
+A digest identifies **one concrete canonical artifact**, not a meaning: rules
+written differently have different digests even when they always decide
+alike (`x > 5` and `5 < x`, a renamed rule, a new description, the decimals
+`1.0` and `1.00`). Telling whether two versions of rules decide alike is the
+work of tests, not of digests.
+
 ## Decision tables
 
 ```go
@@ -686,7 +721,8 @@ values, errors with their codes and context, actions (an error, an error
 whose `Error` panics, a panic, `runtime.Goexit`, nested runs, goroutines),
 `Close`, cleanups and shared ownership, nil and zero values, concurrency,
 documents (each kind in each format both ways, files, limits, actions on
-loading, `RuleFromText`, `ReadDecision`), decision tables (each kind of cell,
+loading, `RuleFromText`, `ReadDecision`, canonical bytes and digests),
+decision tables (each kind of cell,
 errors with their pointers, settings, formats), result trees and
 `ActionContext.Tree`, `Limits.MaxValues` (a diamond 30 levels deep refused at
 once, what counts at the limit and one over it, lengths beyond memory,
@@ -723,7 +759,13 @@ platform and tag, and the examples
   `[]any`, `map[string]any`...), through `Decision`,
   `Explanation`, `Summary` and `ResultTree`, and as their JSON forms. `read`
   vectors go through `Loads`, `Dumps`, `RuleFromText`, `NewDecisionTable`
-  (grids) and `ReadDecision`.
+  (grids) and `ReadDecision`, and `canonical` vectors build the condition,
+  rule or rule set in code (a decision table is read with `Loads`).
+
+Both routes compare the canonical bytes (`CanonicalBytes`), the digest
+(`Digest`) and the rule set digest of `canonical` vectors exactly, and check
+that the digest is the SHA-256 hash of the bytes and that the bytes read back
+to themselves.
 
 The comparison follows
 [`conformance/README.md`](../../conformance/README.md) (*Comparing*), with

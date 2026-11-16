@@ -150,6 +150,19 @@ impl Document {
     pub fn write(&self, format: &JsValue) -> Result<String, JsValue> {
         self.core.write(&raw(format)).or_fail()
     }
+
+    /// The document's canonical bytes, as in the napi-rs build.
+    #[wasm_bindgen(js_name = canonicalBytes)]
+    #[must_use]
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        self.core.canonical_bytes()
+    }
+
+    /// The document's digest, as in the napi-rs build.
+    #[must_use]
+    pub fn digest(&self) -> String {
+        self.core.digest()
+    }
 }
 
 // --- RuleSet --------------------------------------------------------------
@@ -230,6 +243,20 @@ impl RuleSet {
     /// As in the napi-rs build.
     pub fn summary(&self, format: &JsValue) -> Result<String, JsValue> {
         self.core.summary(&raw(format)).or_fail()
+    }
+
+    /// The canonical bytes of the rule set's document, as in the napi-rs
+    /// build.
+    #[wasm_bindgen(js_name = canonicalBytes)]
+    #[must_use]
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        self.core.canonical_bytes()
+    }
+
+    /// The rule set digest, as in the napi-rs build.
+    #[must_use]
+    pub fn digest(&self) -> String {
+        self.core.digest()
     }
 
     /// How many rules the rule set has.

@@ -99,11 +99,13 @@ must sit next to your program or on `PATH`; on macOS its install name is
 exceptions, the example, the installed package, and `conformance`: every
 vector of [`conformance/`](../../conformance/README.md), through this header.
 Each vector runs as `json:<id>`, with JSON documents and inputs and the
-overloads that throw (`read` vectors also with `error_info`), and, except the
-`read` vectors, as `native:<id>`, with input built by the value constructors,
-the `error_info` overloads, and decisions read back with the decision
-readers. The runner reports every vector that fails, with what it got and
-what the vector expects:
+overloads that throw (`read` and `canonical` vectors also with `error_info`),
+and, except the `read` and `canonical` vectors, as `native:<id>`, with input
+built by the value constructors, the `error_info` overloads, and decisions
+read back with the decision readers. `canonical` vectors compare the
+canonical bytes, the digest and the rule set digest exactly. The runner
+reports every vector that fails, with what it got and what the vector
+expects:
 
 ```sh
 ctest --test-dir build/cpp -R conformance --output-on-failure
@@ -362,6 +364,37 @@ rule and keep it the same one when two versions are compared (a later
 phase), give it an explicit id: its old name if it had none, or its old id.
 Adding a different id, or changing the id, changes the effective id, so the
 two versions show one rule removed and another added.
+
+## Canonical bytes and digests
+
+`canonical_bytes()` gives the canonical bytes of a document or a rule set
+(`spec/json-format.md`, *Canonical bytes*): the UTF-8 JSON text of its
+canonical form, every object's members sorted by key, without whitespace, in
+a `std::string`. `digest()` gives its digest (*Digests*): `sha256:` and the 64
+lowercase hexadecimal digits of the SHA-256 hash of those bytes. The core
+computes both, so they are the same in every language, whatever format or
+layout the document was read from. Each has an `error_info` overload.
+
+```cpp
+std::string bytes = rules.canonical_bytes();
+std::string digest = rules.digest();             // "sha256:5a0e590c..."
+auto rule_digest = cr::document::from_rule(vip).digest();
+auto table = cr::document::read(csv, cr::format::csv);
+auto own = table.digest();                       // the table's own document
+auto compiled = cr::ruleset::from_document(table).digest();  // its rule set digest
+```
+
+`ruleset::digest()` is the rule set digest (*Rule set digests*), which a
+decision's `ruleset_digest` holds: `read_decision` checks a decision that
+carries one against its rule set (a `decision_mismatch` at
+`/decision/ruleset_digest` for other rules) and writes it back with it;
+decisions made in C++ carry none. A rule set read from a rule or a decision table has the digest of the rule set it
+gives, so a decision table has two digests, its document's and its rule
+set's. A rule's action is a name in C++, never code, so nothing is refused
+for it. A digest identifies **one concrete canonical artifact**, not a
+meaning: rules written differently have different digests even when they
+always decide alike (`x > 5` and `5 < x`, a renamed rule, a new description,
+the decimals `1.0` and `1.00`).
 
 ## Actions
 

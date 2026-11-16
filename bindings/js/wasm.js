@@ -111,7 +111,9 @@ export let Field = pending('Field')
 export let Rule = pending('Rule')
 export let RuleSet = pending('RuleSet')
 export let and = pending('and')
+export let canonicalBytes = pending('canonicalBytes')
 export let constant = pending('constant')
+export let digest = pending('digest')
 export let dump = pending('dump')
 export let dumps = pending('dumps')
 export let evaluateTree = pending('evaluateTree')
@@ -139,7 +141,8 @@ function settle(layer) {
   }
   for (const [name, value] of Object.entries(values)) reals.set(name, value)
   ;({ Const, Decision, DecisionTable, Expr, F, Field, Rule, RuleSet, native, decimal } = values)
-  ;({ and, constant, dump, dumps, evaluateTree, evaluateValueTree, field, load, loads, not, or, ruleFromText } = values)
+  ;({ and, canonicalBytes, constant, digest, dump, dumps, evaluateTree, evaluateValueTree, field, load, loads, not, or, ruleFromText } =
+    values)
   FORMAT_VERSION = layer.FORMAT_VERSION
   version = layer.version()
 }

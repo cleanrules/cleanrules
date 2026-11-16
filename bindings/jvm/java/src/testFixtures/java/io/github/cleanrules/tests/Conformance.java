@@ -53,11 +53,18 @@ import io.github.cleanrules.tests.TestJson.Num;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Period;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -82,7 +89,8 @@ import java.util.stream.Stream;
  *       CSV, {@code RuleSet.read}, {@code fromDocument}, {@code readDecision},
  *       {@code evaluateJson}, {@code evaluateManyJson}, {@code explain},
  *       {@code summary}, and {@code Node.evaluateTreeJson} and
- *       {@code evaluateValueTreeJson}. Decisions are also checked with the
+ *       {@code evaluateValueTreeJson}, and {@code canonicalBytes} and
+ *       {@code digest} of documents and rule sets. Decisions are also checked with the
  *       layer's readers ({@code ruleName}, {@code firedAt}, {@code truth},
  *       {@code selected}, {@code ruleOutput}, {@code outputs},
  *       {@code outputsJson}, {@code output}, {@code outputJson}).</li>
@@ -101,7 +109,10 @@ import java.util.stream.Stream;
  *       compared exactly. {@code read} vectors go through
  *       {@link Documents#loads}, {@link Documents#dumps},
  *       {@link Documents#ruleFromText}, {@link DecisionTable} (grids) and
- *       {@link RuleSet#readDecision(String, Format, Limits)}.</li>
+ *       {@link RuleSet#readDecision(String, Format, Limits)}; {@code canonical}
+ *       vectors through {@link Documents#canonicalBytes} and
+ *       {@link Documents#digest} of what {@code loads} gives and of what is
+ *       built in code.</li>
  * </ul>
  *
  * <p>The runner only drives the library and compares: results are parsed with
@@ -115,7 +126,7 @@ import java.util.stream.Stream;
  */
 class Conformance {
     /** Vectors are only ever added: the count when this runner was written. */
-    static final int MINIMUM_VECTORS = 2519;
+    static final int MINIMUM_VECTORS = 2951;
 
     /** Why a vector does not run one way: each is counted and listed. */
     static final Map<String, String> SKIPS = Map.of(
@@ -306,6 +317,10 @@ class Conformance {
         {"ast/types/aware-by-instant", "08:30:00Z", "08:30:01Z"},
         {"format/tables/grid-header-empty", "\"pointer\":\"/header/1\"", "\"pointer\":\"/header/0\""},
         {"format/decisions/tree-too-deep", "\"code\":\"limit_exceeded\"", "\"code\":\"format_error\""},
+        // Canonical bytes, a digest and a rule set digest.
+        {"format/canonical/decimal-scale-2", "1.00", "1.0"},
+        {"format/canonical/condition", "\"digest\":\"sha256:", "\"digest\":\"sha256:0"},
+        {"format/canonical/decision-table", "\"ruleset_digest\":\"sha256:", "\"ruleset_digest\":\"sha256:f"},
     };
 
     @SuppressWarnings("unchecked") // Parsed JSON objects have string keys.
@@ -675,6 +690,136 @@ class Conformance {
         }
     }
 
+    // ---- Canonical bytes and digests (spec/json-format.md, Canonical bytes, Digests).
+
+    /**
+     * Canonical bytes, a digest and a rule set digest (null when the document
+     * gives no rule set) against a {@code canonical} vector's {@code expect}:
+     * the bytes are strict UTF-8 without a NUL byte, compared exactly as text,
+     * and the digest is also checked against the SHA-256 of the bytes.
+     */
+    static String checkCanonical(String how, byte[] bytes, String digest, String rulesetDigest, Map<?, ?> expect) {
+        String text;
+        try {
+            text = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes))
+                    .toString();
+        } catch (CharacterCodingException invalid) {
+            return how + ": the canonical bytes are not UTF-8";
+        }
+        List<String> issues = new ArrayList<>();
+        if (text.indexOf('\0') >= 0) {
+            issues.add(how + ": the canonical bytes hold a NUL byte");
+        }
+        issues.add(compareText(how + ": canonicalBytes", text, need(expect, "canonical")));
+        issues.add(compareText(how + ": digest", digest, need(expect, "digest")));
+        String hashed = sha256(bytes);
+        if (!hashed.equals(digest)) {
+            issues.add(how + ": digest " + digest + " is not the SHA-256 of the canonical bytes, " + hashed);
+        }
+        Object want = expect.get("ruleset_digest");
+        if (want == null ? rulesetDigest != null : !want.equals(rulesetDigest)) {
+            issues.add(how + ": the rule set digest " + rulesetDigest + ", expected " + want);
+        }
+        return join(issues);
+    }
+
+    /** {@code sha256:} and the lowercase hexadecimal SHA-256 of {@code bytes}, computed by the JDK. */
+    static String sha256(byte[] bytes) {
+        try {
+            return "sha256:" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (NoSuchAlgorithmException missing) {
+            throw new IllegalStateException(missing);
+        }
+    }
+
+    /**
+     * The native layer: {@code Document.read}, its canonical bytes and digest,
+     * and the digest of the rule set it gives ({@code RuleSet.fromDocument},
+     * and {@code RuleSet.read} of the same text), whose canonical bytes are
+     * the document's for a rule set document.
+     */
+    private String canonicalJson(Map<?, ?> given, Map<?, ?> expect) {
+        Source source = sourceOf(given);
+        try (Document document = Document.read(source.text(), source.format())) {
+            if (document.kind() == io.github.cleanrules.DocumentKind.CONDITION) {
+                return checkCanonical("Document", document.canonicalBytes(), document.digest(), null, expect);
+            }
+            try (io.github.cleanrules.ffi.RuleSet compiled = io.github.cleanrules.ffi.RuleSet.fromDocument(document);
+                    io.github.cleanrules.ffi.RuleSet read =
+                            io.github.cleanrules.ffi.RuleSet.read(source.text(), source.format())) {
+                List<String> issues = new ArrayList<>();
+                issues.add(checkCanonical(
+                        "Document", document.canonicalBytes(), document.digest(), compiled.digest(), expect));
+                issues.add(compareText("RuleSet.read(text).digest", read.digest(), compiled.digest()));
+                if (document.kind() == io.github.cleanrules.DocumentKind.RULESET) {
+                    issues.add(checkCanonical(
+                            "RuleSet.read", read.canonicalBytes(), read.digest(), read.digest(), expect));
+                }
+                return join(issues);
+            }
+        }
+    }
+
+    /** The rule set digest of what a document holds: null for a condition. */
+    static String rulesetDigest(DocumentContent content) {
+        return switch (content) {
+            case Expr _ -> null;
+            case Rule rule -> Documents.digest(RuleSet.of(rule));
+            case RuleSet rules -> Documents.digest(rules);
+            case DecisionTable table -> Documents.digest(table.ruleSet());
+        };
+    }
+
+    /** {@link #checkCanonical} for what the idiomatic API gives for {@code content}. */
+    static String checkCanonical(String how, DocumentContent content, Map<?, ?> expect) {
+        return checkCanonical(
+                how, Documents.canonicalBytes(content), Documents.digest(content), rulesetDigest(content), expect);
+    }
+
+    /**
+     * The idiomatic API: {@link Documents#canonicalBytes} and
+     * {@link Documents#digest} of what {@link Documents#loads} gives, and of
+     * what it gives again from {@link Documents#dumps}; and, for a document
+     * given as an object, of the condition, rule or rule set built in code
+     * from it with Java data.
+     */
+    private String canonicalNative(Map<?, ?> given, Map<?, ?> expect) {
+        Source source = sourceOf(given);
+        DocumentContent loaded = Documents.loads(source.text(), source.format());
+        List<String> issues = new ArrayList<>();
+        issues.add(checkCanonical("loads", loaded, expect));
+        issues.add(checkCanonical("loads(dumps(x))", Documents.loads(Documents.dumps(loaded)), expect));
+        if (given.get("document") instanceof Map<?, ?> document) {
+            DocumentContent built;
+            try {
+                built = builtContent(document);
+            } catch (NoJavaForm missing) {
+                built = null; // Data no Java value holds: read only.
+            }
+            if (built != null) {
+                issues.add(checkCanonical("built in code", built, expect));
+            }
+        }
+        return join(issues);
+    }
+
+    /** The condition, rule or rule set of a document built in code; null for a decision table. */
+    private DocumentContent builtContent(Map<?, ?> document) {
+        if (document.get("condition") instanceof Map<?, ?> condition) {
+            return build(condition);
+        }
+        if (document.get("rule") instanceof Map<?, ?> rule) {
+            return buildRuleSet(Map.of("rules", List.of(rule))).rules().getFirst();
+        }
+        if (document.get("ruleset") instanceof Map<?, ?> ruleset) {
+            return buildRuleSet(ruleset);
+        }
+        return null;
+    }
+
     private String runJson(Map<?, ?> vector) {
         Map<String, Object> given = object(need(vector, "given"));
         Map<String, Object> expect = object(need(vector, "expect"));
@@ -707,6 +852,9 @@ class Conformance {
                     }
                     return compareText("summarised", rules.summary(Format.TEXT), expect.get("text"));
                 }
+            }
+            case "canonical" -> {
+                return canonicalJson(given, expect);
             }
             case "evaluate", "explain" -> {
                 if (given.containsKey("limits")) {
@@ -1617,6 +1765,9 @@ class Conformance {
         }
         if (kind.equals("condition") || kind.equals("value")) {
             return treeNative(kind, given, expect);
+        }
+        if (kind.equals("canonical")) {
+            return canonicalNative(given, expect);
         }
         if (!kind.equals("evaluate") && !kind.equals("explain")) {
             throw new VectorError("unknown kind " + kind);

@@ -122,3 +122,16 @@ func ExampleError() {
 	// missing_field adult [customer age]
 	// true
 }
+
+// Digest identifies the exact rules a decision was made with: the SHA-256
+// hash of their canonical bytes, the same string in every language. It
+// tells one artifact, not a meaning: 5 < years would give another digest.
+func ExampleDigest() {
+	vip := cr.Must(cr.NewRule("vip", cr.Field("years").Gt(5), cr.Then("discount", cr.MustDecimal("0.15"))))
+	rules := cr.Must(cr.NewRuleSet([]*cr.Rule{vip}))
+	fmt.Println(string(cr.Must(cr.CanonicalBytes(rules))))
+	fmt.Println(cr.Must(cr.Digest(rules)))
+	// Output:
+	// {"ruleset":{"hit_policy":"first","logic":"boolean","rules":[{"name":"vip","then":{"discount":{"op":"const","value":{"$decimal":"0.15"}}},"when":{"left":{"op":"field","path":["years"]},"op":"gt","right":{"op":"const","value":5}}}]},"version":1}
+	// sha256:5a0e590cb8f3bd57392ede84c0d0c4596cf9374fefcbcc6b28ed61421878f312
+}

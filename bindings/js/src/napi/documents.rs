@@ -7,7 +7,7 @@
 //! (`src/wasm/documents.rs`), with the same checks and errors.
 
 use cleanrules::table::{Cell, HeaderItem};
-use napi::bindgen_prelude::{ClassInstance, FromNapiValue, Unknown};
+use napi::bindgen_prelude::{ClassInstance, FromNapiValue, Uint8Array, Unknown};
 use napi::{Env, Result};
 use napi_derive::napi;
 
@@ -150,6 +150,21 @@ impl NativeTable {
     #[napi(ts_args_type = "format?: Format | null")]
     pub fn write(&self, env: &Env, format: Option<Unknown<'_>>) -> Result<String> {
         self.core.write(&optional(format)?).or_fail(env)
+    }
+
+    /// The canonical bytes of the table's own document.
+    #[napi]
+    #[must_use]
+    pub fn canonical_bytes(&self) -> Uint8Array {
+        Uint8Array::new(self.core.canonical_bytes())
+    }
+
+    /// The digest of the table's own document; its rule set digest is
+    /// `ruleset().digest()`.
+    #[napi]
+    #[must_use]
+    pub fn digest(&self) -> String {
+        self.core.digest()
     }
 }
 
@@ -386,6 +401,35 @@ pub fn write_condition(env: &Env, node: &Node, format: Unknown<'_>) -> Result<St
 #[napi]
 pub fn write_rule(env: &Env, rule: &NativeRule, format: Unknown<'_>) -> Result<String> {
     documents::write_rule(&rule.rule, &raw(&format)?).or_fail(env)
+}
+
+/// The canonical bytes of the condition document of a node. The JavaScript
+/// half refuses value nodes first, as `dumps` does.
+#[napi]
+#[must_use]
+pub fn canonical_condition(node: &Node) -> Uint8Array {
+    Uint8Array::new(documents::condition_canonical(node.core.node()))
+}
+
+/// The digest of the condition document of a node.
+#[napi]
+#[must_use]
+pub fn digest_condition(node: &Node) -> String {
+    documents::condition_digest(node.core.node())
+}
+
+/// The canonical bytes of the rule document of a rule.
+#[napi]
+#[must_use]
+pub fn canonical_rule(rule: &NativeRule) -> Uint8Array {
+    Uint8Array::new(documents::rule_canonical(&rule.rule))
+}
+
+/// The digest of the rule document of a rule.
+#[napi]
+#[must_use]
+pub fn digest_rule(rule: &NativeRule) -> String {
+    documents::rule_digest(&rule.rule)
 }
 
 /// The text of a document the core wrote, with each float that holds an

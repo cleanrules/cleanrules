@@ -279,3 +279,86 @@ def test_text_files(tmp_path: Path) -> None:
     assert (tmp_path / "copy.rules").read_text(encoding="utf-8") == SHOP_TEXT + "\n"
     with pytest.raises(ValueError, match="format='text'"):
         load(tmp_path / "pricing.txt")
+
+
+# The rule set of `spec/json-format.md` (*Canonical bytes*) and its digest.
+SPEC_EXAMPLE = (
+    b'{"ruleset":{"hit_policy":"first","logic":"boolean","rules":[{"name":"vip","then":'
+    b'{"discount":{"op":"const","value":{"$decimal":"0.15"}}},"when":{"left":{"op":"field",'
+    b'"path":["years"]},"op":"gt","right":{"op":"const","value":5}}}]},"version":1}'
+)
+SPEC_DIGEST = "sha256:5a0e590cb8f3bd57392ede84c0d0c4596cf9374fefcbcc6b28ed61421878f312"
+
+
+def test_canonical_bytes_and_digest_of_the_spec_example() -> None:
+    rules = RuleSet([Rule("vip", F.years > 5, {"discount": Decimal("0.15")})])
+    assert cleanrules.canonical_bytes(rules) == SPEC_EXAMPLE
+    assert cleanrules.digest(rules) == SPEC_DIGEST
+    # Any layout, member order or format of the same document.
+    cases: list[tuple[str | bytes, cleanrules.Format]] = [
+        (json.dumps(json.loads(dumps(rules)), indent=3, sort_keys=True), "json"),
+        (dumps(rules, format="yaml"), "yaml"),
+        (SPEC_EXAMPLE, "json"),
+    ]
+    for text, fmt in cases:
+        assert cleanrules.digest(loads(text, format=fmt)) == SPEC_DIGEST
+    # One rule in the text syntax is a rule document; a rule set of it has
+    # the same rule set digest.
+    rule = loads("RULE vip IF years > 5 THEN discount = 0.15", format="text")
+    assert isinstance(rule, Rule)
+    assert cleanrules.digest(RuleSet([rule])) == SPEC_DIGEST
+
+
+def test_a_digest_identifies_an_artifact_not_a_meaning() -> None:
+    def digest_of(text: str) -> str:
+        return cleanrules.digest(loads(text, format="text"))
+
+    base = digest_of("RULE r IF x > 5 THEN price = 1.0")
+    assert digest_of("RULE r IF 5 < x THEN price = 1.0") != base
+    assert digest_of("RULE r IF x > 5 THEN price = 1.00") != base
+    assert digest_of("RULE s IF x > 5 THEN price = 1.0") != base
+    assert digest_of("RULE r IF x > 5 THEN price = 1.0  # a comment") == base
+
+
+def test_every_document_has_canonical_bytes() -> None:
+    condition = F.x > 1
+    rule = Rule("r", condition)
+    assert cleanrules.canonical_bytes(condition).startswith(b'{"condition":{"left":')
+    assert cleanrules.canonical_bytes(rule).startswith(b'{"rule":{"name":"r"')
+    # A rule's digest is its document's; its rule set digest is that of a rule
+    # set of that rule.
+    assert cleanrules.digest(rule) != cleanrules.digest(RuleSet([rule]))
+    table = loads("RULE,years,THEN discount\nvip,> 5,0.15\n", format="csv")
+    assert isinstance(table, cleanrules.DecisionTable)
+    assert cleanrules.digest(table) != cleanrules.digest(table.ruleset)
+    with pytest.raises(ExpressionError):
+        cleanrules.digest(F.x + 1)
+    with pytest.raises(TypeError, match="digest takes"):
+        cleanrules.digest("x > 1")  # pyright: ignore[reportArgumentType]
+
+
+def test_actions_given_as_code_have_no_digest() -> None:
+    rules = RuleSet([Rule("a", F.x > 1), Rule("b", F.x > 2, do=record)])
+    with pytest.raises(UnsupportedError) as info:
+        cleanrules.digest(rules)
+    assert info.value.pointer == "/ruleset/rules/1/do"
+    with pytest.raises(UnsupportedError):
+        cleanrules.canonical_bytes(rules["b"])
+    without = RuleSet([Rule("a", F.x > 1), Rule("b", F.x > 2)])
+    assert cleanrules.digest(rules, omit_actions=True) == cleanrules.digest(without)
+    assert cleanrules.canonical_bytes(rules, omit_actions=True) == cleanrules.canonical_bytes(
+        without
+    )
+
+
+def test_a_decision_read_with_a_digest_is_checked_and_keeps_it() -> None:
+    rules = RuleSet([Rule("vip", F.years > 5, {"discount": Decimal("0.15")})])
+    decision = rules.evaluate({"years": 7}).to_dict()
+    decision["decision"]["ruleset_digest"] = cleanrules.digest(rules)
+    text = json.dumps(decision)
+    assert rules.read_decision(text).to_dict()["decision"]["ruleset_digest"] == SPEC_DIGEST
+    other = RuleSet([Rule("vip", F.years > 5, {"discount": Decimal("0.15")}, description="d")])
+    with pytest.raises(cleanrules.FormatError) as info:
+        other.read_decision(text)
+    assert info.value.code == "decision_mismatch"
+    assert info.value.pointer == "/decision/ruleset_digest"

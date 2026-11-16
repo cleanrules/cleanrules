@@ -71,6 +71,11 @@
               }
             }
           ]
+        },
+        "ruleset_digest": {
+          "description": "The rule set digest of the rule set that made the decision (spec/json-format.md, Digests): sha256: and 64 lowercase hexadecimal digits.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
         }
       },
       "required": [

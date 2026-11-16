@@ -9,6 +9,7 @@
 use std::borrow::Cow;
 
 use crate::ast::{Closed, CompareOp, Expr, Node};
+use crate::digest::Digest;
 use crate::error::{Error, ErrorCode, Result, Segment};
 use crate::eval::{Evaluated, Outcome, Reason, ReasonCode, recompute};
 use crate::format::result::{write_reason, write_truth};
@@ -705,6 +706,22 @@ pub(crate) fn read_decision<'a>(
             ));
         }
     };
+    // The digest's shape, in the order of the table (`spec/json-format.md`,
+    // *Digests*, *In decisions*).
+    let digest_at = at(pointer, "ruleset_digest");
+    let digest = match get(members, "ruleset_digest") {
+        None => None,
+        Some(Json::String(text)) => Some(
+            text.parse::<Digest>()
+                .map_err(|e| e.at_pointer(&digest_at))?,
+        ),
+        Some(_) => {
+            return Err(format_error(
+                &digest_at,
+                "\"ruleset_digest\" is a string: sha256: and 64 lowercase hexadecimal digits",
+            ));
+        }
+    };
     unknown_keys(
         members,
         &[
@@ -714,9 +731,25 @@ pub(crate) fn read_decision<'a>(
             "results",
             "selected",
             "aggregated",
+            "ruleset_digest",
         ],
         pointer,
     )?;
+
+    // The rule set digest comes first: a decision of another rule set is
+    // reported as such, whatever else it holds.
+    if let Some(digest) = digest {
+        let own = ruleset.digest();
+        if digest != own {
+            return Err(mismatch(
+                &digest_at,
+                format!("made by the rule set {digest}, not by this one, {own}"),
+            )
+            .with_hint(
+                "read it with the rule set that made it; rules that differ even in a description have another digest",
+            ));
+        }
+    }
 
     // 1. The rule set's configuration.
     if policy != ruleset.hit_policy() {
@@ -867,7 +900,8 @@ pub(crate) fn read_decision<'a>(
             Some(computed)
         }
     };
-    Ok(Decision::from_parts(ruleset, results, selected, aggregated))
+    Ok(Decision::from_parts(ruleset, results, selected, aggregated)
+        .with_ruleset_digest(digest.is_some()))
 }
 
 #[cfg(test)]

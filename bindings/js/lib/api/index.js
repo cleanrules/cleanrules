@@ -22,7 +22,9 @@ export const NAMES = Object.freeze([
   'Rule',
   'RuleSet',
   'and',
+  'canonicalBytes',
   'constant',
+  'digest',
   'dump',
   'dumps',
   'evaluateTree',
@@ -53,7 +55,7 @@ export function api(native, build) {
     const { Decision, Rule, RuleSet } = ruleApi
     const { DecisionTable } = tableApi
     const { evaluateTree, evaluateValueTree } = treeApi
-    const { dump, dumps, load, loads, ruleFromText } = documentApi
+    const { canonicalBytes, digest, dump, dumps, load, loads, ruleFromText } = documentApi
     found = Object.freeze({
       Const,
       Decision,
@@ -64,7 +66,9 @@ export function api(native, build) {
       Rule,
       RuleSet,
       and,
+      canonicalBytes,
       constant,
+      digest,
       dump,
       dumps,
       evaluateTree,

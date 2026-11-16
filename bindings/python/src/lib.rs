@@ -57,6 +57,8 @@ fn native_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(documents::dump_condition, module)?)?;
     module.add_function(wrap_pyfunction!(documents::dump_rule, module)?)?;
     module.add_function(wrap_pyfunction!(documents::dump_ruleset, module)?)?;
+    module.add_function(wrap_pyfunction!(documents::canonical_bytes, module)?)?;
+    module.add_function(wrap_pyfunction!(documents::digest, module)?)?;
     module.add_function(wrap_pyfunction!(trees::evaluate_condition, module)?)?;
     module.add_function(wrap_pyfunction!(trees::evaluate_value, module)?)?;
     module.add_class::<agents::PyCatalog>()?;

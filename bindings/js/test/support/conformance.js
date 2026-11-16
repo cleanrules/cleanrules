@@ -4,9 +4,10 @@
 // - `json:<id>`: documents, inputs and results cross as JSON text through the
 //   native layer (`cleanrules/native`): `Document`, `RuleSet`, `Node` and
 //   `Decision`, with `read`, `write`, `readDecision`, `evaluateJson`,
-//   `evaluateManyJson`, `evaluateTreeJson`, `explain` and `summary`; decisions
-//   are also checked with the native layer's readers (`ruleName`, `firedAt`,
-//   `truth`, `selected`, `ruleOutputJson`, `outputsJson`, `outputJson`).
+//   `evaluateManyJson`, `evaluateTreeJson`, `explain`, `summary`,
+//   `canonicalBytes` and `digest`; decisions are also checked with the native
+//   layer's readers (`ruleName`, `firedAt`, `truth`, `selected`,
+//   `ruleOutputJson`, `outputsJson`, `outputJson`).
 // - `native:<id>`: the idiomatic API of the root entry (`cleanrules`).
 //   Conditions, rules and rule sets are built in code (`field`, `constant`,
 //   `and`, `or`, `not`, the methods of `Expr`, `Rule`, `RuleSet`), checked
@@ -22,7 +23,8 @@
 //   `Node.evaluateTree`), whose JSON is compared exactly, so the reading of
 //   native data is checked to the last digit. `read` vectors go through
 //   `loads`, `dumps`, `ruleFromText`, `DecisionTable` (grids) and
-//   `RuleSet.readDecision`.
+//   `RuleSet.readDecision`; `canonical` vectors through `canonicalBytes` and
+//   `digest`, of what `loads` reads and of the same document built in code.
 //
 // The runner only drives the library and compares: results are parsed with
 // ./json.js and compared with the vectors as trees, never with the library's
@@ -30,8 +32,8 @@
 
 import { Num, Obj, byCodePoint, parse, same, tree, write } from './json.js'
 
-/** Vectors are only ever added: the count when this runner was written. */
-export const MINIMUM_VECTORS = 2508
+/** Vectors are only ever added: the count when this runner was last changed. */
+export const MINIMUM_VECTORS = 2951
 
 /** Why a vector does not run one way: each is counted and listed. */
 export const SKIPS = {
@@ -80,6 +82,17 @@ const MAX_SAFE = 2n ** 53n - 1n
 
 /** A vector the runner cannot run as written, or an answer that breaks the API's promises. */
 class VectorError extends Error {}
+
+/**
+ * Canonical bytes as text: strict UTF-8, a byte order mark kept (canonical
+ * bytes have none, so one fails the comparison).
+ */
+function utf8(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.constructor !== Uint8Array) {
+    throw new VectorError(`canonical bytes must be a Uint8Array, not ${bytes?.constructor?.name ?? bytes}`)
+  }
+  return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)
+}
 
 /** A step's outcome: `{ result }`, or `{ error }` for a `CleanRulesError`. */
 function attempt(R, step) {
@@ -389,6 +402,34 @@ export function conformance(R, N) {
     return issues.filter(Boolean).join('; ')
   }
 
+  /**
+   * A `canonical` vector through the native layer: the document's canonical
+   * bytes and digest, the same bytes when they are read back, and the digest
+   * of the rule set the document gives (`RuleSet.fromDocument`), which a
+   * condition does not give.
+   */
+  function canonicalJson(given, expect) {
+    const [source] = sourceOf(given)
+    const document = N.Document.read(source)
+    const canonical = need(expect, 'canonical')
+    const issues = [
+      compareText('canonicalBytes()', utf8(document.canonicalBytes()), canonical),
+      compareText('digest()', document.digest(), need(expect, 'digest')),
+    ]
+    const again = N.Document.read(document.canonicalBytes())
+    issues.push(compareText('read back, canonicalBytes()', utf8(again.canonicalBytes()), canonical))
+    const ruleset = attempt(R, () => N.RuleSet.fromDocument(document))
+    if (expect.has('ruleset_digest')) {
+      if (ruleset.error !== undefined) return `RuleSet.fromDocument: ${ruleset.error.code}: ${ruleset.error.message}`
+      issues.push(compareText('the rule set digest', ruleset.result.digest(), expect.get('ruleset_digest')))
+      const read = N.Document.read(ruleset.result.canonicalBytes())
+      issues.push(compareText("the rule set's document digest", read.digest(), expect.get('ruleset_digest')))
+    } else if (ruleset.error?.code !== 'format_error') {
+      issues.push(`a ${document.kind} document gives no rule set: expected a format_error from RuleSet.fromDocument`)
+    }
+    return issues.filter(Boolean).join('; ')
+  }
+
   function runJson(vector) {
     const given = need(vector, 'given')
     const expect = need(vector, 'expect')
@@ -398,6 +439,8 @@ export function conformance(R, N) {
         return { skip: 'diagram' }
       case 'read':
         return readJson(given, expect)
+      case 'canonical':
+        return canonicalJson(given, expect)
       case 'condition':
       case 'value': {
         const node = N.Node.read(write(need(given, kind)))
@@ -856,24 +899,27 @@ export function conformance(R, N) {
     }
   }
 
+  /** A rule of the format, built with `Rule`. */
+  function buildRule(rule) {
+    const then = rule.get('then')
+    const options = {}
+    if (rule.has('id')) options.id = rule.get('id')
+    if (rule.has('priority')) options.priority = nativeOf(rule.get('priority'))
+    if (rule.has('tags')) options.tags = rule.get('tags')
+    if (rule.has('description')) options.description = rule.get('description')
+    if (rule.has('metadata')) options.metadata = nativeOf(rule.get('metadata'))
+    if (rule.has('do')) options.do = rule.get('do')
+    return new R.Rule(
+      need(rule, 'name'),
+      build(need(rule, 'when')),
+      then === undefined ? undefined : new Map(then.entries.map(([k, n]) => [k, build(n)])),
+      options,
+    )
+  }
+
   /** A rule set of the format, built with `Rule` and `RuleSet`. */
   function buildRuleSet(content) {
-    const rules = need(content, 'rules').map((rule) => {
-      const then = rule.get('then')
-      const options = {}
-      if (rule.has('id')) options.id = rule.get('id')
-      if (rule.has('priority')) options.priority = nativeOf(rule.get('priority'))
-      if (rule.has('tags')) options.tags = rule.get('tags')
-      if (rule.has('description')) options.description = rule.get('description')
-      if (rule.has('metadata')) options.metadata = nativeOf(rule.get('metadata'))
-      if (rule.has('do')) options.do = rule.get('do')
-      return new R.Rule(
-        need(rule, 'name'),
-        build(need(rule, 'when')),
-        then === undefined ? undefined : new Map(then.entries.map(([k, n]) => [k, build(n)])),
-        options,
-      )
-    })
+    const rules = need(content, 'rules').map(buildRule)
     const options = {}
     for (const [key, name] of [
       ['hit_policy', 'hitPolicy'],
@@ -1026,6 +1072,41 @@ export function conformance(R, N) {
     return ''
   }
 
+  /**
+   * A `canonical` vector through the idiomatic API: `canonicalBytes` and
+   * `digest` of what `loads` reads, and of the same condition, rule or rule
+   * set built in code (a table is read only); the rule set digest is that of
+   * the rule set the document gives: a rule set, a rule set of the one rule,
+   * or the table's `ruleset`.
+   */
+  function canonicalNative(given, expect) {
+    const [source] = sourceOf(given)
+    const loaded = R.loads(source)
+    const subjects = [['loads', loaded]]
+    const document = given.get('document')
+    if (document !== undefined) {
+      if (document.has('condition')) subjects.push(['built in code', build(document.get('condition'))])
+      if (document.has('rule')) subjects.push(['built in code', buildRule(document.get('rule'))])
+      if (document.has('ruleset')) subjects.push(['built in code', buildRuleSet(document.get('ruleset'))])
+    }
+    const issues = []
+    for (const [how, value] of subjects) {
+      issues.push(compareText(`${how}, canonicalBytes`, utf8(R.canonicalBytes(value)), need(expect, 'canonical')))
+      issues.push(compareText(`${how}, digest`, R.digest(value), need(expect, 'digest')))
+      let ruleset = null
+      if (value instanceof R.RuleSet) ruleset = value
+      else if (value instanceof R.Rule) ruleset = new R.RuleSet([value])
+      else if (value instanceof R.DecisionTable) ruleset = value.ruleset
+      if (expect.has('ruleset_digest')) {
+        if (ruleset === null) return `${how}: a ${value.constructor.name} gives no rule set, expected the rule set digest`
+        issues.push(compareText(`${how}, the rule set digest`, R.digest(ruleset), expect.get('ruleset_digest')))
+      } else if (ruleset !== null) {
+        issues.push(`${how}: a ${value.constructor.name} gives a rule set, but the vector expects none`)
+      }
+    }
+    return issues.filter(Boolean).join('; ')
+  }
+
   function inputOf(given) {
     return given.has('inputs') ? need(given, 'inputs').map(nativeOf) : nativeOf(need(given, 'input'))
   }
@@ -1036,6 +1117,7 @@ export function conformance(R, N) {
     const kind = need(given, 'kind')
     if (kind === 'draw') return { skip: 'diagram' }
     if (kind === 'read') return readNative(given, expect)
+    if (kind === 'canonical') return canonicalNative(given, expect)
     if (kind === 'summary') {
       const ruleset = buildRuleSet(need(given, 'ruleset'))
       const built = checkBuilt(ruleset, given)

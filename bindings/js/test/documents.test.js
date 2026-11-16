@@ -1,6 +1,7 @@
 // Documents (task F.2b): loads, dumps, load, dump and ruleFromText, with the
 // behaviour of Python's `cleanrules._documents` and its tests
-// (bindings/python/tests/test_documents.py).
+// (bindings/python/tests/test_documents.py); and their canonical bytes and
+// digests (task R.2: canonicalBytes and digest).
 
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
@@ -9,7 +10,7 @@ import path from 'node:path'
 import { describe, test } from 'node:test'
 import { pathToFileURL } from 'node:url'
 
-import { deno, root } from './support/cr.js'
+import { deno, native, root } from './support/cr.js'
 
 const {
   Const,
@@ -24,7 +25,9 @@ const {
   RuleSet,
   RuleSyntaxError,
   UnsupportedError,
+  canonicalBytes,
   decimal,
+  digest,
   dump,
   dumps,
   float,
@@ -211,6 +214,160 @@ describe('loads and dumps', () => {
     throwsWith(() => dumps(F.x.gt(1), { formt: 'json' }), TypeError, /unknown option "formt"/)
     throwsWith(() => loads('{}', { action: {} }), TypeError, /unknown option "action"/)
     throwsWith(() => loads('{}'), FormatError, /.+/)
+  })
+})
+
+// `spec/json-format.md`, *Canonical bytes* and *Digests*: the example there.
+describe('canonicalBytes and digest', () => {
+  const EXAMPLE =
+    '{"ruleset":{"hit_policy":"first","logic":"boolean","rules":[{"name":"vip","then":{"discount":{"op":"const","value":{"$decimal":"0.15"}}},' +
+    '"when":{"left":{"op":"field","path":["years"]},"op":"gt","right":{"op":"const","value":5}}}]},"version":1}'
+  const EXAMPLE_DIGEST = 'sha256:5a0e590cb8f3bd57392ede84c0d0c4596cf9374fefcbcc6b28ed61421878f312'
+  const example = () => new RuleSet([new Rule('vip', F.years.gt(5), { discount: decimal('0.15') })])
+  const text = (bytes) => new TextDecoder().decode(bytes)
+
+  test("the canonical bytes are a Uint8Array of the canonical form's UTF-8 JSON; the digest is its SHA-256", () => {
+    const bytes = canonicalBytes(example())
+    assert.equal(bytes.constructor, Uint8Array)
+    assert.equal(text(bytes), EXAMPLE)
+    assert.equal(digest(example()), EXAMPLE_DIGEST)
+    assert.match(digest(F.x.gt(1)), /^sha256:[0-9a-f]{64}$/)
+    // Each call gives new bytes, which the caller owns.
+    const again = canonicalBytes(example())
+    again[0] = 0
+    assert.equal(text(canonicalBytes(example())), EXAMPLE)
+    // UTF-8, with no escape for what needs none.
+    const accented = canonicalBytes(F.name.eq('é/\u2028'))
+    const at = accented.indexOf(0xc3)
+    assert.deepEqual([...accented.subarray(at - 1, at + 7)], [0x22, 0xc3, 0xa9, 0x2f, 0xe2, 0x80, 0xa8, 0x22])
+  })
+
+  test('the same document in another layout, member order or format has the same bytes and digest', () => {
+    const spaced = `{
+      "version": 1,
+      "ruleset": {
+        "rules": [{ "then": { "discount": { "value": { "$decimal": "1.5e-1" }, "op": "const" } },
+                    "when": { "right": { "value": 5, "op": "const" }, "op": "gt", "left": { "path": ["years"], "op": "field" } },
+                    "name": "vip" }],
+        "logic": "boolean", "hit_policy": "first"
+      }
+    }`
+    const yaml = 'version: 1\nruleset:\n  rules:\n    - name: vip\n      when: {op: gt, left: {op: field, path: [years]}, right: {op: const, value: 5}}\n      then: {discount: {op: const, value: {$decimal: "0.15"}}}\n'
+    const rules = 'HIT POLICY first\n\nRULE vip\nIF years > 5\nTHEN discount = 0.15'
+    const read = [loads(spaced), loads(yaml, { format: 'yaml' }), loads(rules, { format: 'text' }), loads(canonicalBytes(example()))]
+    for (const value of read) {
+      assert.ok(value instanceof RuleSet)
+      assert.equal(text(canonicalBytes(value)), EXAMPLE)
+      assert.equal(digest(value), EXAMPLE_DIGEST)
+    }
+    // Defaults written or left out are one canonical form.
+    assert.equal(digest(new RuleSet(example().rules, { hitPolicy: 'first', logic: 'boolean', strict: false })), EXAMPLE_DIGEST)
+  })
+
+  test('a digest is of one canonical artifact, not of what it means', () => {
+    // The same condition, written two ways.
+    assert.notEqual(digest(F.x.gt(5)), digest(root.constant(5).lt(F.x)))
+    // The scale of a decimal is part of the value written.
+    assert.notEqual(digest(F.x.eq(decimal('1.0'))), digest(F.x.eq(decimal('1.00'))))
+    assert.match(text(canonicalBytes(F.x.eq(decimal('1.00')))), /\{"\$decimal":"1\.00"\}/)
+    // A float and an int are different values; 1e2 and 100.0, the same float.
+    assert.notEqual(digest(F.x.eq(float(1))), digest(F.x.eq(1)))
+    assert.equal(digest(loads('{"version":1,"condition":{"op":"eq","left":{"op":"field","path":["x"]},"right":{"op":"const","value":1e2}}}')), digest(F.x.eq(float(100))))
+    // Everything the document holds: a description, a rule's name, a setting.
+    const described = new RuleSet([new Rule('vip', F.years.gt(5), { discount: decimal('0.15') }, { description: 'loyal' })])
+    assert.notEqual(digest(described), EXAMPLE_DIGEST)
+    assert.notEqual(digest(new RuleSet([new Rule('gold', F.years.gt(5), { discount: decimal('0.15') })])), EXAMPLE_DIGEST)
+    assert.notEqual(digest(new RuleSet(example().rules, { hitPolicy: 'priority' })), EXAMPLE_DIGEST)
+  })
+
+  test('every kind of document: a condition, a rule, a rule set and a decision table', () => {
+    const rule = shop().rule('vip')
+    assert.deepEqual(Object.keys(JSON.parse(text(canonicalBytes(rule)))), ['rule', 'version'])
+    assert.deepEqual(Object.keys(JSON.parse(text(canonicalBytes(F.x.gt(1))))), ['condition', 'version'])
+    // A rule's document is not the rule set of that rule.
+    assert.notEqual(digest(rule), digest(new RuleSet([rule])))
+    assert.equal(digest(loads(dumps(rule))), digest(rule))
+    // A constant used as a condition is a document too.
+    assert.match(digest(root.constant(true)), /^sha256:/)
+    const table = new DecisionTable(['RULE', 'x', 'THEN rate'], [['a', '> 1', decimal('0.5')], ['b', '<= 1', decimal('0.1')]])
+    assert.deepEqual(Object.keys(JSON.parse(text(canonicalBytes(table)))), ['decision_table', 'version'])
+    // A table has two digests: its own document's, and its rule set digest.
+    assert.notEqual(digest(table), digest(table.ruleset))
+    assert.equal(digest(loads(dumps(table, { format: 'csv' }), { format: 'csv' })), digest(table))
+    assert.equal(digest(loads(dumps(table.ruleset))), digest(table.ruleset))
+    // As the native layer gives them.
+    const document = native.Document.read(dumps(table))
+    assert.equal(document.digest(), digest(table))
+    assert.equal(native.RuleSet.fromDocument(document).digest(), digest(table.ruleset))
+    assert.equal(text(document.canonicalBytes()), text(canonicalBytes(table)))
+    assert.equal(document.canonicalBytes().constructor, Uint8Array)
+    assert.equal(native.RuleSet.read(dumps(shop())).digest(), digest(shop()))
+    assert.equal(text(native.RuleSet.read(dumps(shop())).canonicalBytes()), text(canonicalBytes(shop())))
+  })
+
+  test('actions given as code are refused, as dumps refuses them, unless omitActions', () => {
+    const record = () => {}
+    const plain = new RuleSet([new Rule('a', F.x.gt(1)), new Rule('b', F.x.gt(2))])
+    const rules = new RuleSet([new Rule('a', F.x.gt(1)), new Rule('b', F.x.gt(2), null, { do: record })])
+    for (const call of [canonicalBytes, digest]) {
+      throwsWith(() => call(rules), UnsupportedError, /action of rule "b"/, (error) => {
+        assert.equal(error.code, 'unsupported')
+        assert.equal(error.context.pointer, '/ruleset/rules/1/do')
+        assert.equal(error.context.rule, 'b')
+      })
+      throwsWith(() => call(rules.rule('b')), UnsupportedError, /.+/, (error) => assert.equal(error.context.pointer, '/rule/do'))
+      // null is false, as left out.
+      throwsWith(() => call(rules, { omitActions: null }), UnsupportedError, /action of rule "b"/)
+      throwsWith(() => call(rules, { omitActions: 'yes' }), TypeError, /omitActions is a boolean/)
+      throwsWith(() => call(rules, { format: 'json' }), TypeError, /unknown option "format"; the options are omitActions/)
+      throwsWith(() => call(rules, 'json'), TypeError, /options must be an object/)
+    }
+    // Without them: the document written without the actions.
+    assert.equal(digest(rules, { omitActions: true }), digest(plain))
+    assert.equal(text(canonicalBytes(rules.rule('b'), { omitActions: true })), text(canonicalBytes(plain.rule('b'))))
+    assert.equal(digest(rules, { omitActions: true }), digest(loads(dumps(rules, { omitActions: true }))))
+    // A named action is part of the document, bound or not.
+    const named = new RuleSet([new Rule('a', F.x.gt(1), null, { do: 'notify' })])
+    assert.notEqual(digest(named), digest(new RuleSet([new Rule('a', F.x.gt(1))])))
+    assert.equal(digest(named.bind({ notify: record })), digest(named))
+  })
+
+  test('what is not a document', () => {
+    for (const [call, name] of [
+      [canonicalBytes, 'canonicalBytes'],
+      [digest, 'digest'],
+    ]) {
+      throwsWith(() => call(F.x.add(1)), ExpressionError, /only a condition can be a document, not the value x \+ 1/, (error) => {
+        assert.match(error.hint, /F\.x\.gt\(0\)/)
+      })
+      throwsWith(() => call({}), TypeError, new RegExp(`${name} takes a condition, a rule, a rule set or a decision table, not a Object`))
+      throwsWith(() => call(dumps(F.x.gt(1))), TypeError, /not the string/)
+    }
+  })
+
+  test("a decision read with its rule set digest keeps it; another rule set's is a decision_mismatch", () => {
+    const rules = example()
+    const written = JSON.parse(JSON.stringify(rules.evaluate({ years: 9 })))
+    written.decision.ruleset_digest = digest(rules)
+    const read = rules.readDecision(JSON.stringify(written))
+    assert.equal(JSON.parse(JSON.stringify(read)).decision.ruleset_digest, digest(rules))
+    assert.deepEqual(read.output, rules.evaluate({ years: 9 }).output)
+    written.decision.ruleset_digest = digest(described())
+    throwsWith(() => rules.readDecision(JSON.stringify(written)), FormatError, /.+/, (error) => {
+      assert.equal(error.code, 'decision_mismatch')
+      assert.equal(error.context.pointer, '/decision/ruleset_digest')
+    })
+    written.decision.ruleset_digest = digest(rules).toUpperCase()
+    throwsWith(() => rules.readDecision(JSON.stringify(written)), FormatError, /.+/, (error) => {
+      assert.equal(error.code, 'format_error')
+      assert.equal(error.context.pointer, '/decision/ruleset_digest')
+    })
+    // A decision made here carries none: only the core stamps one, when asked.
+    assert.equal(JSON.parse(JSON.stringify(rules.evaluate({ years: 9 }))).decision.ruleset_digest, undefined)
+
+    function described() {
+      return new RuleSet([new Rule('vip', F.years.gt(5), { discount: decimal('0.15') }, { description: 'other' })])
+    }
   })
 })
 

@@ -1629,6 +1629,23 @@ public:
     std::string write(error_info &error) const { return write_(format::json, &error); }
     std::string write(format f, error_info &error) const { return write_(f, &error); }
 
+    // Its canonical bytes (spec/json-format.md, *Canonical bytes*): the UTF-8
+    // JSON text of its canonical form, every object's members sorted by key,
+    // by Unicode code point, without whitespace or a final line break; the
+    // same bytes in every language, whatever format it was read from.
+    CLEANRULES_THROWING(std::string canonical_bytes() const { return canonical_(nullptr); })
+    std::string canonical_bytes(error_info &error) const { return canonical_(&error); }
+
+    // Its digest (spec/json-format.md, *Digests*): the SHA-256 hash of its
+    // canonical bytes, as `sha256:` and 64 lowercase hexadecimal digits. A
+    // digest identifies one concrete canonical artifact, not a meaning: rules
+    // written differently have different digests even when they always decide
+    // alike (`x > 5` and `5 < x`, a renamed rule, the decimals `1.0` and
+    // `1.00`). For a decision table, the digest of the table's own document;
+    // its rule set digest is `ruleset::from_document(d).digest()`.
+    CLEANRULES_THROWING(std::string digest() const { return digest_(nullptr); })
+    std::string digest(error_info &error) const { return digest_(&error); }
+
     explicit operator bool() const noexcept { return handle_ != nullptr; }
     const cr_document *c_ptr() const noexcept { return handle_.get(); }
 
@@ -1657,6 +1674,16 @@ private:
     std::string write_(format f, error_info *sink) const {
         return detail::text(sink, [&](char **o, std::size_t *n, cr_error **e) {
             return cr_document_write(handle_.get(), static_cast<cr_format>(f), o, n, e);
+        });
+    }
+    std::string canonical_(error_info *sink) const {
+        return detail::text(sink, [&](char **o, std::size_t *n, cr_error **e) {
+            return cr_document_canonical_bytes(handle_.get(), o, n, e);
+        });
+    }
+    std::string digest_(error_info *sink) const {
+        return detail::text(sink, [&](char **o, std::size_t *n, cr_error **e) {
+            return cr_document_digest(handle_.get(), o, n, e);
         });
     }
 
@@ -1774,6 +1801,21 @@ public:
     })
     std::string write(error_info &error) const { return write_(format::json, &error); }
     std::string write(format f, error_info &error) const { return write_(f, &error); }
+
+    // The canonical bytes of its rule set document (spec/json-format.md,
+    // *Canonical bytes*), as `document::canonical_bytes` gives them.
+    CLEANRULES_THROWING(std::string canonical_bytes() const { return canonical_(nullptr); })
+    std::string canonical_bytes(error_info &error) const { return canonical_(&error); }
+
+    // Its rule set digest (spec/json-format.md, *Rule set digests*): the
+    // digest of its rule set document, as `sha256:` and 64 lowercase
+    // hexadecimal digits, which a decision's `ruleset_digest` holds. A rule
+    // set read from a rule or a decision table has the digest of the rule set
+    // it gives. A digest identifies one concrete canonical artifact, not a
+    // meaning: `x > 5` and `5 < x`, a renamed rule, or the decimals `1.0` and
+    // `1.00` give different digests.
+    CLEANRULES_THROWING(std::string digest() const { return digest_(nullptr); })
+    std::string digest(error_info &error) const { return digest_(&error); }
 
     // The summary (spec/explain.md, *Summaries*): text by default, or a JSON
     // or YAML document.
@@ -1924,6 +1966,16 @@ private:
     std::string write_(format f, error_info *sink) const {
         return detail::text(sink, [&](char **o, std::size_t *n, cr_error **e) {
             return cr_ruleset_write(raw(), static_cast<cr_format>(f), o, n, e);
+        });
+    }
+    std::string canonical_(error_info *sink) const {
+        return detail::text(sink, [&](char **o, std::size_t *n, cr_error **e) {
+            return cr_ruleset_canonical_bytes(raw(), o, n, e);
+        });
+    }
+    std::string digest_(error_info *sink) const {
+        return detail::text(sink, [&](char **o, std::size_t *n, cr_error **e) {
+            return cr_ruleset_digest(raw(), o, n, e);
         });
     }
     std::string summary_(format f, error_info *sink) const {

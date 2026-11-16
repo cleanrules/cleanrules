@@ -138,6 +138,44 @@ public final class Document implements AutoCloseable {
         }
     }
 
+    /**
+     * The document's canonical bytes ({@code spec/json-format.md}, <i>Canonical
+     * bytes</i>): the UTF-8 JSON text of its canonical form, every object's
+     * members sorted by key by Unicode code point, without whitespace. They
+     * hold no NUL byte.
+     *
+     * @return the bytes
+     */
+    public byte[] canonicalBytes() {
+        MemorySegment pointer = handle.acquire();
+        try {
+            return Scope.textBytes((out, len, error) -> Native.documentCanonical(pointer, out, len, error));
+        } finally {
+            handle.release();
+        }
+    }
+
+    /**
+     * The document's digest ({@code spec/json-format.md}, <i>Digests</i>):
+     * {@code sha256:} and the 64 lowercase hexadecimal digits of the SHA-256
+     * hash of its {@linkplain #canonicalBytes() canonical bytes}. A digest
+     * identifies one concrete canonical artifact, not a meaning: {@code x > 5}
+     * and {@code 5 < x}, or the decimals {@code 1.0} and {@code 1.00}, have
+     * different digests. For a decision table it is the digest of the table's
+     * own document; the rule set it compiles to has its own
+     * ({@link RuleSet#digest()} of {@link RuleSet#fromDocument(Document)}).
+     *
+     * @return the digest
+     */
+    public String digest() {
+        MemorySegment pointer = handle.acquire();
+        try {
+            return Scope.text((out, len, error) -> Native.documentDigest(pointer, out, len, error));
+        } finally {
+            handle.release();
+        }
+    }
+
     /** Hold the native document for one call; {@link #release()} it after. */
     MemorySegment acquire() {
         return handle.acquire();

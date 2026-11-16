@@ -54,7 +54,9 @@ final case class CustomerOrder(customer: Any, order: Any)
  *    with patterns, and each `toJson` exactly.
  *  - `read` vectors go through `loads` (as a string or UTF-8 bytes in turn),
  *    `dumps`, `ruleFromText`, `DecisionTable(...)` with Scala cells (grids) and
- *    `RuleSet.readDecision(text, format, limits)`.
+ *    `RuleSet.readDecision(text, format, limits)`; `canonical` vectors through
+ *    `canonicalBytes` and `digest` of what `loads` gives and of what is built
+ *    in Scala.
  *
  * Never the library's equality: results become trees of the format and
  * [[TestJson.same]] compares them; objects are compared by identity (`eq`).
@@ -747,7 +749,36 @@ final class ScalaConformance extends Conformance:
       case "summary" => summarize(setup, expect)
       case kind @ ("condition" | "value") => tree(kind, setup, expect)
       case kind @ ("evaluate" | "explain") => evaluate(kind, setup, expect)
+      case "canonical" => canonical(setup, expect)
       case kind => throw VectorError(s"unknown kind $kind")
+
+  /**
+   * `canonical` vectors: `canonicalBytes` and `digest` of what `loads` gives (from a string or UTF-8 bytes in turn),
+   * of `loads(dumps(x))`, and of the condition, rule or rule set built in Scala from a document given as an object.
+   */
+  private def canonical(setup: JsonMap, expect: JsonMap): String =
+    val source = Conformance.sourceOf(setup)
+    val loaded =
+      if wellFormed(source.text) && turn(2) == 0 then loads(source.text.getBytes(UTF_8), source.format)
+      else loads(source.text, source.format)
+    def check(how: String, content: DocumentContent): String =
+      val rulesetDigest: String | Null = content match
+        case _: Expr => null
+        case rule: Rule => digest(RuleSet(rule))
+        case rules: RuleSet => digest(rules)
+        case table: DecisionTable => digest(table.ruleSet)
+      Conformance.checkCanonical(how, canonicalBytes(content), digest(content), rulesetDigest, expect)
+    val built: Option[DocumentContent] = setup.get("document") match
+      case document: java.util.Map[?, ?] =>
+        // Data no JVM value holds, such as a decimal infinity, is checked through loads only.
+        try
+          if document.containsKey("condition") then Some(build(document.get("condition")))
+          else if document.containsKey("rule") then Some(buildRule(document.get("rule").asInstanceOf[AnyRef]))
+          else if document.containsKey("ruleset") then Some(buildRuleSet(document.get("ruleset").asInstanceOf[AnyRef]))
+          else None
+        catch case _: NoJavaForm => None
+      case _ => None
+    join((Vector(check("loads", loaded), check("loads(dumps(x))", loads(dumps(loaded)))) ++ built.map(check("built in Scala", _)))*)
 
   private def evaluate(kind: String, setup: JsonMap, expect: JsonMap): String = boundary:
     val ruleset = buildRuleSet(need(setup, "ruleset"))

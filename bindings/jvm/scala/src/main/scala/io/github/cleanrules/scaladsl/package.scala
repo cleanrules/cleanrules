@@ -15,7 +15,7 @@
  * }}}
  *
  * Documents and decision tables: `loads`, `load`, `dumps`, `dump`,
- * `ruleFromText` and [[DecisionTable]].
+ * `canonicalBytes`, `digest`, `ruleFromText` and [[DecisionTable]].
  *
  * The core builds, checks, evaluates and explains; this layer delegates to
  * the Java binding's idiomatic API and converts Scala values. Errors are the

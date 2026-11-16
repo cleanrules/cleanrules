@@ -27,7 +27,16 @@ from cleanrules._rules import Action, Rule, RuleSet
 from cleanrules._tables import DecisionTable
 from cleanrules.errors import ExpressionError, FormatError, UnsupportedError
 
-__all__ = ["Format", "dump", "dumps", "load", "loads", "rule_from_text"]
+__all__ = [
+    "Format",
+    "canonical_bytes",
+    "digest",
+    "dump",
+    "dumps",
+    "load",
+    "loads",
+    "rule_from_text",
+]
 
 Format: TypeAlias = Literal["json", "yaml", "text", "csv"]
 """A document format: JSON, YAML, the text syntax of rules, or CSV for decision tables."""
@@ -204,6 +213,87 @@ def dumps(
         return _native.dump_ruleset(value._native, format)  # pyright: ignore[reportPrivateUsage]
     raise TypeError(
         "dumps takes a condition, a rule, a rule set or a decision table,"
+        f" not {type(value).__name__}"
+    )
+
+
+def canonical_bytes(
+    value: Expr | Rule | RuleSet | DecisionTable, *, omit_actions: bool = False
+) -> bytes:
+    """The canonical bytes of a condition, rule, rule set or decision table.
+
+    They are the UTF-8 JSON text of the document in its canonical form, every
+    object's members sorted by key (by Unicode code point), without whitespace,
+    with one layout for each number (`spec/json-format.md`, *Canonical bytes*).
+    The same document written with another layout, member order or format has
+    the same bytes.
+
+        canonical_bytes(rule_from_text("RULE r IF x > 1"))
+        # b'{"rule":{"name":"r","when":{"left":...,"op":"gt",...}},"version":1}'
+
+    Args:
+        value: A condition, a rule, a rule set or a decision table.
+        omit_actions: Give the bytes of the document written without the
+            rules' actions given as code, instead of refusing, as `dumps`.
+
+    Returns:
+        The canonical bytes.
+
+    Raises:
+        ExpressionError: If `value` is a value node, not a condition.
+        UnsupportedError: If a rule has an action given as code and
+            `omit_actions` is false, as `dumps` does.
+    """
+    return _native.canonical_bytes(_native_document(value, "canonical_bytes", omit_actions))
+
+
+def digest(value: Expr | Rule | RuleSet | DecisionTable, *, omit_actions: bool = False) -> str:
+    """The digest of a condition, rule, rule set or decision table.
+
+    The SHA-256 hash of its canonical bytes, written `sha256:` and 64 lowercase
+    hexadecimal digits (`spec/json-format.md`, *Digests*). A digest identifies
+    one concrete canonical artifact: it does not say that two rule sets decide
+    alike (`x > 5` and `5 < x`, or the decimals `1.0` and `1.00`, give different
+    digests). The digest of a rule set is its rule set digest, which a decision
+    can carry; a decision table's rule set digest is `digest(table.ruleset)`,
+    and `digest(table)` that of the table's own document.
+
+    Args:
+        value: A condition, a rule, a rule set or a decision table.
+        omit_actions: As in `canonical_bytes`.
+
+    Returns:
+        The digest, such as `"sha256:5a0e…f312"`.
+
+    Raises:
+        ExpressionError: If `value` is a value node, not a condition.
+        UnsupportedError: If a rule has an action given as code and
+            `omit_actions` is false.
+    """
+    return _native.digest(_native_document(value, "digest", omit_actions))
+
+
+def _native_document(
+    value: Expr | Rule | RuleSet | DecisionTable, function: str, omit_actions: bool
+) -> _native.Node | _native.Rule | _native.RuleSet | _native.DecisionTable:
+    """The native object whose document `value` is, checked as `dumps` checks it."""
+    if isinstance(value, DecisionTable):
+        return value._native  # pyright: ignore[reportPrivateUsage]
+    if isinstance(value, Expr):
+        if value.kind == "value":
+            raise ExpressionError(
+                f"only a condition can be a document, not the value {value!r}",
+                hint="compare it first, e.g. F.x > 0",
+            )
+        return value._node  # pyright: ignore[reportPrivateUsage]
+    if isinstance(value, Rule):
+        _check_actions([value], "/rule", omit_actions)
+        return value._native  # pyright: ignore[reportPrivateUsage]
+    if isinstance(value, RuleSet):  # pyright: ignore[reportUnnecessaryIsInstance]
+        _check_actions(list(value), "/ruleset/rules/{}", omit_actions)
+        return value._native  # pyright: ignore[reportPrivateUsage]
+    raise TypeError(
+        f"{function} takes a condition, a rule, a rule set or a decision table,"
         f" not {type(value).__name__}"
     )
 

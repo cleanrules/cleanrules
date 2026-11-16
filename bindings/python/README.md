@@ -127,6 +127,24 @@ print(cleanrules.dumps(gold, format="text"))
 # IF vip
 ```
 
+Each document has one canonical form as bytes, and a digest of them that
+identifies that exact artifact, whatever its layout, member order or format
+([`spec/json-format.md`](../../spec/json-format.md), *Canonical bytes* and
+*Digests*):
+
+```python
+cleanrules.canonical_bytes(rules)  # b'{"ruleset":{"hit_policy":"priority",...},"version":1}'
+cleanrules.digest(rules)  # 'sha256:...', the rule set digest
+cleanrules.digest(table.ruleset)  # a decision table's rule set digest
+```
+
+A digest does not say that two rule sets decide alike: `x > 5` and `5 < x`, or
+the decimals `1.0` and `1.00`, give different digests. A decision document
+that carries `ruleset_digest` is checked against it by `read_decision` and
+keeps it; decisions made in Python carry none. Actions given as code are not
+part of a document: the digest that decisions of such rules are checked
+against is `digest(rules, omit_actions=True)`.
+
 `evaluate` never has side effects; `run` evaluates and then calls the actions
 of the selected rules. An action is a function given to `Rule(do=...)`, or a
 name that a rule file gives (`DO notify_sales` in text, `"do"` in JSON) and the

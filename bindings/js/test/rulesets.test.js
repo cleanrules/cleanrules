@@ -74,10 +74,12 @@ describe(`the package (${build})`, () => {
       'UnsupportedError',
       'ZonedDateTime',
       'and',
+      'canonicalBytes',
       'constant',
       'date',
       'datetime',
       'decimal',
+      'digest',
       'dump',
       'dumps',
       'evaluateTree',
@@ -151,7 +153,7 @@ describe(`the package (${build})`, () => {
       assert.notEqual(napiRoot[name], wasmRoot[name], name)
       assert.deepEqual(members(wasmRoot[name]), members(napiRoot[name]), name)
     }
-    for (const name of ['loads', 'dumps', 'load', 'dump', 'ruleFromText', 'evaluateTree', 'evaluateValueTree']) {
+    for (const name of ['loads', 'dumps', 'load', 'dump', 'canonicalBytes', 'digest', 'ruleFromText', 'evaluateTree', 'evaluateValueTree']) {
       assert.notEqual(napiRoot[name], wasmRoot[name], name)
       assert.equal(wasmRoot[name].length, napiRoot[name].length, name)
     }
@@ -167,7 +169,7 @@ describe(`the package (${build})`, () => {
     }
     const internal = (layer) =>
       Object.keys(layer)
-        .filter((name) => /^(node|rule|decision|explanation|summary|action|document|write|grid|file|maxValues)[A-Z]|^(NodeList|RuleList|Native[A-Z]\w*|stringifiable)$/.test(name))
+        .filter((name) => /^(node|rule|decision|explanation|summary|action|document|write|canonical|digest|grid|file|maxValues)[A-Z]|^(NodeList|RuleList|Native[A-Z]\w*|stringifiable)$/.test(name))
         .sort()
     assert.deepEqual(internal(napiLayer), [...INTERNAL].sort())
     assert.deepEqual(internal(wasmLayer), [...INTERNAL].sort())

@@ -11,6 +11,7 @@
 pub mod agents;
 pub mod ast;
 pub mod build;
+pub mod digest;
 mod error;
 pub mod eval;
 pub mod explain;

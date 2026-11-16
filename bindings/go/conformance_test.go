@@ -22,7 +22,12 @@ package cleanrules
 //     values given back (spec/data-model.md, Go, Values given back), checking
 //     each Go type, through Decision, Explanation, Summary and ResultTree,
 //     and as their JSON forms. read vectors go through Loads, Dumps,
-//     RuleFromText, NewDecisionTable (grids) and RuleSet.ReadDecision.
+//     RuleFromText, NewDecisionTable (grids) and RuleSet.ReadDecision, and
+//     canonical vectors build their condition, rule or rule set in code (a
+//     decision table is read with Loads).
+//
+// Both routes compare the canonical bytes, digest and rule set digest of
+// canonical vectors exactly (CanonicalBytes, Digest).
 //
 // The runner only drives the package and compares: results are parsed with
 // its own JSON reader and compared with the vectors as trees, never with the
@@ -32,7 +37,9 @@ package cleanrules
 // written to build/reports/conformance.txt).
 
 import (
+	"bytes"
 	"cmp"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -46,7 +53,7 @@ import (
 
 // minimumVectors is the count when this runner was written: vectors are only
 // ever added.
-const minimumVectors = 2534
+const minimumVectors = 2951
 
 // conformanceRoutes are the two ways each vector runs.
 var conformanceRoutes = []string{"json", "native"}
@@ -459,6 +466,13 @@ func (c *conformance) runJSON(given, expect *jsonObject) string {
 		panic(vectorSkip{"diagram"})
 	case "read":
 		return c.readJSON(given, expect)
+	case "canonical":
+		text, _ := source(given)
+		doc, err := Loads(text)
+		if err != nil {
+			failf("reading the document: %v", err)
+		}
+		return checkCanonical(doc, expect)
 	case "condition", "value":
 		node, err := readNode(writeJSON(need(given, kind)))
 		if err != nil {
@@ -1361,6 +1375,8 @@ func (c *conformance) runNative(given, expect *jsonObject) string {
 		panic(vectorSkip{"diagram"})
 	case "read":
 		return c.readNative(given, expect)
+	case "canonical":
+		return c.canonicalNative(given, expect)
 	case "summary":
 		return c.summaryNative(given, expect)
 	case "condition", "value":
@@ -1668,4 +1684,98 @@ func fromText(text string, limits Limits, limited bool, expect *jsonObject) stri
 		return fmt.Sprintf("RuleFromText of a %s: %v, expected a rule_syntax_error", what, err)
 	}
 	return ""
+}
+
+// ---- Canonical bytes and digests.
+
+// canonicalNative builds a canonical vector's document in code (Field,
+// Const, NewRule, NewRuleSet), as the core reads it, and checks its
+// canonical bytes and digests. A decision table has no builder from a
+// document (NewDecisionTable takes a grid), so it is read with Loads.
+func (c *conformance) canonicalNative(given, expect *jsonObject) string {
+	var document *jsonObject
+	if given.has("text") {
+		document, _ = parsed(given.str("text")).(*jsonObject)
+	} else {
+		document = given.obj("document")
+	}
+	if document == nil {
+		failf("no document to build")
+	}
+	var doc Document
+	switch {
+	case document.has("condition"):
+		node := document.get("condition")
+		e := c.build(node)
+		if issue := checkBuiltNode(e, "condition", node); issue != "" {
+			return issue
+		}
+		doc = e
+	case document.has("rule"):
+		settings := newObject().set("rules", []any{document.get("rule")})
+		rs := c.buildRuleSet(settings)
+		if issue := checkBuilt(rs, newObject().set("ruleset", settings)); issue != "" {
+			return issue
+		}
+		doc = rs.Rules()[0]
+	case document.has("ruleset"):
+		rs := c.buildRuleSet(document.get("ruleset"))
+		if issue := checkBuilt(rs, document); issue != "" {
+			return issue
+		}
+		doc = rs
+	case document.has("decision_table"):
+		text, _ := source(given)
+		doc = must2(Loads(text))
+	default:
+		failf("a document of no known kind: %s", writeJSON(document))
+	}
+	return checkCanonical(doc, expect)
+}
+
+// checkCanonical compares a document's canonical bytes, digest and rule set
+// digest with a canonical vector's, exactly, and checks that the digest is
+// the SHA-256 hash of the bytes and that the bytes read back to themselves.
+func checkCanonical(doc Document, expect *jsonObject) string {
+	for _, key := range expect.keys {
+		if key != "canonical" && key != "digest" && key != "ruleset_digest" {
+			failf("the unknown expectation %q", key)
+		}
+	}
+	canonical, err := CanonicalBytes(doc)
+	if err != nil {
+		return "CanonicalBytes: unexpected error " + err.Error()
+	}
+	digest, err := Digest(doc)
+	if err != nil {
+		return "Digest: unexpected error " + err.Error()
+	}
+	issues := []string{
+		compareText("CanonicalBytes gave", string(canonical), need(expect, "canonical")),
+		compareText("Digest gave", digest, need(expect, "digest")),
+	}
+	if hashed := fmt.Sprintf("sha256:%x", sha256.Sum256(canonical)); digest != hashed {
+		issues = append(issues, fmt.Sprintf("Digest gave %s, the SHA-256 of the canonical bytes is %s", digest, hashed))
+	}
+	again := must2(CanonicalBytes(must2(Loads(string(canonical)))))
+	if !bytes.Equal(again, canonical) {
+		issues = append(issues, fmt.Sprintf("the canonical bytes read back give %q", again))
+	}
+	var ruleSet *RuleSet
+	switch doc := doc.(type) {
+	case *Expr:
+	case *Rule:
+		ruleSet = must2(NewRuleSet([]*Rule{doc}))
+	case *RuleSet:
+		ruleSet = doc
+	case *DecisionTable:
+		ruleSet = must2(doc.RuleSet())
+	}
+	switch {
+	case ruleSet == nil && expect.has("ruleset_digest"):
+		issues = append(issues, fmt.Sprintf("a %T gives no rule set, expected the rule set digest %v", doc, expect.get("ruleset_digest")))
+	case ruleSet != nil:
+		issues = append(issues, compareText("the rule set digest", must2(Digest(ruleSet)), need(expect, "ruleset_digest")))
+	}
+	return join(issues...)
 }

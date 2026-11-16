@@ -50,9 +50,10 @@ pub use napi::classes::{
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use napi::documents::{
-    NativeGrid, NativeTable, NativeTree, document_condition, document_rule, document_table,
-    file_size_check, grid_new, node_tree, rule_nodes, rule_parts, rule_set_rules, rule_text,
-    rule_tree, stringifiable, write_condition, write_rule,
+    NativeGrid, NativeTable, NativeTree, canonical_condition, canonical_rule, digest_condition,
+    digest_rule, document_condition, document_rule, document_table, file_size_check, grid_new,
+    node_tree, rule_nodes, rule_parts, rule_set_rules, rule_text, rule_tree, stringifiable,
+    write_condition, write_rule,
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use napi::hooks::set_hooks;
@@ -70,9 +71,10 @@ pub use wasm::build::{
 pub use wasm::classes::{Decision, Document, Node, RuleSet};
 #[cfg(target_arch = "wasm32")]
 pub use wasm::documents::{
-    NativeGrid, NativeTable, NativeTree, document_condition, document_rule, document_table,
-    file_size_check, grid_new, node_tree, rule_nodes, rule_parts, rule_set_rules, rule_text,
-    rule_tree, stringifiable, write_condition, write_rule,
+    NativeGrid, NativeTable, NativeTree, canonical_condition, canonical_rule, digest_condition,
+    digest_rule, document_condition, document_rule, document_table, file_size_check, grid_new,
+    node_tree, rule_nodes, rule_parts, rule_set_rules, rule_text, rule_tree, stringifiable,
+    write_condition, write_rule,
 };
 #[cfg(target_arch = "wasm32")]
 pub use wasm::{decimal_problem, format_version, not_a_document, set_hooks, version};

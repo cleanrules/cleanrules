@@ -379,12 +379,16 @@ public final class Native {
     private static final MethodHandle DOCUMENT_READ = bind("cr_document_read", fn(I, P, SIZE_T, I, P, P, P));
     private static final MethodHandle DOCUMENT_KIND = bind("cr_document_kind", fn(I, P));
     private static final MethodHandle DOCUMENT_WRITE = bind("cr_document_write", fn(I, P, I, P, P, P));
+    private static final MethodHandle DOCUMENT_CANONICAL = bind("cr_document_canonical_bytes", fn(I, P, P, P, P));
+    private static final MethodHandle DOCUMENT_DIGEST = bind("cr_document_digest", fn(I, P, P, P, P));
     private static final MethodHandle DOCUMENT_FREE = bind("cr_document_free", proc(P));
 
     // Rule sets.
     private static final MethodHandle RULESET_READ = bind("cr_ruleset_read", fn(I, P, SIZE_T, I, P, P, P));
     private static final MethodHandle RULESET_FROM_DOCUMENT = bind("cr_ruleset_from_document", fn(I, P, P, P));
     private static final MethodHandle RULESET_WRITE = bind("cr_ruleset_write", fn(I, P, I, P, P, P));
+    private static final MethodHandle RULESET_CANONICAL = bind("cr_ruleset_canonical_bytes", fn(I, P, P, P, P));
+    private static final MethodHandle RULESET_DIGEST = bind("cr_ruleset_digest", fn(I, P, P, P, P));
     private static final MethodHandle RULESET_SUMMARY = bind("cr_ruleset_summary", fn(I, P, I, P, P, P));
     private static final MethodHandle RULESET_LEN = bind("cr_ruleset_len", fn(SIZE_T, P));
     private static final MethodHandle RULESET_RULE_NAME = bind("cr_ruleset_rule_name", fn(I, P, SIZE_T, P, P, P));
@@ -730,6 +734,11 @@ public final class Native {
         return borrowed(text, length);
     }
 
+    /** The bytes of a text the library gave, copied as they are. */
+    public static byte[] borrowedBytes(MemorySegment text, long length) {
+        return length == 0 ? new byte[0] : text.reinterpret(length).toArray(JAVA_BYTE);
+    }
+
     /** The {@code length} bytes at {@code text}, UTF-8. */
     public static String borrowed(MemorySegment text, long length) {
         if (length == 0) {
@@ -882,6 +891,23 @@ public final class Native {
         }
     }
 
+    public static int documentCanonical(
+            MemorySegment document, MemorySegment out, MemorySegment len, MemorySegment error) {
+        try {
+            return (int) DOCUMENT_CANONICAL.invokeExact(document, out, len, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int documentDigest(MemorySegment document, MemorySegment out, MemorySegment len, MemorySegment error) {
+        try {
+            return (int) DOCUMENT_DIGEST.invokeExact(document, out, len, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
     public static void documentFree(MemorySegment document) {
         try {
             DOCUMENT_FREE.invokeExact(document);
@@ -913,6 +939,23 @@ public final class Native {
             MemorySegment ruleset, int format, MemorySegment out, MemorySegment len, MemorySegment error) {
         try {
             return (int) RULESET_WRITE.invokeExact(ruleset, format, out, len, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int rulesetCanonical(
+            MemorySegment ruleset, MemorySegment out, MemorySegment len, MemorySegment error) {
+        try {
+            return (int) RULESET_CANONICAL.invokeExact(ruleset, out, len, error);
+        } catch (Throwable thrown) {
+            throw rethrow(thrown);
+        }
+    }
+
+    public static int rulesetDigest(MemorySegment ruleset, MemorySegment out, MemorySegment len, MemorySegment error) {
+        try {
+            return (int) RULESET_DIGEST.invokeExact(ruleset, out, len, error);
         } catch (Throwable thrown) {
             throw rethrow(thrown);
         }

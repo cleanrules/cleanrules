@@ -196,6 +196,30 @@ public final class RuleSet implements AutoCloseable {
     }
 
     /**
+     * The canonical bytes of the rule set's document ({@code spec/json-format.md},
+     * <i>Canonical bytes</i>), as {@link Document#canonicalBytes()} gives them.
+     *
+     * @return the bytes
+     */
+    public byte[] canonicalBytes() {
+        return with(pointer -> Scope.textBytes((out, len, error) -> Native.rulesetCanonical(pointer, out, len, error)));
+    }
+
+    /**
+     * The rule set digest ({@code spec/json-format.md}, <i>Rule set digests</i>):
+     * the digest of the rule set's document, {@code sha256:} and 64 lowercase
+     * hexadecimal digits, which a decision's {@code ruleset_digest} holds. A
+     * rule set read from a rule or a decision table has the digest of the rule
+     * set it gives. A digest identifies one concrete canonical artifact, not a
+     * meaning: rule sets that decide alike may have different digests.
+     *
+     * @return the digest
+     */
+    public String digest() {
+        return with(pointer -> Scope.text((out, len, error) -> Native.rulesetDigest(pointer, out, len, error)));
+    }
+
+    /**
      * The rule set's summary ({@code spec/explain.md}, <i>Summaries</i>) as text.
      *
      * @return the summary

@@ -133,6 +133,19 @@ impl NativeTable {
     pub fn write(&self, format: &JsValue) -> Result<String, JsValue> {
         self.core.write(&raw(format)).or_fail()
     }
+
+    /// The canonical bytes of the table's own document.
+    #[wasm_bindgen(js_name = canonicalBytes)]
+    #[must_use]
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        self.core.canonical_bytes()
+    }
+
+    /// The digest of the table's own document.
+    #[must_use]
+    pub fn digest(&self) -> String {
+        self.core.digest()
+    }
 }
 
 /// A decision table being built from a grid.
@@ -361,6 +374,34 @@ pub fn write_condition(node: &Node, format: &JsValue) -> Result<String, JsValue>
 #[wasm_bindgen(js_name = writeRule)]
 pub fn write_rule(rule: &NativeRule, format: &JsValue) -> Result<String, JsValue> {
     documents::write_rule(&rule.rule, &raw(format)).or_fail()
+}
+
+/// The canonical bytes of the condition document of a node.
+#[wasm_bindgen(js_name = canonicalCondition)]
+#[must_use]
+pub fn canonical_condition(node: &Node) -> Vec<u8> {
+    documents::condition_canonical(node.core.node())
+}
+
+/// The digest of the condition document of a node.
+#[wasm_bindgen(js_name = digestCondition)]
+#[must_use]
+pub fn digest_condition(node: &Node) -> String {
+    documents::condition_digest(node.core.node())
+}
+
+/// The canonical bytes of the rule document of a rule.
+#[wasm_bindgen(js_name = canonicalRule)]
+#[must_use]
+pub fn canonical_rule(rule: &NativeRule) -> Vec<u8> {
+    documents::rule_canonical(&rule.rule)
+}
+
+/// The digest of the rule document of a rule.
+#[wasm_bindgen(js_name = digestRule)]
+#[must_use]
+pub fn digest_rule(rule: &NativeRule) -> String {
+    documents::rule_digest(&rule.rule)
 }
 
 /// As in the napi-rs build.

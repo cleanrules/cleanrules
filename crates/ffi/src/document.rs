@@ -115,6 +115,66 @@ pub unsafe extern "C" fn cr_document_write(
     unsafe { call(error, body) }
 }
 
+/// The document's canonical bytes (`spec/json-format.md`, *Canonical bytes*):
+/// the UTF-8 JSON text of its canonical form, every object's members sorted by
+/// key, by Unicode code point, without whitespace. The text holds no NUL byte
+/// (a NUL character in a string is escaped), so it is also a C string.
+///
+/// # Safety
+///
+/// `document` is `NULL` or a live `cr_document`; `out` is `NULL` or points to
+/// a writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+/// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_document_canonical_bytes(
+    document: *const cr_document,
+    out: *mut *mut c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `document` is NULL or live (# Safety).
+        let document = &unsafe { handle(document, "document") }?.document;
+        let text = String::from_utf8(document.canonical_bytes())
+            .map_err(|_| Failure::Internal("canonical bytes are UTF-8; please report it".into()))?;
+        // SAFETY: `out` passed `clear`; `len` is NULL or writable (# Safety).
+        unsafe { give_text(out, len, text) }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call(error, body) }
+}
+
+/// The document's digest (`spec/json-format.md`, *Digests*): the SHA-256 hash
+/// of its canonical bytes, as `sha256:` and 64 lowercase hexadecimal digits.
+/// For a decision table, the digest of the table's own document; the rule set
+/// it compiles to has its own (`cr_ruleset_digest` of `cr_ruleset_read`).
+///
+/// # Safety
+///
+/// `document` is `NULL` or a live `cr_document`; `out` is `NULL` or points to
+/// a writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+/// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_document_digest(
+    document: *const cr_document,
+    out: *mut *mut c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `document` is NULL or live (# Safety).
+        let document = &unsafe { handle(document, "document") }?.document;
+        // SAFETY: `out` passed `clear`; `len` is NULL or writable (# Safety).
+        unsafe { give_text(out, len, document.digest().to_string()) }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call(error, body) }
+}
+
 /// Hand a new document out.
 ///
 /// # Safety

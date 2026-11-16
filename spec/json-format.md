@@ -2,7 +2,8 @@
 
 **Status:** draft, format version `1`. This document covers documents, values
 and conditions (task A.1a), rules and rule sets (A.1b), decisions and reasons
-(A.1c), and explanations and summaries (A.1d).
+(A.1c), explanations and summaries (A.1d), and canonical bytes and digests
+(R.2).
 
 The JSON format is the contract between languages and with users' files
 (`CLAUDE.md`, invariant 6). A condition written in Java and read in Go is the
@@ -160,8 +161,9 @@ structural identity (`ast.md`).
   literal is accepted, and `{"$float": -0}` is `-0.0`. NaN has no encoding:
   conditions reject it and data treats it as null (`ast.md`). Writers produce
   the shortest digits that read back as the same float, with a `.` or an
-  exponent, and `-0.0` for negative zero. The layout (`100.0` or `1e2`) is not
-  part of the contract.
+  exponent, and `-0.0` for negative zero, laid out as *Canonical bytes* says
+  (`100.0`, `1e16`). Readers accept any layout, and comparing documents
+  ignores it (`100.0` equals `1e2`).
 - **decimal** is exact: a sign, a coefficient and an exponent. A reader accepts
   text matching `-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?`, or `inf` or `-inf`.
   The value is never rounded. One outside the 38 digits of `data-model.md`
@@ -313,7 +315,8 @@ trees, never as text. Objects compare by their members, whatever their order
 lexical class (integer literal, or literal with a fraction or exponent) and
 exact value, so `1` and `1.0` differ and `100.0` equals `1e2`; the sign of a
 float zero is compared too, so `-0.0` and `0.0` differ. Whitespace and number
-layout are not part of the contract.
+layout are not compared; the exact bytes of a document are its canonical bytes
+(*Canonical bytes*), which conformance vectors compare as text.
 
 ## Rules
 
@@ -501,6 +504,7 @@ the rule set that produced it (*Reading a decision*).
 | `results` | yes | array of rule results, one per rule, in rule order |
 | `selected` | yes | array of the selected rules' names, in selection order (rule order for every policy of this version), without repetition |
 | `aggregated` | with an aggregate | object: payload key → data value, keys sorted by Unicode code point, or `null` when nothing was selected |
+| `ruleset_digest` | no | string: the rule set digest of the rule set that made the decision (*Digests*) |
 
 A **rule result** is an object with:
 
@@ -518,11 +522,12 @@ has `"then": {}`.
 
 `logic`, and the `alpha` that rule sets reserve, take the rule set's forms, so
 graded logics extend decisions in the same way (*Rule sets*, *Reserved for
-later versions*). Two optional keys are reserved too: `ruleset_digest`, a
-digest of the rule set document that readers will verify, once a canonical
-byte form exists to hash; and `metadata`, data values supplied by the caller,
-such as a correlation id. The core never stamps times or ids itself, so
-decisions stay deterministic. Repeated firings in forward chaining (phase K),
+later versions*). `ruleset_digest` ties a decision to the exact rule set that
+made it (*Digests*, *In decisions*): writers write it only when the caller
+asks, and readers verify it (*Reading a decision*). One optional key is
+reserved: `metadata`, data values supplied by the caller, such as a
+correlation id. The core never stamps times or ids itself, so decisions stay
+deterministic. Repeated firings in forward chaining (phase K),
 batches and the record of a `run` with its actions (task D.4) will use other
 content keys or optional keys, not new meanings of these.
 
@@ -640,7 +645,8 @@ releases. Writers omit empty `paths` and
 `types`, and `detail` when there is none.
 
 Writers write every key in the order of its table, and omit `aggregate`,
-`aggregated`, `then`, `path`, `reason` and `children` when they do not apply.
+`aggregated`, `ruleset_digest`, `then`, `path`, `reason` and `children` when
+they do not apply.
 
 The C ABI also gives a result tree as a value (`cr_tree_value`), for bindings
 that build objects of it: the same structure and keys, with the values
@@ -656,8 +662,11 @@ subtrees, in the canonical form, the members in the order of their tables.
 A decision is read with the rule set that produced it, already read
 (`read_decision(text, ruleset)` or its idiom in each language). After its
 shape (`format_error`), the reader checks that the decision belongs to that
-rule set and is consistent with it. The first failed check, in this order, is
-a `decision_mismatch`, with a pointer to the offending value:
+rule set and is consistent with it. A `ruleset_digest` is verified first: one
+that is not the rule set digest of that rule set (*Digests*) is a
+`decision_mismatch` at `/decision/ruleset_digest`, whatever else the decision
+holds. Then the first failed check, in this order, is a `decision_mismatch`,
+with a pointer to the offending value:
 
 1. `hit_policy`, `aggregate` and `logic` are the rule set's;
 2. `results` names exactly the rule set's rules, in rule order;
@@ -684,7 +693,8 @@ rule's constants by structural identity (`ast.md`). Reasons compare on `code`,
 order.
 
 So a decision that a reader accepts is exactly one the core could have
-produced for some input.
+produced for some input. A decision read with a `ruleset_digest` keeps it, and
+is written back with it.
 
 ## Explanations
 
@@ -828,7 +838,204 @@ would have been written:
   parameters.
 
 Decisions and explanations can always be written: a native value with no
-equivalent is recorded as an opaque value (*Values*).
+equivalent is recorded as an opaque value (*Values*). The canonical bytes and
+the digest of a document fail in the same way as writing it (*Rule set
+digests*).
+
+## Canonical bytes
+
+Every document a writer produces has exactly one sequence of **canonical
+bytes**: the bytes that digests hash (*Digests*), and that tools may compare
+byte for byte. They are the UTF-8 encoding, without a byte order mark, of a
+JSON text that holds the document's canonical form (the *Writing* rules of
+each section: defaults written or omitted as each table says, `and` and `or`
+flattened, `in` values normalized, tags sorted, values in their canonical
+form), laid out with these rules and no others:
+
+1. **No insignificant whitespace.** No space, tab or line break outside
+   strings, and no line break at the end.
+2. **Objects.** The members of every object, at every level, sorted by key, by
+   Unicode code point (*Objects*): the keys that a table defines too, so `op`
+   is not first (`{"left":…,"op":"gt","right":…}`), and the document's top
+   level (`{"ruleset":…,"version":1}`). This is not the order writers use for
+   people (*Writing*), and it is not RFC 8785's, which sorts by UTF-16 code
+   unit: here `"ｚ"` comes before `"😀"`.
+3. **Arrays.** Their items in order, as the canonical form has them.
+4. **Strings**, keys and values alike, between `"` with exactly these escapes:
+   `\"` for U+0022, `\\` for U+005C, `\b`, `\t`, `\n`, `\f` and `\r` for
+   U+0008, U+0009, U+000A, U+000C and U+000D, and `\u00` followed by two
+   lowercase hexadecimal digits for every other character below U+0020
+   (`\u0000`, `\u001f`). Every other character, `/`, U+007F, U+2028, U+2029
+   and noncharacters included, is its own UTF-8 bytes, never escaped. This is
+   the string form of RFC 8785 (section 3.2.2.2). Strings are never
+   Unicode-normalized: `"é"` (U+00E9) and `"é"` (`e` and U+0301) are different
+   bytes.
+5. **Literals.** `null`, `true` and `false`.
+6. **Numbers.** Integer literals and float literals, as below.
+
+**Integer literals** are written in decimal, with `-` for a negative number,
+no leading zero and no `+`, and `0` for zero (never `-0`). The ints of *Values*
+take this form up to 2⁵³ − 1 in magnitude; larger ones are typed values,
+below. The integers the format writes outside values (`version`, path
+indexes and `round`'s `scale`) are always integer literals.
+
+**Float literals** are written from the float's **shortest round-trip
+digits**: the fewest significant decimal digits d₁d₂…dₙ (d₁ ≠ 0, and dₙ ≠ 0
+when n > 1), with an exponent e, such that d₁.d₂…dₙ × 10ᵉ reads back as the
+same float (*Numbers*: nearest, ties to even); when several digit strings of
+that length read back as the float, the nearest to its exact value, and of two
+equally near, the one whose last digit is even. These are the digits of
+Python's `repr` and of JavaScript's `Number.prototype.toString` (not of
+Java's `Double.toString`, which writes at least two digits: `4.9E-324` for
+`5e-324`). Then:
+
+- zero is `0.0`, and negative zero `-0.0`; any other negative float starts
+  with `-`;
+- when −4 ≤ e ≤ 15, the digits are written in plain notation, with a `.`,
+  zeros added where needed, and at least one digit on each side of the point:
+  `0.0001`, `0.1`, `1.0`, `100.0`, `123.456`, `1000000000000000.0`;
+- otherwise, in exponent notation: d₁, then `.` and d₂…dₙ when n > 1, then
+  `e`, then `-` when e is negative, then the digits of |e| with no leading
+  zero and no `+`: `1e-5`, `1.5e-7`, `1e16`, `1.7976931348623157e308`,
+  `5e-324`.
+
+This is the layout of Python's `repr`, but for its exponents, which `repr`
+writes `1e+16` and `1e-05`.
+
+**Every type** of the data model (`data-model.md`) is written in the canonical
+form of *Values*:
+
+| Type | Canonical bytes |
+|---|---|
+| null, boolean | `null`, `true`, `false` |
+| string | the string, as above |
+| int, \|n\| ≤ 2⁵³ − 1 | an integer literal: `42`, `-7`, `0` |
+| int, \|n\| > 2⁵³ − 1 | `{"$int":"9007199254740992"}`: the digits as an integer literal, in a string |
+| float, finite | a float literal: `1.0`, `-0.0`, `0.1`, `1e16` |
+| float, infinite | `{"$float":"inf"}`, `{"$float":"-inf"}` |
+| decimal | `{"$decimal":"1.00"}`: the canonical text (*Numbers*), whose fraction digits are the scale, so `{"$decimal":"1.0"}` and `{"$decimal":"1.00"}` are different bytes; `{"$decimal":"inf"}`, `{"$decimal":"-inf"}` |
+| date | `{"$date":"2026-10-31"}` |
+| datetime | `{"$datetime":"2026-10-31T09:30:00.500000+01:00[Europe/Madrid]"}`: the text writers write (*Dates and datetimes*): a fraction of six digits or none, `Z` for a zero fixed offset, offset seconds only when not zero, and the zone name as read |
+| opaque | `{"$opaque":"numpy.ndarray"}`, with its type name (decisions and explanations only) |
+| list | `[1,2.0,"a"]` |
+| map | `{"a":1,"b":2}`, its members sorted as every object's; `{"$map":{"$ref":1}}` when a key starts with `$` |
+
+For example, the rule set document
+
+```json
+{
+  "version": 1,
+  "ruleset": {
+    "hit_policy": "first",
+    "logic": "boolean",
+    "rules": [
+      { "name": "vip", "when": { "op": "gt", "left": { "op": "field", "path": ["years"] }, "right": { "op": "const", "value": 5 } },
+        "then": { "discount": { "op": "const", "value": { "$decimal": "0.15" } } } }
+    ]
+  }
+}
+```
+
+has the canonical bytes (one line, without a line break at the end)
+
+```text
+{"ruleset":{"hit_policy":"first","logic":"boolean","rules":[{"name":"vip","then":{"discount":{"op":"const","value":{"$decimal":"0.15"}}},"when":{"left":{"op":"field","path":["years"]},"op":"gt","right":{"op":"const","value":5}}}]},"version":1}
+```
+
+Reading the canonical bytes of a document gives the same document, and
+writing it again gives the same bytes. They fix what comparing documents
+ignores (*Comparing documents*): `100.0` and `1e2` read as the same float,
+whose canonical bytes are `100.0`.
+
+## Digests
+
+A document's **digest** is the SHA-256 hash (FIPS 180-4) of its canonical
+bytes, written as the string `sha256:` followed by the hash's 64 lowercase
+hexadecimal digits. For example,
+
+```text
+sha256:5a0e590cb8f3bd57392ede84c0d0c4596cf9374fefcbcc6b28ed61421878f312
+```
+
+is the digest of the rule set document of *Canonical bytes*.
+
+Every language gives digests in this form, so they compare as strings. The
+prefix names the hash function, so that a later version can add another one
+without ambiguity. A reader of this version accepts only `sha256:` and
+lowercase digits: anything else where a digest is expected is a
+`format_error`.
+
+**What is hashed.** The whole document as the core writes it, `version` and
+the content key included: names, descriptions, tags, metadata, the names of
+actions, priorities and the rule set's settings, every member of the
+canonical form. `$schema`, which readers ignore and writers never write, is
+not part of it, and a document never holds its own digest. Changing anything
+the canonical form holds changes the digest, even a description, or the scale
+of a decimal (`{"$decimal":"1.0"}` and `{"$decimal":"1.00"}` have different
+digests).
+
+**What it promises.** A digest identifies **one concrete canonical
+artifact**: two documents have the same digest when they have the same
+canonical bytes, whatever the layout, member order, whitespace, string
+escapes, number layout (`1e2` and `100.0`), accepted forms of values
+(`{"$int":"007"}` and `7`), format (JSON, YAML, the text syntax, CSV for a
+table) or language they were written in; and different digests otherwise
+(barring a SHA-256 collision). It does **not** promise that two rule sets
+decide alike, nor that they differ: rules written differently have different
+digests even when they always decide the same way (`x > 5` and `5 < x`,
+`not (a and b)` and `not a or not b`, a renamed rule, `1.0` and `1.00`).
+Telling whether two versions of rules decide alike is the work of tests and
+comparisons, not of digests.
+
+**Stability.** Within one format version, the canonical bytes of a valid
+document never change, so neither does its digest: an optional key added
+later (*Versioning*) is omitted when it is absent or holds its default, so
+documents that do not use it keep their bytes, and any change that would
+alter the bytes of an existing document increases the format version. A
+reader of a later version that reads such a document gives the same bytes.
+
+The core gives the canonical bytes and the digest of the documents that
+readers build: conditions, rules, rule sets and decision tables. The canonical
+bytes of decisions, explanations and summaries follow the same rules; this
+version defines no digest of them.
+
+### Rule set digests
+
+The **rule set digest** of a rule set is the digest of its rule set document,
+`{"ruleset":…,"version":1}`. A rule set given by another document (*A rule
+set from a document*) has the digest of the rule set document it gives: for a
+rule, a rule set of that rule with the default settings; for a decision
+table, the rule set it compiles to (`tables.md`, *Compiling*). So a decision
+table has two digests, that of its own document and its rule set digest, and
+two tables that compile to the same rule set have the same rule set digest.
+
+Actions given as code are not part of any document (*Writing errors*). In
+every language, asking for the canonical bytes or the digest of a rule or
+rule set with such an action is `unsupported`, as writing it is, unless the
+caller passes `omit_actions`, which gives those of the document written
+without them. The core holds no actions as code, so the rule set digest that
+a reader verifies (*In decisions*) is always that of the rule set written
+without them.
+
+### In decisions
+
+A decision may carry the rule set digest of the rule set that made it, under
+`ruleset_digest` (*Decisions*), so that an audit log ties each decision to the
+exact rules that made it. Writers write it only when the caller asks, so
+decisions stay small and do not change with every edit of a description (in
+this version, only the core's Rust API asks: `Decision::with_ruleset_digest`;
+decisions made in the other languages carry none, and every language keeps
+one that it reads). A
+reader verifies it before any other check against the rule set (*Reading a
+decision*):
+
+- a `ruleset_digest` that is not a string of the form above is a
+  `format_error`, at `/decision/ruleset_digest`, in the order of the
+  *Decisions* table;
+- one that is not the rule set digest of the rule set the decision is read
+  with is a `decision_mismatch` at `/decision/ruleset_digest`.
+
+A decision read with a `ruleset_digest` keeps it, and is written back with it.
 
 ## YAML
 
@@ -899,7 +1106,7 @@ it would have (`/condition/right`), and an unknown or extra key by its own
 
 | Code | Meaning |
 |---|---|
-| `format_error` | not valid JSON or UTF-8, a duplicate, unknown or missing key, a wrong JSON type, an unknown `op`, `$`-key or name, or a malformed value |
+| `format_error` | not valid JSON or UTF-8, a duplicate, unknown or missing key, a wrong JSON type, an unknown `op`, `$`-key or name, or a malformed value or digest |
 | `unsupported_version` | `version` is missing, is not an integer literal, or is not a version the reader knows |
 | `expression_error` | the shape is valid, but a construction rule of a node (see *Reading*) is broken |
 | `rule_definition_error` | the shape is valid, but a construction rule of a rule or rule set is broken |

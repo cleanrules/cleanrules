@@ -11,8 +11,8 @@ use std::fmt;
 pub use datetime::{AwareDateTime, DateTimeError, Zone, check_date, check_naive};
 pub use decimal::{ArithmeticError, Decimal, DecimalError, MAX_DIGITS, RoundingMode};
 use jiff::civil::{Date, DateTime};
-pub(crate) use number::ExactSum;
 pub use number::Number;
+pub(crate) use number::{ExactSum, float_literal, shortest_digits};
 
 use crate::error::{Error, ErrorCode};
 use crate::walk::post_order;

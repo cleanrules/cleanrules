@@ -586,6 +586,8 @@ pub struct RuleSet {
     aggregate: Option<Aggregate>,
     logic: LogicName,
     strict: bool,
+    /// The rule set digest, computed once: a rule set never changes.
+    pub(crate) digest: std::sync::OnceLock<crate::digest::Digest>,
 }
 
 impl RuleSet {
@@ -619,6 +621,7 @@ impl RuleSet {
             aggregate: config.aggregate,
             logic,
             strict: config.strict,
+            digest: std::sync::OnceLock::new(),
         })
     }
 
@@ -780,12 +783,7 @@ impl RuleSet {
             Some(aggregate) => Some(self.aggregated(aggregate, &results, &selected)?),
             None => None,
         };
-        Ok(Decision {
-            ruleset: self,
-            results,
-            selected,
-            aggregated,
-        })
+        Ok(Decision::from_parts(self, results, selected, aggregated))
     }
 
     /// The rules the hit policy selects among those that fired (`spec/rules.md`).
@@ -1000,6 +998,7 @@ pub struct Decision<'a> {
     results: Vec<RuleResult<'a>>,
     selected: Vec<usize>,
     aggregated: Option<Aggregated>,
+    ruleset_digest: bool,
 }
 
 impl<'a> Decision<'a> {
@@ -1015,7 +1014,26 @@ impl<'a> Decision<'a> {
             results,
             selected,
             aggregated,
+            ruleset_digest: false,
         }
+    }
+
+    /// The same decision, carrying its rule set's digest or not
+    /// (`spec/json-format.md`, *Digests*, *In decisions*): when it does, its
+    /// document has `ruleset_digest`, which readers verify against the rule
+    /// set they read it with. Decisions do not carry it unless asked; one read
+    /// with it does.
+    #[must_use]
+    pub fn with_ruleset_digest(mut self, carry: bool) -> Self {
+        self.ruleset_digest = carry;
+        self
+    }
+
+    /// Whether the decision carries its rule set's digest
+    /// ([`Decision::with_ruleset_digest`]).
+    #[must_use]
+    pub fn carries_ruleset_digest(&self) -> bool {
+        self.ruleset_digest
     }
 
     /// The rule set that produced it.

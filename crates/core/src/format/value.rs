@@ -492,8 +492,7 @@ fn write_scalar(value: &Value) -> Json {
             "$float",
             Json::String(if *f > 0.0 { "inf" } else { "-inf" }.into()),
         ),
-        // Debug writes the shortest round-trip digits with a `.` or an exponent.
-        Value::Float(f) => Json::Number(JsonNumber::from_literal(format!("{f:?}"))),
+        Value::Float(f) => Json::Number(JsonNumber::from_literal(crate::value::float_literal(*f))),
         Value::Decimal(d) => typed("$decimal", Json::String(d.to_string())),
         Value::String(s) => Json::String(s.clone()),
         Value::Date(d) => typed("$date", Json::String(date_text(*d))),

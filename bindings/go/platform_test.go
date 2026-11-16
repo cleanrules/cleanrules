@@ -24,7 +24,7 @@ var platformLibs = []struct {
 	libs         string
 }{
 	{"darwin", "amd64", false, "darwin_amd64", "link_darwin_amd64.go", "-lm"},
-	{"darwin", "arm64", false, "darwin_arm64", "link_darwin_arm64.go", "-lm"},
+	{"darwin", "arm64", false, "darwin_arm64", "link_darwin_arm64.go", "-lm -liconv"},
 	{"linux", "amd64", false, "linux_amd64", "link_linux_amd64.go", "-lgcc_s -lutil -lrt -lpthread -lm -ldl"},
 	{"linux", "arm64", false, "linux_arm64", "link_linux_arm64.go", "-lgcc_s -lutil -lrt -lpthread -lm -ldl"},
 	{"linux", "amd64", true, "linux_amd64_musl", "link_musl_linux_amd64.go", "-lgcc_s"},

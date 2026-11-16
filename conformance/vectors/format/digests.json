@@ -1,0 +1,1090 @@
+{
+  "version": 1,
+  "area": "format",
+  "vectors": [
+    {
+      "id": "format/digests/kept",
+      "spec": [
+        "json-format.md#in-decisions",
+        "json-format.md#reading-a-decision"
+      ],
+      "description": "a decision with its rule set's digest is accepted, and written back with it",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ],
+            "ruleset_digest": "sha256:73e4877d4b3c2be21a76759e9a340fa5617c357a9e61d4d723443cd1b652c7d0"
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ],
+            "ruleset_digest": "sha256:73e4877d4b3c2be21a76759e9a340fa5617c357a9e61d4d723443cd1b652c7d0"
+          }
+        }
+      }
+    },
+    {
+      "id": "format/digests/other-ruleset",
+      "spec": [
+        "json-format.md#in-decisions"
+      ],
+      "description": "the digest of another rule set is a decision_mismatch, though the rule sets differ only in a description, which no other check sees",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ],
+            "ruleset_digest": "sha256:73e4877d4b3c2be21a76759e9a340fa5617c357a9e61d4d723443cd1b652c7d0"
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "description": "edited"
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/ruleset_digest"
+        }
+      }
+    },
+    {
+      "id": "format/digests/without-digest",
+      "spec": [
+        "json-format.md#reading-a-decision"
+      ],
+      "description": "without a digest, the same decision is accepted with that rule set",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ]
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "description": "edited"
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/digests/first-check",
+      "spec": [
+        "json-format.md#in-decisions",
+        "json-format.md#reading-a-decision"
+      ],
+      "description": "the digest is verified before every other check against the rule set",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ],
+            "ruleset_digest": "sha256:12f09b219588a6029c5e689b9d9b7027c500cd3fc1f631e2df67d4f3560a5f09"
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch",
+          "pointer": "/decision/ruleset_digest"
+        }
+      }
+    },
+    {
+      "id": "format/digests/uppercase",
+      "spec": [
+        "json-format.md#in-decisions"
+      ],
+      "description": "a digest in uppercase hexadecimal is a format_error",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ],
+            "ruleset_digest": "sha256:73E4877D4B3C2BE21A76759E9A340FA5617C357A9E61D4D723443CD1B652C7D0"
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision/ruleset_digest"
+        }
+      }
+    },
+    {
+      "id": "format/digests/other-function",
+      "spec": [
+        "json-format.md#in-decisions"
+      ],
+      "description": "a digest of another hash function is a format_error",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ],
+            "ruleset_digest": "sha512:73e4877d4b3c2be21a76759e9a340fa5617c357a9e61d4d723443cd1b652c7d0"
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision/ruleset_digest"
+        }
+      }
+    },
+    {
+      "id": "format/digests/too-short",
+      "spec": [
+        "json-format.md#in-decisions"
+      ],
+      "description": "a digest with 63 hexadecimal digits is a format_error",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ],
+            "ruleset_digest": "sha256:73e4877d4b3c2be21a76759e9a340fa5617c357a9e61d4d723443cd1b652c7d"
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision/ruleset_digest"
+        }
+      }
+    },
+    {
+      "id": "format/digests/not-a-string",
+      "spec": [
+        "json-format.md#in-decisions"
+      ],
+      "description": "a digest that is not a string is a format_error",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "decision": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "results": [
+              {
+                "rule": "a",
+                "fired": true,
+                "when": {
+                  "op": "gt",
+                  "truth": true,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "y": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "rule": "b",
+                "fired": false,
+                "when": {
+                  "op": "gt",
+                  "truth": false,
+                  "children": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ],
+                      "value": 2
+                    },
+                    {
+                      "op": "const",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ],
+            "selected": [
+              "a"
+            ],
+            "ruleset_digest": null
+          }
+        },
+        "ruleset": {
+          "hit_policy": "first",
+          "logic": "boolean",
+          "rules": [
+            {
+              "name": "a",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 1
+                }
+              },
+              "then": {
+                "y": {
+                  "op": "const",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "name": "b",
+              "when": {
+                "op": "gt",
+                "left": {
+                  "op": "field",
+                  "path": [
+                    "x"
+                  ]
+                },
+                "right": {
+                  "op": "const",
+                  "value": 5
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/decision/ruleset_digest"
+        }
+      }
+    }
+  ]
+}

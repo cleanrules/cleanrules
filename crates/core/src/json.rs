@@ -586,6 +586,35 @@ fn lone_surrogate(line: u64, column: u64) -> Error {
 /// strings escaping only `"`, `\` and control characters.
 #[must_use]
 pub fn to_string(value: &Json) -> String {
+    write(value, false)
+}
+
+/// Write JSON text as [`to_string`] does, but with the members of every object
+/// sorted by key, by Unicode code point: the layout of canonical bytes
+/// (`spec/json-format.md`, *Canonical bytes*).
+///
+/// It is not canonical by itself: numbers are written as their literals
+/// (`1e2` stays `1e2`), so the result is a document's canonical bytes only
+/// for JSON whose values are already in canonical form, such as what the
+/// writers of [`crate::format`] produce. For a document, use
+/// [`crate::format::Document::canonical_bytes`], which does both.
+///
+/// # Examples
+///
+/// ```
+/// use cleanrules::json::{Limits, parse, to_sorted_string};
+///
+/// let json = parse(r#"{ "b": [1, "\u00e9"], "a": null }"#, &Limits::default())?;
+/// assert_eq!(to_sorted_string(&json), r#"{"a":null,"b":[1,"é"]}"#);
+/// # Ok::<(), cleanrules::Error>(())
+/// ```
+#[must_use]
+pub fn to_sorted_string(value: &Json) -> String {
+    write(value, true)
+}
+
+/// Write JSON text, with each object's members in order or sorted by key.
+fn write(value: &Json, sorted: bool) -> String {
     let mut out = String::new();
     // The open arrays and objects, each with its items still to write and
     // whether it has written one: an explicit stack, so that no value within
@@ -600,7 +629,12 @@ pub fn to_string(value: &Json) -> String {
             }
             Json::Object(members) => {
                 out.push('{');
-                open.push(Open::Object(members.iter(), true));
+                let members = if sorted {
+                    by_key(members)
+                } else {
+                    members.iter().collect()
+                };
+                open.push(Open::Object(members.into_iter(), true));
             }
             scalar => write_scalar(&mut out, scalar),
         }
@@ -644,7 +678,7 @@ pub fn to_string(value: &Json) -> String {
 /// none has been written yet.
 enum Open<'a> {
     Array(std::slice::Iter<'a, Json>, bool),
-    Object(std::slice::Iter<'a, (String, Json)>, bool),
+    Object(std::vec::IntoIter<&'a (String, Json)>, bool),
 }
 
 fn write_scalar(out: &mut String, value: &Json) {

@@ -752,6 +752,92 @@ void identity() {
     CHECK(decision.rule_name(0) == "gold_customer");
 }
 
+void canonical_and_digests() {
+    // The example of spec/json-format.md (*Canonical bytes*, *Digests*),
+    // built in code.
+    auto years = cr::node::field(cr::value::list({"years"}));
+    auto vip = cr::rule::make("vip", cr::node::compare("gt", years, cr::node::constant(5)))
+                   .with_payload("discount", cr::node::constant(cr::value::decimal("0.15")));
+    auto rules = cr::ruleset::make({vip});
+    const std::string canonical =
+        R"({"ruleset":{"hit_policy":"first","logic":"boolean","rules":[{"name":"vip","then":{"discount":{"op":"const","value":{"$decimal":"0.15"}}},"when":{"left":{"op":"field","path":["years"]},"op":"gt","right":{"op":"const","value":5}}}]},"version":1})";
+    const std::string digest =
+        "sha256:5a0e590cb8f3bd57392ede84c0d0c4596cf9374fefcbcc6b28ed61421878f312";
+    CHECK(rules.canonical_bytes() == canonical);
+    CHECK(rules.digest() == digest);
+
+    // The same rule set read from another format and layout: the same bytes.
+    auto read = cr::document::read(rules.write(cr::format::yaml), cr::format::yaml);
+    CHECK(read.canonical_bytes() == canonical);
+    CHECK(read.digest() == digest);
+    CHECK(cr::ruleset::read("RULE vip IF years > 5 THEN discount = 0.15", cr::format::text)
+              .digest() == digest);
+
+    // A rule's own digest is that of its rule document; its rule set digest
+    // that of a rule set of it alone.
+    auto rule_document = cr::document::from_rule(vip);
+    CHECK(rule_document.canonical_bytes().rfind(R"({"rule":{"name":"vip",)", 0) == 0);
+    CHECK(rule_document.digest() != digest);
+    CHECK(cr::ruleset::from_document(rule_document).digest() == digest);
+
+    // A digest tells one artifact, not a meaning.
+    auto flipped = cr::node::compare("lt", cr::node::constant(5), years);
+    auto gt = cr::document::from_condition(cr::node::compare("gt", years, cr::node::constant(5)));
+    CHECK(gt.digest() != cr::document::from_condition(flipped).digest());
+    auto scale = [&](const char *text) {
+        return cr::document::from_condition(
+                   cr::node::compare("eq", years, cr::node::constant(cr::value::decimal(text))))
+            .digest();
+    };
+    CHECK(scale("1.0") != scale("1.00"));
+
+    // A decision table has two digests: its own document's, and that of the
+    // rule set it compiles to.
+    auto table = cr::document::read("RULE,customer.years,THEN discount\nvip,> 5,0.15\n",
+                                    cr::format::csv);
+    CHECK(table.content() == cr::document_content::decision_table);
+    CHECK(table.canonical_bytes().rfind(R"({"decision_table":)", 0) == 0);
+    auto compiled = cr::ruleset::from_document(table);
+    CHECK(table.digest() != compiled.digest());
+    CHECK(compiled.canonical_bytes().rfind(R"({"ruleset":)", 0) == 0);
+    CHECK(cr::ruleset::read(compiled.write(), cr::format::json).digest() == compiled.digest());
+
+    // The error_info overloads, and what has no bytes.
+    cr::error_info error;
+    CHECK(rules.canonical_bytes(error) == canonical && !error);
+    CHECK(rules.digest(error) == digest && !error);
+    CHECK(table.canonical_bytes(error) == table.canonical_bytes() && !error);
+    CHECK(table.digest(error) == table.digest() && !error);
+    cr::document no_document;
+    CHECK_THROWS(no_document.canonical_bytes(), cr::invalid_argument_error);
+    CHECK(no_document.digest(error).empty() && error.code() == cr::errc::invalid_argument);
+    cr::ruleset no_rules;
+    CHECK_THROWS(no_rules.digest(), cr::invalid_argument_error);
+    CHECK(no_rules.canonical_bytes(error).empty() && error.code() == cr::errc::invalid_argument);
+
+    // A decision read with its rule set digest keeps it; another's is a
+    // decision_mismatch.
+    auto decision = rules.evaluate(cr::value::map({{"years", 7}}));
+    std::string written = decision.write();
+    CHECK(written.find("ruleset_digest") == std::string::npos);
+    auto stamp = [&](const std::string &with) {
+        std::string out = written;
+        const std::string key = R"("decision":{)";
+        out.insert(out.find(key) + key.size(), R"("ruleset_digest":")" + with + R"(",)");
+        return out;
+    };
+    CHECK(rules.read_decision(stamp(digest), cr::format::json).write().find(digest) !=
+          std::string::npos);
+    try {
+        (void)rules.read_decision(stamp(compiled.digest()), cr::format::json);
+        CHECK(false);
+    } catch (const cr::format_error &e) {
+        CHECK(e.code() == cr::errc::decision_mismatch);
+        CHECK(e.info().json().find(R"("pointer":"/decision/ruleset_digest")") !=
+              std::string_view::npos);
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -765,5 +851,6 @@ int main() {
     building();
     rules_and_documents();
     identity();
+    canonical_and_digests();
     return check::report("api");
 }

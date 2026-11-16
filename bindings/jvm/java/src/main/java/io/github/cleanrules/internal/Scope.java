@@ -180,6 +180,24 @@ public final class Scope implements AutoCloseable {
         }
     }
 
+    /** The bytes of the text that {@code call} gives, copied as they are and freed. */
+    public static byte[] textBytes(TextCall call) {
+        try (Scope scope = new Scope()) {
+            MemorySegment out = scope.pointer();
+            MemorySegment len = scope.size();
+            scope.check(call.call(out, len, scope.error()));
+            MemorySegment text = out.get(ADDRESS, 0);
+            if (text.equals(MemorySegment.NULL)) {
+                return new byte[0];
+            }
+            try {
+                return Native.borrowedBytes(text, len.get(JAVA_LONG, 0));
+            } finally {
+                Native.stringFree(text);
+            }
+        }
+    }
+
     /** A call that gives an owned value through {@code out}. */
     @FunctionalInterface
     public interface ValueCall {

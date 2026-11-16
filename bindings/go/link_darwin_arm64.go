@@ -5,9 +5,10 @@ package cleanrules
 // The prebuilt library for macOS on arm64 (README.md, Platforms), with the
 // system libraries that Rust's standard library needs there, as rustc prints
 // them (--print native-static-libs) for aarch64-apple-darwin, without the C
-// library, which the compiler links anyway.
+// library, which the compiler links anyway. -liconv comes from the libc
+// crate, which sha2 uses there to detect the CPU's SHA-2 instructions.
 
 /*
-#cgo LDFLAGS: ${SRCDIR}/lib/darwin_arm64/libcleanrules_ffi.a -lm
+#cgo LDFLAGS: ${SRCDIR}/lib/darwin_arm64/libcleanrules_ffi.a -lm -liconv
 */
 import "C"

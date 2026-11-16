@@ -152,6 +152,10 @@ test('a wrong expected output fails both ways', () => {
     ['ast/missing/strict-missing', '"path":["age"]', '"path":["years"]'],
     ['format/conditions/and-flattened', '"path":["c"]', '"path":["d"]'],
     ['format/tables/basic', 'loyal,> 2,-,0.05', 'loyal,> 3,-,0.05'],
+    // Canonical bytes are compared exactly, and so are digests.
+    ['format/canonical/ruleset-example', '\\"0.15\\"', '\\"0.150\\"'],
+    ['format/canonical/condition', 'sha256:2eb0', 'sha256:2eb1'],
+    ['format/canonical/decision-table', '"ruleset_digest":"sha256:', '"ruleset_digest":"sha256:0'],
   ]
   for (const [id, from, to] of wrong) {
     const vector = mutated(id, from, to)

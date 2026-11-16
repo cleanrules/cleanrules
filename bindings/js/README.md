@@ -79,11 +79,11 @@ CommonJS) and [`docs/examples/discounts.deno.js`](../../docs/examples/discounts.
 
 - `cleanrules`: the idiomatic API (`F`, `field`, `constant`, `and`, `or`,
   `not`, `Expr`, `Rule`, `RuleSet`, `Decision`, `DecisionTable`, `loads`,
-  `dumps`, `load`, `dump`, `ruleFromText`, `evaluateTree`,
-  `evaluateValueTree`, and the classes of explanations, summaries, result
-  trees and tables), the errors, the marker values (`decimal`, `float`,
-  `date`, `datetime`, and `ZonedDateTime` given back), `FORMAT_VERSION` and
-  `version`.
+  `dumps`, `load`, `dump`, `canonicalBytes`, `digest`, `ruleFromText`,
+  `evaluateTree`, `evaluateValueTree`, and the classes of explanations,
+  summaries, result trees and tables), the errors, the marker values
+  (`decimal`, `float`, `date`, `datetime`, and `ZonedDateTime` given back),
+  `FORMAT_VERSION` and `version`.
 - `cleanrules/native`: the native layer, the classes below. The idiomatic API
   builds on it, and it stays available.
 - `cleanrules/wasm`: the WebAssembly build initialised by hand (*Initialising
@@ -299,13 +299,14 @@ so the build does not use it.
 
 | Name | What |
 |---|---|
-| `Document.read(text, { format, limits }?)` | a condition, rule, rule set or decision table; `kind`, `write(format?)` |
+| `Document.read(text, { format, limits }?)` | a condition, rule, rule set or decision table; `kind`, `write(format?)`, `canonicalBytes()`, `digest()` |
 | `RuleSet.read(text, { format, limits }?)`, `RuleSet.fromDocument(doc)` | a rule set (a rule document is a rule set of that rule; a CSV table is compiled) |
 | `ruleset.evaluate(data, limits?)`, `evaluateJson(text, limits?)` | one decision, from native data (at most `limits.maxValues` values of it) or from a JSON value |
 | `ruleset.evaluateMany(rows, limits?)`, `evaluateManyJson(text, limits?)` | a batch; an error names its `row` |
 | `ruleset.run(data, actions, limits?)` | evaluate, then call the selected rules' actions, in rule order |
 | `ruleset.readDecision(text, { format, limits }?)` | a recorded decision, checked against the rule set |
 | `ruleset.write(format?)`, `summary(format?)` | the document (JSON by default), and the summary (text by default, or JSON or YAML) |
+| `ruleset.canonicalBytes()`, `digest()` | the canonical bytes of its document (a `Uint8Array`) and the rule set digest (*Canonical bytes and digests*, below) |
 | `ruleset.length`, `ruleNames()`, `hitPolicy`, `aggregate`, `logic`, `strict`, `fieldPaths()` | what it is and what it reads |
 | `decision.length`, `ruleName(i)`, `firedAt(i)`, `truth(i)`, `selected()` | each rule's result |
 | `decision.outputJson()`, `outputsJson()`, `ruleOutputJson(i)` | outputs, in the JSON format; `null` for none |
@@ -544,6 +545,52 @@ nothing: the members of a JSON object have no order, and payloads and maps
 come back sorted by key, by Unicode code point. `dumps` writes conditions, rules, rule
 sets and tables exactly, and so do the native layer's `write()` and
 `explain('json')` for decisions and explanations.
+
+## Canonical bytes and digests
+
+```js
+import { canonicalBytes, digest } from 'cleanrules'
+
+const bytes = canonicalBytes(rules)   // a Uint8Array
+const id = digest(rules)              // 'sha256:5a0e590c…', the rule set digest
+digest(table)                         // the table's own document
+digest(table.ruleset)                 // the rule set digest of the table
+```
+
+| Name | What |
+|---|---|
+| `canonicalBytes(value, { omitActions }?)` | the canonical bytes of the document of a condition, rule, rule set or table: a `Uint8Array` |
+| `digest(value, { omitActions }?)` | their SHA-256 digest, `sha256:` and 64 lowercase hexadecimal digits |
+
+The canonical bytes (`spec/json-format.md`, *Canonical bytes*) are the UTF-8
+JSON text of the canonical form that `dumps` writes, with every object's
+members sorted by key, by Unicode code point, no whitespace, minimal string
+escapes and one layout for each number; they are the same in every language,
+and `loads` reads them back. The digest (*Digests*) is the SHA-256 hash of
+those bytes, a string that compares equal across languages. They take the
+same values and give the same errors as `dumps`: a value such as `F.x.add(1)`
+is not a document (`ExpressionError`), and a rule whose action is code is an
+`UnsupportedError` with the rule's `pointer` unless `omitActions`, which gives
+those of the document written without it.
+
+A digest identifies **one concrete canonical artifact**; it does not say that
+two rule sets decide alike. The same document in another layout, member order,
+number layout (`1e2`, `100.0`) or format (JSON, YAML, the rule syntax) has
+the same digest; anything else gives another one, even when the rules decide
+the same: `x > 5` and `5 < x`, the decimals `1.0` and `1.00`, or another
+description. Telling whether two versions decide alike is the work of tests,
+not digests.
+
+The **rule set digest** (*Rule set digests*) is `digest(ruleset)`: that of a
+rule is `digest(new RuleSet([rule]))`, and that of a decision table
+`digest(table.ruleset)`, the rule set it compiles to, while `digest(table)`
+is the table's own document. A decision may carry it, under
+`ruleset_digest`: `ruleset.readDecision` checks it against the rule set (a
+`FormatError` with code `decision_mismatch` at `/decision/ruleset_digest`
+when it differs) and keeps it, so the decision writes back with it. Decisions
+made in JavaScript carry none. In the native layer, `Document` and `RuleSet`
+have `canonicalBytes()` and `digest()`, so `RuleSet.fromDocument(doc).digest()`
+is the rule set digest of any document but a condition.
 
 ## Decision tables
 

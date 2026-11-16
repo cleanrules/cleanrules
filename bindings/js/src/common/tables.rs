@@ -123,6 +123,19 @@ impl TableCore {
             format,
         )?)
     }
+
+    /// The canonical bytes of the table's own document.
+    pub(crate) fn canonical_bytes(&self) -> Vec<u8> {
+        Document::DecisionTable(self.table.clone()).canonical_bytes()
+    }
+
+    /// The digest of the table's own document; the rule set it compiles into
+    /// has its own (`ruleset().digest()`).
+    pub(crate) fn digest(&self) -> String {
+        Document::DecisionTable(self.table.clone())
+            .digest()
+            .to_string()
+    }
 }
 
 /// The settings of a grid as JavaScript gives them: the hit policy (`"first"`

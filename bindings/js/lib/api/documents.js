@@ -1,16 +1,19 @@
 // Loading and dumping conditions, rules, rule sets and decision tables, as
-// Python's `cleanrules._documents`:
+// Python's `cleanrules._documents`, and their canonical bytes and digests:
 //
 //   const rules = await load('pricing.yaml')
 //   const text = dumps(rules, { format: 'yaml' })
 //   const vip = ruleFromText('RULE vip IF customer.years > 5 THEN discount = 0.15')
+//   const id = digest(rules)  // 'sha256:…'
 //
 // The documents are the JSON format of `spec/json-format.md`, the contract
 // between languages; YAML files hold the same documents, the text syntax
 // (`spec/text.md`) the same model, and CSV holds decision tables
 // (`spec/tables.md`). The core reads and writes every document, strictly and
-// within limits; this module checks the arguments, picks the format of a file
-// from its extension, and makes the objects of the API of its build.
+// within limits, and makes its canonical bytes and digest
+// (`spec/json-format.md`, *Canonical bytes*, *Digests*); this module checks
+// the arguments, picks the format of a file from its extension, and makes the
+// objects of the API of its build.
 
 import { ExpressionError, RuleDefinitionError } from '../errors.js'
 import { fileSystem } from '../files.js'
@@ -21,6 +24,7 @@ const EXTENSIONS = { '.json': 'json', '.yaml': 'yaml', '.yml': 'yaml', '.rules':
 
 const LOAD_OPTIONS = ['format', 'limits', 'actions']
 const DUMP_OPTIONS = ['format', 'omitActions']
+const DIGEST_OPTIONS = ['omitActions']
 
 /** The file name of `path`, a string or a `file:` URL; a `TypeError` for anything else. */
 function fileName(path, operation) {
@@ -93,6 +97,37 @@ function documents(native, expressions, rules, tables, build) {
   }
 
   /**
+   * What a document of `value` holds, for `operation`: `[kind, native]`, with
+   * the checks of `dumps` (a value node is not a document; a rule whose action
+   * is code is refused unless `omitActions`).
+   */
+  function documentOf(value, omit, operation) {
+    const omitActions = omit ?? false
+    if (typeof omitActions !== 'boolean') {
+      throw new TypeError(`omitActions is a boolean, not ${show(omitActions)}`)
+    }
+    if (value instanceof DecisionTable) return ['table', tableNative(value)]
+    if (value instanceof Expr) {
+      if (value.kind === 'value') {
+        throw new ExpressionError(`only a condition can be a document, not the value ${value}`, {
+          hint: 'compare it first, e.g. F.x.gt(0)',
+        })
+      }
+      return ['condition', nodeOf(value)]
+    }
+    if (value instanceof Rule) {
+      checkActions([value], '/rule', omitActions)
+      return ['rule', ruleNative(value)]
+    }
+    if (value instanceof RuleSet) {
+      checkActions(value.rules, '/ruleset/rules/{}', omitActions)
+      return ['ruleset', ruleSetNative(value)]
+    }
+    sameBuild(value, build)
+    throw new TypeError(`${operation} takes a condition, a rule, a rule set or a decision table, not ${show(value)}`)
+  }
+
+  /**
    * Write a condition, rule, rule set or decision table, in its canonical
    * form: `format` is `'json'` (compact, the default), `'yaml'`, `'text'` or
    * `'csv'` (decision tables only). A rule whose action is code is refused
@@ -100,32 +135,54 @@ function documents(native, expressions, rules, tables, build) {
    * name, never code.
    */
   function dumps(value, dumpOptions) {
-    const { format, omitActions: omit = null } = options(dumpOptions, DUMP_OPTIONS, "{ format: 'yaml' }")
-    const omitActions = omit ?? false
-    if (typeof omitActions !== 'boolean') {
-      throw new TypeError(`omitActions is a boolean, not ${show(omitActions)}`)
+    const { format, omitActions } = options(dumpOptions, DUMP_OPTIONS, "{ format: 'yaml' }")
+    const [kind, document] = documentOf(value, omitActions, 'dumps')
+    switch (kind) {
+      case 'condition':
+        return native.writeCondition(document, format)
+      case 'rule':
+        return native.writeRule(document, format)
+      default:
+        return document.write(format)
     }
-    if (value instanceof DecisionTable) {
-      return tableNative(value).write(format)
+  }
+
+  /**
+   * The canonical bytes of the document of a condition, rule, rule set or
+   * decision table (`spec/json-format.md`, *Canonical bytes*): the UTF-8 JSON
+   * text of its canonical form, every object's members sorted by key, by code
+   * point, without whitespace. The same checks as `dumps`.
+   */
+  function canonicalBytes(value, digestOptions) {
+    const { omitActions } = options(digestOptions, DIGEST_OPTIONS, '{ omitActions: true }')
+    const [kind, document] = documentOf(value, omitActions, 'canonicalBytes')
+    switch (kind) {
+      case 'condition':
+        return native.canonicalCondition(document)
+      case 'rule':
+        return native.canonicalRule(document)
+      default:
+        return document.canonicalBytes()
     }
-    if (value instanceof Expr) {
-      if (value.kind === 'value') {
-        throw new ExpressionError(`only a condition can be a document, not the value ${value}`, {
-          hint: 'compare it first, e.g. F.x.gt(0)',
-        })
-      }
-      return native.writeCondition(nodeOf(value), format)
+  }
+
+  /**
+   * The digest of the document of a condition, rule, rule set or decision
+   * table (`spec/json-format.md`, *Digests*): `sha256:` and the 64 lowercase
+   * hexadecimal digits of the SHA-256 hash of its canonical bytes. The same
+   * checks as `dumps`.
+   */
+  function digest(value, digestOptions) {
+    const { omitActions } = options(digestOptions, DIGEST_OPTIONS, '{ omitActions: true }')
+    const [kind, document] = documentOf(value, omitActions, 'digest')
+    switch (kind) {
+      case 'condition':
+        return native.digestCondition(document)
+      case 'rule':
+        return native.digestRule(document)
+      default:
+        return document.digest()
     }
-    if (value instanceof Rule) {
-      checkActions([value], '/rule', omitActions)
-      return native.writeRule(ruleNative(value), format)
-    }
-    if (value instanceof RuleSet) {
-      checkActions(value.rules, '/ruleset/rules/{}', omitActions)
-      return ruleSetNative(value).write(format)
-    }
-    sameBuild(value, build)
-    throw new TypeError(`dumps takes a condition, a rule, a rule set or a decision table, not ${show(value)}`)
   }
 
   /**
@@ -179,7 +236,7 @@ function documents(native, expressions, rules, tables, build) {
     await files.write(path, format === 'text' ? `${text}\n` : text)
   }
 
-  return { dump, dumps, load, loads, ruleFromText }
+  return { canonicalBytes, digest, dump, dumps, load, loads, ruleFromText }
 }
 
 export { documents }

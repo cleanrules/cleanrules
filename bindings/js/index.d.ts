@@ -1129,6 +1129,49 @@ export declare function load(path: string | URLLike, options?: LoadOptions | nul
  */
 export declare function dump(value: Loaded, path: string | URLLike, options?: DumpOptions | null): Promise<void>
 
+export interface DigestOptions {
+  /** Give those of rules written without their actions given as code, instead of refusing; `null` is `false`. */
+  omitActions?: boolean | null
+}
+
+/**
+ * The canonical bytes of the document of a condition, rule, rule set or
+ * decision table (`spec/json-format.md`, *Canonical bytes*): the UTF-8 JSON
+ * text of its canonical form, every object's members sorted by key, by
+ * Unicode code point, with no whitespace. The same in every language, and
+ * what `digest` hashes. The same errors as `dumps`: an `ExpressionError` for
+ * a value, which is not a document, and an `UnsupportedError` for an action
+ * given as code (unless `omitActions`).
+ *
+ * @example
+ * new TextDecoder().decode(canonicalBytes(F.x.gt(5)))
+ * // '{"condition":{"left":{"op":"field","path":["x"]},"op":"gt","right":{"op":"const","value":5}},"version":1}'
+ */
+export declare function canonicalBytes(value: Loaded, options?: DigestOptions | null): Uint8Array
+
+/**
+ * The digest of the document of a condition, rule, rule set or decision
+ * table (`spec/json-format.md`, *Digests*): `sha256:` and the 64 lowercase
+ * hexadecimal digits of the SHA-256 hash of its canonical bytes, the same
+ * string in every language. The same errors as `dumps`.
+ *
+ * A digest identifies one concrete canonical artifact; it does not say that
+ * two rule sets decide alike, nor that they differ. Layout, member order,
+ * number layout and format change nothing, but any difference in the
+ * canonical form does: `x > 5` and `5 < x` have different digests, and so do
+ * the decimals `1.0` and `1.00`, or a rule with another description.
+ *
+ * The rule set digest, which a decision's `ruleset_digest` holds, is the
+ * digest of a rule set: `digest(ruleset)`. That of a rule is
+ * `digest(new RuleSet([rule]))`, and that of a decision table
+ * `digest(table.ruleset)`, the rule set it compiles to; `digest(table)` is
+ * that of the table's own document.
+ *
+ * @example
+ * digest(rules)  // 'sha256:5a0e590c…'
+ */
+export declare function digest(value: Loaded, options?: DigestOptions | null): string
+
 /** A `file:` URL (`URL` where the TypeScript libraries in use declare it). */
 export type URLLike = typeof globalThis extends { URL: abstract new (...args: never[]) => infer Url } ? Url : never
 

@@ -18,7 +18,7 @@ use cleanrules::rules::Aggregate;
 use cleanrules::table::{Cell, DecisionTable, TableConfig, TablePolicy};
 use common::{get, int, limits_of, on_small_stack, same, text, vectors};
 
-const FILES: [&str; 10] = [
+const FILES: [&str; 11] = [
     "format/documents.json",
     "format/values.json",
     "format/conditions.json",
@@ -29,6 +29,7 @@ const FILES: [&str; 10] = [
     "format/yaml.json",
     "format/text.json",
     "format/tables.json",
+    "format/digests.json",
 ];
 
 /// A decision as the document it is written in.

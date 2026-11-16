@@ -37,6 +37,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     Scala: `Rule(..., id = Some(...))`, `withId`, `id` (`Option`) and
     `effectiveId`. Go: the option `WithID`, `Rule.ID()` (`""` when none) and
     `Rule.EffectiveID()`.
+- Canonical bytes and digests (task R.2; `spec/json-format.md`, *Canonical
+  bytes*, *Digests*). Every document has one sequence of canonical bytes: the
+  UTF-8 JSON of its canonical form with every object's members sorted by key,
+  by Unicode code point (not by UTF-16 code unit, as RFC 8785 does), no
+  insignificant whitespace, RFC 8785's string escapes (only `"`, `\` and
+  characters below U+0020, as `\b`, `\t`, `\n`, `\f`, `\r` or `\u00xx`), ints
+  bare up to 2⁵³ − 1 and `{"$int": "…"}` beyond, floats from their shortest
+  round-trip digits (ties to the even digit) in plain notation for exponents
+  from −4 to 15 and `1.5e-7` otherwise, decimals in their canonical text with
+  their scale kept (`1.0` and `1.00` are different bytes), and dates,
+  datetimes and opaque values as writers write them. A document's digest is
+  the SHA-256 of those bytes, written `sha256:` and 64 lowercase hexadecimal
+  digits. It covers the whole document (names, descriptions, tags, metadata,
+  action names, settings) and identifies one concrete artifact: it does not
+  promise that two rule sets decide alike (`x > 5` and `5 < x` differ). The
+  rule set digest of a rule set is the digest of its rule set document; a rule
+  or a decision table gives the digest of the rule set it gives. A rule's
+  optional `id` (R.3) sorts like any other key and is absent when not given,
+  so rules without one keep their bytes. 28 vectors of
+  a new kind `canonical` and 8 `read` vectors of decisions, generated and
+  checked by `conformance/tools/canonical_vectors.py`, an oracle independent of
+  the core (Python's `repr`, `decimal` and `hashlib`), which CI runs.
+  - Decisions: the optional key `ruleset_digest`, reserved until now, holds
+    the rule set digest of the rule set that made the decision. Writers write
+    it only when asked; readers verify it before every other check
+    (`decision_mismatch` at `/decision/ruleset_digest`, or `format_error` for
+    a malformed digest), and a decision read with it keeps it. The decision
+    JSON Schema has it.
+  - Core: dependency `sha2` (RustCrypto, without default features); module
+    `digest` with `Digest` (`Display` and `FromStr` in the `sha256:` form,
+    `of`, `as_bytes`); `Document::canonical_bytes` and `Document::digest`,
+    `Rule::canonical_bytes` and `Rule::digest`, `RuleSet::canonical_bytes`
+    and `RuleSet::digest`; `json::to_sorted_string` (the layout of canonical bytes for JSON whose numbers are already canonical);
+    `Decision::with_ruleset_digest` and `Decision::carries_ruleset_digest`.
+    Example `docs/examples/digests.rs`.
+  - C ABI: `cr_document_canonical_bytes`, `cr_document_digest`,
+    `cr_ruleset_canonical_bytes` and `cr_ruleset_digest`.
+  - Python: `cleanrules.canonical_bytes(value, *, omit_actions=False)` and
+    `cleanrules.digest(value, *, omit_actions=False)` for conditions, rules,
+    rule sets and decision tables, with the errors of `dumps`.
+  - JavaScript (Node, WebAssembly, Deno): `canonicalBytes(value, { omitActions })`
+    (a `Uint8Array`) and `digest(value, { omitActions })`, with the errors of
+    `dumps`; `Document.canonicalBytes()`/`digest()` and
+    `RuleSet.canonicalBytes()`/`digest()` in `cleanrules/native`.
+  - Java: `Documents.canonicalBytes(value[, omitActions])` (`byte[]`) and
+    `Documents.digest(value[, omitActions])`; `canonicalBytes()` and `digest()`
+    on `ffi.Document` and `ffi.RuleSet`. Scala: `canonicalBytes(value,
+    omitActions = false)` and `digest(value, omitActions = false)`.
+  - Go: `CanonicalBytes(value Document) ([]byte, error)` and
+    `Digest(value Document) (string, error)`.
+  - C++: `canonical_bytes()` and `digest()` on `cleanrules::document` and
+    `cleanrules::ruleset`, throwing or with `error_info`.
 
 - Path length limit (task B.12; `spec/json-format.md`, *Errors and limits*):
   a field path has at most `max_path_segments` segments, 256 by default, in
@@ -1309,6 +1361,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`CLAUDE.md`, `.claude/`).
 
 ### Changed
+
+- Floats are written from their shortest round-trip digits with an exact tie
+  broken towards the even last digit, as ECMAScript, Java and Python do
+  (`201409170638417.125` is written `201409170638417.12`, which the core wrote
+  `…17.13` before), and their layout (plain or exponent notation) is now part
+  of the format (`spec/json-format.md`, *Numbers*, *Canonical bytes*); readers
+  still accept any layout.
 
 - Field paths longer than 256 segments are refused by default (task B.12):
   by every reader unless `max_path_segments` is raised, and by the field

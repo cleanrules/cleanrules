@@ -1880,30 +1880,33 @@ pub(crate) fn path(segments: &[Segment]) -> String {
     out
 }
 
-/// A finite float with the shortest digits that read back: plain digits and
-/// `e0` when its magnitude is 0 or within [1e-4, 1e16) (`0.7e0`, `42500e0`), as
-/// `{:e}` writes it otherwise (`1e-7`).
+/// A finite float with the shortest digits that read back (ties to the even
+/// digit, as in JSON: `spec/json-format.md`, *Canonical bytes*): plain digits
+/// and `e0` when its magnitude is 0 or within [1e-4, 1e16) (`0.7e0`,
+/// `42500e0`), and `1e-7` or `1.5e16` otherwise.
 fn float_literal(value: f64) -> String {
-    match positional(value) {
-        Some(plain) => plain + "e0",
-        None => format!("{value:e}"),
+    if let Some(plain) = positional(value) {
+        return plain + "e0";
+    }
+    let (digits, exponent) = crate::value::shortest_digits(value.abs());
+    let sign = if value.is_sign_negative() { "-" } else { "" };
+    match digits.split_at_checked(1) {
+        Some((first, rest)) if !rest.is_empty() => format!("{sign}{first}.{rest}e{exponent}"),
+        _ => format!("{sign}{digits}e{exponent}"),
     }
 }
 
 /// A finite float in plain positional notation, with the shortest digits that
 /// read back, when its magnitude is 0 or within [1e-4, 1e16).
 pub(crate) fn positional(value: f64) -> Option<String> {
-    let scientific = format!("{value:e}");
-    let (mantissa, exponent) = scientific.split_once('e')?;
-    let exponent: i32 = exponent.parse().ok()?;
+    let sign = if value.is_sign_negative() { "-" } else { "" };
+    if value == 0.0 {
+        return Some(format!("{sign}0"));
+    }
+    let (digits, exponent) = crate::value::shortest_digits(value.abs());
     if !(-4..16).contains(&exponent) {
         return None;
     }
-    let (sign, mantissa) = match mantissa.strip_prefix('-') {
-        Some(rest) => ("-", rest),
-        None => ("", mantissa),
-    };
-    let digits = mantissa.replace('.', "");
     let point = usize::try_from(exponent + 1).unwrap_or(0);
     let body = if exponent < 0 {
         let zeros = "0".repeat(usize::try_from(-exponent - 1).unwrap_or(0));
@@ -2336,6 +2339,22 @@ mod tests {
     #![allow(clippy::unwrap_used)]
 
     use super::{parse, parse_rule, to_string};
+
+    #[test]
+    // The tie below is exactly representable: its digits are the point.
+    #[allow(clippy::excessive_precision)]
+    fn floats_are_printed_with_the_digits_of_json() {
+        use crate::Value;
+        for (value, printed) in [
+            (201_409_170_638_417.125, "201409170638417.12e0"),
+            (-0.0, "-0e0"),
+            (1e-7, "1e-7"),
+            (-1.5e16, "-1.5e16"),
+            (5e-324, "5e-324"),
+        ] {
+            assert_eq!(super::literal(&Value::Float(value)), printed);
+        }
+    }
     use crate::error::ErrorCode;
     use crate::format::{Document, read_document};
     use crate::json::Limits;

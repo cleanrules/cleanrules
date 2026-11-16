@@ -250,6 +250,35 @@ ResultTree tree = vip.when().evaluateTree(Map.of("customer", Map.of("years", 7))
   `value()`, `reason()`, `children()` and `toJson()` (the core's JSON result
   tree of that result).
 
+### Canonical bytes and digests
+
+```java
+byte[] bytes = canonicalBytes(rules);   // the canonical UTF-8 JSON of the document
+String pinned = digest(rules);          // "sha256:" and 64 lowercase hex digits
+String tableDigest = digest(table);     // the table's own document
+String compiled = digest(table.ruleSet()); // the rule set it compiles to
+```
+
+`Documents.canonicalBytes(value[, omitActions])` gives the canonical bytes of
+a condition, rule, rule set or decision table (`spec/json-format.md`,
+*Canonical bytes*): the UTF-8 JSON text of its document, every object's members
+sorted by key by code point, without whitespace, the same in every language
+whatever layout, member order or escapes the document was read from.
+`Documents.digest(value[, omitActions])` gives their SHA-256 digest
+(*Digests*). The core computes both; the errors are those of `dumps` (a value
+node is an `ExpressionException`; a rule whose action is code without a name
+an `UnsupportedException`, unless `omitActions`). A rule set's digest is the
+rule set digest that a decision's `ruleset_digest` holds (*Rule set digests*):
+`readDecision` verifies one when a decision carries it, and keeps it;
+decisions made on the JVM carry none. A decision table's
+digest is that of the table's own document, and its rule set has its own,
+`digest(table.ruleSet())`; for a rule it is `digest(RuleSet.of(rule))`.
+
+A digest identifies one concrete canonical artifact, not equivalence: `x > 5`
+and `5 < x` decide alike but have different digests, and so do the decimals
+`1.0` and `1.00`, equal but of another scale. In the native layer,
+`Document` and `RuleSet` give the same with `canonicalBytes()` and `digest()`.
+
 [`docs/examples/RiskTable.java`](../../docs/examples/RiskTable.java) does what
 `risk.mjs` does in JavaScript (the table of `risk.csv`, built again, a rule
 from text, a result tree, a rule set written and read back with its action
@@ -474,7 +503,11 @@ table.evaluate(order).output            // Some(VectorMap(risk -> low))
   (JSON by default) and `dump(value, path[, format, omitActions])` write one in
   canonical form: a rule whose action is code without a name is an
   `UnsupportedException` at `/rule/do` or `/ruleset/rules/<i>/do` unless
-  `omitActions`. `ruleFromText(text[, actions, limits])` reads one rule
+  `omitActions`. `canonicalBytes(value[, omitActions])` (an `Array[Byte]`) and
+  `digest(value[, omitActions])` give the canonical bytes and the digest, as
+  in Java: `digest(table.ruleSet)` is a table's rule set digest, and a digest
+  tells artifacts apart, not meanings (`F.x > 5` and `5 < F.x` differ).
+  `ruleFromText(text[, actions, limits])` reads one rule
   (fuzzytool's verb; `rule_1` without a `RULE` line); code without a name is a
   step, `ruleFromText(text).withAction(code)`, which keeps the name the text
   gives. Every argument after the first is optional and best named; the
@@ -606,7 +639,12 @@ the vector, inputs as `Long`, `Integer`, `Short`, `BigInteger`, `Double`,
 given back (`Decision`, `Explanation`, `Summary`, `ResultTree`) and as their
 `toJson()`, and the same Java data through the native layer, compared
 exactly. `read` vectors go through `Documents.loads`/`dumps`,
-`ruleFromText`, `DecisionTable` and `RuleSet.readDecision`. Grids are Java
+`ruleFromText`, `DecisionTable` and `RuleSet.readDecision`; `canonical`
+vectors through `Document.canonicalBytes`/`digest` and `RuleSet.fromDocument`
+and `read` with `digest` (`json:`), and `Documents.canonicalBytes`/`digest`
+of what `loads` gives, of `loads(dumps(x))` and of what is built in code
+(`native:`), the bytes compared exactly as UTF-8 text and the digest also
+against the JDK's SHA-256 of them. Grids are Java
 data, so the 28 `table_grid` vectors have no JSON route; the report lists
 them. The runner compares with a lossless JSON reader of its own
 (`TestJson.java`), never with the library's equality.
@@ -627,7 +665,9 @@ one has their keys; results compared as the Scala values given back (`None`,
 `toJson`, and decisions read back with `readDecision` in JSON and YAML.
 `read` vectors go through `loads` (a string or UTF-8 bytes), `dumps`,
 `ruleFromText`, `DecisionTable(...)` with Scala cells (grids included) and
-`RuleSet.readDecision(text, format, limits)`. One grid cell is a list, which
+`RuleSet.readDecision(text, format, limits)`; `canonical` vectors through
+`canonicalBytes` and `digest` of what `loads` gives and of what is built in
+Scala. One grid cell is a list, which
 `DecisionTable.Cell` does not admit: the route passes it by a cast so that the
 core refuses it, and the report names it. The engine is shared: the Java
 runner (`Conformance.java`, `TestJson.java`, `JavaValues.java`) is the Java
@@ -835,8 +875,8 @@ a 64-bit platform.
 
 | Class (package) | What it is |
 |---|---|
-| `Document` (`ffi`) | a document in JSON, YAML, the rule syntax or CSV: `read(text, format[, limits])` (a `String`, or UTF-8 bytes), `kind()`, `write([format])` |
-| `RuleSet` (`ffi`) | `read(text, format[, limits])`, `fromDocument(document)`, `write([format])`, `summary([format])` (text by default), `size()`, `ruleName(i)`, `ruleNames()`, `hitPolicy()`, `logic()`, `aggregate()`, `isStrict()`, `fieldPaths()`, `evaluate(data[, limits])`, `evaluateJson(json[, limits])` (a `String` or bytes), `evaluateMany(inputs[, limits])` (any `Iterable`), `evaluateManyJson(json[, limits])`, `readDecision(text[, format[, limits]])`, `checkActions(names)`, `run(data, actions[, limits])` |
+| `Document` (`ffi`) | a document in JSON, YAML, the rule syntax or CSV: `read(text, format[, limits])` (a `String`, or UTF-8 bytes), `kind()`, `write([format])`, `canonicalBytes()`, `digest()` |
+| `RuleSet` (`ffi`) | `read(text, format[, limits])`, `fromDocument(document)`, `write([format])`, `canonicalBytes()`, `digest()` (the rule set digest), `summary([format])` (text by default), `size()`, `ruleName(i)`, `ruleNames()`, `hitPolicy()`, `logic()`, `aggregate()`, `isStrict()`, `fieldPaths()`, `evaluate(data[, limits])`, `evaluateJson(json[, limits])` (a `String` or bytes), `evaluateMany(inputs[, limits])` (any `Iterable`), `evaluateManyJson(json[, limits])`, `readDecision(text[, format[, limits]])`, `checkActions(names)`, `run(data, actions[, limits])` |
 | `Decision` (`ffi`) | `size()`, `ruleName(i)`, `firedAt(i)`, `truth(i)`, `selected()`, `output()`, `outputs()`, `ruleOutput(i)`, `outputJson()`, `outputsJson()`, `write([format])` (JSON by default), `explain([format])` (text by default) |
 | `Node` (`ffi`) | one condition or value: `read(text, format[, limits])`, `write([format])`, `fieldPaths()`, `evaluateTree(data[, logic, strict[, limits]])`, `evaluateValueTree(data[, strict[, limits]])` and their `...Json` forms, which give the result tree as JSON |
 | `Limits` | immutable limits: `Limits.defaults().withMaxSize(n)`, `withMaxNesting`, `withMaxDepth`, `withMaxTableSize`, `withMaxYamlSize`, `withMaxTextSize` (documents and JSON input), `withMaxPathSegments` (the segments of a field path in every format, 256 by default; `field(...)` checks the default, and beyond it the error is a `FormatException` with the code `limit_exceeded` and the name `max_path_segments`), `withMaxValues` (Java data) |

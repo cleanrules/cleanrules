@@ -377,6 +377,77 @@ fn documents_change_format() {
 }
 
 #[test]
+fn documents_and_rule_sets_give_canonical_bytes_and_digests() {
+    let document = common::read_document(RULES.as_bytes(), CR_FORMAT_JSON, None).unwrap();
+    let ruleset = rules();
+    // SAFETY: live handles; writable out-parameters.
+    let (canonical, digest, ruleset_canonical, ruleset_digest) = unsafe {
+        (
+            common::text(|out, len, error| {
+                cr_document_canonical_bytes(document.0, out, len, error)
+            }),
+            common::text(|out, len, error| cr_document_digest(document.0, out, len, error)),
+            common::text(|out, len, error| cr_ruleset_canonical_bytes(ruleset.0, out, len, error)),
+            common::text(|out, len, error| cr_ruleset_digest(ruleset.0, out, len, error)),
+        )
+    };
+    let canonical = canonical.unwrap();
+    assert!(
+        canonical.starts_with(
+            r#"{"ruleset":{"hit_policy":"first","logic":"boolean","rules":[{"name":"vip","then":"#
+        ),
+        "{canonical}"
+    );
+    assert_eq!(ruleset_canonical.unwrap(), canonical);
+    let digest = digest.unwrap();
+    assert_eq!(digest.len(), 7 + 64);
+    assert!(digest.starts_with("sha256:"));
+    assert_eq!(ruleset_digest.unwrap(), digest);
+    // A NUL character is escaped: the canonical text is also a C string.
+    let nul = common::read_document(
+        br#"{"version":1,"condition":{"op":"eq","left":{"op":"field","path":["a\u0000b"]},"right":{"op":"const","value":1}}}"#,
+        CR_FORMAT_JSON,
+        None,
+    )
+    .unwrap();
+    // SAFETY: a live document.
+    let text = unsafe {
+        common::text(|out, len, error| cr_document_canonical_bytes(nul.0, out, len, error))
+    }
+    .unwrap();
+    assert!(text.contains(r#""a\u0000b""#), "{text}");
+    // NULL handles and out-parameters.
+    // SAFETY: the library checks every NULL before using it.
+    unsafe {
+        for status in [
+            common::text(|out, len, error| {
+                cr_document_canonical_bytes(ptr::null(), out, len, error)
+            }),
+            common::text(|out, len, error| cr_document_digest(ptr::null(), out, len, error)),
+            common::text(|out, len, error| {
+                cr_ruleset_canonical_bytes(ptr::null(), out, len, error)
+            }),
+            common::text(|out, len, error| cr_ruleset_digest(ptr::null(), out, len, error)),
+        ] {
+            assert_eq!(status.err().unwrap().status, CR_INVALID_ARGUMENT);
+        }
+        assert_eq!(
+            cr_ruleset_digest(ruleset.0, ptr::null_mut(), ptr::null_mut(), ptr::null_mut()),
+            CR_INVALID_ARGUMENT
+        );
+        assert_eq!(
+            cr_document_digest(
+                document.0,
+                ptr::null_mut(),
+                ptr::null_mut(),
+                ptr::null_mut()
+            ),
+            CR_INVALID_ARGUMENT
+        );
+    }
+}
+
+#[test]
 fn one_rule_is_a_rule_set_of_one() {
     let ruleset = common::read_ruleset(
         b"RULE vip\nIF years > 5\nTHEN discount = 0.15",

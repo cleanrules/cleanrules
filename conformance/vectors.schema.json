@@ -367,6 +367,39 @@
         },
         {
           "type": "object",
+          "description": "Read a condition, rule, rule set or decision table document and give its canonical bytes and digest (spec/json-format.md, Canonical bytes, Digests).",
+          "properties": {
+            "kind": {
+              "const": "canonical"
+            },
+            "document": {
+              "type": "object",
+              "description": "A condition, rule, rule set or decision table document."
+            },
+            "text": {
+              "type": "string",
+              "description": "The document as JSON text, for lexical cases."
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "document"
+              ]
+            },
+            {
+              "required": [
+                "text"
+              ]
+            }
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
           "description": "Draw a diagram (spec/visual.md): of the document, or, with an input, of the explanation of a rule set's decision or of a decision table's grid with the statuses of its rows.",
           "properties": {
             "kind": {
@@ -454,6 +487,20 @@
         "output": {
           "type": "object",
           "description": "A tool's result (spec/agents.md, Results), with the error of a validate result written without its free text (conformance/README.md, Comparing)."
+        },
+        "canonical": {
+          "type": "string",
+          "description": "The canonical bytes of a document, as UTF-8 text compared exactly (spec/json-format.md, Canonical bytes)."
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "The document's digest (spec/json-format.md, Digests)."
+        },
+        "ruleset_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "The rule set digest of the rule set the document gives (spec/json-format.md, Rule set digests): none for a condition."
         },
         "diagram": {
           "type": "string",

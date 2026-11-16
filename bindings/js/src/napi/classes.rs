@@ -4,7 +4,8 @@
 
 use cleanrules::Segment;
 use napi::bindgen_prelude::{
-    Array, ClassInstance, FnArgs, FromNapiValue, JavaScriptClassExt, JsValue, This, Unknown,
+    Array, ClassInstance, FnArgs, FromNapiValue, JavaScriptClassExt, JsValue, This, Uint8Array,
+    Unknown,
 };
 use napi::{Env, Result, ValueType};
 use napi_derive::napi;
@@ -326,6 +327,27 @@ impl Document {
     pub fn write(&self, env: &Env, format: Option<Unknown<'_>>) -> Result<String> {
         self.core.write(&optional(format)?).or_fail(env)
     }
+
+    /// The document's canonical bytes (`spec/json-format.md`, *Canonical
+    /// bytes*): the UTF-8 JSON text of its canonical form, every object's
+    /// members sorted by key, by Unicode code point, without whitespace.
+    #[napi]
+    #[must_use]
+    pub fn canonical_bytes(&self) -> Uint8Array {
+        Uint8Array::new(self.core.canonical_bytes())
+    }
+
+    /// The document's digest (`spec/json-format.md`, *Digests*): `sha256:` and
+    /// the 64 lowercase hexadecimal digits of the SHA-256 hash of its
+    /// canonical bytes. It identifies one concrete canonical artifact, not
+    /// what the document means: `x > 5` and `5 < x` have different digests.
+    /// A decision table's is that of its own document; its rule set digest is
+    /// `RuleSet.fromDocument(document).digest()`.
+    #[napi]
+    #[must_use]
+    pub fn digest(&self) -> String {
+        self.core.digest()
+    }
 }
 
 /// An optional argument as a [`Raw`] value.
@@ -433,6 +455,24 @@ impl RuleSet {
     #[napi(ts_args_type = "format?: Format | null")]
     pub fn summary(&self, env: &Env, format: Option<Unknown<'_>>) -> Result<String> {
         self.core.summary(&optional(format)?).or_fail(env)
+    }
+
+    /// The canonical bytes of the rule set's document (`spec/json-format.md`,
+    /// *Canonical bytes*), as `Document.canonicalBytes` gives them.
+    #[napi]
+    #[must_use]
+    pub fn canonical_bytes(&self) -> Uint8Array {
+        Uint8Array::new(self.core.canonical_bytes())
+    }
+
+    /// The rule set digest (`spec/json-format.md`, *Rule set digests*): the
+    /// digest of the rule set's document. A rule set read from a rule or a
+    /// decision table has the digest of the rule set it gives. This is what a
+    /// decision's `ruleset_digest` holds.
+    #[napi]
+    #[must_use]
+    pub fn digest(&self) -> String {
+        self.core.digest()
     }
 
     /// How many rules the rule set has.

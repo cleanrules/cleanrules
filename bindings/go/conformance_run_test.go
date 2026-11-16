@@ -319,6 +319,13 @@ var wrongVectors = [][3]string{
 	// A map passed through to an output, and a max_values limit's row.
 	{"rules/payloads/map-keys-without-order", `"Z":2.5`, `"Z":2.25`},
 	{"rules/limits/batch-row", `"row":1`, `"row":0`},
+	// Canonical bytes (one byte), a digest, a rule set digest, and a
+	// decision's rule set digest read back.
+	{"format/canonical/decimal-scale-2", `\"$decimal\":\"1.00\"`, `\"$decimal\":\"1.0\"`},
+	{"format/canonical/condition", `"digest":"sha256:2eb0`, `"digest":"sha256:2eb1`},
+	{"format/canonical/decision-table", `"ruleset_digest":"sha256:ac5f`, `"ruleset_digest":"sha256:25b8`},
+	{"format/canonical/rule", `"ruleset_digest":"sha256:b36f`, `"ruleset_digest":"sha256:b36e`},
+	{"format/digests/kept", `"ruleset_digest":"sha256:`, `"ruleset_digest":"sha256:0`},
 }
 
 // TestConformanceWrongVectors checks that the runner fails vectors whose

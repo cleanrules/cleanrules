@@ -128,6 +128,21 @@ export declare class Document {
    * `UnsupportedError` for a format the document has no form in.
    */
   write(format?: Format | null): string
+  /**
+   * The document's canonical bytes (`spec/json-format.md`, *Canonical
+   * bytes*): the UTF-8 JSON text of its canonical form, every object's
+   * members sorted by key, by Unicode code point, without whitespace.
+   */
+  canonicalBytes(): Uint8Array
+  /**
+   * The document's digest (`spec/json-format.md`, *Digests*): `sha256:` and
+   * the 64 lowercase hexadecimal digits of the SHA-256 hash of its
+   * canonical bytes. It identifies one concrete canonical artifact, not
+   * what the document means: `x > 5` and `5 < x` have different digests.
+   * A decision table's is that of its own document; its rule set digest is
+   * `RuleSet.fromDocument(document).digest()`.
+   */
+  digest(): string
 }
 
 /**
@@ -249,6 +264,13 @@ export declare class NativeTable {
    * `UnsupportedError` for the rule syntax.
    */
   write(format?: Format | null): string
+  /** The canonical bytes of the table's own document. */
+  canonicalBytes(): Uint8Array
+  /**
+   * The digest of the table's own document; its rule set digest is
+   * `ruleset().digest()`.
+   */
+  digest(): string
 }
 
 /** A result tree (`common::core::TreeData`): its encoding and its nodes. */
@@ -410,6 +432,18 @@ export declare class RuleSet {
    * `UnsupportedError` for CSV.
    */
   summary(format?: Format | null): string
+  /**
+   * The canonical bytes of the rule set's document (`spec/json-format.md`,
+   * *Canonical bytes*), as `Document.canonicalBytes` gives them.
+   */
+  canonicalBytes(): Uint8Array
+  /**
+   * The rule set digest (`spec/json-format.md`, *Rule set digests*): the
+   * digest of the rule set's document. A rule set read from a rule or a
+   * decision table has the digest of the rule set it gives. This is what a
+   * decision's `ruleset_digest` holds.
+   */
+  digest(): string
   /** How many rules the rule set has. */
   get length(): number
   /** The rules' names, in rule order. */
@@ -549,6 +583,15 @@ export declare function actionErrorData(rule: string, action: string | undefined
 export type Aggregate = 'sum' | 'min' | 'max' | 'count'
 
 /**
+ * The canonical bytes of the condition document of a node. The JavaScript
+ * half refuses value nodes first, as `dumps` does.
+ */
+export declare function canonicalCondition(node: Node): Uint8Array
+
+/** The canonical bytes of the rule document of a rule. */
+export declare function canonicalRule(rule: NativeRule): Uint8Array
+
+/**
  * Why `text` is not a decimal literal, or `null` when it is one; for the
  * `Decimal` marker of `lib/values.js`. A literal too large for 38 digits is a
  * decimal: as data it reads as null with reason `decimal_overflow`.
@@ -557,6 +600,12 @@ export declare function decimalProblem(text: string): string | null
 
 /** What a decision gives back, in the binding's encoding. */
 export declare function decisionData(decision: Decision): string
+
+/** The digest of the condition document of a node. */
+export declare function digestCondition(node: Node): string
+
+/** The digest of the rule document of a rule. */
+export declare function digestRule(rule: NativeRule): string
 
 /**
  * The condition of a condition document.

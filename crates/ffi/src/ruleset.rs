@@ -131,6 +131,64 @@ pub unsafe extern "C" fn cr_ruleset_write(
     unsafe { call(error, body) }
 }
 
+/// The canonical bytes of the rule set's document (`spec/json-format.md`,
+/// *Canonical bytes*), as `cr_document_canonical_bytes` gives them.
+///
+/// # Safety
+///
+/// `ruleset` is `NULL` or a live `cr_ruleset`; `out` is `NULL` or points to a
+/// writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+/// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_ruleset_canonical_bytes(
+    ruleset: *const cr_ruleset,
+    out: *mut *mut c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `ruleset` is NULL or live (# Safety).
+        let ruleset = &unsafe { handle(ruleset, "ruleset") }?.ruleset;
+        let text = String::from_utf8(ruleset.canonical_bytes())
+            .map_err(|_| Failure::Internal("canonical bytes are UTF-8; please report it".into()))?;
+        // SAFETY: `out` passed `clear`; `len` is NULL or writable (# Safety).
+        unsafe { give_text(out, len, text) }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call(error, body) }
+}
+
+/// The rule set digest (`spec/json-format.md`, *Rule set digests*): the digest
+/// of the rule set's document, as `sha256:` and 64 lowercase hexadecimal
+/// digits. A rule set read from a rule or a decision table has the digest of
+/// the rule set it gives. This is what a decision's `ruleset_digest` holds.
+///
+/// # Safety
+///
+/// `ruleset` is `NULL` or a live `cr_ruleset`; `out` is `NULL` or points to a
+/// writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+/// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_ruleset_digest(
+    ruleset: *const cr_ruleset,
+    out: *mut *mut c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `ruleset` is NULL or live (# Safety).
+        let ruleset = &unsafe { handle(ruleset, "ruleset") }?.ruleset;
+        // SAFETY: `out` passed `clear`; `len` is NULL or writable (# Safety).
+        unsafe { give_text(out, len, ruleset.digest().to_string()) }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call(error, body) }
+}
+
 /// The rule set's summary (`spec/explain.md`, *Summaries*) as a JSON or YAML
 /// document, or as text (`CR_FORMAT_TEXT`).
 ///

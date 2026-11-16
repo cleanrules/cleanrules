@@ -27,6 +27,16 @@ int main() {
     CHECK(!bad);
     CHECK(error.code() == cr::errc::rule_syntax_error);
 
+    // Canonical bytes and digests, by their error_info overloads.
+    CHECK(rules.digest(error).rfind("sha256:", 0) == 0);
+    CHECK(!error);
+    auto doc = cr::document::read(rules.write(cr::format::json, error), cr::format::json, error);
+    CHECK(doc.canonical_bytes(error) == rules.canonical_bytes(error));
+    CHECK(doc.digest(error) == rules.digest(error));
+    cr::ruleset none;
+    CHECK(none.digest(error).empty());
+    CHECK(error.code() == cr::errc::invalid_argument);
+
     auto input = cr::value::map({{"customer", cr::value::map({{"years", 7}}, error)}}, error);
     CHECK(!error);
     // A key that is not UTF-8: an empty value and the error.

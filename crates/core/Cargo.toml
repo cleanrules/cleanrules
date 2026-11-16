@@ -24,6 +24,10 @@ jiff = { version = "0.2.38", default-features = false, features = ["std", "tzdb-
 libm = { version = "0.2.16", default-features = false }
 regex = "1.13.1"
 saphyr-parser = { version = "0.3.3", optional = true }
+# SHA-256 of the canonical bytes of documents (`spec/json-format.md`,
+# *Digests*): RustCrypto's pure-Rust implementation, without default
+# features (no `alloc`, no OIDs).
+sha2 = { version = "0.11.1", default-features = false }
 thiserror = "2.0.21"
 
 [dev-dependencies]
@@ -57,3 +61,8 @@ path = "../../docs/examples/decimals.rs"
 [[example]]
 name = "rule_ids"
 path = "../../docs/examples/rule_ids.rs"
+
+# The example of canonical bytes and digests in the documentation (task R.2).
+[[example]]
+name = "digests"
+path = "../../docs/examples/digests.rs"

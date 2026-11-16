@@ -567,5 +567,11 @@ pub fn write_decision(decision: &Decision<'_>) -> Json {
         Some(Aggregated::NothingSelected) => members.push(("aggregated".into(), Json::Null)),
         None => {}
     }
+    if decision.carries_ruleset_digest() {
+        members.push((
+            "ruleset_digest".into(),
+            Json::String(ruleset.digest().to_string()),
+        ));
+    }
     Json::Object(members)
 }

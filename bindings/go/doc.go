@@ -42,7 +42,8 @@
 //
 // Loads and Load read a condition, rule, rule set or decision table from
 // JSON, YAML, the rule syntax or CSV, as a Document to read with a type
-// switch; Dumps and Dump write one; RuleFromText reads one rule, and
+// switch; Dumps and Dump write one, and CanonicalBytes and Digest give its
+// canonical bytes and its digest; RuleFromText reads one rule, and
 // RuleSet.ReadDecision a recorded decision. NewDecisionTable builds a
 // decision table from a header and rows of cells. Expr.EvaluateTree,
 // Expr.EvaluateValueTree and ActionContext.Tree give a ResultTree. Each

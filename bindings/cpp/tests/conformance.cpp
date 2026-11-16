@@ -3,12 +3,13 @@
 //
 // - `json:<id>`: documents, inputs and results cross as JSON text, through the
 //   reading and writing entry points, with the overloads that throw. `read`
-//   vectors run a second time with the error_info overloads.
-// - `native:<id>`, for every kind but `read`: the input is built as a
-//   `cleanrules::value` from C++ data with the value constructors, checked
-//   against what the library reads from the same JSON and against a copy
-//   rebuilt with the value readers, and evaluated with the error_info
-//   overloads; decisions are also read back with the decision readers.
+//   and `canonical` vectors run a second time with the error_info overloads.
+// - `native:<id>`, for every kind but `read` and `canonical`: the input is
+//   built as a `cleanrules::value` from C++ data with the value
+//   constructors, checked against what the library reads from the same JSON
+//   and against a copy rebuilt with the value readers, and evaluated with the
+//   error_info overloads; decisions are also read back with the decision
+//   readers.
 //
 // The runner only drives the library and compares: results are parsed with
 // json.hpp and compared with the vectors as trees, never with the library's
@@ -48,7 +49,7 @@ namespace cr = cleanrules;
 namespace {
 
 // Vectors are only ever added: the count when this runner was written.
-constexpr std::size_t minimum_vectors = 2508;
+constexpr std::size_t minimum_vectors = 2733;
 
 // Which overloads a run calls.
 enum class mode { throwing, info };
@@ -396,6 +397,93 @@ std::string run_read(const json::value &given, const json::value &expect, mode m
             return content(CALL0(m, rules.write), "ruleset");
         });
         return compare(compiled, expect, "compiled", fields::read);
+    }
+    return {};
+}
+
+// A `canonical` vector: the canonical bytes and the digest of the document
+// read, and the rule set digest of the rule set it gives (none for a
+// condition), compared exactly. The bytes are also checked to read back to
+// themselves, a rule set's, a rule's and a condition's to be those of the
+// document `ruleset::read`, `document::from_rule` and
+// `document::from_condition` give, and a rule's rule set digest to be that of
+// `ruleset::make` of it alone.
+std::string run_canonical(const json::value &given, const json::value &expect, mode m) {
+    for (const auto &member : expect.members) {
+        if (member.first != "canonical" && member.first != "digest" &&
+            member.first != "ruleset_digest") {
+            throw vector_error("the unknown expectation `" + member.first + "`");
+        }
+    }
+    std::string source;
+    if (const std::string *text = given.string_at("text")) {
+        source = *text;
+    } else {
+        source = json::write(need(given, "document"));
+    }
+    const std::string &want_canonical = need(expect, "canonical").text;
+    const std::string &want_digest = need(expect, "digest").text;
+    const json::value *want_ruleset_digest = expect.get("ruleset_digest");
+
+    cr::document document = CALL(m, cr::document::read, source, cr::format::json);
+    std::string canonical = CALL0(m, document.canonical_bytes);
+    if (std::string issue = compare_text("canonical", canonical, want_canonical); !issue.empty()) {
+        return issue;
+    }
+    if (std::string issue = compare_text("digest", CALL0(m, document.digest), want_digest);
+        !issue.empty()) {
+        return issue;
+    }
+    cr::document again = CALL(m, cr::document::read, canonical, cr::format::json);
+    if (std::string issue =
+            compare_text("read back, canonical", CALL0(m, again.canonical_bytes), canonical);
+        !issue.empty()) {
+        return issue;
+    }
+
+    switch (document.content()) {
+        case cr::document_content::condition: {
+            if (want_ruleset_digest != nullptr) {
+                return "a condition gives no rule set, expected the rule set digest " +
+                       json::write(*want_ruleset_digest);
+            }
+            cr::node condition = CALL0(m, document.as_condition);
+            cr::document built = CALL(m, cr::document::from_condition, condition);
+            return compare_text("from_condition, canonical", CALL0(m, built.canonical_bytes), canonical);
+        }
+        case cr::document_content::rule: {
+            cr::rule r = CALL0(m, document.as_rule);
+            cr::document built = CALL(m, cr::document::from_rule, r);
+            if (std::string issue =
+                    compare_text("from_rule, digest", CALL0(m, built.digest), want_digest);
+                !issue.empty()) {
+                return issue;
+            }
+            cr::ruleset alone = CALL(m, cr::ruleset::make, cr::rule_refs{r});
+            if (std::string issue = compare_text("ruleset::make of the rule, digest",
+                                                 CALL0(m, alone.digest),
+                                                 need(expect, "ruleset_digest").text);
+                !issue.empty()) {
+                return issue;
+            }
+            break;
+        }
+        case cr::document_content::ruleset: {
+            cr::ruleset rules = CALL(m, cr::ruleset::read, source, cr::format::json);
+            if (std::string issue =
+                    compare_text("ruleset::read, canonical", CALL0(m, rules.canonical_bytes), canonical);
+                !issue.empty()) {
+                return issue;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    if (document.content() != cr::document_content::condition) {
+        cr::ruleset rules = CALL(m, cr::ruleset::from_document, document);
+        return compare_text("the rule set digest", CALL0(m, rules.digest),
+                            need(expect, "ruleset_digest").text);
     }
     return {};
 }
@@ -1050,6 +1138,15 @@ std::string run(const json::value &vector, bool native_run) {
             }
             return {};
         }
+        if (kind == "canonical") {
+            if (std::string issue = run_canonical(given, expect, mode::throwing); !issue.empty()) {
+                return issue;
+            }
+            if (std::string issue = run_canonical(given, expect, mode::info); !issue.empty()) {
+                return "with error_info: " + issue;
+            }
+            return {};
+        }
         if (kind == "condition" || kind == "value") {
             return run_node(given, expect, kind == "value", native_run);
         }
@@ -1148,7 +1245,10 @@ int main(int argc, char **argv) {
                 } else {
                     failures.push_back("json:" + id + ": " + issue);
                 }
-                if (need(need(vector, "given"), "kind").text == "read") {
+                // Reading and canonical bytes have no native data: their JSON
+                // run calls both kinds of overloads.
+                if (const std::string &kind = need(need(vector, "given"), "kind").text;
+                    kind == "read" || kind == "canonical") {
                     continue;
                 }
                 ++ran_native;

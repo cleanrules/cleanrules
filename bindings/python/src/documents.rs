@@ -165,3 +165,38 @@ pub(crate) fn dump_table(table: &Bound<'_, PyDecisionTable>, format: &str) -> Py
         format,
     )
 }
+
+/// The document of a condition, rule, rule set or decision table, as the core
+/// holds it.
+fn document_of(value: &Bound<'_, PyAny>) -> PyResult<Document> {
+    if let Ok(node) = value.cast::<PyNode>() {
+        Ok(Document::Condition(node.get().node.clone()))
+    } else if let Ok(rule) = value.cast::<PyRule>() {
+        Ok(Document::Rule(rule.get().rule().clone()))
+    } else if let Ok(ruleset) = value.cast::<PyRuleSet>() {
+        Ok(Document::RuleSet(ruleset.get().ruleset().clone()))
+    } else if let Ok(table) = value.cast::<PyDecisionTable>() {
+        Ok(Document::DecisionTable(table.get().table.clone()))
+    } else {
+        Err(PyValueError::new_err(
+            "a condition, a rule, a rule set or a decision table",
+        ))
+    }
+}
+
+/// The canonical bytes of a document (`spec/json-format.md`, *Canonical
+/// bytes*).
+#[pyfunction]
+pub(crate) fn canonical_bytes<'py>(
+    value: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
+    let bytes = document_of(value)?.canonical_bytes();
+    Ok(pyo3::types::PyBytes::new(value.py(), &bytes))
+}
+
+/// The digest of a document (`spec/json-format.md`, *Digests*): `sha256:` and
+/// 64 lowercase hexadecimal digits.
+#[pyfunction]
+pub(crate) fn digest(value: &Bound<'_, PyAny>) -> PyResult<String> {
+    Ok(document_of(value)?.digest().to_string())
+}

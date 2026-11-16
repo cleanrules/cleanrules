@@ -368,9 +368,26 @@ func dumps(value Document, format Format) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return documentText(value,
+		func(document *C.cr_document, out **C.char, n *C.size_t, e **C.cr_error) C.cr_status {
+			return C.cr_document_write(document, code, out, n, e)
+		},
+		func(ptr *C.cr_ruleset, out **C.char, n *C.size_t, e **C.cr_error) C.cr_status {
+			return C.cr_ruleset_write(ptr, code, out, n, e)
+		})
+}
+
+// documentText is the text that ofDocument gives of the document value is
+// written in, or that ofRuleSet gives of a rule set.
+func documentText(
+	value Document,
+	ofDocument func(*C.cr_document, **C.char, *C.size_t, **C.cr_error) C.cr_status,
+	ofRuleSet func(*C.cr_ruleset, **C.char, *C.size_t, **C.cr_error) C.cr_status,
+) (string, error) {
 	var out *C.char
 	var n C.size_t
 	var e *C.cr_error
+	var err error
 	switch v := value.(type) {
 	case *Expr:
 		err = v.use(func(node *C.cr_node) error {
@@ -379,7 +396,7 @@ func dumps(value Document, format Format) (string, error) {
 				return err
 			}
 			defer C.cr_document_free(document)
-			return check(C.cr_document_write(document, code, &out, &n, &e), e)
+			return check(ofDocument(document, &out, &n, &e), e)
 		})
 	case *Rule:
 		err = v.use(func(rule *C.cr_rule) error {
@@ -388,15 +405,15 @@ func dumps(value Document, format Format) (string, error) {
 				return err
 			}
 			defer C.cr_document_free(document)
-			return check(C.cr_document_write(document, code, &out, &n, &e), e)
+			return check(ofDocument(document, &out, &n, &e), e)
 		})
 	case *RuleSet:
 		err = v.use(func(ptr *C.cr_ruleset) error {
-			return check(C.cr_ruleset_write(ptr, code, &out, &n, &e), e)
+			return check(ofRuleSet(ptr, &out, &n, &e), e)
 		})
 	case *DecisionTable:
 		err = v.use(func(document *C.cr_document) error {
-			return check(C.cr_document_write(document, code, &out, &n, &e), e)
+			return check(ofDocument(document, &out, &n, &e), e)
 		})
 	default: // nil
 		err = errNilDocument
@@ -429,4 +446,67 @@ func Dump(value Document, path string, options ...DumpOption) error {
 		text += "\n"
 	}
 	return os.WriteFile(path, []byte(text), 0o666)
+}
+
+// ---- Canonical bytes and digests.
+
+// CanonicalBytes are the canonical bytes of a condition, rule, rule set or
+// decision table (spec/json-format.md, Canonical bytes): the UTF-8 JSON text
+// of its canonical form, every object's members sorted by key, by Unicode
+// code point, without whitespace and without a line break at the end. The
+// core writes them, so they are the same bytes in every language. Errors are
+// those of Dumps: a value node (Field("a").Add(1)) is not a condition, an
+// expression_error, and a nil Document is unsupported. A rule's action is
+// its name, as Dumps writes it (a Go rule never holds code, so nothing is
+// refused for its action, and there is nothing to omit).
+//
+// They identify one concrete canonical artifact, not a meaning: rules
+// written differently have different bytes even when they always decide
+// alike (x > 5 and 5 < x, a renamed rule, the decimals 1.0 and 1.00).
+//
+//	canonical, err := cleanrules.CanonicalBytes(rules)
+func CanonicalBytes(value Document) ([]byte, error) {
+	text, err := documentText(value,
+		func(document *C.cr_document, out **C.char, n *C.size_t, e **C.cr_error) C.cr_status {
+			return C.cr_document_canonical_bytes(document, out, n, e)
+		},
+		func(ptr *C.cr_ruleset, out **C.char, n *C.size_t, e **C.cr_error) C.cr_status {
+			return C.cr_ruleset_canonical_bytes(ptr, out, n, e)
+		})
+	if err != nil {
+		return nil, err
+	}
+	return []byte(text), nil
+}
+
+// Digest is the digest of a condition, rule, rule set or decision table
+// (spec/json-format.md, Digests): the SHA-256 hash of its canonical bytes
+// (CanonicalBytes), written as "sha256:" and 64 lowercase hexadecimal
+// digits, the same string in every language. Errors are those of
+// CanonicalBytes.
+//
+// A digest identifies one concrete canonical artifact: two documents have
+// the same digest when they have the same canonical bytes, whatever their
+// layout, member order or format, and different digests otherwise. It does
+// not promise that two rule sets decide alike, nor that they differ: x > 5
+// and 5 < x, a renamed rule, a changed description, or the decimals 1.0
+// and 1.00 give different digests. Telling whether two versions of rules
+// decide alike is the work of tests, not of digests.
+//
+// The digest of a *RuleSet is its rule set digest (spec/json-format.md,
+// Rule set digests), the one a decision's ruleset_digest holds. A
+// *DecisionTable has two: Digest(table) is that of the table's own
+// document, and Digest of DecisionTable.RuleSet() its rule set digest. The
+// rule set digest of a rule is that of a rule set of it alone, with the
+// default settings (NewRuleSet([]*Rule{rule})).
+//
+//	digest, err := cleanrules.Digest(rules) // "sha256:5a0e590c..."
+func Digest(value Document) (string, error) {
+	return documentText(value,
+		func(document *C.cr_document, out **C.char, n *C.size_t, e **C.cr_error) C.cr_status {
+			return C.cr_document_digest(document, out, n, e)
+		},
+		func(ptr *C.cr_ruleset, out **C.char, n *C.size_t, e **C.cr_error) C.cr_status {
+			return C.cr_ruleset_digest(ptr, out, n, e)
+		})
 }

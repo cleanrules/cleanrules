@@ -427,9 +427,44 @@ def run_tool(vector: dict[str, Any], route: str) -> None:
     assert same(got, wanted), f"\ngot  {json.dumps(got)}\nwant {json.dumps(wanted)}"
 
 
+def run_canonical(given: dict[str, Any], expect: dict[str, Any], *, built: bool) -> None:
+    """Canonical bytes and digests (`spec/json-format.md`, *Canonical bytes*, *Digests*).
+
+    The document is read with `loads`, or, on the native run, built in code
+    from its content (a decision table is read: it is built from grids only).
+    """
+    document = given.get("document") or load(given["text"])
+    if built and "condition" in document:
+        value: Any = build(document["condition"])
+    elif built and "rule" in document:
+        value = build_ruleset({"rules": [document["rule"]]}).rules[0]
+    elif built and "ruleset" in document:
+        value = build_ruleset(document["ruleset"])
+    else:
+        value = cleanrules.loads(given.get("text") or dumps(document))
+    canonical = cleanrules.canonical_bytes(value)
+    assert canonical.decode("utf-8") == expect["canonical"], canonical
+    assert cleanrules.digest(value) == expect["digest"]
+    # The bytes read back as the same document.
+    assert cleanrules.canonical_bytes(cleanrules.loads(canonical)) == canonical
+    if isinstance(value, cleanrules.RuleSet):
+        ruleset: cleanrules.RuleSet | None = value
+    elif isinstance(value, cleanrules.Rule):
+        ruleset = cleanrules.RuleSet([value])
+    elif isinstance(value, cleanrules.DecisionTable):
+        ruleset = value.ruleset
+    else:
+        ruleset = None
+    wanted = expect.get("ruleset_digest")
+    assert (None if ruleset is None else cleanrules.digest(ruleset)) == wanted
+
+
 def run_json(vector: dict[str, Any]) -> None:
     given, expect = vector["given"], vector["expect"]
     kind = given["kind"]
+    if kind == "canonical":
+        run_canonical(given, expect, built=False)
+        return
     if kind == "read":
         limits = cast(Limits, {k: int(v) for k, v in given.get("limits", {}).items()})
         if "rules_text" in given or given.get("write") == "text":
@@ -516,6 +551,8 @@ def run_json(vector: dict[str, Any]) -> None:
             expect,
             "summary",
         )
+    else:
+        raise AssertionError(f"unknown kind {kind}")
 
 
 def by_key(value: Any, where: str) -> None:
@@ -544,6 +581,9 @@ def given_by_key(decision: cleanrules.Decision) -> cleanrules.Decision:
 def run_native(vector: dict[str, Any]) -> None:
     given, expect = vector["given"], vector["expect"]
     kind = given["kind"]
+    if kind == "canonical":
+        run_canonical(given, expect, built=True)
+        return
     if kind in ("condition", "value"):
         strict = bool(given.get("strict", False))
 
@@ -594,6 +634,8 @@ def run_native(vector: dict[str, Any]) -> None:
             expect,
             "summary",
         )
+    else:
+        raise AssertionError(f"unknown kind {kind}")
 
 
 DRAW_SKIP = (
@@ -652,4 +694,4 @@ def test_vector(vector: dict[str, Any], run: str) -> None:
 
 def test_every_vector_is_collected() -> None:
     # 2,135 vectors at the end of phase B; vectors are only ever added.
-    assert len([p for p in collect() if p.id.startswith("json:")]) >= 2508
+    assert len([p for p in collect() if p.id.startswith("json:")]) >= 2937

@@ -1,6 +1,7 @@
 package io.github.cleanrules.tests;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -141,6 +142,17 @@ class ConformanceTest {
                     .toList();
             for (String route : ROUTES) {
                 assertEquals(drawn, counts.get(route).skipped.getOrDefault("diagram", List.of()), route);
+            }
+            // Canonical bytes and digests run both ways, never skipped.
+            List<String> canonical = vectors.entrySet().stream()
+                    .filter(v -> "canonical".equals(((Map<?, ?>) v.getValue().get("given")).get("kind")))
+                    .map(Map.Entry::getKey)
+                    .toList();
+            assertFalse(canonical.isEmpty(), "no canonical vectors");
+            for (String route : ROUTES) {
+                for (List<String> ids : counts.get(route).skipped.values()) {
+                    assertTrue(ids.stream().noneMatch(canonical::contains), route + " skips a canonical vector");
+                }
             }
             // And conditions under a graded logic, both ways, until task J.1b.
             List<String> graded = vectors.entrySet().stream()

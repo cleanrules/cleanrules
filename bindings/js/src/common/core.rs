@@ -77,6 +77,19 @@ impl DocumentCore {
         Ok(write_document_as(&self.document, format)?)
     }
 
+    /// The document's canonical bytes (`spec/json-format.md`, *Canonical
+    /// bytes*).
+    pub(crate) fn canonical_bytes(&self) -> Vec<u8> {
+        self.document.canonical_bytes()
+    }
+
+    /// The document's digest (`spec/json-format.md`, *Digests*), as
+    /// `sha256:` and 64 lowercase hexadecimal digits. A decision table's is
+    /// that of its own document, not its rule set digest.
+    pub(crate) fn digest(&self) -> String {
+        self.document.digest().to_string()
+    }
+
     /// The condition of a condition document.
     pub(crate) fn condition(&self) -> Outcome<Node> {
         match &self.document {
@@ -253,6 +266,16 @@ impl RulesCore {
         let format = super::format(format, DocumentFormat::Json)?;
         let document = Document::RuleSet(RuleSet::clone(&self.ruleset));
         Ok(write_document_as(&document, format)?)
+    }
+
+    /// The canonical bytes of the rule set's document.
+    pub(crate) fn canonical_bytes(&self) -> Vec<u8> {
+        self.ruleset.canonical_bytes()
+    }
+
+    /// The rule set digest (`spec/json-format.md`, *Rule set digests*).
+    pub(crate) fn digest(&self) -> String {
+        self.ruleset.digest().to_string()
     }
 
     /// The summary: its text by default, as in C++.

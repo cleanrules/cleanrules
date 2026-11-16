@@ -302,10 +302,146 @@ fn sign_of(zero: bool, negative: bool) -> i8 {
     }
 }
 
+/// A finite float's literal (`spec/json-format.md`, *Canonical bytes*): its
+/// shortest round-trip digits, nearest to it and, between two equally near,
+/// the one whose last digit is even; in plain notation when the exponent is
+/// from -4 to 15 (`0.0001`, `100.0`) and in exponent notation otherwise
+/// (`1e-5`, `1.5e16`), with `-0.0` for negative zero.
+pub(crate) fn float_literal(f: f64) -> String {
+    let mut out = String::with_capacity(24);
+    if f.is_sign_negative() {
+        out.push('-');
+    }
+    if f == 0.0 {
+        out.push_str("0.0");
+        return out;
+    }
+    let (digits, exponent) = shortest_digits(f.abs());
+    if (-4..=15).contains(&exponent) {
+        // Plain notation, with at least one digit on each side of the point.
+        if exponent < 0 {
+            out.push_str("0.");
+            out.extend(std::iter::repeat_n(
+                '0',
+                exponent.unsigned_abs() as usize - 1,
+            ));
+            out.push_str(&digits);
+        } else {
+            let point = exponent.unsigned_abs() as usize + 1;
+            if digits.len() > point {
+                out.push_str(&digits[..point]);
+                out.push('.');
+                out.push_str(&digits[point..]);
+            } else {
+                out.push_str(&digits);
+                out.extend(std::iter::repeat_n('0', point - digits.len()));
+                out.push_str(".0");
+            }
+        }
+    } else {
+        out.push_str(&digits[..1]);
+        if digits.len() > 1 {
+            out.push('.');
+            out.push_str(&digits[1..]);
+        }
+        out.push('e');
+        out.push_str(&exponent.to_string());
+    }
+    out
+}
+
+/// The shortest round-trip digits of a finite positive float, d1 d2 ... dn
+/// without trailing zeros, and the exponent e of d1.d2...dn × 10^e.
+pub(crate) fn shortest_digits(f: f64) -> (String, i32) {
+    // `{:e}` writes the shortest digits that read back as the float, nearest
+    // to it (`d.ddde-7`), but breaks an exact tie between two equally near
+    // ones upwards; the spec breaks it towards an even last digit, as
+    // ECMAScript, Java and Python do.
+    let scientific = format!("{f:e}");
+    let (mantissa, exponent) = scientific.split_once('e').unwrap_or((&scientific, "0"));
+    let mut digits: String = mantissa.chars().filter(char::is_ascii_digit).collect();
+    let exponent: i32 = exponent.parse().unwrap_or(0);
+    // At most 17 digits: they fit a u64.
+    if let Ok(value) = digits.parse::<u64>() {
+        let scale = exponent - i32::try_from(digits.len()).unwrap_or(0) + 1;
+        for other in [value.wrapping_sub(1), value + 1] {
+            let text = other.to_string();
+            if other % 2 == 0
+                && other != 0
+                && text.len() == digits.len()
+                && format!("{text}e{scale}").parse::<f64>() == Ok(f)
+                && is_midpoint(f, value + other, scale)
+            {
+                digits = text;
+                break;
+            }
+        }
+    }
+    (digits, exponent)
+}
+
+/// Whether `f` is exactly `sum / 2 × 10^scale`: halfway between two decimals
+/// whose digits add up to `sum`.
+fn is_midpoint(value: f64, sum: u64, scale: i32) -> bool {
+    // value = mantissa × 2^exponent exactly.
+    let bits = value.to_bits();
+    let biased = i32::try_from((bits >> 52) & 0x7ff).unwrap_or(0);
+    let fraction = bits & ((1 << 52) - 1);
+    let (mantissa, exponent) = if biased == 0 {
+        (fraction, -1074)
+    } else {
+        (fraction | 1 << 52, biased - 1075)
+    };
+    // mantissa × 2^(exponent + 1) = sum × 2^scale × 5^scale, both sides
+    // multiplied by 2^twos × 5^fives so that every exponent is natural.
+    let twos = 0.max(-(exponent + 1)).max(-scale);
+    let fives = 0.max(-scale);
+    let natural = |e: i32| e.unsigned_abs();
+    let left = BigUint::from(u128::from(mantissa))
+        .shl(natural(exponent + 1 + twos))
+        .mul_pow5(natural(fives));
+    let right = BigUint::from(u128::from(sum))
+        .shl(natural(scale + twos))
+        .mul_pow5(natural(scale + fives));
+    left == right
+}
+
 #[cfg(test)]
 // Exact float equality is what these tests check.
 #[allow(clippy::float_cmp)]
 mod tests {
+    #[test]
+    // The tie below is exactly representable: its digits are the point.
+    #[allow(clippy::excessive_precision)]
+    fn floats_are_laid_out_as_the_spec_says() {
+        use super::float_literal;
+        for (value, written) in [
+            (0.0, "0.0"),
+            (-0.0, "-0.0"),
+            (1.0, "1.0"),
+            (-7.5, "-7.5"),
+            (100.0, "100.0"),
+            (0.1, "0.1"),
+            (0.0001, "0.0001"),
+            (0.00001, "1e-5"),
+            (1.5e-7, "1.5e-7"),
+            (1e15, "1000000000000000.0"),
+            (9_999_999_999_999_998.0, "9999999999999998.0"),
+            (1e16, "1e16"),
+            (1.5e16, "1.5e16"),
+            (f64::MAX, "1.7976931348623157e308"),
+            (f64::MIN_POSITIVE, "2.2250738585072014e-308"),
+            (5e-324, "5e-324"),
+            // An exact tie between two shortest digit strings goes to the even
+            // last digit (…17.12, not …17.13).
+            (201_409_170_638_417.125, "201409170638417.12"),
+            (-201_409_170_638_417.125, "-201409170638417.12"),
+        ] {
+            assert_eq!(float_literal(value), written, "{value:e}");
+            assert_eq!(written.parse::<f64>().unwrap().to_bits(), value.to_bits());
+        }
+    }
+
     use std::cmp::Ordering::{Equal, Greater, Less};
 
     use super::Number::{self, Decimal as D, Float, Int};

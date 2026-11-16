@@ -107,6 +107,11 @@ const ran: Decision = ruleset.run(
 
 const document: Document = Document.read(new Uint8Array([123, 125]), { format: 'json' })
 const kind: DocumentKind = document.kind
+const documentBytes: Uint8Array = document.canonicalBytes()
+const documentDigest: string = document.digest()
+const rulesetDigest: string = RuleSet.fromDocument(document).digest()
+const rulesetBytes: Uint8Array = RuleSet.fromDocument(document).canonicalBytes()
+void [documentBytes, documentDigest, rulesetDigest, rulesetBytes]
 const node: Node = Node.read('x > 1', { format: 'text' })
 const tree: string = node.evaluateTree({ x: 2 }, { logic: 'boolean', strict: true })
 const valueTree: string = node.evaluateValueTreeJson('{"x": 2}', { strict: false, limits })
@@ -296,6 +301,8 @@ import {
   TableOutput,
   type TablePolicy,
   TableRow,
+  canonicalBytes,
+  digest,
   dump,
   dumps,
   evaluateTree,
@@ -311,6 +318,11 @@ const loaded: Loaded = loads('{}', { format: 'yaml', limits: { maxSize: 1000 }, 
 const loadedBytes: Loaded = loads(new Uint8Array(), { actions: new Map([['notify', (context: ActionContext) => void context.tree.truth]]) })
 if (loaded instanceof RootRuleSet) void loaded.rules
 const dumped: string = dumps(rules, { format: 'yaml', omitActions: true })
+const canonical: Uint8Array = canonicalBytes(rules, { omitActions: true })
+const ruleDigest: string = digest(F.x.gt(1), { omitActions: null })
+// @ts-expect-error: canonical bytes have no format.
+canonicalBytes(rules, { format: 'yaml' })
+void [canonical, ruleDigest]
 const loadedFile: Promise<Loaded> = load('rules.yaml', { actions: {} })
 const dumpedFile: Promise<void> = dump(rules, 'rules.json', { format: 'json' })
 const parsed: Rule = ruleFromText('RULE vip IF x > 1', { do: (context) => void context.rule.name, limits: { maxDepth: 10 } })

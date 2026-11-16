@@ -392,7 +392,8 @@ public final class DecisionTable implements DocumentContent {
         }
     }
 
-    private <T> T with(Function<MemorySegment, T> call) {
+    /** Call {@code call} with the native document, held for the call. */
+    <T> T with(Function<MemorySegment, T> call) {
         MemorySegment pointer = handle.acquire();
         try {
             return call.apply(pointer);

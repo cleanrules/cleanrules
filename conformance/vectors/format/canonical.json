@@ -1,0 +1,1335 @@
+{
+  "version": 1,
+  "area": "format",
+  "vectors": [
+    {
+      "id": "format/canonical/ruleset-example",
+      "spec": [
+        "json-format.md#canonical-bytes",
+        "json-format.md#digests"
+      ],
+      "description": "the rule set of the spec's example: members sorted by code point at every level",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"ruleset\":{\"hit_policy\":\"first\",\"logic\":\"boolean\",\"rules\":[{\"name\":\"vip\",\"then\":{\"discount\":{\"op\":\"const\",\"value\":{\"$decimal\":\"0.15\"}}},\"when\":{\"left\":{\"op\":\"field\",\"path\":[\"years\"]},\"op\":\"gt\",\"right\":{\"op\":\"const\",\"value\":5}}}]},\"version\":1}",
+        "digest": "sha256:5a0e590cb8f3bd57392ede84c0d0c4596cf9374fefcbcc6b28ed61421878f312",
+        "ruleset_digest": "sha256:5a0e590cb8f3bd57392ede84c0d0c4596cf9374fefcbcc6b28ed61421878f312"
+      }
+    },
+    {
+      "id": "format/canonical/layout-and-member-order",
+      "spec": [
+        "json-format.md#canonical-bytes",
+        "json-format.md#digests"
+      ],
+      "description": "the same rule set with other whitespace, member order, escapes and number layout: the same bytes and digest",
+      "given": {
+        "kind": "canonical",
+        "text": "{ \"ruleset\" : {\"rules\":[{\"then\":{\"discount\":{\"value\":{\"$decimal\":\"1.5e-1\"},\"op\":\"const\"}},\n\"when\":{\"right\":{\"value\":{\"$int\":\"005\"},\"op\":\"const\"},\"op\":\"gt\",\"left\":{\"path\":[\"y\\u0065ars\"],\"op\":\"field\"}},\"name\":\"\\u0076ip\"}],\r\n\"logic\":\"boolean\",\"hit_policy\":\"first\"},\"$schema\":\"x\",\"version\":1}"
+      },
+      "expect": {
+        "canonical": "{\"ruleset\":{\"hit_policy\":\"first\",\"logic\":\"boolean\",\"rules\":[{\"name\":\"vip\",\"then\":{\"discount\":{\"op\":\"const\",\"value\":{\"$decimal\":\"0.15\"}}},\"when\":{\"left\":{\"op\":\"field\",\"path\":[\"years\"]},\"op\":\"gt\",\"right\":{\"op\":\"const\",\"value\":5}}}]},\"version\":1}",
+        "digest": "sha256:5a0e590cb8f3bd57392ede84c0d0c4596cf9374fefcbcc6b28ed61421878f312",
+        "ruleset_digest": "sha256:5a0e590cb8f3bd57392ede84c0d0c4596cf9374fefcbcc6b28ed61421878f312"
+      }
+    },
+    {
+      "id": "format/canonical/condition",
+      "spec": [
+        "json-format.md#canonical-bytes",
+        "json-format.md#digests"
+      ],
+      "description": "a condition document: op is not first, and a condition gives no rule set",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"condition\":{\"left\":{\"op\":\"field\",\"path\":[\"x\"]},\"op\":\"gt\",\"right\":{\"op\":\"const\",\"value\":1}},\"version\":1}",
+        "digest": "sha256:2eb0c79c06443a02638a1df2a65c2699b10a53dc7e5941c677feba1d4c082b48"
+      }
+    },
+    {
+      "id": "format/canonical/rule",
+      "spec": [
+        "json-format.md#canonical-bytes",
+        "json-format.md#rule-set-digests"
+      ],
+      "description": "a rule document with every optional key: its digest, and the rule set digest of a rule set of that rule with the default settings",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {
+              "y": {
+                "op": "const",
+                "value": "z"
+              }
+            },
+            "priority": 10,
+            "tags": [
+              "b",
+              "a"
+            ],
+            "description": "d",
+            "metadata": {
+              "owner": "ops"
+            },
+            "do": "notify"
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"rule\":{\"description\":\"d\",\"do\":\"notify\",\"metadata\":{\"owner\":\"ops\"},\"name\":\"r\",\"priority\":10,\"tags\":[\"a\",\"b\"],\"then\":{\"y\":{\"op\":\"const\",\"value\":\"z\"}},\"when\":{\"left\":{\"op\":\"field\",\"path\":[\"x\"]},\"op\":\"gt\",\"right\":{\"op\":\"const\",\"value\":1}}},\"version\":1}",
+        "digest": "sha256:69a2c6eaf591901733881d17516502f9cc79b90a1fa1a12851097eb72e48af20",
+        "ruleset_digest": "sha256:b36f63a0f7be55bde40e55676b6fc4435c4d0c2d123af2956f51ce49b557122a"
+      }
+    },
+    {
+      "id": "format/canonical/rule-description",
+      "spec": [
+        "json-format.md#digests"
+      ],
+      "description": "the same rule with another description: another digest",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {
+              "y": {
+                "op": "const",
+                "value": "z"
+              }
+            },
+            "priority": 10,
+            "tags": [
+              "a",
+              "b"
+            ],
+            "description": "e",
+            "metadata": {
+              "owner": "ops"
+            },
+            "do": "notify"
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"rule\":{\"description\":\"e\",\"do\":\"notify\",\"metadata\":{\"owner\":\"ops\"},\"name\":\"r\",\"priority\":10,\"tags\":[\"a\",\"b\"],\"then\":{\"y\":{\"op\":\"const\",\"value\":\"z\"}},\"when\":{\"left\":{\"op\":\"field\",\"path\":[\"x\"]},\"op\":\"gt\",\"right\":{\"op\":\"const\",\"value\":1}}},\"version\":1}",
+        "digest": "sha256:bd704da5a77fcf90c03ab72c8d83ccb75c8c4ba39189851078410b9d24839226",
+        "ruleset_digest": "sha256:17bc8b34ee39ad8f6830fe069da6fd2a4d94b1a76e0c6d628030e17bbd5980a2"
+      }
+    },
+    {
+      "id": "format/canonical/decision-table",
+      "spec": [
+        "json-format.md#canonical-bytes",
+        "json-format.md#rule-set-digests"
+      ],
+      "description": "a decision table: the digest of its own document, and the rule set digest of the rule set it compiles to",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "inputs": [
+              "customer.years",
+              "order.total"
+            ],
+            "outputs": [
+              {
+                "name": "discount"
+              },
+              {
+                "name": "label"
+              }
+            ],
+            "rows": [
+              {
+                "name": "vip",
+                "inputs": [
+                  "> 5",
+                  "> 1000"
+                ],
+                "outputs": [
+                  "0.15",
+                  "'VIP'"
+                ]
+              },
+              {
+                "name": "loyal",
+                "inputs": [
+                  "> 2",
+                  "-"
+                ],
+                "outputs": [
+                  "0.05",
+                  "'loyal'"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"decision_table\":{\"hit_policy\":\"first\",\"inputs\":[\"customer.years\",\"order.total\"],\"logic\":\"boolean\",\"outputs\":[{\"name\":\"discount\"},{\"name\":\"label\"}],\"rows\":[{\"inputs\":[\"> 5\",\"> 1000\"],\"name\":\"vip\",\"outputs\":[\"0.15\",\"'VIP'\"]},{\"inputs\":[\"> 2\",\"-\"],\"name\":\"loyal\",\"outputs\":[\"0.05\",\"'loyal'\"]}]},\"version\":1}",
+        "digest": "sha256:25b8eed192147951cd20449c7886c2b8e3d7ff096c74c978c3d0b87ce00cb8ba",
+        "ruleset_digest": "sha256:ac5face379ffdf3fd8015e84ec1f5c71d371113016da6fcad6320d7894b29ee3"
+      }
+    },
+    {
+      "id": "format/canonical/flipped-comparison",
+      "spec": [
+        "json-format.md#digests"
+      ],
+      "description": "x > 1 written as 1 < x decides alike but is another artifact: another digest",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "lt",
+            "left": {
+              "op": "const",
+              "value": 1
+            },
+            "right": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"condition\":{\"left\":{\"op\":\"const\",\"value\":1},\"op\":\"lt\",\"right\":{\"op\":\"field\",\"path\":[\"x\"]}},\"version\":1}",
+        "digest": "sha256:348a9afa7a8aad8ec00e5d11529fb47ca411208a9ce0a9dea68e33679d36e927"
+      }
+    },
+    {
+      "id": "format/canonical/in-normalized",
+      "spec": [
+        "json-format.md#canonical-bytes"
+      ],
+      "description": "in values are normalized before the bytes are written: duplicates and order of the text do not change the digest",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "values": [
+              3,
+              1,
+              2,
+              1,
+              {
+                "$int": "2"
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"condition\":{\"op\":\"in\",\"operand\":{\"op\":\"field\",\"path\":[\"x\"]},\"values\":[1,2,3]},\"version\":1}",
+        "digest": "sha256:c622f545346a1c25a68d56f8e8e2b7d5e41ccaa48ea3ce7996ff1680307e7733"
+      }
+    },
+    {
+      "id": "format/canonical/ints",
+      "spec": [
+        "json-format.md#canonical-bytes"
+      ],
+      "description": "ints: bare up to 2^53 - 1, typed beyond, no leading zeros, no -0",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "in",
+            "operand": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "values": [
+              {
+                "$int": "-9223372036854775808"
+              },
+              -9007199254740992,
+              -9007199254740991,
+              -7,
+              -0,
+              {
+                "$int": "007"
+              },
+              9007199254740991,
+              9007199254740992,
+              {
+                "$int": "9223372036854775807"
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"condition\":{\"op\":\"in\",\"operand\":{\"op\":\"field\",\"path\":[\"x\"]},\"values\":[{\"$int\":\"-9223372036854775808\"},{\"$int\":\"-9007199254740992\"},-9007199254740991,-7,0,7,9007199254740991,{\"$int\":\"9007199254740992\"},{\"$int\":\"9223372036854775807\"}]},\"version\":1}",
+        "digest": "sha256:72fa82c4dff1aabc5dc9c6231884312d2abf124422708e878d1d2336558d8266"
+      }
+    },
+    {
+      "id": "format/canonical/priority-beyond-2-53",
+      "spec": [
+        "json-format.md#canonical-bytes"
+      ],
+      "description": "a priority beyond 2^53 - 1 is a typed int",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "priority": 9007199254740993
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"rule\":{\"name\":\"r\",\"priority\":{\"$int\":\"9007199254740993\"},\"when\":{\"left\":{\"op\":\"field\",\"path\":[\"x\"]},\"op\":\"gt\",\"right\":{\"op\":\"const\",\"value\":1}}},\"version\":1}",
+        "digest": "sha256:9309225a29a210456158f4a7398d9bb3b3dd15461a4d5637c87168e47e4b6bcf",
+        "ruleset_digest": "sha256:6e4dde3a5d99b5282f51cc101c7ca72872129e7f9534681b09ec38540e46a82d"
+      }
+    },
+    {
+      "id": "format/canonical/floats-plain",
+      "spec": [
+        "json-format.md#canonical-bytes"
+      ],
+      "description": "floats with an exponent from -4 to 15 in plain notation, with a point",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "a": {
+                    "op": "const",
+                    "value": {
+                      "$float": 1
+                    }
+                  },
+                  "b": {
+                    "op": "const",
+                    "value": 1e2
+                  },
+                  "c": {
+                    "op": "const",
+                    "value": 0.1
+                  },
+                  "d": {
+                    "op": "const",
+                    "value": 0.0001
+                  },
+                  "e": {
+                    "op": "const",
+                    "value": -7.5
+                  },
+                  "f": {
+                    "op": "const",
+                    "value": 1e15
+                  },
+                  "g": {
+                    "op": "const",
+                    "value": 9999999999999998.0
+                  },
+                  "h": {
+                    "op": "const",
+                    "value": 123.456
+                  },
+                  "i": {
+                    "op": "const",
+                    "value": 0.0
+                  },
+                  "j": {
+                    "op": "const",
+                    "value": -0.0
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"ruleset\":{\"hit_policy\":\"first\",\"logic\":\"boolean\",\"rules\":[{\"name\":\"r\",\"then\":{\"a\":{\"op\":\"const\",\"value\":1.0},\"b\":{\"op\":\"const\",\"value\":100.0},\"c\":{\"op\":\"const\",\"value\":0.1},\"d\":{\"op\":\"const\",\"value\":0.0001},\"e\":{\"op\":\"const\",\"value\":-7.5},\"f\":{\"op\":\"const\",\"value\":1000000000000000.0},\"g\":{\"op\":\"const\",\"value\":9999999999999998.0},\"h\":{\"op\":\"const\",\"value\":123.456},\"i\":{\"op\":\"const\",\"value\":0.0},\"j\":{\"op\":\"const\",\"value\":-0.0}},\"when\":{\"op\":\"const\",\"value\":true}}]},\"version\":1}",
+        "digest": "sha256:1a267558fdf27c4a8a427bd1f1d8d7f292937b2519f26aa488fe5b5c94e0e2d3",
+        "ruleset_digest": "sha256:1a267558fdf27c4a8a427bd1f1d8d7f292937b2519f26aa488fe5b5c94e0e2d3"
+      }
+    },
+    {
+      "id": "format/canonical/floats-exponent",
+      "spec": [
+        "json-format.md#canonical-bytes"
+      ],
+      "description": "floats with an exponent below -4 or above 15 in exponent notation, without + or leading zeros",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "a": {
+                    "op": "const",
+                    "value": 0.00001
+                  },
+                  "b": {
+                    "op": "const",
+                    "value": 1.5E-7
+                  },
+                  "c": {
+                    "op": "const",
+                    "value": 1e16
+                  },
+                  "d": {
+                    "op": "const",
+                    "value": 1.5e+16
+                  },
+                  "e": {
+                    "op": "const",
+                    "value": 1.7976931348623157e308
+                  },
+                  "f": {
+                    "op": "const",
+                    "value": 5e-324
+                  },
+                  "g": {
+                    "op": "const",
+                    "value": 2.2250738585072014e-308
+                  },
+                  "h": {
+                    "op": "const",
+                    "value": -1e-05
+                  },
+                  "i": {
+                    "op": "const",
+                    "value": 123456789012345678.0
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"ruleset\":{\"hit_policy\":\"first\",\"logic\":\"boolean\",\"rules\":[{\"name\":\"r\",\"then\":{\"a\":{\"op\":\"const\",\"value\":1e-5},\"b\":{\"op\":\"const\",\"value\":1.5e-7},\"c\":{\"op\":\"const\",\"value\":1e16},\"d\":{\"op\":\"const\",\"value\":1.5e16},\"e\":{\"op\":\"const\",\"value\":1.7976931348623157e308},\"f\":{\"op\":\"const\",\"value\":5e-324},\"g\":{\"op\":\"const\",\"value\":2.2250738585072014e-308},\"h\":{\"op\":\"const\",\"value\":-1e-5},\"i\":{\"op\":\"const\",\"value\":1.2345678901234568e17}},\"when\":{\"op\":\"const\",\"value\":true}}]},\"version\":1}",
+        "digest": "sha256:a31d7fa0a3ba8171a5d608901442f12fa0dce0936ef1fbd48cd0bbfb8042a7a3",
+        "ruleset_digest": "sha256:a31d7fa0a3ba8171a5d608901442f12fa0dce0936ef1fbd48cd0bbfb8042a7a3"
+      }
+    },
+    {
+      "id": "format/canonical/floats-shortest",
+      "spec": [
+        "json-format.md#canonical-bytes"
+      ],
+      "description": "the shortest digits that read back, and of two equally near the even one",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "a": {
+                    "op": "const",
+                    "value": 0.30000000000000004
+                  },
+                  "b": {
+                    "op": "const",
+                    "value": 0.1000000000000000055511151231257827
+                  },
+                  "c": {
+                    "op": "const",
+                    "value": 201409170638417.125
+                  },
+                  "d": {
+                    "op": "const",
+                    "value": -881490291707823.25
+                  },
+                  "e": {
+                    "op": "const",
+                    "value": 2.5e-5
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"ruleset\":{\"hit_policy\":\"first\",\"logic\":\"boolean\",\"rules\":[{\"name\":\"r\",\"then\":{\"a\":{\"op\":\"const\",\"value\":0.30000000000000004},\"b\":{\"op\":\"const\",\"value\":0.1},\"c\":{\"op\":\"const\",\"value\":201409170638417.12},\"d\":{\"op\":\"const\",\"value\":-881490291707823.2},\"e\":{\"op\":\"const\",\"value\":2.5e-5}},\"when\":{\"op\":\"const\",\"value\":true}}]},\"version\":1}",
+        "digest": "sha256:51c981b20e217d2cb31838464929403b391f829937c7f042bea4f5b5fc8c5d8f",
+        "ruleset_digest": "sha256:51c981b20e217d2cb31838464929403b391f829937c7f042bea4f5b5fc8c5d8f"
+      }
+    },
+    {
+      "id": "format/canonical/floats-infinite",
+      "spec": [
+        "json-format.md#canonical-bytes"
+      ],
+      "description": "infinite floats are typed values",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "a": {
+                    "op": "const",
+                    "value": {
+                      "$float": "inf"
+                    }
+                  },
+                  "b": {
+                    "op": "const",
+                    "value": {
+                      "$float": "-inf"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"ruleset\":{\"hit_policy\":\"first\",\"logic\":\"boolean\",\"rules\":[{\"name\":\"r\",\"then\":{\"a\":{\"op\":\"const\",\"value\":{\"$float\":\"inf\"}},\"b\":{\"op\":\"const\",\"value\":{\"$float\":\"-inf\"}}},\"when\":{\"op\":\"const\",\"value\":true}}]},\"version\":1}",
+        "digest": "sha256:635dca78ffa4b7185fac429fbcee3a8adaeed1fd7ee85a729ed977fc5fadd6cd",
+        "ruleset_digest": "sha256:635dca78ffa4b7185fac429fbcee3a8adaeed1fd7ee85a729ed977fc5fadd6cd"
+      }
+    },
+    {
+      "id": "format/canonical/decimals",
+      "spec": [
+        "json-format.md#canonical-bytes"
+      ],
+      "description": "decimals in their canonical text: plain, no leading zeros, scale kept, zero unsigned",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "a": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "007.50"
+                    }
+                  },
+                  "b": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "1.5e-3"
+                    }
+                  },
+                  "c": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "1e2"
+                    }
+                  },
+                  "d": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "-0.00"
+                    }
+                  },
+                  "e": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "inf"
+                    }
+                  },
+                  "f": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "-inf"
+                    }
+                  },
+                  "g": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "-12345678901234567890.123456789012345678"
+                    }
+                  },
+                  "h": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "1.5E+3"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"ruleset\":{\"hit_policy\":\"first\",\"logic\":\"boolean\",\"rules\":[{\"name\":\"r\",\"then\":{\"a\":{\"op\":\"const\",\"value\":{\"$decimal\":\"7.50\"}},\"b\":{\"op\":\"const\",\"value\":{\"$decimal\":\"0.0015\"}},\"c\":{\"op\":\"const\",\"value\":{\"$decimal\":\"100\"}},\"d\":{\"op\":\"const\",\"value\":{\"$decimal\":\"0.00\"}},\"e\":{\"op\":\"const\",\"value\":{\"$decimal\":\"inf\"}},\"f\":{\"op\":\"const\",\"value\":{\"$decimal\":\"-inf\"}},\"g\":{\"op\":\"const\",\"value\":{\"$decimal\":\"-12345678901234567890.123456789012345678\"}},\"h\":{\"op\":\"const\",\"value\":{\"$decimal\":\"1500\"}}},\"when\":{\"op\":\"const\",\"value\":true}}]},\"version\":1}",
+        "digest": "sha256:7aa60668b6cdd199623d3004593baea60cfec216b65498e77a0909374af3658d",
+        "ruleset_digest": "sha256:7aa60668b6cdd199623d3004593baea60cfec216b65498e77a0909374af3658d"
+      }
+    },
+    {
+      "id": "format/canonical/decimal-scale-1",
+      "spec": [
+        "json-format.md#digests"
+      ],
+      "description": "the decimal 1.0",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "price": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "1.0"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"ruleset\":{\"hit_policy\":\"first\",\"logic\":\"boolean\",\"rules\":[{\"name\":\"r\",\"then\":{\"price\":{\"op\":\"const\",\"value\":{\"$decimal\":\"1.0\"}}},\"when\":{\"op\":\"const\",\"value\":true}}]},\"version\":1}",
+        "digest": "sha256:3ffaa52d76d80bed4ec1da74ca05734e094292f3b1d602b5e7027414a34ce027",
+        "ruleset_digest": "sha256:3ffaa52d76d80bed4ec1da74ca05734e094292f3b1d602b5e7027414a34ce027"
+      }
+    },
+    {
+      "id": "format/canonical/decimal-scale-2",
+      "spec": [
+        "json-format.md#digests"
+      ],
+      "description": "the decimal 1.00, equal to 1.0 but of another scale: other bytes, another digest",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "price": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "1.00"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"ruleset\":{\"hit_policy\":\"first\",\"logic\":\"boolean\",\"rules\":[{\"name\":\"r\",\"then\":{\"price\":{\"op\":\"const\",\"value\":{\"$decimal\":\"1.00\"}}},\"when\":{\"op\":\"const\",\"value\":true}}]},\"version\":1}",
+        "digest": "sha256:5a097717ba4d263582e49361bbd3bda5e0165e724d1c348f5a5c2cd7155f85b0",
+        "ruleset_digest": "sha256:5a097717ba4d263582e49361bbd3bda5e0165e724d1c348f5a5c2cd7155f85b0"
+      }
+    },
+    {
+      "id": "format/canonical/dates-and-datetimes",
+      "spec": [
+        "json-format.md#canonical-bytes"
+      ],
+      "description": "dates and datetimes as writers write them: six fraction digits or none, Z for a zero offset, offset seconds only when not zero, the zone name",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "a": {
+                    "op": "const",
+                    "value": {
+                      "$date": "2026-10-31"
+                    }
+                  },
+                  "b": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-10-31T09:30:00"
+                    }
+                  },
+                  "c": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-10-31T09:30:00.5"
+                    }
+                  },
+                  "d": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-10-31T09:30:00.000"
+                    }
+                  },
+                  "e": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-10-31T09:30:00-00:00"
+                    }
+                  },
+                  "f": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-10-31T09:30:00+00:00"
+                    }
+                  },
+                  "g": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-10-31T09:30:00.123456+05:30:15"
+                    }
+                  },
+                  "h": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-10-31T09:30:00+01:00:00"
+                    }
+                  },
+                  "i": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-10-31T09:30:00+01:00[Europe/Madrid]"
+                    }
+                  },
+                  "j": {
+                    "op": "const",
+                    "value": {
+                      "$datetime": "2026-01-15T12:00:00+00:00[Europe/London]"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"ruleset\":{\"hit_policy\":\"first\",\"logic\":\"boolean\",\"rules\":[{\"name\":\"r\",\"then\":{\"a\":{\"op\":\"const\",\"value\":{\"$date\":\"2026-10-31\"}},\"b\":{\"op\":\"const\",\"value\":{\"$datetime\":\"2026-10-31T09:30:00\"}},\"c\":{\"op\":\"const\",\"value\":{\"$datetime\":\"2026-10-31T09:30:00.500000\"}},\"d\":{\"op\":\"const\",\"value\":{\"$datetime\":\"2026-10-31T09:30:00\"}},\"e\":{\"op\":\"const\",\"value\":{\"$datetime\":\"2026-10-31T09:30:00Z\"}},\"f\":{\"op\":\"const\",\"value\":{\"$datetime\":\"2026-10-31T09:30:00Z\"}},\"g\":{\"op\":\"const\",\"value\":{\"$datetime\":\"2026-10-31T09:30:00.123456+05:30:15\"}},\"h\":{\"op\":\"const\",\"value\":{\"$datetime\":\"2026-10-31T09:30:00+01:00\"}},\"i\":{\"op\":\"const\",\"value\":{\"$datetime\":\"2026-10-31T09:30:00+01:00[Europe/Madrid]\"}},\"j\":{\"op\":\"const\",\"value\":{\"$datetime\":\"2026-01-15T12:00:00+00:00[Europe/London]\"}}},\"when\":{\"op\":\"const\",\"value\":true}}]},\"version\":1}",
+        "digest": "sha256:c10c34e3838630b7471b93839ecf46b074b34bc45aa54defa95127dcead3ea8b",
+        "ruleset_digest": "sha256:c10c34e3838630b7471b93839ecf46b074b34bc45aa54defa95127dcead3ea8b"
+      }
+    },
+    {
+      "id": "format/canonical/strings-escapes",
+      "spec": [
+        "json-format.md#canonical-bytes"
+      ],
+      "description": "strings escape only quote, backslash and the characters below U+0020; slash, DEL, U+2028, U+2029 and noncharacters are their own UTF-8 bytes",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "a": {
+                    "op": "const",
+                    "value": "quote \" backslash \\ slash / /"
+                  },
+                  "b": {
+                    "op": "const",
+                    "value": "\u0000\u0001\b\t\n\u000b\f\r\u000e\u001f "
+                  },
+                  "c": {
+                    "op": "const",
+                    "value": "  ￿￾😀"
+                  },
+                  "d": {
+                    "op": "const",
+                    "value": "é é café 日本"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"ruleset\":{\"hit_policy\":\"first\",\"logic\":\"boolean\",\"rules\":[{\"name\":\"r\",\"then\":{\"a\":{\"op\":\"const\",\"value\":\"quote \\\" backslash \\\\ slash / /\"},\"b\":{\"op\":\"const\",\"value\":\"\\u0000\\u0001\\b\\t\\n\\u000b\\f\\r\\u000e\\u001f \"},\"c\":{\"op\":\"const\",\"value\":\"  ￿￾😀\"},\"d\":{\"op\":\"const\",\"value\":\"é é café 日本\"}},\"when\":{\"op\":\"const\",\"value\":true}}]},\"version\":1}",
+        "digest": "sha256:c7fd2f7868213ed933d983d69687e0b39dcae3164ebccabd4cce24ef4314877a",
+        "ruleset_digest": "sha256:c7fd2f7868213ed933d983d69687e0b39dcae3164ebccabd4cce24ef4314877a"
+      }
+    },
+    {
+      "id": "format/canonical/string-precomposed",
+      "spec": [
+        "json-format.md#digests"
+      ],
+      "description": "a rule named with a precomposed é (U+00E9)",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "café",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "a": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"ruleset\":{\"hit_policy\":\"first\",\"logic\":\"boolean\",\"rules\":[{\"name\":\"café\",\"then\":{\"a\":{\"op\":\"const\",\"value\":1}},\"when\":{\"op\":\"const\",\"value\":true}}]},\"version\":1}",
+        "digest": "sha256:696c1416a145f8e0c1427d47417fdfbc9e2d569b67b59b222a53b23109cdd50c",
+        "ruleset_digest": "sha256:696c1416a145f8e0c1427d47417fdfbc9e2d569b67b59b222a53b23109cdd50c"
+      }
+    },
+    {
+      "id": "format/canonical/string-decomposed",
+      "spec": [
+        "json-format.md#digests"
+      ],
+      "description": "the same name with e and a combining acute accent: never normalized, another digest",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "café",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "a": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"ruleset\":{\"hit_policy\":\"first\",\"logic\":\"boolean\",\"rules\":[{\"name\":\"café\",\"then\":{\"a\":{\"op\":\"const\",\"value\":1}},\"when\":{\"op\":\"const\",\"value\":true}}]},\"version\":1}",
+        "digest": "sha256:1c1fb0ec8b7a4923acb1b764bfd032cb5bdc048aa45c930e683dc38edbe6e5a7",
+        "ruleset_digest": "sha256:1c1fb0ec8b7a4923acb1b764bfd032cb5bdc048aa45c930e683dc38edbe6e5a7"
+      }
+    },
+    {
+      "id": "format/canonical/keys-by-code-point",
+      "spec": [
+        "json-format.md#canonical-bytes"
+      ],
+      "description": "keys sorted by code point, not by UTF-16 code unit: U+FF5A before U+1F600",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "then": {
+              "😀": {
+                "op": "const",
+                "value": 1
+              },
+              "ｚ": {
+                "op": "const",
+                "value": 2
+              },
+              "Z": {
+                "op": "const",
+                "value": 3
+              },
+              "a": {
+                "op": "const",
+                "value": 4
+              },
+              "é": {
+                "op": "const",
+                "value": 5
+              }
+            },
+            "metadata": {
+              "😀": 1,
+              "ｚ": 2,
+              "a b": 3,
+              "a": 4
+            }
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"rule\":{\"metadata\":{\"a\":4,\"a b\":3,\"ｚ\":2,\"😀\":1},\"name\":\"r\",\"then\":{\"Z\":{\"op\":\"const\",\"value\":3},\"a\":{\"op\":\"const\",\"value\":4},\"é\":{\"op\":\"const\",\"value\":5},\"ｚ\":{\"op\":\"const\",\"value\":2},\"😀\":{\"op\":\"const\",\"value\":1}},\"when\":{\"left\":{\"op\":\"field\",\"path\":[\"x\"]},\"op\":\"gt\",\"right\":{\"op\":\"const\",\"value\":1}}},\"version\":1}",
+        "digest": "sha256:750eb11a3a47ac037e4187dc9d5236d06b2f3ccb8f6b717f4b1a948179f5f5e0",
+        "ruleset_digest": "sha256:7933f49bf579eb295731264a5de1e0707e64103f46658e4eeeeeab0216c8bc91"
+      }
+    },
+    {
+      "id": "format/canonical/data-in-metadata",
+      "spec": [
+        "json-format.md#canonical-bytes"
+      ],
+      "description": "lists and maps in metadata: lists in order, maps sorted, $map only for a key that starts with $",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "r",
+            "when": {
+              "op": "gt",
+              "left": {
+                "op": "field",
+                "path": [
+                  "x"
+                ]
+              },
+              "right": {
+                "op": "const",
+                "value": 1
+              }
+            },
+            "metadata": {
+              "list": [
+                3,
+                1.0,
+                "a",
+                null,
+                true,
+                {
+                  "$decimal": "1.10"
+                },
+                []
+              ],
+              "map": {
+                "b": {
+                  "$map": {
+                    "y": 1,
+                    "x": 2
+                  }
+                },
+                "a": {}
+              },
+              "dollar": {
+                "$map": {
+                  "$ref": 1,
+                  "b": {
+                    "$map": {
+                      "$id": "x"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"rule\":{\"metadata\":{\"dollar\":{\"$map\":{\"$ref\":1,\"b\":{\"$map\":{\"$id\":\"x\"}}}},\"list\":[3,1.0,\"a\",null,true,{\"$decimal\":\"1.10\"},[]],\"map\":{\"a\":{},\"b\":{\"x\":2,\"y\":1}}},\"name\":\"r\",\"when\":{\"left\":{\"op\":\"field\",\"path\":[\"x\"]},\"op\":\"gt\",\"right\":{\"op\":\"const\",\"value\":1}}},\"version\":1}",
+        "digest": "sha256:b12aad71231f451ef3efdaa6fbf429bbc9e9a23ff4a5da2dd2ae2cd5956382a1",
+        "ruleset_digest": "sha256:0c7378051a1dd0710eb5f0c5712297e8471ffdfac47309dc1a3c0ec019174974"
+      }
+    },
+    {
+      "id": "format/canonical/paths-and-round",
+      "spec": [
+        "json-format.md#canonical-bytes"
+      ],
+      "description": "path indexes and round's scale are integer literals; round's mode is written",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "round",
+              "operand": {
+                "op": "field",
+                "path": [
+                  "items",
+                  0,
+                  "price"
+                ]
+              },
+              "scale": 2
+            },
+            "right": {
+              "op": "const",
+              "value": {
+                "$decimal": "9.99"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"condition\":{\"left\":{\"mode\":\"half_even\",\"op\":\"round\",\"operand\":{\"op\":\"field\",\"path\":[\"items\",0,\"price\"]},\"scale\":2},\"op\":\"gt\",\"right\":{\"op\":\"const\",\"value\":{\"$decimal\":\"9.99\"}}},\"version\":1}",
+        "digest": "sha256:724305307946b0db1cb4165aa3a35ca8144085e5cfcd1dc9e8a8bb6cc98579a4"
+      }
+    },
+    {
+      "id": "format/canonical/rule-with-id",
+      "spec": [
+        "json-format.md#canonical-bytes",
+        "json-format.md#rule-set-digests",
+        "rules.md#identity"
+      ],
+      "description": "a rule with an id: the key id sorts like any other key, before name",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "gold_customer",
+            "id": "vip",
+            "when": {
+              "op": "field",
+              "path": [
+                "vip"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"rule\":{\"id\":\"vip\",\"name\":\"gold_customer\",\"when\":{\"op\":\"field\",\"path\":[\"vip\"]}},\"version\":1}",
+        "digest": "sha256:b09e2457642bab567299af02a987e42810a122f05666ad0741a6c8905bf16b3e",
+        "ruleset_digest": "sha256:fb8637e45a5fd3fe8c805900c7e75b5c8eb047c4d95dcc50dbe24dee3f579581"
+      }
+    },
+    {
+      "id": "format/canonical/rule-id-equal-to-name",
+      "spec": [
+        "json-format.md#digests",
+        "rules.md#identity"
+      ],
+      "description": "an explicit id equal to the name is written, so the digest differs from the same rule without an id, whose effective id is the same",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "vip",
+            "id": "vip",
+            "when": {
+              "op": "field",
+              "path": [
+                "vip"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"rule\":{\"id\":\"vip\",\"name\":\"vip\",\"when\":{\"op\":\"field\",\"path\":[\"vip\"]}},\"version\":1}",
+        "digest": "sha256:643bd26dd2bd198653c4d7f48a001b8557d00bb0cce89ef483a16a2458ec5e09",
+        "ruleset_digest": "sha256:b31135a72dad395a5c353a08f45a048f2b08f5c99a86aee99ceea3377ee333cc"
+      }
+    },
+    {
+      "id": "format/canonical/rule-without-id",
+      "spec": [
+        "json-format.md#digests",
+        "rules.md#identity"
+      ],
+      "description": "the same rule without an id: no id key, as before ids existed",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "vip",
+            "when": {
+              "op": "field",
+              "path": [
+                "vip"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"rule\":{\"name\":\"vip\",\"when\":{\"op\":\"field\",\"path\":[\"vip\"]}},\"version\":1}",
+        "digest": "sha256:694c8e1ca609db375f4f3e4a29f59b8d33c1ea48248d27003c56ffba0cc15093",
+        "ruleset_digest": "sha256:5e431aad17af9f230ab90881ea2abe8f4a5b201bedf431bc3ca1388df23bb794"
+      }
+    },
+    {
+      "id": "format/canonical/ruleset-ids-mixed",
+      "spec": [
+        "json-format.md#canonical-bytes",
+        "json-format.md#rule-set-digests",
+        "rules.md#identity"
+      ],
+      "description": "a rule set of a rule with an id and one without: id is written only where given",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "gold_customer",
+                "id": "vip",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "vip"
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "default",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"ruleset\":{\"hit_policy\":\"first\",\"logic\":\"boolean\",\"rules\":[{\"id\":\"vip\",\"name\":\"gold_customer\",\"then\":{\"discount\":{\"op\":\"const\",\"value\":{\"$decimal\":\"0.15\"}}},\"when\":{\"op\":\"field\",\"path\":[\"vip\"]}},{\"name\":\"default\",\"then\":{\"discount\":{\"op\":\"const\",\"value\":{\"$decimal\":\"0\"}}},\"when\":{\"op\":\"const\",\"value\":true}}]},\"version\":1}",
+        "digest": "sha256:fe37e98966acefbac102c8aac251d292ac619bd1c83b23f8752052124436f799",
+        "ruleset_digest": "sha256:fe37e98966acefbac102c8aac251d292ac619bd1c83b23f8752052124436f799"
+      }
+    }
+  ]
+}

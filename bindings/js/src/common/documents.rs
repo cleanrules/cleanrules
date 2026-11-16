@@ -1,8 +1,10 @@
 //! Documents for the idiomatic API (`lib/api/documents.js`): writing a
-//! condition or a rule as a document, reading one rule from text, the parts of
-//! a rule read from a document, and the size check of a file before it is
-//! read. The core reads and writes every document (`spec/json-format.md`,
-//! `spec/text.md`); JavaScript builds its objects from what this gives.
+//! condition or a rule as a document, their canonical bytes and digests
+//! (`spec/json-format.md`, *Canonical bytes*, *Digests*), reading one rule
+//! from text, the parts of a rule read from a document, and the size check of
+//! a file before it is read. The core reads and writes every document
+//! (`spec/json-format.md`, `spec/text.md`); JavaScript builds its objects
+//! from what this gives.
 
 use cleanrules::ast::Node;
 use cleanrules::format::{Document, DocumentFormat, write_document_as};
@@ -26,6 +28,26 @@ pub(crate) fn write_condition(node: &Node, format: &Raw) -> Outcome<String> {
 pub(crate) fn write_rule(rule: &Rule, format: &Raw) -> Outcome<String> {
     let format = super::format(format, DocumentFormat::Json)?;
     Ok(write_document_as(&Document::Rule(rule.clone()), format)?)
+}
+
+/// The canonical bytes of the condition document of `node`.
+pub(crate) fn condition_canonical(node: &Node) -> Vec<u8> {
+    Document::Condition(node.clone()).canonical_bytes()
+}
+
+/// The digest of the condition document of `node`.
+pub(crate) fn condition_digest(node: &Node) -> String {
+    Document::Condition(node.clone()).digest().to_string()
+}
+
+/// The canonical bytes of the rule document of `rule`.
+pub(crate) fn rule_canonical(rule: &Rule) -> Vec<u8> {
+    rule.canonical_bytes()
+}
+
+/// The digest of the rule document of `rule`.
+pub(crate) fn rule_digest(rule: &Rule) -> String {
+    rule.digest().to_string()
 }
 
 /// One rule written in the text syntax (`spec/text.md`, `rule_from_text`).

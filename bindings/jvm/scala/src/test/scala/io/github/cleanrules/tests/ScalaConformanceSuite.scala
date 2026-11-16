@@ -94,6 +94,10 @@ class ScalaConformanceSuite extends munit.FunSuite:
     assertEquals(skipped.getOrElse("agents", Vector()), ofKind("tool"))
     assertEquals(skipped.getOrElse("diagram", Vector()), ofKind("draw"))
     assertEquals(skipped.getOrElse("graded", Vector()), vectors.collect { case (id, vector) if Conformance.isGraded(vector) => id }.toVector)
+    // Canonical bytes and digests run the Scala way, never skipped.
+    val canonical = ofKind("canonical")
+    assert(canonical.nonEmpty, "no canonical vectors")
+    assert(canonical.forall(id => !skipped.values.exists(_.contains(id))), "a canonical vector was skipped")
 
   test("a wrong expected output fails the Scala way"):
     val all = mutable.LinkedHashMap[String, java.util.Map[?, ?]]()

@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * Loading and dumping conditions, rules, rule sets and decision tables, and
@@ -45,6 +46,12 @@ import java.util.Objects;
  * <p>Rules read from a document keep the core's own rules, so they write back
  * exactly. A rule's action is the name the document gives it, never code:
  * pass {@code actions}, a registry, to bind those names ({@link RuleSet#bind(Map)}).
+ *
+ * <p>{@link #canonicalBytes(DocumentContent)} gives a document's canonical
+ * bytes and {@link #digest(DocumentContent)} their SHA-256 digest
+ * ({@code sha256:<hex>}), the same in every language: to pin, cache or audit
+ * the exact artifact a decision was made with. A digest tells one artifact
+ * from another, not whether two of them decide alike.
  */
 public final class Documents {
     private Documents() {}
@@ -384,10 +391,105 @@ public final class Documents {
     public static String dumps(DocumentContent value, Format format, boolean omitActions) {
         Objects.requireNonNull(value, "value");
         Objects.requireNonNull(format, "format");
+        int code = Native.format(format);
+        return emit(
+                value,
+                omitActions,
+                document -> Scope.text((out, len, error) -> Native.documentWrite(document, code, out, len, error)),
+                rules -> rules.write(format));
+    }
+
+    /**
+     * The canonical bytes of a condition, rule, rule set or decision table
+     * ({@code spec/json-format.md}, <i>Canonical bytes</i>): the UTF-8 JSON
+     * text of its document in canonical form, every object's members sorted
+     * by key by Unicode code point, without whitespace. The same document
+     * gives the same bytes in every language, whatever the layout, member
+     * order or escapes of the text it was read from.
+     *
+     * @param value what to write
+     * @return the bytes, valid UTF-8 without a NUL byte
+     * @throws UnsupportedException if a rule's action is code without a name
+     * @throws ExpressionException if {@code value} is a value node, not a condition
+     */
+    public static byte[] canonicalBytes(DocumentContent value) {
+        return canonicalBytes(value, false);
+    }
+
+    /**
+     * The canonical bytes of a condition, rule, rule set or decision table.
+     *
+     * @param value what to write
+     * @param omitActions leave out the actions that are code without a name,
+     *     instead of refusing them, as {@link #dumps(DocumentContent, Format, boolean)}
+     * @return the bytes
+     * @throws CleanRulesException as {@link #canonicalBytes(DocumentContent)}
+     */
+    public static byte[] canonicalBytes(DocumentContent value, boolean omitActions) {
+        return emit(
+                value,
+                omitActions,
+                document -> Scope.textBytes((out, len, error) -> Native.documentCanonical(document, out, len, error)),
+                io.github.cleanrules.ffi.RuleSet::canonicalBytes);
+    }
+
+    /**
+     * The digest of a condition, rule, rule set or decision table
+     * ({@code spec/json-format.md}, <i>Digests</i>): {@code sha256:} and the
+     * 64 lowercase hexadecimal digits of the SHA-256 hash of its
+     * {@linkplain #canonicalBytes(DocumentContent) canonical bytes}.
+     *
+     * <p>A digest identifies one concrete canonical artifact, not equivalence:
+     * {@code x > 5} and {@code 5 < x} decide alike but have different digests,
+     * and so do the decimals {@code 1.0} and {@code 1.00}, equal but of another
+     * scale. A rule set's digest is the rule set digest that a decision's
+     * {@code ruleset_digest} holds. A decision table's is the digest of the
+     * table's own document; the rule set it compiles to has its own,
+     * {@code digest(table.ruleSet())}. For a rule, the rule set digest is that
+     * of a rule set of the rule with the defaults, {@code digest(RuleSet.of(rule))}.
+     *
+     * @param value what to digest
+     * @return the digest, such as {@code sha256:5a0e590c...}
+     * @throws UnsupportedException if a rule's action is code without a name
+     * @throws ExpressionException if {@code value} is a value node, not a condition
+     */
+    public static String digest(DocumentContent value) {
+        return digest(value, false);
+    }
+
+    /**
+     * The digest of a condition, rule, rule set or decision table.
+     *
+     * @param value what to digest
+     * @param omitActions leave out the actions that are code without a name,
+     *     instead of refusing them, as {@link #dumps(DocumentContent, Format, boolean)}
+     * @return the digest
+     * @throws CleanRulesException as {@link #digest(DocumentContent)}
+     */
+    public static String digest(DocumentContent value, boolean omitActions) {
+        return emit(
+                value,
+                omitActions,
+                document -> Scope.text((out, len, error) -> Native.documentDigest(document, out, len, error)),
+                io.github.cleanrules.ffi.RuleSet::digest);
+    }
+
+    /**
+     * What {@code fromDocument} gives for the native document of {@code value},
+     * or, for a rule set, what {@code fromRuleSet} gives for its native rule set.
+     */
+    private static <T> T emit(
+            DocumentContent value,
+            boolean omitActions,
+            Function<MemorySegment, T> fromDocument,
+            Function<io.github.cleanrules.ffi.RuleSet, T> fromRuleSet) {
+        Objects.requireNonNull(value, "value");
         return switch (value) {
-            case DecisionTable table -> table.write(format);
-            case Expr condition -> write(condition.with(pointer ->
-                    Scope.value((out, error) -> Native.documentNewCondition(pointer, out, error))), format);
+            case DecisionTable table -> table.with(fromDocument);
+            case Expr condition -> owned(
+                    condition.with(pointer ->
+                            Scope.value((out, error) -> Native.documentNewCondition(pointer, out, error))),
+                    fromDocument);
             case Rule rule -> {
                 checkActions(List.of(rule), "/rule", omitActions);
                 MemorySegment pointer = rule.acquire();
@@ -397,20 +499,19 @@ public final class Documents {
                 } finally {
                     rule.release();
                 }
-                yield write(document, format);
+                yield owned(document, fromDocument);
             }
             case RuleSet rules -> {
                 checkActions(rules.rules(), "/ruleset/rules/", omitActions);
-                yield rules.nativeRuleSet().write(format);
+                yield fromRuleSet.apply(rules.nativeRuleSet());
             }
         };
     }
 
-    /** The text of an owned document, which this frees. */
-    private static String write(MemorySegment document, Format format) {
+    /** What {@code call} gives for an owned document, which this frees. */
+    private static <T> T owned(MemorySegment document, Function<MemorySegment, T> call) {
         try {
-            return Scope.text((out, len, error) ->
-                    Native.documentWrite(document, Native.format(format), out, len, error));
+            return call.apply(document);
         } finally {
             Native.documentFree(document);
         }

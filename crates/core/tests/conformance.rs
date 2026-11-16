@@ -17,7 +17,8 @@ use cleanrules::agents::Catalog;
 use cleanrules::eval::{Options, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
-    Document, read_decision_document, read_parsed_document, write_explanation, write_summary,
+    Document, read_decision_document, read_document, read_parsed_document, write_explanation,
+    write_summary,
 };
 use cleanrules::format::{
     ValueContext, read_node, read_ruleset, read_value, write_decision, write_path, write_result,
@@ -369,9 +370,42 @@ fn run_draw(vector: &Json) -> Result<(), String> {
     }
 }
 
+/// A `canonical` vector: the document's canonical bytes, its digest and, for
+/// the documents that give a rule set, its rule set digest
+/// (`spec/json-format.md`, *Canonical bytes*, *Digests*).
+fn run_canonical(vector: &Json) -> Result<(), String> {
+    let given = get(vector, "given").unwrap();
+    let expect = get(vector, "expect").unwrap();
+    let source = text(get(given, "text"))
+        .map_or_else(|| to_string(get(given, "document").unwrap()), str::to_owned);
+    let document = read_document(&source, &Limits::default())
+        .map_err(|e| format!("reading the document: {e}"))?;
+    let mut problems = Vec::new();
+    let bytes = String::from_utf8(document.canonical_bytes()).unwrap();
+    if Some(bytes.as_str()) != text(get(expect, "canonical")) {
+        problems.push(format!("canonical bytes {bytes}"));
+    }
+    let digest = document.digest().to_string();
+    if Some(digest.as_str()) != text(get(expect, "digest")) {
+        problems.push(format!("digest {digest}"));
+    }
+    let ruleset_digest = document.into_ruleset().ok().map(|r| r.digest().to_string());
+    if ruleset_digest.as_deref() != text(get(expect, "ruleset_digest")) {
+        problems.push(format!("rule set digest {ruleset_digest:?}"));
+    }
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        Err(problems.join("; "))
+    }
+}
+
 fn run(vector: &Json) -> Result<(), String> {
     let given = get(vector, "given").unwrap();
     let kind = text(get(given, "kind")).unwrap();
+    if kind == "canonical" {
+        return run_canonical(vector);
+    }
     if kind == "draw" {
         return run_draw(vector);
     }
@@ -438,7 +472,14 @@ fn conformance_vectors() {
                 }
                 if !matches!(
                     kind,
-                    "condition" | "value" | "evaluate" | "explain" | "summary" | "tool" | "draw"
+                    "condition"
+                        | "value"
+                        | "evaluate"
+                        | "explain"
+                        | "summary"
+                        | "tool"
+                        | "draw"
+                        | "canonical"
                 ) {
                     *pending.entry(kind.to_owned()).or_default() += 1;
                     continue;
