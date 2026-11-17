@@ -71,14 +71,17 @@ var conformanceSkips = map[string]string{
 	"zero_limit": "a limit of 0, which Go cannot give: 0 in a field of Limits keeps the default" +
 		" (spec/json-format.md, Errors and limits), and a limit of 0 refuses every input",
 	"zone_unknown_to_go": "a datetime in a zone that Go's zone database does not know, which no time.Time holds",
+	"bundle": "bundles (spec/bundles.md) have no Go type yet (a beta binding, docs/PLAN.md, R.5): Loads" +
+		" refuses a bundle once the core has read it, so vectors that read one without an error, make or" +
+		" compare bundles run in the core, C ABI, Python and JavaScript runners",
 	"graded": "conditions under a graded logic: the binding evaluates one node under boolean only until task" +
 		" J.1b",
 }
 
 // allowedSkips are the skips each route may have; any other fails.
 var allowedSkips = map[string][]string{
-	"json":   {"agents", "diagram", "graded", "grid", "native"},
-	"native": {"agents", "diagram", "graded", "zero_limit", "zone_unknown_to_go"},
+	"json":   {"agents", "bundle", "diagram", "graded", "grid", "native"},
+	"native": {"agents", "bundle", "diagram", "graded", "zero_limit", "zone_unknown_to_go"},
 }
 
 // conformance runs vectors; it counts the Go forms of the native route.
@@ -154,10 +157,36 @@ func (c *conformance) run(vector *jsonObject, route string) (failure, skip strin
 	if isGraded(given) {
 		return "", "graded"
 	}
+	if needsBundles(given, expect) {
+		return "", "bundle"
+	}
 	if route == "json" {
 		return c.runJSON(given, expect), ""
 	}
 	return c.runNative(given, expect), ""
+}
+
+// needsBundles says whether a vector needs the Go type of a bundle, which the
+// binding does not have yet: one that makes or compares bundles, reads one
+// without an error, or holds a bundle of the engine that runs it. Vectors
+// whose bundle the reader refuses still run: Loads gives the core's error.
+func needsBundles(given, expect *jsonObject) bool {
+	switch given.str("kind") {
+	case "bundle", "bundle_compare":
+		return true
+	case "read", "canonical":
+		if given.get("current_engine") == true {
+			return true
+		}
+		holds := false
+		if document := given.obj("document"); document != nil {
+			holds = document.has("bundle")
+		} else if yaml, ok := given.get("yaml").(string); ok {
+			holds = strings.Contains(yaml, "\nbundle:")
+		}
+		return holds && !expect.has("error")
+	}
+	return false
 }
 
 // isGraded says whether a vector evaluates a condition under a graded logic,

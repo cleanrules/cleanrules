@@ -16,6 +16,7 @@ use napi::bindgen_prelude::{
 use napi::{Env, Result, ValueType};
 use napi_derive::napi;
 
+use crate::common::bundles::RawCase;
 use crate::common::{LIMIT_NAMES, LIMITS, OBJECT, Outcome, Problem, Raw, RawLimits, RawOptions};
 use hooks::{range_error, throw, type_error};
 
@@ -145,6 +146,38 @@ pub(crate) fn raw_list(env: &Env, value: &Unknown<'_>, what: &str) -> Result<Vec
         .map(|i| match array.get::<Unknown<'_>>(i)? {
             Some(item) => raw(&item),
             None => Ok(Raw::Undefined),
+        })
+        .collect()
+}
+
+/// The case files of a bundle, `[{ path, content }]`: none when left out.
+pub(crate) fn raw_cases(env: &Env, value: Option<Unknown<'_>>) -> Result<Vec<RawCase>> {
+    let Some(value) = value else {
+        return Ok(Vec::new());
+    };
+    let kind = raw(&value)?;
+    if matches!(kind, Raw::Undefined | Raw::Null) {
+        return Ok(Vec::new());
+    }
+    if !value.is_array()? {
+        return Err(fail(env, crate::common::not_a_list("cases", &kind)));
+    }
+    let array = Array::from_unknown(value)?;
+    (0..array.len())
+        .map(|i| {
+            let Some(item) = array.get::<Unknown<'_>>(i)? else {
+                return Ok(RawCase::Wrong("undefined"));
+            };
+            match raw(&item)? {
+                Raw::Other(OBJECT) => {
+                    let object = Object::from_unknown(item)?;
+                    Ok(RawCase::Given {
+                        path: member(&object, "path")?,
+                        content: member(&object, "content")?,
+                    })
+                }
+                other => Ok(RawCase::Wrong(other.describe())),
+            }
         })
         .collect()
 }

@@ -33,6 +33,7 @@ describe(`the package (${build})`, () => {
     assert.deepEqual(Object.keys(root).sort(), [
       'ActionContext',
       'ActionError',
+      'Bundle',
       'Cause',
       'CauseGroup',
       'CleanRulesError',
@@ -149,7 +150,7 @@ describe(`the package (${build})`, () => {
     }
     // The idiomatic API: each build makes its own classes, with the same members.
     const [napiRoot, wasmRoot] = await roots()
-    for (const name of ['Expr', 'Field', 'Const', 'Rule', 'RuleSet', 'Decision', 'DecisionTable']) {
+    for (const name of ['Expr', 'Field', 'Const', 'Rule', 'RuleSet', 'Decision', 'DecisionTable', 'Bundle']) {
       assert.notEqual(napiRoot[name], wasmRoot[name], name)
       assert.deepEqual(members(wasmRoot[name]), members(napiRoot[name]), name)
     }
@@ -169,7 +170,7 @@ describe(`the package (${build})`, () => {
     }
     const internal = (layer) =>
       Object.keys(layer)
-        .filter((name) => /^(node|rule|decision|explanation|summary|action|document|write|canonical|digest|grid|file|maxValues)[A-Z]|^(NodeList|RuleList|Native[A-Z]\w*|stringifiable)$/.test(name))
+        .filter((name) => /^(node|rule|decision|explanation|summary|action|document|write|canonical|digest|grid|file|maxValues|bundle)[A-Z]|^(NodeList|RuleList|Native[A-Z]\w*|stringifiable)$/.test(name))
         .sort()
     assert.deepEqual(internal(napiLayer), [...INTERNAL].sort())
     assert.deepEqual(internal(wasmLayer), [...INTERNAL].sort())

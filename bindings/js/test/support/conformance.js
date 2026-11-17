@@ -26,6 +26,15 @@
 //   `RuleSet.readDecision`; `canonical` vectors through `canonicalBytes` and
 //   `digest`, of what `loads` reads and of the same document built in code.
 //
+// Bundles (spec/bundles.md): `read` vectors with `current_engine` get this
+// engine's version (`version`) in `engine.version` of the given and the
+// expected document, and so does the expected document of a `bundle` vector.
+// `bundle` vectors make a bundle with `Document.makeBundle` (json) and
+// `new Bundle` of a rule set built in code or a table read (native), write it
+// and read it back; their errors are compared by code only. `bundle_compare`
+// vectors compare two bundles read with `Document.read` and `compareBundle`
+// (json) or `loads` and `Bundle.compare` (native), both ways round.
+//
 // The runner only drives the library and compares: results are parsed with
 // ./json.js and compared with the vectors as trees, never with the library's
 // own JSON parser or equality.
@@ -33,7 +42,7 @@
 import { Num, Obj, byCodePoint, parse, same, tree, write } from './json.js'
 
 /** Vectors are only ever added: the count when this runner was last changed. */
-export const MINIMUM_VECTORS = 2951
+export const MINIMUM_VECTORS = 3066
 
 /** Why a vector does not run one way: each is counted and listed. */
 export const SKIPS = {
@@ -313,6 +322,152 @@ export function conformance(R, N) {
 
   const rulesetDocument = (given) => `{"version":1,"ruleset":${write(need(given, 'ruleset'))}}`
 
+  // --- Bundles ---------------------------------------------------------------
+
+  /** `o` with its member `key` replaced by `change(value)`. */
+  const swap = (o, key, change) => new Obj(o.entries.map(([k, v]) => [k, k === key ? change(v) : v]))
+
+  /** A bundle document that names this engine: `engine.version` is this build's `version`. */
+  const withThisEngine = (document) =>
+    swap(document, 'bundle', (bundle) => swap(bundle, 'engine', (engine) => swap(engine, 'version', () => R.version)))
+
+  /**
+   * A `read` vector's given and expected outputs, with `current_engine`
+   * honoured (`conformance/README.md`): both documents name this engine.
+   */
+  function currentEngine(given, expect) {
+    if (given.get('current_engine') !== true) return [given, expect]
+    const fixed = expect.has('document') ? swap(expect, 'document', withThisEngine) : expect
+    return [swap(given, 'document', withThisEngine), fixed]
+  }
+
+  /** The error of a `bundle` vector: its code only. */
+  function codeForm(error) {
+    checkClass(error)
+    return new Obj([['code', error.code]])
+  }
+
+  /** The case files of a `bundle` vector, as `{ path, content }`: every other content as UTF-8 bytes. */
+  function casesOf(given, bytesToo) {
+    return (given.get('cases') ?? []).map((item, i) => {
+      const text = need(item, 'text')
+      return { path: need(item, 'path'), content: bytesToo && i % 2 === 1 ? new TextEncoder().encode(text) : text }
+    })
+  }
+
+  /**
+   * A `Bundle` of the idiomatic API against the bundle document that the
+   * core reads or writes for it: what each getter gives, and its cases.
+   */
+  function checkBundle(bundle, document) {
+    const want = need(document, 'bundle')
+    const engine = need(want, 'engine')
+    const limits = need(engine, 'limits')
+    const got = new Obj([
+      ['id', bundle.id],
+      ['revision', bundle.revision],
+      ['ruleset_digest', bundle.rulesetDigest],
+      [
+        'engine',
+        new Obj([
+          ['name', bundle.engine.name],
+          ['version', bundle.engine.version],
+          ['limits', new Obj(Object.entries(LIMITS).map(([key, name]) => [key, tree(bundle.engine.limits[name] ?? null)]))],
+        ]),
+      ],
+      ['contract', tree(bundle.contract)],
+      ['cases', bundle.cases.map((c) => new Obj([['path', c.path], ['digest', c.digest]]))],
+    ])
+    const expected = new Obj([
+      ['id', need(want, 'id')],
+      ['revision', need(want, 'revision')],
+      ['ruleset_digest', need(want, 'ruleset_digest')],
+      ['engine', new Obj([['name', need(engine, 'name')], ['version', need(engine, 'version')], ['limits', limits]])],
+      ['contract', need(want, 'contract')],
+      ['cases', want.get('cases') ?? []],
+    ])
+    if (!same(got, expected)) return `the Bundle's getters give
+  ${write(got)}
+not
+  ${write(expected)}`
+    const isCurrent = need(engine, 'name') === 'cleanrules' && need(engine, 'version') === R.version
+    if (bundle.engine.isCurrent !== isCurrent) return `engine.isCurrent is ${bundle.engine.isCurrent}`
+    const held = want.has('decision_table') ? R.DecisionTable : R.RuleSet
+    if (!(bundle.rules instanceof held)) return `rules is a ${bundle.rules.constructor.name}, not a ${held.name}`
+    if (R.digest(bundle.ruleset) !== bundle.rulesetDigest) return 'digest(bundle.ruleset) is not bundle.rulesetDigest'
+    if (!Object.isFrozen(bundle.engine) || !Object.isFrozen(bundle.contract) || !Object.isFrozen(bundle.cases)) {
+      return "a Bundle's engine, contract and cases are frozen"
+    }
+    return ''
+  }
+
+  /** A `bundle` vector through the native layer: `Document.makeBundle`, written and read back. */
+  function makeJson(given, expect) {
+    const want = expect.has('document') ? swap(expect, 'document', withThisEngine) : expect
+    const rules = N.Document.read(write(need(given, 'document')))
+    const outcome = attempt(R, () =>
+      N.Document.makeBundle(rules, need(given, 'id'), need(given, 'revision'), casesOf(given, false), limitsOf(given)),
+    )
+    if (outcome.error !== undefined || want.has('error')) return compare(outcome, want, 'document', { form: codeForm })
+    const made = outcome.result
+    const text = made.write()
+    const issues = [compare({ result: parse(text) }, want, 'document')]
+    // This engine reads what it made, verifying its digest and contract.
+    const again = attempt(R, () => N.Document.read(text))
+    if (again.error !== undefined) return `read back: ${again.error.code}: ${again.error.message}`
+    issues.push(compareText('read back', again.result.write(), text))
+    issues.push(compareText('read back, digest()', again.result.digest(), made.digest()))
+    return issues.filter(Boolean).join('; ')
+  }
+
+  /** A `bundle` vector through the idiomatic API: `new Bundle`, `dumps` and `loads`. */
+  function makeNative(given, expect) {
+    const want = expect.has('document') ? swap(expect, 'document', withThisEngine) : expect
+    const document = need(given, 'document')
+    const rules = document.has('ruleset') ? buildRuleSet(document.get('ruleset')) : R.loads(write(document))
+    const cases = casesOf(given, true)
+    const limits = limitsOf(given)
+    const outcome = attempt(R, () => new R.Bundle(rules, { id: need(given, 'id'), revision: need(given, 'revision'), cases, limits }))
+    if (outcome.error !== undefined || want.has('error')) return compare(outcome, want, 'document', { form: codeForm })
+    const bundle = outcome.result
+    const text = R.dumps(bundle)
+    const issues = [compare({ result: parse(text) }, want, 'document'), checkBundle(bundle, need(want, 'document'))]
+    for (const { path, content } of cases) {
+      if (!bundle.caseMatches(path, content)) issues.push(`caseMatches(${JSON.stringify(path)}) is false for its own content`)
+      if (bundle.caseMatches(path, 'another content')) issues.push(`caseMatches(${JSON.stringify(path)}) is true for another content`)
+    }
+    const again = attempt(R, () => R.loads(text))
+    if (again.error !== undefined) return `loads(dumps(bundle)): ${again.error.code}: ${again.error.message}`
+    issues.push(compareText('loads(dumps(bundle)), digest', R.digest(again.result), R.digest(bundle)))
+    const comparison = again.result.compare(bundle)
+    if (!comparison.identical || comparison.relation !== 'same_rules_same_engine') {
+      issues.push(`a bundle read back compares ${JSON.stringify(comparison)} with itself`)
+    }
+    return issues.filter(Boolean).join('; ')
+  }
+
+  /** A `bundle_compare` vector through the native layer, both ways round. */
+  function compareJson(given, expect) {
+    const a = N.Document.read(write(need(given, 'a')))
+    const b = N.Document.read(write(need(given, 'b')))
+    const forth = parse(a.compareBundle(b))
+    const back = parse(b.compareBundle(a))
+    if (!same(back, forth)) return `not symmetric: a with b ${write(forth)}, b with a ${write(back)}`
+    return compare({ result: forth }, expect, 'comparison')
+  }
+
+  /** A `bundle_compare` vector through the idiomatic API, both ways round. */
+  function compareNative(given, expect) {
+    const a = R.loads(write(need(given, 'a')))
+    const b = R.loads(write(need(given, 'b')))
+    if (!(a instanceof R.Bundle) || !(b instanceof R.Bundle)) return 'loads of a bundle document gives no Bundle'
+    const forth = a.compare(b)
+    if (!Object.isFrozen(forth) || !Object.isFrozen(forth.differences)) return 'a comparison is frozen'
+    const back = b.compare(a)
+    if (!same(tree(back), tree(forth))) return `not symmetric: a with b ${JSON.stringify(forth)}, b with a ${JSON.stringify(back)}`
+    return compare({ result: tree(forth) }, expect, 'comparison')
+  }
+
   /** The text a `read` vector reads, and its format. */
   function sourceOf(given) {
     if (given.has('text')) return [given.get('text'), 'json']
@@ -367,8 +522,9 @@ export function conformance(R, N) {
     return ''
   }
 
-  function readJson(given, expect) {
-    if (given.has('table_grid')) return { skip: 'grid' }
+  function readJson(vectorGiven, vectorExpect) {
+    if (vectorGiven.has('table_grid')) return { skip: 'grid' }
+    const [given, expect] = currentEngine(vectorGiven, vectorExpect)
     const [source, format] = sourceOf(given)
     const limits = limitsOf(given)
     const read = { read: true }
@@ -392,6 +548,11 @@ export function conformance(R, N) {
     }
     const issues = []
     if (expect.has('document')) issues.push(compare(attempt(R, () => parse(document.write())), expect, 'document', read))
+    if (document.kind === 'bundle') {
+      // Written in YAML, the same bundle reads back.
+      const yaml = attempt(R, () => N.Document.read(document.write('yaml'), { format: 'yaml' }).write())
+      issues.push(yaml.error === undefined ? compareText('read back from YAML', yaml.result, document.write()) : `YAML: ${yaml.error.message}`)
+    }
     if (expect.has('printed')) issues.push(compareText('printed', document.write('text'), expect.get('printed')))
     if (expect.has('csv')) issues.push(compareText('wrote the CSV', document.write('csv'), expect.get('csv')))
     if (expect.has('compiled')) {
@@ -441,6 +602,10 @@ export function conformance(R, N) {
         return readJson(given, expect)
       case 'canonical':
         return canonicalJson(given, expect)
+      case 'bundle':
+        return makeJson(given, expect)
+      case 'bundle_compare':
+        return compareJson(given, expect)
       case 'condition':
       case 'value': {
         const node = N.Node.read(write(need(given, kind)))
@@ -985,7 +1150,16 @@ export function conformance(R, N) {
     const read = attempt(R, () => ruleset.readDecision(JSON.stringify(decision)))
     if (read.error !== undefined) return `readDecision(JSON.stringify(decision)): ${read.error.code}: ${read.error.message}`
     const issue = checkDecision(ruleset, read.result, expected, true)
-    return issue === '' ? '' : `readDecision(JSON.stringify(decision)): ${issue}`
+    if (issue !== '') return `readDecision(JSON.stringify(decision)): ${issue}`
+    // Written with the digest of its rule set, it reads back the same decision.
+    const logged = R.dumps(decision, { rulesetDigest: true })
+    const carried = content(logged, 'decision').get('ruleset_digest')
+    if (carried !== R.digest(ruleset)) return `dumps(decision, { rulesetDigest: true }) carries ${carried}, not the rule set digest`
+    const back = attempt(R, () => ruleset.readDecision(logged))
+    if (back.error !== undefined) return `readDecision of a decision with its digest: ${back.error.code}: ${back.error.message}`
+    if (content(R.dumps(back.result), 'decision').get('ruleset_digest') !== carried) return 'a decision read with its digest drops it'
+    const again = checkDecision(ruleset, back.result, expected, true)
+    return again === '' ? '' : `readDecision of a decision with its digest: ${again}`
   }
 
   // --- The native route: the idiomatic API --------------------------------------------
@@ -993,7 +1167,8 @@ export function conformance(R, N) {
   const idiomatic = { form: contextForm }
   const givenMode = { form: contextForm, mode: { given: true } }
 
-  function readNative(given, expect) {
+  function readNative(vectorGiven, vectorExpect) {
+    const [given, expect] = currentEngine(vectorGiven, vectorExpect)
     const [source, format] = sourceOf(given)
     const limits = limitsOf(given)
     const read = { read: true, form: contextForm }
@@ -1039,6 +1214,12 @@ export function conformance(R, N) {
     if (expect.has('document')) {
       issues.push(compare(attempt(R, () => parse(R.dumps(loaded))), expect, 'document', read))
       issues.push(checkReload(loaded))
+    }
+    if (expect.get('document')?.has('bundle')) {
+      if (!(loaded instanceof R.Bundle)) return `read a ${loaded.constructor.name}, expected a Bundle`
+      issues.push(checkBundle(loaded, expect.get('document')))
+      const yaml = attempt(R, () => R.dumps(R.loads(R.dumps(loaded, { format: 'yaml' }), { format: 'yaml' })))
+      issues.push(yaml.error === undefined ? compareText('read back from YAML', yaml.result, R.dumps(loaded)) : `YAML: ${yaml.error.message}`)
     }
     if (expect.has('printed')) issues.push(compareText('printed', R.dumps(loaded, { format: 'text' }), expect.get('printed')))
     if (expect.has('csv')) issues.push(compareText('wrote the CSV', R.dumps(loaded, { format: 'csv' }), expect.get('csv')))
@@ -1097,6 +1278,10 @@ export function conformance(R, N) {
       if (value instanceof R.RuleSet) ruleset = value
       else if (value instanceof R.Rule) ruleset = new R.RuleSet([value])
       else if (value instanceof R.DecisionTable) ruleset = value.ruleset
+      else if (value instanceof R.Bundle) {
+        ruleset = value.ruleset
+        if (expect.has('ruleset_digest')) issues.push(compareText(`${how}, rulesetDigest`, value.rulesetDigest, expect.get('ruleset_digest')))
+      }
       if (expect.has('ruleset_digest')) {
         if (ruleset === null) return `${how}: a ${value.constructor.name} gives no rule set, expected the rule set digest`
         issues.push(compareText(`${how}, the rule set digest`, R.digest(ruleset), expect.get('ruleset_digest')))
@@ -1118,6 +1303,8 @@ export function conformance(R, N) {
     if (kind === 'draw') return { skip: 'diagram' }
     if (kind === 'read') return readNative(given, expect)
     if (kind === 'canonical') return canonicalNative(given, expect)
+    if (kind === 'bundle') return makeNative(given, expect)
+    if (kind === 'bundle_compare') return compareNative(given, expect)
     if (kind === 'summary') {
       const ruleset = buildRuleSet(need(given, 'ruleset'))
       const built = checkBuilt(ruleset, given)

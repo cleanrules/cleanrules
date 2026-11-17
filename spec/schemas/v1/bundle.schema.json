@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanrules.github.io/schemas/v1/bundle.schema.json",
+  "title": "cleanrules bundle document, format version 1",
+  "description": "A reproducible package of rules: identifier, revision, the rules, their rule set digest, the engine and its configuration, the input and output contract and references to test case files. See spec/bundles.md, which is normative. The schema checks shapes and forms; readers also verify the rule set digest against the rules, the contract against their own derivation when the bundle names their engine, the range of numbers in the contract, and that case paths and output keys are not repeated.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "bundle": {
+      "$ref": "#/$defs/bundle"
+    }
+  },
+  "required": [
+    "version",
+    "bundle"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "bundle": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The stable identifier of the rules: segments of lowercase ASCII letters, digits, '.', '_' and '-', separated by '/'.",
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)*$"
+        },
+        "revision": {
+          "description": "One immutable revision of the rules, assigned by the bundle's author: every bundle with the same id and revision holds the same rules.",
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]*$"
+        },
+        "ruleset": {
+          "$ref": "ruleset.schema.json#/$defs/ruleset"
+        },
+        "decision_table": {
+          "$ref": "decision_table.schema.json#/$defs/table"
+        },
+        "ruleset_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "engine": {
+          "$ref": "#/$defs/engine"
+        },
+        "contract": {
+          "$ref": "#/$defs/contract"
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/case"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "ruleset_digest",
+        "engine",
+        "contract"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "ruleset"
+          ]
+        },
+        {
+          "required": [
+            "decision_table"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "digest": {
+      "description": "A SHA-256 digest (spec/json-format.md, Digests): sha256: and 64 lowercase hexadecimal digits.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "engine": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "version": {
+          "description": "A Semantic Versioning 2.0.0 version, compared exactly.",
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+        },
+        "limits": {
+          "$ref": "#/$defs/limits"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "limits"
+      ],
+      "additionalProperties": false
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "max_size": {
+          "$ref": "#/$defs/limit"
+        },
+        "max_nesting": {
+          "$ref": "#/$defs/limit"
+        },
+        "max_depth": {
+          "$ref": "#/$defs/limit"
+        },
+        "max_path_segments": {
+          "$ref": "#/$defs/limit"
+        },
+        "max_table_size": {
+          "$ref": "#/$defs/limit"
+        },
+        "max_values": {
+          "$ref": "#/$defs/limit"
+        }
+      },
+      "required": [
+        "max_size",
+        "max_nesting",
+        "max_depth",
+        "max_path_segments",
+        "max_table_size",
+        "max_values"
+      ],
+      "additionalProperties": false
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "contract": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "description": "The input schema of the rules (spec/agents.md, Input schemas), a JSON Schema.",
+          "type": "object"
+        },
+        "output": {
+          "type": "object",
+          "properties": {
+            "keys": {
+              "description": "The payload keys any rule may output, sorted by Unicode code point when written.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "keys"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "input",
+        "output"
+      ],
+      "additionalProperties": false
+    },
+    "case": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "The file's path relative to the bundle's directory: segments of lowercase ASCII letters, digits, '.', '_' and '-', none ending with '.', separated by '/'.",
+          "type": "string",
+          "maxLength": 1024,
+          "pattern": "^[a-z0-9._-]*[a-z0-9_-](/[a-z0-9._-]*[a-z0-9_-])*$"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "required": [
+        "path",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "comparison": {
+      "description": "The comparison of two bundles (spec/bundles.md, Comparing bundles).",
+      "type": "object",
+      "properties": {
+        "relation": {
+          "enum": [
+            "conflict",
+            "same_rules_same_engine",
+            "same_rules_other_engine",
+            "other_rules_same_engine",
+            "other_rules_other_engine"
+          ]
+        },
+        "identical": {
+          "type": "boolean"
+        },
+        "differences": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(id|revision|rules|source|engine\\.name|engine\\.version|engine\\.limits\\.[a-z_]+|contract\\.input|contract\\.output|cases)$"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "relation",
+        "identical",
+        "differences"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

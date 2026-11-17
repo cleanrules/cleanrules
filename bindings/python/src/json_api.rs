@@ -3,12 +3,13 @@
 //! task D.1 gives the binding its public reading and writing API.
 
 use cleanrules::Value;
+use cleanrules::bundle::{Bundle, BundleRules, CaseFile};
 use cleanrules::eval::{Options, evaluate_tree, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
-    DocumentFormat, ValueContext, read_decision_document_as, read_document, read_node,
-    read_ruleset, read_value, write_decision, write_document, write_explanation, write_result,
-    write_summary,
+    Document, DocumentFormat, ValueContext, read_decision_document_as, read_document,
+    read_document_as, read_node, read_ruleset, read_value, write_decision, write_document,
+    write_explanation, write_result, write_summary,
 };
 use cleanrules::json::{Json, Limits, parse, to_string};
 use cleanrules::logic::{Kleene, LogicName};
@@ -16,6 +17,7 @@ use cleanrules::rules::RuleSet;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
+use crate::bundles::recorded_limits;
 use crate::errors::IntoPyResult;
 
 fn limits(max_size: Option<usize>, max_nesting: Option<usize>, max_depth: Option<usize>) -> Limits {
@@ -44,10 +46,11 @@ fn input(py: Python<'_>, text: &str) -> PyResult<Value> {
     read_value(&json(py, text)?, "/input", ValueContext::Data).or_raise(py)
 }
 
-/// Read a document; its canonical form.
+/// Read a document, in `format` (`json` or `yaml`); its canonical form.
 #[pyfunction]
-#[pyo3(signature = (text, max_size=None, max_nesting=None, max_depth=None, max_path_segments=None))]
+#[pyo3(signature = (text, max_size=None, max_nesting=None, max_depth=None, max_path_segments=None, max_table_size=None, format="json"))]
 #[pyo3(name = "_read_document")]
+#[allow(clippy::too_many_arguments)] // The limits are keyword arguments in Python.
 pub(crate) fn py_read_document(
     py: Python<'_>,
     text: &str,
@@ -55,13 +58,82 @@ pub(crate) fn py_read_document(
     max_nesting: Option<usize>,
     max_depth: Option<usize>,
     max_path_segments: Option<usize>,
+    max_table_size: Option<usize>,
+    format: &str,
 ) -> PyResult<String> {
     let mut limits = limits(max_size, max_nesting, max_depth);
     if let Some(segments) = max_path_segments {
         limits.max_path_segments = segments;
     }
-    let document = read_document(text, &limits).or_raise(py)?;
+    if let Some(size) = max_table_size {
+        limits.max_table_size = size;
+    }
+    let document =
+        read_document_as(text.as_bytes(), document_format(format)?, &limits).or_raise(py)?;
     Ok(to_string(&write_document(&document)))
+}
+
+fn document_format(name: &str) -> PyResult<DocumentFormat> {
+    DocumentFormat::from_name(name)
+        .ok_or_else(|| PyValueError::new_err(format!("unknown format {name:?}")))
+}
+
+/// Make a bundle of the rules of a rule set or decision table document, with
+/// the case files given as `(path, text)`; the bundle's document.
+#[pyfunction]
+#[pyo3(signature = (rules_json, id, revision, cases, max_size=None, max_nesting=None, max_depth=None, max_path_segments=None, max_table_size=None, max_values=None))]
+#[pyo3(name = "_make_bundle")]
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)] // The limits are keyword arguments in Python; PyO3 extracts lists by value.
+pub(crate) fn py_make_bundle(
+    py: Python<'_>,
+    rules_json: &str,
+    id: &str,
+    revision: &str,
+    cases: Vec<(String, String)>,
+    max_size: Option<usize>,
+    max_nesting: Option<usize>,
+    max_depth: Option<usize>,
+    max_path_segments: Option<usize>,
+    max_table_size: Option<usize>,
+    max_values: Option<usize>,
+) -> PyResult<String> {
+    let rules: BundleRules = match read_document(rules_json, &Limits::default()).or_raise(py)? {
+        Document::RuleSet(ruleset) => ruleset.into(),
+        Document::DecisionTable(table) => table.into(),
+        _ => {
+            return Err(PyValueError::new_err(
+                "the rules of a bundle are a rule set or a decision table document",
+            ));
+        }
+    };
+    let cases = cases
+        .iter()
+        .map(|(path, text)| CaseFile::new(path, text.as_bytes()))
+        .collect::<cleanrules::Result<Vec<_>>>()
+        .or_raise(py)?;
+    let limits = recorded_limits(
+        max_size,
+        max_nesting,
+        max_depth,
+        max_path_segments,
+        max_table_size,
+        max_values,
+    );
+    let bundle = Bundle::new(rules, id, revision, cases, &limits).or_raise(py)?;
+    Ok(to_string(&write_document(&bundle.into_document())))
+}
+
+/// Read two bundle documents and compare the first with the second; the
+/// comparison's JSON form.
+#[pyfunction]
+#[pyo3(name = "_compare_bundles")]
+pub(crate) fn py_compare_bundles(py: Python<'_>, a_json: &str, b_json: &str) -> PyResult<String> {
+    let bundle = |text: &str| match read_document(text, &Limits::default()).or_raise(py)? {
+        Document::Bundle(bundle) => Ok(bundle),
+        _ => Err(PyValueError::new_err("not a bundle document")),
+    };
+    let (a, b) = (bundle(a_json)?, bundle(b_json)?);
+    Ok(to_string(&a.compare(&b).to_json()))
 }
 
 /// Read a decision document with its rule set (the content of a rule set
@@ -81,8 +153,7 @@ pub(crate) fn py_read_decision(
 ) -> PyResult<String> {
     let rules = ruleset(py, ruleset_json)?;
     let limits = limits(max_size, max_nesting, max_depth);
-    let format = DocumentFormat::from_name(format)
-        .ok_or_else(|| PyValueError::new_err(format!("unknown format {format:?}")))?;
+    let format = document_format(format)?;
     let decision =
         read_decision_document_as(text.as_bytes(), format, &rules, &limits).or_raise(py)?;
     Ok(to_string(&write_decision(&decision)))

@@ -82,6 +82,7 @@ public final class Native {
     public static final int CR_DOCUMENT_RULE = 2;
     public static final int CR_DOCUMENT_RULESET = 3;
     public static final int CR_DOCUMENT_DECISION_TABLE = 4;
+    public static final int CR_DOCUMENT_BUNDLE = 5;
 
     public static final int CR_VALUE_NULL = 1;
     public static final int CR_VALUE_BOOL = 2;
@@ -678,6 +679,7 @@ public final class Native {
             case CR_DOCUMENT_RULE -> DocumentKind.RULE;
             case CR_DOCUMENT_RULESET -> DocumentKind.RULESET;
             case CR_DOCUMENT_DECISION_TABLE -> DocumentKind.DECISION_TABLE;
+            case CR_DOCUMENT_BUNDLE -> DocumentKind.BUNDLE;
             default -> throw new IllegalStateException("cleanrules gave an unknown document kind " + code);
         };
     }

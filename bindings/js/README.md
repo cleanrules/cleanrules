@@ -78,7 +78,7 @@ CommonJS) and [`docs/examples/discounts.deno.js`](../../docs/examples/discounts.
 ## Entry points
 
 - `cleanrules`: the idiomatic API (`F`, `field`, `constant`, `and`, `or`,
-  `not`, `Expr`, `Rule`, `RuleSet`, `Decision`, `DecisionTable`, `loads`,
+  `not`, `Expr`, `Rule`, `RuleSet`, `Decision`, `DecisionTable`, `Bundle`, `loads`,
   `dumps`, `load`, `dump`, `canonicalBytes`, `digest`, `ruleFromText`,
   `evaluateTree`, `evaluateValueTree`, and the classes of explanations,
   summaries, result trees and tables), the errors, the marker values
@@ -299,7 +299,8 @@ so the build does not use it.
 
 | Name | What |
 |---|---|
-| `Document.read(text, { format, limits }?)` | a condition, rule, rule set or decision table; `kind`, `write(format?)`, `canonicalBytes()`, `digest()` |
+| `Document.read(text, { format, limits }?)` | a condition, rule, rule set, decision table or bundle; `kind`, `write(format?)`, `canonicalBytes()`, `digest()` |
+| `Document.makeBundle(rules, id, revision, cases?, limits?)`, `doc.compareBundle(other)` | a bundle of a rule set or table document, with `cases` an array of `{ path, content }`; the comparison of two bundles as JSON (*Bundles*, below) |
 | `RuleSet.read(text, { format, limits }?)`, `RuleSet.fromDocument(doc)` | a rule set (a rule document is a rule set of that rule; a CSV table is compiled) |
 | `ruleset.evaluate(data, limits?)`, `evaluateJson(text, limits?)` | one decision, from native data (at most `limits.maxValues` values of it) or from a JSON value |
 | `ruleset.evaluateMany(rows, limits?)`, `evaluateManyJson(text, limits?)` | a batch; an error names its `row` |
@@ -310,7 +311,7 @@ so the build does not use it.
 | `ruleset.length`, `ruleNames()`, `hitPolicy`, `aggregate`, `logic`, `strict`, `fieldPaths()` | what it is and what it reads |
 | `decision.length`, `ruleName(i)`, `firedAt(i)`, `truth(i)`, `selected()` | each rule's result |
 | `decision.outputJson()`, `outputsJson()`, `ruleOutputJson(i)` | outputs, in the JSON format; `null` for none |
-| `decision.write(format?)`, `explain(format?)` | the decision document (JSON by default), and its explanation (text by default, or JSON or YAML) |
+| `decision.write(format?, rulesetDigest?)`, `explain(format?)` | the decision document (JSON by default; with `rulesetDigest`, its rule set's digest), and its explanation (text by default, or JSON or YAML) |
 | `Node.read(text, { format, limits }?)` | one condition or value node; `write`, `fieldPaths`, `evaluateTree(data, { logic, strict, limits }?)`, `evaluateValueTree(data, { strict, limits }?)`, and `evaluateTreeJson(text, { logic, strict, limits }?)` and `evaluateValueTreeJson(text, { strict, limits }?)` |
 
 Formats are `"json"`, `"yaml"`, `"text"` (the rule syntax) and `"csv"`
@@ -498,10 +499,10 @@ await dump(rules, 'pricing.rules')
 
 | Name | What |
 |---|---|
-| `loads(text, { format, limits, actions }?)` | an `Expr`, `Rule`, `RuleSet` or `DecisionTable` from a document (a string or UTF-8 bytes); typed `DecisionTable` for `format: 'csv'` and `Expr \| Rule \| RuleSet` for `'text'` |
-| `dumps(value, { format, omitActions }?)` | the canonical document of a condition, rule, rule set or table |
+| `loads(text, { format, limits, actions }?)` | an `Expr`, `Rule`, `RuleSet`, `DecisionTable` or `Bundle` from a document (a string or UTF-8 bytes); typed `DecisionTable` for `format: 'csv'` and `Expr \| Rule \| RuleSet` for `'text'` |
+| `dumps(value, { format, omitActions, rulesetDigest }?)` | the canonical document of a condition, rule, rule set, table, bundle or decision; `rulesetDigest` for decisions only |
 | `load(path, { format, limits, actions }?)` | `loads` of a file: a promise; the format comes from the extension |
-| `dump(value, path, { format, omitActions }?)` | `dumps` to a file: a promise; a rule text ends with a line break |
+| `dump(value, path, { format, omitActions, rulesetDigest }?)` | `dumps` to a file: a promise; a rule text ends with a line break |
 | `ruleFromText(text, { do, actions, limits }?)` | one rule in the text syntax (fuzzytool's verb); `rule_1` without a `RULE` line |
 
 Formats are `'json'` (the default for `loads` and `dumps`), `'yaml'`, `'text'`
@@ -543,8 +544,8 @@ plain object cannot hold is lost: the sign of a float zero
 first (a payload `{ b, "10" }` is written `{ "10", b }`), which changes
 nothing: the members of a JSON object have no order, and payloads and maps
 come back sorted by key, by Unicode code point. `dumps` writes conditions, rules, rule
-sets and tables exactly, and so do the native layer's `write()` and
-`explain('json')` for decisions and explanations.
+sets, tables, bundles and decisions exactly, and so does the native layer's
+`explain('json')` for explanations.
 
 ## Canonical bytes and digests
 
@@ -559,7 +560,7 @@ digest(table.ruleset)                 // the rule set digest of the table
 
 | Name | What |
 |---|---|
-| `canonicalBytes(value, { omitActions }?)` | the canonical bytes of the document of a condition, rule, rule set or table: a `Uint8Array` |
+| `canonicalBytes(value, { omitActions }?)` | the canonical bytes of the document of a condition, rule, rule set, table or bundle: a `Uint8Array` |
 | `digest(value, { omitActions }?)` | their SHA-256 digest, `sha256:` and 64 lowercase hexadecimal digits |
 
 The canonical bytes (`spec/json-format.md`, *Canonical bytes*) are the UTF-8
@@ -587,10 +588,72 @@ rule is `digest(new RuleSet([rule]))`, and that of a decision table
 is the table's own document. A decision may carry it, under
 `ruleset_digest`: `ruleset.readDecision` checks it against the rule set (a
 `FormatError` with code `decision_mismatch` at `/decision/ruleset_digest`
-when it differs) and keeps it, so the decision writes back with it. Decisions
-made in JavaScript carry none. In the native layer, `Document` and `RuleSet`
+when it differs) and keeps it, so the decision writes back with it. A decision
+made in JavaScript carries it when it is written with `dumps(decision, {
+rulesetDigest: true })` (or `dump`), so a log of decisions is tied to the rules
+that made them, and to the bundle that holds them, by a string comparison;
+`toJSON()` writes it only for a decision read with one. Such a document is
+read back with `ruleset.readDecision`, not `loads`: a decision is read with
+its rule set. In the native layer, `Document` and `RuleSet`
 have `canonicalBytes()` and `digest()`, so `RuleSet.fromDocument(doc).digest()`
 is the rule set digest of any document but a condition.
+
+## Bundles
+
+```js
+import { Bundle, dump, load } from 'cleanrules'
+
+const bundle = new Bundle(rules, {
+  id: 'acme/discounts',
+  revision: '2026-11-16.1',
+  cases: [{ path: 'cases/vip.json', content: await readFile('cases/vip.json') }],
+})
+await dump(bundle, 'discounts.bundle.json')
+const kept = await load('discounts.bundle.json')
+kept.compare(bundle)        // { relation: 'same_rules_same_engine', identical: true, differences: [] }
+kept.caseMatches('cases/vip.json', await readFile('cases/vip.json'))  // true
+```
+
+A bundle (`spec/bundles.md`) is a reproducible package of rules: the rules
+themselves (a rule set or a decision table), the identifier and revision their
+author gives them, their rule set digest, the engine and limits that made it,
+the contract of their input and output, and the digests of their files of test
+cases. Making the same bundle twice gives the same bytes and the same
+`digest(bundle)`: the engine never invents an identifier or a revision, and
+reads no clock.
+
+| Name | What |
+|---|---|
+| `new Bundle(rules, { id, revision, cases, omitActions, limits })` | a bundle of a `RuleSet` or a `DecisionTable` with this engine; `cases` an iterable of `{ path, content }` (a string or a `Uint8Array`), whose digests it records in order; `limits` those the rules run with, which it records (`maxSize`, `maxNesting`, `maxDepth`, `maxPathSegments`, `maxTableSize`, `maxValues`; the defaults for those left out) |
+| `bundle.id`, `revision` | the identifier, such as `acme/discounts`, and the revision, such as `2026-11-16.1` |
+| `bundle.rules`, `ruleset`, `rulesetDigest` | the rules it holds (a `RuleSet` or a `DecisionTable`, actions as unbound names), the rule set it gives, and that rule set's digest |
+| `bundle.engine` | `{ name, version, limits, isCurrent }`, frozen: the engine that made it, its exact version, the six limits by the names of the `limits` option, and whether it is this engine (same name and version) |
+| `bundle.contract` | `{ input, output: { keys } }`, frozen: the JSON Schema of the input and the sorted output keys |
+| `bundle.cases` | `[{ path, digest }]`, frozen, in order |
+| `bundle.caseMatches(path, content)` | whether `content` is the case file the bundle was made with (a `RangeError` for a path it does not refer to); the engine never opens files |
+| `bundle.compare(other)` | `{ relation, identical, differences }`, frozen (*Comparing bundles*) |
+| `loads`, `load`, `dumps`, `dump`, `canonicalBytes`, `digest`, `toJSON()` | as for any document, in JSON or YAML |
+
+An `id` is one or more `/`-separated segments of lowercase letters, digits,
+`.`, `_` and `-`; a `revision` letters, digits, `.`, `_`, `+` and `-`; a case
+path stays inside the bundle's directory. Anything else is a `FormatError`, as
+is a case path given twice. Rules whose actions are code are refused
+(`UnsupportedError`) unless `omitActions`, as `dumps` refuses them; giving
+`maxYamlSize` or `maxTextSize`, which bound the reading of texts and not
+decisions, is a `TypeError`.
+
+Reading a bundle checks its rule set digest against its rules, and, when it
+names this engine (`engine.isCurrent`), its contract against the one the
+engine derives (a `FormatError` with code `decision_mismatch` either way). A
+bundle of another engine or version is read as it is, never refused: `version`
+is the version of this engine.
+
+`compare` tells the two questions apart: `same_rules_other_engine` (the same
+rule set digest, another engine version or other limits) and
+`other_rules_same_engine`; `conflict` is one `id` and `revision` naming two
+sets of rules. `differences` names what differs, in the specification's
+order (`id`, `revision`, `rules`, `source`, `engine.name`, `engine.version`,
+`engine.limits.max_depth`..., `contract.input`, `contract.output`, `cases`).
 
 ## Decision tables
 

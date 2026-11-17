@@ -1,6 +1,7 @@
-//! The napi-rs side of documents, result trees and decision tables for the
-//! idiomatic API (`lib/api/documents.js`, `trees.js` and `tables.js`), over
-//! `common::documents`, `common::tables` and `common::core`.
+//! The napi-rs side of documents, result trees, decision tables and bundles
+//! for the idiomatic API (`lib/api/documents.js`, `trees.js`, `tables.js` and
+//! `bundles.js`), over `common::documents`, `common::tables`,
+//! `common::bundles` and `common::core`.
 //!
 //! Internal, like `build.rs`: the addon exports these functions and classes,
 //! but no entry point does. The WebAssembly build has the same ones
@@ -12,8 +13,11 @@ use napi::{Env, Result};
 use napi_derive::napi;
 
 use super::build::NativeRule;
-use super::classes::{Decision, Document, Node, RuleSet, chained, is_undefined, optional, read};
+use super::classes::{
+    Decision, Document, Node, RuleSet, chained, is_undefined, make_bundle, optional, read,
+};
 use super::{OrFail, fail, raw, raw_limits, raw_options};
+use crate::common::bundles;
 use crate::common::core::{NodeCore, TreeData, TreeKind};
 use crate::common::documents;
 use crate::common::tables::{GridCore, TableCore};
@@ -507,5 +511,103 @@ pub fn rule_tree(env: &Env, decision: &Decision, position: Unknown<'_>) -> Resul
         .core
         .rule_tree(&raw(&position)?)
         .map(NativeTree::from)
+        .or_fail(env)
+}
+
+/// A bundle of a rule set, made with this engine (`Document.makeBundle`).
+///
+/// # Errors
+///
+/// As `Document.makeBundle`.
+#[napi(
+    ts_args_type = "ruleset: RuleSet, id: string, revision: string, cases?: BundleCaseInput[] | null, limits?: Limits | null"
+)]
+pub fn bundle_of_ruleset(
+    env: &Env,
+    ruleset: &RuleSet,
+    id: Unknown<'_>,
+    revision: Unknown<'_>,
+    cases: Option<Unknown<'_>>,
+    limits: Option<Unknown<'_>>,
+) -> Result<Document> {
+    let rules = bundles::ruleset_rules(&ruleset.core);
+    make_bundle(env, rules, &id, &revision, cases, limits).map(|core| Document { core })
+}
+
+/// A bundle of a decision table, made with this engine (`Document.makeBundle`).
+///
+/// # Errors
+///
+/// As `Document.makeBundle`.
+#[napi(
+    ts_args_type = "table: NativeTable, id: string, revision: string, cases?: BundleCaseInput[] | null, limits?: Limits | null"
+)]
+pub fn bundle_of_table(
+    env: &Env,
+    table: &NativeTable,
+    id: Unknown<'_>,
+    revision: Unknown<'_>,
+    cases: Option<Unknown<'_>>,
+    limits: Option<Unknown<'_>>,
+) -> Result<Document> {
+    let rules = bundles::table_rules(&table.core);
+    make_bundle(env, rules, &id, &revision, cases, limits).map(|core| Document { core })
+}
+
+/// What the idiomatic `Bundle` reads of a bundle document, as JSON
+/// (`common::bundles`).
+///
+/// # Errors
+///
+/// For a document of another kind.
+#[napi]
+pub fn bundle_data(env: &Env, document: &Document) -> Result<String> {
+    document.core.bundle_data().or_fail(env)
+}
+
+/// The rule set a bundle gives.
+///
+/// # Errors
+///
+/// For a document of another kind.
+#[napi]
+pub fn bundle_ruleset(env: &Env, document: &Document) -> Result<RuleSet> {
+    document
+        .core
+        .bundle_ruleset()
+        .map(|core| RuleSet { core })
+        .or_fail(env)
+}
+
+/// The decision table a bundle holds.
+///
+/// # Errors
+///
+/// For a bundle of a rule set, or a document of another kind.
+#[napi]
+pub fn bundle_table(env: &Env, document: &Document) -> Result<NativeTable> {
+    document
+        .core
+        .bundle_table()
+        .map(|core| NativeTable { core })
+        .or_fail(env)
+}
+
+/// Whether `bytes` are the case file at `path` the bundle was made with.
+///
+/// # Errors
+///
+/// A `RangeError` for a path the bundle does not refer to; a `TypeError` for
+/// arguments of the wrong type.
+#[napi(ts_args_type = "document: Document, path: string, bytes: string | Uint8Array")]
+pub fn bundle_case_matches(
+    env: &Env,
+    document: &Document,
+    path: Unknown<'_>,
+    bytes: Unknown<'_>,
+) -> Result<bool> {
+    document
+        .core
+        .case_matches(&raw(&path)?, raw(&bytes)?)
         .or_fail(env)
 }

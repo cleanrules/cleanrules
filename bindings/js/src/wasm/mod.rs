@@ -19,6 +19,7 @@ use js_sys::{Array, ArrayBuffer, Function, Object, RangeError, Reflect, TypeErro
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 
+use crate::common::bundles::RawCase;
 use crate::common::{LIMIT_NAMES, LIMITS, OBJECT, Outcome, Problem, Raw, RawLimits, RawOptions};
 
 /// The hooks of the JavaScript half: `read`, `error`, `call` and `actions`.
@@ -287,6 +288,27 @@ pub(crate) fn raw_list(value: &JsValue, what: &str) -> Result<Vec<Raw>, JsValue>
         return Err(fail(crate::common::not_a_list(what, &raw(value))));
     }
     Ok(Array::from(value).iter().map(|item| raw(&item)).collect())
+}
+
+/// The case files of a bundle, `[{ path, content }]`: none when left out.
+pub(crate) fn raw_cases(value: &JsValue) -> Result<Vec<RawCase>, JsValue> {
+    let kind = raw(value);
+    if matches!(kind, Raw::Undefined | Raw::Null) {
+        return Ok(Vec::new());
+    }
+    if !Array::is_array(value) {
+        return Err(fail(crate::common::not_a_list("cases", &kind)));
+    }
+    Array::from(value)
+        .iter()
+        .map(|item| match raw(&item) {
+            Raw::Other(OBJECT) => Ok(RawCase::Given {
+                path: member(&item, "path")?,
+                content: member(&item, "content")?,
+            }),
+            other => Ok(RawCase::Wrong(other.describe())),
+        })
+        .collect()
 }
 
 /// A plain JavaScript object with these members, in order.

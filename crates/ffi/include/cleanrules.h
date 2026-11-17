@@ -53,6 +53,11 @@
 // The version of the ABI that this header describes.
 #define CR_ABI_VERSION 1
 
+// A flag of `cr_decision_write_with`: write the rule set digest of the rule
+// set that made the decision under `ruleset_digest` (`spec/json-format.md`,
+// *In decisions*), which readers verify.
+#define CR_WRITE_RULESET_DIGEST 1
+
 // One call of an action: the decision, the rule and the input, valid during
 // the call only, and the reason the action gives when it fails.
 typedef struct cr_action_call cr_action_call;
@@ -71,8 +76,8 @@ typedef struct cr_batch cr_batch;
 // the recorded decision, again.
 typedef struct cr_decision cr_decision;
 
-// A document read in any format: a condition, a rule, a rule set or a decision
-// table.
+// A document read in any format: a condition, a rule, a rule set, a decision
+// table or a bundle.
 typedef struct cr_document cr_document;
 
 // An error: its status, message, hint and JSON form.
@@ -116,6 +121,20 @@ typedef int32_t cr_status;
 // and must not unwind or jump out of the call.
 typedef int32_t (*cr_action)(void *data,
                              struct cr_action_call *call);
+
+// A file of test cases given to `cr_bundle_new`: its path, relative to the
+// bundle's directory, as UTF-8 bytes, and the file's content. The library
+// keeps the path and the SHA-256 digest of the content, never the pointers.
+typedef struct cr_case_file {
+  // The path: `len` bytes of UTF-8, such as `cases/basic.json`.
+  const char *path;
+  // The length of `path` in bytes.
+  size_t path_len;
+  // The file's bytes, any content.
+  const uint8_t *bytes;
+  // The number of bytes.
+  size_t len;
+} cr_case_file;
 
 // A format diagrams are written in (`CR_DIAGRAM_*`).
 typedef int32_t cr_diagram;
@@ -184,6 +203,10 @@ typedef int32_t cr_value_type;
 
 // A document holding a decision table.
 #define CR_DOCUMENT_DECISION_TABLE 4
+
+// A document holding a bundle (`spec/bundles.md`): read and written in JSON
+// or YAML, made with `cr_bundle_new`.
+#define CR_DOCUMENT_BUNDLE 5
 
 // `format_error`.
 #define CR_FORMAT_ERROR 1
@@ -438,6 +461,53 @@ const struct cr_decision *cr_batch_get(const struct cr_batch *batch,
 // `batch` is `NULL` or a live `cr_batch`.
 size_t cr_batch_len(const struct cr_batch *batch);
 
+// Compare two bundles (`spec/bundles.md`, *Comparing bundles*): the JSON
+// object of the comparison, with `relation`, `identical` and `differences`,
+// such as `{"relation":"same_rules_other_engine","identical":false,
+// "differences":["engine.version"]}`. Documents that are not bundles are
+// `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `a` and `b` are `NULL` or live `cr_document`s; `out` is `NULL` or points to
+// a writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_bundle_compare(const struct cr_document *a,
+                            const struct cr_document *b,
+                            char **out,
+                            size_t *len,
+                            struct cr_error **error);
+
+// Make a bundle of the rules `rules` holds, a `CR_DOCUMENT_RULESET` or
+// `CR_DOCUMENT_DECISION_TABLE` document, with this engine
+// (`spec/bundles.md`, *Making a bundle*): the identifier and revision its
+// author gives, its `case_count` case files in order, and `limits` (the
+// defaults for `NULL`), which it records. The bundle is a new
+// `CR_DOCUMENT_BUNDLE` document. An identifier, revision or path that does
+// not have its form, or a path given twice, is a `CR_FORMAT_ERROR`; a limit
+// of 0 or above 2^53 - 1 is `CR_UNSUPPORTED`; a document of another kind is
+// `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `rules` is `NULL` or a live `cr_document`; `id` and `revision` are `NULL`
+// or point to `id_len` and `revision_len` readable bytes; `cases` is `NULL`
+// with a `case_count` of 0, or points to `case_count` readable `cr_case_file`
+// whose `path` and `bytes` are `NULL` or point to `path_len` and `len`
+// readable bytes; `limits` is `NULL` or a live `cr_limits`; `out` is `NULL`
+// or points to a writable `cr_document *`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_bundle_new(const struct cr_document *rules,
+                        const char *id,
+                        size_t id_len,
+                        const char *revision,
+                        size_t revision_len,
+                        const struct cr_case_file *cases,
+                        size_t case_count,
+                        const struct cr_limits *limits,
+                        struct cr_document **out,
+                        struct cr_error **error);
+
 // A copy of a decision that the caller owns, freed with `cr_decision_free`:
 // to keep a decision borrowed from a batch, an action call or an error after
 // what lends it is freed. It shares the rule set and holds its own copy of
@@ -672,6 +742,22 @@ cr_status cr_decision_write(const struct cr_decision *decision,
                             size_t *len,
                             struct cr_error **error);
 
+// Write a decision as `cr_decision_write` does, with options: `flags` is 0 or
+// `CR_WRITE_RULESET_DIGEST`. A decision read with a `ruleset_digest` keeps it
+// either way. Unknown flags are `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to a
+// writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_decision_write_with(const struct cr_decision *decision,
+                                 cr_format format,
+                                 uint32_t flags,
+                                 char **out,
+                                 size_t *len,
+                                 struct cr_error **error);
+
 // The document's canonical bytes (`spec/json-format.md`, *Canonical bytes*):
 // the UTF-8 JSON text of its canonical form, every object's members sorted by
 // key, by Unicode code point, without whitespace. The text holds no NUL byte
@@ -774,6 +860,18 @@ cr_status cr_document_new_condition(const struct cr_node *node,
 cr_status cr_document_new_rule(const struct cr_rule *rule,
                                struct cr_document **out,
                                struct cr_error **error);
+
+// A document holding a rule set (copied), to write it with
+// `cr_document_write` or make a bundle of it with `cr_bundle_new`.
+//
+// # Safety
+//
+// `ruleset` is `NULL` or a live `cr_ruleset`; `out` is `NULL` or points to a
+// writable `cr_document *`; `error` is `NULL` or points to a writable
+// `cr_error *` set to `NULL`.
+cr_status cr_document_new_ruleset(const struct cr_ruleset *ruleset,
+                                  struct cr_document **out,
+                                  struct cr_error **error);
 
 // Read a document in `format` (`CR_FORMAT_*`): JSON, YAML or the rule syntax,
 // or CSV for a decision table. Bytes that are not UTF-8 are a

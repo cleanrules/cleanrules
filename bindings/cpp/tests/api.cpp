@@ -490,6 +490,23 @@ void actions() {
     CHECK(calls == 100);
 }
 
+// A bundle (spec/bundles.md) is a document: read, written, hashed, and the
+// rule set it holds; cleanrules.hpp has no functions of its own for it yet.
+void bundles_are_documents() {
+    auto rules = cr::ruleset::read(R"({"version": 1, "ruleset": {"rules": []}})", cr::format::json);
+    const std::string bundle =
+        R"({"version": 1, "bundle": {"id": "a", "revision": "1", "ruleset": {"rules": []}, )"
+        R"("ruleset_digest": ")" +
+        rules.digest() +
+        R"(", "engine": {"name": "cleanrules", "version": "1.0.0-other", "limits": {"max_size": 1, )"
+        R"("max_nesting": 1, "max_depth": 1, "max_path_segments": 1, "max_table_size": 1, "max_values": 1}}, )"
+        R"("contract": {"input": {}, "output": {"keys": []}}}})";
+    auto doc = cr::document::read(bundle, cr::format::json);
+    CHECK(doc.content() == cr::document_content::bundle);
+    CHECK(doc.digest().rfind("sha256:", 0) == 0);
+    CHECK(cr::ruleset::from_document(doc).digest() == rules.digest());
+}
+
 void grids_nodes_and_batches() {
     auto table = cr::grid::make(cr::value::list({"RULE", "customer.years", "THEN discount"}),
                                 {"priority", {}, {}, false});
@@ -848,6 +865,7 @@ int main() {
     errors();
     actions();
     grids_nodes_and_batches();
+    bundles_are_documents();
     building();
     rules_and_documents();
     identity();

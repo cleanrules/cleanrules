@@ -19,6 +19,7 @@
 // The ABI's names are C's.
 #![allow(non_camel_case_types)]
 
+pub mod bundle;
 pub mod construct;
 pub mod decision;
 pub mod document;
@@ -37,6 +38,7 @@ mod boundary;
 
 use std::ffi::{CStr, CString, c_char};
 
+pub use bundle::*;
 pub use construct::*;
 pub use decision::*;
 pub use document::*;

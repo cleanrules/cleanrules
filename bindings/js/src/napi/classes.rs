@@ -11,7 +11,8 @@ use napi::{Env, Result, ValueType};
 use napi_derive::napi;
 
 use super::hooks::{hook, throw};
-use super::{OrFail, fail, raw, raw_limits, raw_list, raw_options};
+use super::{OrFail, fail, raw, raw_cases, raw_limits, raw_list, raw_options};
+use crate::common::bundles;
 use crate::common::core::{
     ActionFailure, DecisionCore, DocumentCore, NodeCore, PathSegment, RulesCore, TreeKind,
     action_error, cause_index, max_values_error, not_a_batch, path_segments, undefined_row,
@@ -155,6 +156,22 @@ pub enum DocumentKind {
     /// A decision table.
     #[napi(value = "decision_table")]
     DecisionTable,
+    /// A bundle (`spec/bundles.md`).
+    #[napi(value = "bundle")]
+    Bundle,
+}
+
+/// A file of test cases given to `Document.makeBundle`: its path, relative to
+/// the bundle's directory, and its content, whose SHA-256 digest the bundle
+/// records (a string as its UTF-8 bytes).
+#[napi(object, object_from_js = false, object_to_js = false)]
+pub struct BundleCaseInput {
+    /// The path, such as `"cases/basic.json"`: segments of letters, digits,
+    /// `.`, `_` and `-` separated by `/`, none `.` or `..`.
+    pub path: String,
+    /// The file's content.
+    #[napi(ts_type = "string | Uint8Array")]
+    pub content: String,
 }
 
 /// A crisp truth value.
@@ -308,8 +325,8 @@ impl Document {
         Ok(Self { core })
     }
 
-    /// What the document holds: `"condition"`, `"rule"`, `"ruleset"` or
-    /// `"decision_table"`.
+    /// What the document holds: `"condition"`, `"rule"`, `"ruleset"`,
+    /// `"decision_table"` or `"bundle"`.
     #[napi(getter, ts_return_type = "DocumentKind")]
     #[must_use]
     pub fn kind(&self) -> &'static str {
@@ -348,6 +365,73 @@ impl Document {
     pub fn digest(&self) -> String {
         self.core.digest()
     }
+
+    /// Make a bundle (`spec/bundles.md`, *Making a bundle*) of the rules that
+    /// `rules` holds, a rule set or decision table document, with this
+    /// engine: the identifier and revision its author gives, its case files in
+    /// order, and the limits it runs with, which it records (`maxYamlSize`
+    /// and `maxTextSize` are not recorded, and are a `TypeError`). The result
+    /// is a bundle document; it holds actions by name, as every document does.
+    ///
+    /// # Errors
+    ///
+    /// `FormatError` for an identifier, revision or case path that does not
+    /// have its form, or a path given twice; a `TypeError` for a document of
+    /// another kind or an argument of the wrong type.
+    #[napi(
+        factory,
+        ts_args_type = "rules: Document, id: string, revision: string, cases?: BundleCaseInput[] | null, limits?: Limits | null"
+    )]
+    pub fn make_bundle(
+        env: &Env,
+        rules: Unknown<'_>,
+        id: Unknown<'_>,
+        revision: Unknown<'_>,
+        cases: Option<Unknown<'_>>,
+        limits: Option<Unknown<'_>>,
+    ) -> Result<Self> {
+        let Ok(document) = ClassInstance::<Document>::from_unknown(rules) else {
+            return Err(fail(env, crate::common::not_a_document(&raw(&rules)?)));
+        };
+        let rules = bundles::rules_of(&document.core).or_fail(env)?;
+        let core = make_bundle(env, rules, &id, &revision, cases, limits)?;
+        Ok(Self { core })
+    }
+
+    /// Compare this bundle with `other` (`spec/bundles.md`, *Comparing
+    /// bundles*): the JSON object `{"relation", "identical", "differences"}`,
+    /// such as `{"relation":"same_rules_other_engine","identical":false,
+    /// "differences":["engine.version"]}`.
+    ///
+    /// # Errors
+    ///
+    /// A `TypeError` when either document is not a bundle.
+    #[napi(ts_args_type = "other: Document")]
+    pub fn compare_bundle(&self, env: &Env, other: Unknown<'_>) -> Result<String> {
+        let Ok(other) = ClassInstance::<Document>::from_unknown(other) else {
+            return Err(fail(env, crate::common::not_a_document(&raw(&other)?)));
+        };
+        self.core.compare_bundle(&other.core).or_fail(env)
+    }
+}
+
+/// A bundle of `rules` made from the arguments of a JavaScript call, as a
+/// document.
+pub(crate) fn make_bundle(
+    env: &Env,
+    rules: cleanrules::bundle::BundleRules,
+    id: &Unknown<'_>,
+    revision: &Unknown<'_>,
+    cases: Option<Unknown<'_>>,
+    limits: Option<Unknown<'_>>,
+) -> Result<DocumentCore> {
+    let (id, revision) = (raw(id)?, raw(revision)?);
+    let cases = raw_cases(env, cases)?;
+    let limits = match limits {
+        Some(value) => raw_limits(&value)?,
+        None => crate::common::RawLimits::Absent,
+    };
+    bundles::make(rules, &id, &revision, cases, &limits).or_fail(env)
 }
 
 /// An optional argument as a [`Raw`] value.
@@ -877,14 +961,26 @@ impl Decision {
         self.core.rule_output_json(&raw(&rule)?).or_fail(env)
     }
 
-    /// The decision document in `format`: JSON (the default) or YAML.
+    /// The decision document in `format`: JSON (the default) or YAML. With
+    /// `rulesetDigest`, it carries the digest of the rule set that made it as
+    /// `ruleset_digest` (`spec/json-format.md`, *In decisions*), which
+    /// `RuleSet.readDecision` verifies; a decision read with one keeps it
+    /// either way.
     ///
     /// # Errors
     ///
-    /// `UnsupportedError` for the rule syntax and CSV.
-    #[napi(ts_args_type = "format?: Format | null")]
-    pub fn write(&self, env: &Env, format: Option<Unknown<'_>>) -> Result<String> {
-        self.core.write(&optional(format)?).or_fail(env)
+    /// `UnsupportedError` for the rule syntax and CSV; a `TypeError` for a
+    /// `rulesetDigest` that is not a boolean.
+    #[napi(ts_args_type = "format?: Format | null, rulesetDigest?: boolean | null")]
+    pub fn write(
+        &self,
+        env: &Env,
+        format: Option<Unknown<'_>>,
+        ruleset_digest: Option<Unknown<'_>>,
+    ) -> Result<String> {
+        self.core
+            .write(&optional(format)?, &optional(ruleset_digest)?)
+            .or_fail(env)
     }
 
     /// The explanation (`spec/explain.md`) in `format`: its text (the

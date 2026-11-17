@@ -489,3 +489,53 @@ pub fn ok_or(call: impl FnOnce(*mut *mut cr_error) -> cr_status) -> Result<(), F
         Err(take(error))
     }
 }
+
+/// Make a bundle of a rule set or table document (`cr_bundle_new`), with
+/// case files as paths and contents.
+pub fn bundle(
+    rules: &Document,
+    id: &str,
+    revision: &str,
+    cases: &[(&str, &[u8])],
+    limits: Option<&Limits_>,
+) -> Result<Document, Failure> {
+    let files: Vec<cr_case_file> = cases
+        .iter()
+        .map(|(path, bytes)| cr_case_file {
+            path: path.as_ptr().cast(),
+            path_len: path.len(),
+            bytes: bytes.as_ptr(),
+            len: bytes.len(),
+        })
+        .collect();
+    let (id, id_len) = arg(id.as_bytes());
+    let (revision, revision_len) = arg(revision.as_bytes());
+    let cases = if files.is_empty() {
+        ptr::null()
+    } else {
+        files.as_ptr()
+    };
+    // SAFETY: a live document; every text and file outlives the call; live or
+    // NULL limits.
+    handle(|out, error| unsafe {
+        cr_bundle_new(
+            rules.0,
+            id,
+            id_len,
+            revision,
+            revision_len,
+            cases,
+            files.len(),
+            raw(limits),
+            out,
+            error,
+        )
+    })
+    .map(Document)
+}
+
+/// Compare two bundles (`cr_bundle_compare`): the comparison's JSON text.
+pub fn compare_bundles(a: &Document, b: &Document) -> Result<String, Failure> {
+    // SAFETY: live documents.
+    text(|out, len, error| unsafe { cr_bundle_compare(a.0, b.0, out, len, error) })
+}

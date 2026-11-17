@@ -427,7 +427,8 @@
             "condition",
             "rule",
             "ruleset",
-            "decision_table"
+            "decision_table",
+            "bundle"
           ]
         },
         "summary": {

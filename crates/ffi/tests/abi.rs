@@ -575,3 +575,206 @@ fn handles_are_shared_between_threads() {
         assert_eq!(thread.join().unwrap(), r#"{"discount":0}"#);
     }
 }
+
+#[test]
+fn bundles_are_made_compared_and_read_back() {
+    let document = common::read_document(RULES.as_bytes(), CR_FORMAT_JSON, None).unwrap();
+    let limits = common::limits(&[(CR_LIMIT_MAX_VALUES, 10)]);
+    let bundle = common::bundle(
+        &document,
+        "acme/vip",
+        "1",
+        &[("cases/a.json", b"[]"), ("cases/b.json", b"")],
+        Some(&limits),
+    )
+    .unwrap();
+    assert_eq!(common::kind(&bundle), CR_DOCUMENT_BUNDLE);
+    let written = common::write_document(&bundle, CR_FORMAT_JSON).unwrap();
+    assert!(written.contains(r#""max_values":10"#), "{written}");
+    assert!(written.contains(r#""path":"cases/b.json""#), "{written}");
+    // Read back: this engine verifies its digest and contract.
+    let again = common::read_document(written.as_bytes(), CR_FORMAT_JSON, None).unwrap();
+    assert_eq!(
+        common::compare_bundles(&bundle, &again).unwrap(),
+        r#"{"relation":"same_rules_same_engine","identical":true,"differences":[]}"#
+    );
+    // A bundle gives its rule set.
+    let ruleset = common::ruleset_of(&bundle).unwrap();
+    // SAFETY: live handles.
+    let (from_bundle, own) = unsafe {
+        (
+            common::text(|out, len, error| cr_ruleset_digest(ruleset.0, out, len, error)),
+            common::text(|out, len, error| cr_ruleset_digest(rules().0, out, len, error)),
+        )
+    };
+    assert_eq!(from_bundle.unwrap(), own.unwrap());
+    // A rule set built in code becomes a document, and a bundle of it.
+    // SAFETY: a live rule set.
+    let of_ruleset =
+        common::handle(|out, error| unsafe { cr_document_new_ruleset(ruleset.0, out, error) })
+            .map(common::Document)
+            .unwrap();
+    assert_eq!(common::kind(&of_ruleset), CR_DOCUMENT_RULESET);
+    let other = common::bundle(&of_ruleset, "acme/vip", "2", &[], None).unwrap();
+    assert_eq!(
+        common::compare_bundles(&bundle, &other).unwrap(),
+        r#"{"relation":"same_rules_other_engine","identical":false,"differences":["revision","engine.limits.max_values","cases"]}"#
+    );
+    // What a bundle refuses.
+    for (id, revision, cases) in [
+        ("Acme", "1", &[][..]),
+        ("acme", "a b", &[][..]),
+        ("acme", "1", &[("../a", &b""[..])][..]),
+        ("acme", "1", &[("a", &b"1"[..]), ("a", &b"2"[..])][..]),
+    ] {
+        let failure = common::bundle(&document, id, revision, cases, None)
+            .err()
+            .unwrap();
+        assert_eq!(failure.status, CR_FORMAT_ERROR, "{id} {revision}");
+    }
+    let huge = common::limits(&[(CR_LIMIT_MAX_VALUES, usize::MAX)]);
+    let failure = common::bundle(&document, "a", "1", &[], Some(&huge))
+        .err()
+        .unwrap();
+    assert_eq!(failure.status, CR_UNSUPPORTED);
+    // Only rule sets and tables make bundles, and only bundles compare.
+    let condition = common::read_document(
+        br#"{"version":1,"condition":{"op":"const","value":true}}"#,
+        CR_FORMAT_JSON,
+        None,
+    )
+    .unwrap();
+    let failure = common::bundle(&condition, "a", "1", &[], None)
+        .err()
+        .unwrap();
+    assert_eq!(failure.status, CR_INVALID_ARGUMENT);
+    let failure = common::bundle(&bundle, "a", "1", &[], None).err().unwrap();
+    assert_eq!(failure.status, CR_INVALID_ARGUMENT);
+    assert_eq!(
+        common::compare_bundles(&bundle, &document)
+            .err()
+            .unwrap()
+            .status,
+        CR_INVALID_ARGUMENT
+    );
+    let failure = common::write_document(&bundle, CR_FORMAT_TEXT)
+        .err()
+        .unwrap();
+    assert_eq!(failure.status, CR_UNSUPPORTED);
+}
+
+#[test]
+fn bundle_arguments_are_checked() {
+    let document = common::read_document(RULES.as_bytes(), CR_FORMAT_JSON, None).unwrap();
+    let bundle = common::bundle(&document, "a", "1", &[], None).unwrap();
+    // SAFETY: the library checks every NULL before using it.
+    unsafe {
+        let mut out = ptr::null_mut();
+        assert_eq!(
+            cr_bundle_new(
+                document.0,
+                ptr::null(),
+                1,
+                ptr::null(),
+                0,
+                ptr::null(),
+                0,
+                ptr::null(),
+                &raw mut out,
+                ptr::null_mut()
+            ),
+            CR_INVALID_ARGUMENT
+        );
+        let (id, id_len) = arg(b"a");
+        assert_eq!(
+            cr_bundle_new(
+                document.0,
+                id,
+                id_len,
+                id,
+                id_len,
+                ptr::null(),
+                2,
+                ptr::null(),
+                &raw mut out,
+                ptr::null_mut()
+            ),
+            CR_INVALID_ARGUMENT
+        );
+        assert_eq!(
+            cr_bundle_new(
+                ptr::null(),
+                id,
+                id_len,
+                id,
+                id_len,
+                ptr::null(),
+                0,
+                ptr::null(),
+                &raw mut out,
+                ptr::null_mut()
+            ),
+            CR_INVALID_ARGUMENT
+        );
+        assert!(out.is_null());
+        assert_eq!(
+            cr_bundle_compare(
+                ptr::null(),
+                bundle.0,
+                ptr::null_mut(),
+                ptr::null_mut(),
+                ptr::null_mut()
+            ),
+            CR_INVALID_ARGUMENT
+        );
+        assert_eq!(
+            cr_document_new_ruleset(ptr::null(), &raw mut out, ptr::null_mut()),
+            CR_INVALID_ARGUMENT
+        );
+    }
+}
+
+#[test]
+fn decisions_carry_their_rule_set_digest_when_asked() {
+    let ruleset = rules();
+    let decision = common::evaluate(&ruleset, br#"{"years": 7}"#).unwrap();
+    // SAFETY: live handles.
+    let (plain, carried, digest, wrong) = unsafe {
+        (
+            common::text(|out, len, error| {
+                cr_decision_write_with(decision.0, CR_FORMAT_JSON, 0, out, len, error)
+            }),
+            common::text(|out, len, error| {
+                cr_decision_write_with(
+                    decision.0,
+                    CR_FORMAT_JSON,
+                    CR_WRITE_RULESET_DIGEST,
+                    out,
+                    len,
+                    error,
+                )
+            }),
+            common::text(|out, len, error| cr_ruleset_digest(ruleset.0, out, len, error)),
+            common::text(|out, len, error| {
+                cr_decision_write_with(decision.0, CR_FORMAT_JSON, 2, out, len, error)
+            }),
+        )
+    };
+    let (plain, carried, digest) = (plain.unwrap(), carried.unwrap(), digest.unwrap());
+    assert!(!plain.contains("ruleset_digest"));
+    assert_eq!(
+        plain,
+        common::write_decision(&decision, CR_FORMAT_JSON).unwrap()
+    );
+    assert!(
+        carried.contains(&format!(r#""ruleset_digest":"{digest}""#)),
+        "{carried}"
+    );
+    assert_eq!(wrong.err().unwrap().status, CR_INVALID_ARGUMENT);
+    // Read back, the decision keeps it, with or without the flag.
+    let read = common::read_decision(&ruleset, carried.as_bytes(), CR_FORMAT_JSON, None).unwrap();
+    assert_eq!(
+        common::write_decision(&read, CR_FORMAT_JSON).unwrap(),
+        carried
+    );
+}

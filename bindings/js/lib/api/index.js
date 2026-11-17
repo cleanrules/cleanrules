@@ -1,10 +1,11 @@
 // The idiomatic API of one build (the Node addon or the WebAssembly module):
-// conditions, rules, rule sets, decisions, result trees, decision tables and
-// documents over its native layer. Each entry point makes it for its build,
+// conditions, rules, rule sets, decisions, result trees, decision tables,
+// bundles and documents over its native layer. Each entry point makes it for its build,
 // once per native layer (`cleanrules` and `cleanrules/wasm` share it in one
 // realm); the classes of what decisions, explanations and summaries give back
 // (`results.js`) and the errors and markers are shared.
 
+import { bundles } from './bundles.js'
 import { documents } from './documents.js'
 import { expressions } from './expr.js'
 import { rules } from './rules.js'
@@ -13,6 +14,7 @@ import { trees } from './trees.js'
 
 /** The names of the API of a build, as each entry point exports them. */
 export const NAMES = Object.freeze([
+  'Bundle',
   'Const',
   'Decision',
   'DecisionTable',
@@ -50,13 +52,16 @@ export function api(native, build) {
     const treeApi = trees(native, built, build)
     const ruleApi = rules(native, built, treeApi, build)
     const tableApi = tables(native, built, ruleApi, build)
-    const documentApi = documents(native, built, ruleApi, tableApi, build)
+    const bundleApi = bundles(native, ruleApi, tableApi, build)
+    const documentApi = documents(native, built, ruleApi, tableApi, bundleApi, build)
     const { Const, Expr, F, Field, and, constant, field, not, or } = built
     const { Decision, Rule, RuleSet } = ruleApi
     const { DecisionTable } = tableApi
+    const { Bundle } = bundleApi
     const { evaluateTree, evaluateValueTree } = treeApi
     const { canonicalBytes, digest, dump, dumps, load, loads, ruleFromText } = documentApi
     found = Object.freeze({
+      Bundle,
       Const,
       Decision,
       DecisionTable,

@@ -20,6 +20,7 @@ const ENTRY = pathToFileURL(path.join(JS, 'wasm.js')).href
 
 /** What needs the module: it throws until `init` resolves. */
 const PENDING = [
+  'Bundle',
   'Const',
   'Decision',
   'DecisionTable',

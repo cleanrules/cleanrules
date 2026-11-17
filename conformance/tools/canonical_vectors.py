@@ -788,12 +788,880 @@ def decision_vectors() -> dict[str, Any]:
     }
 
 
+# --- Bundles ---------------------------------------------------------------------
+
+BUNDLES = "bundles.md"
+SEMVER_OTHER = "1.0.0-conformance.1"
+SEMVER_OTHER_2 = "1.0.0-conformance.2"
+LIMIT_KEYS = (
+    "max_size",
+    "max_nesting",
+    "max_depth",
+    "max_path_segments",
+    "max_table_size",
+    "max_values",
+)
+DEFAULT_LIMITS = dict(zip(LIMIT_KEYS, (16777216, 1024, 256, 256, 2097152, 1000000), strict=True))
+NUMBER_OR_NULL = '{"anyOf": [{"type": "number"}, {"type": "null"}]}'
+# The input schema of EXAMPLE's rules, derived by hand from `agents.md`
+# (*Input schemas*): `years` is compared with an int, so it is a number.
+EXAMPLE_INPUT = (
+    '{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object",'
+    ' "properties": {"years": {"description": "conditions of vip",'
+    ' "anyOf": [{"type": "number"}, {"type": "null"}]}}}'
+)
+# That of the rules `format/tables/basic` compiles to.
+TABLE_INPUT = (
+    '{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object",'
+    ' "properties": {'
+    '"customer": {"anyOf": [{"type": "object", "properties": {"years": {"description":'
+    ' "conditions of vip, loyal", "anyOf": [{"type": "number"}, {"type": "null"}]}}},'
+    ' {"type": "null"}]},'
+    ' "order": {"anyOf": [{"type": "object", "properties": {"total": {"description":'
+    ' "conditions of vip", "anyOf": [{"type": "number"}, {"type": "null"}]}}},'
+    ' {"type": "null"}]}}}'
+)
+
+
+def raw_canonical(value: Any) -> Any:
+    """The canonical form of JSON that is not a value (a contract): numbers only."""
+    if isinstance(value, IntLit):
+        return IntLit(str(int(value)))
+    assert not isinstance(value, FloatLit), value
+    if isinstance(value, list):
+        return [raw_canonical(v) for v in value]
+    if isinstance(value, dict):
+        return {k: raw_canonical(v) for k, v in value.items()}
+    return value
+
+
+def ruleset_digest_of(content: Any) -> str:
+    """The rule set digest of a rule set's content in canonical structure."""
+    return digest(canonical_text(canonical_value(ruleset_document(content))))
+
+
+def limits_json(changes: dict[str, int] | None = None) -> dict[str, Any]:
+    """The six recorded limits, the defaults unless changed."""
+    values = {**DEFAULT_LIMITS, **(changes or {})}
+    return {key: IntLit(str(values[key])) for key in LIMIT_KEYS}
+
+
+def engine(version: str = SEMVER_OTHER, **limits: int) -> dict[str, Any]:
+    """An engine record (`bundles.md`, *Engine*)."""
+    return {"name": "cleanrules", "version": version, "limits": limits_json(limits)}
+
+
+def contract(input_text: str = '{"type": "object"}', keys: list[str] | None = None) -> Any:
+    """A contract record (`bundles.md`, *Contract*)."""
+    return {"input": load(input_text), "output": {"keys": keys or ["discount"]}}
+
+
+def case(path: str, text: str) -> dict[str, Any]:
+    """A case file reference to a file holding `text`."""
+    return {"path": path, "digest": digest(text)}
+
+
+def example_rules(threshold: int = 5) -> Any:
+    """EXAMPLE's rule set content, with another threshold."""
+    content = load(EXAMPLE)["ruleset"]
+    content["rules"][0]["when"]["right"]["value"] = IntLit(str(threshold))
+    return content
+
+
+def bundle(
+    *,
+    id: str = "acme/discounts",
+    revision: str = "1",
+    ruleset: Any = None,
+    table: Any = None,
+    stated: str | None = None,
+    engine_record: Any = None,
+    contract_record: Any = None,
+    cases: list[Any] | None = None,
+) -> dict[str, Any]:
+    """A bundle document in canonical structure, its rule set digest computed."""
+    content: dict[str, Any] = {"id": id, "revision": revision}
+    if table is not None:
+        content["decision_table"] = table
+        _, compiled = table_basic()
+        content["ruleset_digest"] = stated or ruleset_digest_of(compiled)
+    else:
+        rules = example_rules() if ruleset is None else ruleset
+        content["ruleset"] = rules
+        content["ruleset_digest"] = stated or ruleset_digest_of(rules)
+    content["engine"] = engine() if engine_record is None else engine_record
+    content["contract"] = contract() if contract_record is None else contract_record
+    if cases:
+        content["cases"] = cases
+    return {"version": IntLit("1"), "bundle": content}
+
+
+def canonical_bundle(document: Any) -> Any:
+    """A bundle document's canonical form.
+
+    Values in the rules, numbers in the contract, sorted output keys, and no
+    empty `cases`.
+    """
+    content = dict(document["bundle"])
+    for key in ("ruleset", "decision_table"):
+        if key in content:
+            content[key] = canonical_value(content[key])
+    content["contract"] = raw_canonical(content["contract"])
+    content["contract"]["output"]["keys"] = sorted(content["contract"]["output"]["keys"])
+    if not content.get("cases", True):
+        del content["cases"]
+    return {"version": IntLit("1"), "bundle": content}
+
+
+def with_changes(document: Any, pointer: str, value: Any) -> Any:
+    """A copy of a document with the value at a pointer replaced (removed for `REMOVE`)."""
+    copy = load(dump(document))
+    *parents, last = pointer.lstrip("/").split("/")
+    node = copy
+    for part in parents:
+        node = node[int(part)] if isinstance(node, list) else node[part]
+    if value is REMOVE:
+        del node[last]
+    elif isinstance(node, list):
+        node[int(last)] = value
+    else:
+        node[last] = value
+    return copy
+
+
+REMOVE = object()
+
+
+def bundle_vectors() -> dict[str, Any]:
+    """The vectors of `format/bundles.json`."""
+    vectors: list[dict[str, Any]] = []
+    table_document, compiled = table_basic()
+    table = table_document["decision_table"]
+
+    def add(name: str, description: str, spec: list[str], given: Any, expect: Any) -> None:
+        vectors.append(
+            {
+                "id": f"format/bundles/{name}",
+                "spec": [s if "#" in s else f"{BUNDLES}#{s}" for s in spec],
+                "description": description,
+                "given": given,
+                "expect": expect,
+            }
+        )
+
+    def read(
+        name: str, description: str, spec: list[str], document: Any, *, current: bool = False
+    ) -> None:
+        given: dict[str, Any] = {"kind": "read", "document": document}
+        if current:
+            given["current_engine"] = True
+        add(name, description, spec, given, {"document": canonical_bundle(document)})
+
+    def refused(
+        name: str,
+        description: str,
+        spec: list[str],
+        document: Any,
+        code: str,
+        pointer: str,
+        *,
+        current: bool = False,
+    ) -> None:
+        given: dict[str, Any] = {"kind": "read", "document": document}
+        if current:
+            given["current_engine"] = True
+        add(name, description, spec, given, {"error": {"code": code, "pointer": pointer}})
+
+    base = bundle(cases=[case("cases/discounts.json", "[]\n")])
+
+    # Reading and writing.
+    read(
+        "read-ruleset",
+        "a bundle of a rule set reads, and is written back as it was",
+        ["keys", "rules-and-their-digest", "reading", "json-format.md#bundles"],
+        base,
+    )
+    read(
+        "read-table",
+        "a bundle of a decision table states the digest of the rule set the table compiles to",
+        ["rules-and-their-digest"],
+        bundle(table=table),
+    )
+    read(
+        "read-without-cases",
+        "without cases, a bundle is written without the key",
+        ["keys", "cases"],
+        bundle(),
+    )
+    empty = bundle()
+    empty["bundle"]["cases"] = []
+    read(
+        "read-empty-cases",
+        "an empty list of cases is written without the key",
+        ["keys", "cases"],
+        empty,
+    )
+    read(
+        "read-output-keys-sorted",
+        "output keys are written sorted by code point",
+        ["contract"],
+        bundle(contract_record=contract(keys=["\uff5a", "\U0001f600", "a"])),
+    )
+    read(
+        "read-other-engine-contract-kept",
+        "a bundle of another engine keeps its contract as recorded, though this engine"
+        " would derive another one",
+        ["contract", "engine"],
+        bundle(contract_record=contract('{"anything": [1, {"x": true}]}', ["other"])),
+    )
+    read(
+        "read-other-engine-name",
+        "a bundle made by an engine of another name is read",
+        ["engine"],
+        bundle(engine_record={**engine(), "name": "other-engine"}),
+    )
+    read(
+        "read-cases-in-order",
+        "case files keep their order",
+        ["cases"],
+        bundle(cases=[case("b.json", "b"), case("a/x.json", "a")]),
+    )
+    read(
+        "read-contract-integers",
+        "integers in a contract are kept, up to 2^53 - 1",
+        ["contract"],
+        bundle(contract_record=contract('{"minItems": 9007199254740991, "n": -9007199254740991}')),
+    )
+    yaml_text = (
+        "version: 1\nbundle:\n  id: acme/discounts\n  revision: '1'\n  ruleset:\n"
+        "    rules:\n    - name: vip\n      when: {op: gt, left: {op: field, path: [years]},"
+        " right: {op: const, value: 5}}\n      then:\n        discount: {op: const, value:"
+        " {$decimal: '0.15'}}\n"
+        f"  ruleset_digest: {ruleset_digest_of(example_rules())}\n"
+        f"  engine:\n    name: cleanrules\n    version: {SEMVER_OTHER}\n    limits:\n"
+        + "".join(f"      {k}: {DEFAULT_LIMITS[k]}\n" for k in LIMIT_KEYS)
+        + "  contract:\n    input: {type: object}\n    output: {keys: [discount]}\n"
+    )
+    add(
+        "read-yaml",
+        "a bundle reads from YAML, settings of its rule set at their defaults",
+        ["keys"],
+        {"kind": "read", "yaml": yaml_text},
+        {"document": canonical_bundle(bundle())},
+    )
+
+    # The rules and their digest.
+    other = ruleset_digest_of(example_rules(6))
+    refused(
+        "digest-mismatch",
+        "a rule set digest that is not that of the rules is a decision_mismatch",
+        ["rules-and-their-digest", "reading"],
+        bundle(stated=other),
+        "decision_mismatch",
+        "/bundle/ruleset_digest",
+    )
+    table_own = digest(canonical_text(canonical_value(table_document)))
+    refused(
+        "digest-of-the-table-document",
+        "the digest of a table's own document is not its rule set digest",
+        ["rules-and-their-digest"],
+        bundle(table=table, stated=table_own),
+        "decision_mismatch",
+        "/bundle/ruleset_digest",
+    )
+    refused(
+        "digest-uppercase",
+        "a malformed rule set digest is a format_error",
+        ["rules-and-their-digest"],
+        bundle(stated=ruleset_digest_of(example_rules()).upper().replace("SHA256", "sha256")),
+        "format_error",
+        "/bundle/ruleset_digest",
+    )
+    refused(
+        "digest-missing",
+        "the rule set digest is required",
+        ["keys"],
+        with_changes(bundle(), "/bundle/ruleset_digest", REMOVE),
+        "format_error",
+        "/bundle/ruleset_digest",
+    )
+    refused(
+        "no-rules",
+        "a bundle without rules is a format_error at the bundle",
+        ["keys"],
+        with_changes(bundle(), "/bundle/ruleset", REMOVE),
+        "format_error",
+        "/bundle",
+    )
+    both = bundle()
+    both["bundle"]["decision_table"] = table
+    refused(
+        "rules-and-table",
+        "a bundle with a rule set and a table is a format_error",
+        ["keys"],
+        both,
+        "format_error",
+        "/bundle",
+    )
+    repeated = example_rules()
+    repeated["rules"] = [repeated["rules"][0], repeated["rules"][0]]
+    refused(
+        "rules-construction-before-digest",
+        "the rules' construction rules come before the digest",
+        ["reading"],
+        bundle(ruleset=repeated, stated=other),
+        "rule_definition_error",
+        "/bundle/ruleset/rules/1/name",
+    )
+    bad_shape = with_changes(bundle(), "/bundle/ruleset/hit_policy", "best")
+    refused(
+        "rules-shape",
+        "the rules are read with the errors of their own documents",
+        ["rules-and-their-digest"],
+        bad_shape,
+        "format_error",
+        "/bundle/ruleset/hit_policy",
+    )
+
+    # Identifier and revision.
+    for name, value in (
+        ("id-uppercase", "Acme"),
+        ("id-empty-segment", "acme//x"),
+        ("id-leading-slash", "/acme"),
+        ("id-too-long", "a" * 129),
+    ):
+        refused(
+            name,
+            f"the identifier {value[:20]!r} is a format_error",
+            ["identifier-and-revision"],
+            bundle(id=value),
+            "format_error",
+            "/bundle/id",
+        )
+    read(
+        "id-segments",
+        "an identifier of several segments, with '.', '_' and '-'",
+        ["identifier-and-revision"],
+        bundle(id="acme/pricing.v2/loan_approval-eu"),
+    )
+    read(
+        "revision-forms",
+        "a revision may hold letters of either case, digits, '.', '_', '+' and '-'",
+        ["identifier-and-revision"],
+        bundle(revision="V1.2.0+build_5-rc"),
+    )
+    for name, value in (
+        ("revision-space", "1 2"),
+        ("revision-leading-dot", ".1"),
+        ("revision-empty", ""),
+    ):
+        refused(
+            name,
+            f"the revision {value!r} is a format_error",
+            ["identifier-and-revision"],
+            bundle(revision=value),
+            "format_error",
+            "/bundle/revision",
+        )
+    refused(
+        "id-not-a-string",
+        "an identifier that is not a string is a format_error",
+        ["identifier-and-revision"],
+        with_changes(bundle(), "/bundle/id", IntLit("1")),
+        "format_error",
+        "/bundle/id",
+    )
+
+    # Engine.
+    for name, value in (
+        ("version-two-parts", "1.0"),
+        ("version-leading-zero", "01.0.0"),
+        ("version-v", "v1.0.0"),
+    ):
+        refused(
+            name,
+            f"the engine version {value!r} is a format_error",
+            ["engine"],
+            with_changes(bundle(), "/bundle/engine/version", value),
+            "format_error",
+            "/bundle/engine/version",
+        )
+    read(
+        "version-prerelease-build",
+        "a version with pre-release and build metadata",
+        ["engine"],
+        bundle(engine_record=engine("2.0.0-rc.1+sha.5114f85")),
+    )
+    refused(
+        "engine-name-uppercase",
+        "an engine name with uppercase letters is a format_error",
+        ["engine"],
+        with_changes(bundle(), "/bundle/engine/name", "CleanRules"),
+        "format_error",
+        "/bundle/engine/name",
+    )
+    refused(
+        "limit-zero",
+        "a limit of 0 is a format_error",
+        ["engine"],
+        bundle(engine_record=engine(max_depth=0)),
+        "format_error",
+        "/bundle/engine/limits/max_depth",
+    )
+    refused(
+        "limit-too-large",
+        "a limit above 2^53 - 1 is a format_error",
+        ["engine"],
+        bundle(engine_record=engine(max_values=2**53)),
+        "format_error",
+        "/bundle/engine/limits/max_values",
+    )
+    refused(
+        "limit-float",
+        "a limit written as a float is a format_error",
+        ["engine"],
+        with_changes(bundle(), "/bundle/engine/limits/max_size", FloatLit("1.0")),
+        "format_error",
+        "/bundle/engine/limits/max_size",
+    )
+    refused(
+        "limit-missing",
+        "every limit is required",
+        ["engine"],
+        with_changes(bundle(), "/bundle/engine/limits/max_table_size", REMOVE),
+        "format_error",
+        "/bundle/engine/limits/max_table_size",
+    )
+    refused(
+        "limit-unknown",
+        "a limit that is not recorded is a format_error",
+        ["engine"],
+        with_changes(bundle(), "/bundle/engine/limits/max_yaml_size", IntLit("1")),
+        "format_error",
+        "/bundle/engine/limits/max_yaml_size",
+    )
+    read(
+        "limits-recorded",
+        "the limits are kept as recorded",
+        ["engine"],
+        bundle(engine_record=engine(max_size=1, max_values=9007199254740991)),
+    )
+
+    # Contract.
+    refused(
+        "contract-float",
+        "a float in a contract is a format_error, at the number",
+        ["contract"],
+        bundle(contract_record=contract('{"properties": {"x": {"minimum": 0.5}}}')),
+        "format_error",
+        "/bundle/contract/input/properties/x/minimum",
+    )
+    refused(
+        "contract-large-integer",
+        "an integer beyond 2^53 - 1 in a contract is a format_error",
+        ["contract"],
+        bundle(contract_record=contract('{"minItems": 9007199254740992}')),
+        "format_error",
+        "/bundle/contract/input/minItems",
+    )
+    refused(
+        "contract-input-not-object",
+        "an input schema that is not an object is a format_error",
+        ["contract"],
+        with_changes(bundle(), "/bundle/contract/input", True),
+        "format_error",
+        "/bundle/contract/input",
+    )
+    refused(
+        "output-key-repeated",
+        "a repeated output key is a format_error",
+        ["contract"],
+        bundle(contract_record=contract(keys=["a", "b", "a"])),
+        "format_error",
+        "/bundle/contract/output/keys/2",
+    )
+
+    # Cases.
+    for name, path in (
+        ("case-parent", "../cases.json"),
+        ("case-absolute", "/cases.json"),
+        ("case-dot", "cases/./a.json"),
+        ("case-backslash", "cases\\a.json"),
+        ("case-uppercase", "cases/A.json"),
+        ("case-trailing-dot", "cases/a."),
+    ):
+        refused(
+            name,
+            f"the case path {path!r} is a format_error",
+            ["cases"],
+            bundle(cases=[case(path, "x")]),
+            "format_error",
+            "/bundle/cases/0/path",
+        )
+    refused(
+        "case-repeated",
+        "the same case path twice is a format_error at the second",
+        ["cases"],
+        bundle(cases=[case("a.json", "1"), case("a.json", "2")]),
+        "format_error",
+        "/bundle/cases/1/path",
+    )
+    refused(
+        "case-digest-malformed",
+        "a malformed case digest is a format_error",
+        ["cases"],
+        bundle(cases=[{"path": "a.json", "digest": "sha1:00"}]),
+        "format_error",
+        "/bundle/cases/0/digest",
+    )
+    refused(
+        "unknown-key",
+        "an unknown key in a bundle is a format_error",
+        ["keys"],
+        with_changes(bundle(), "/bundle/digest", ruleset_digest_of(example_rules())),
+        "format_error",
+        "/bundle/digest",
+    )
+    two = bundle()
+    two["version"] = IntLit("2")
+    refused(
+        "format-version-unknown",
+        "only the format version refuses a bundle",
+        ["engine"],
+        two,
+        "unsupported_version",
+        "/version",
+    )
+
+    # This engine: the contract is verified.
+    strict_vector = next(
+        v
+        for v in load((VECTORS / "agents" / "input-schemas.json").read_text(encoding="utf-8"))[
+            "vectors"
+        ]
+        if v["id"] == "agents/input-schemas/strict"
+    )
+    strict_rules = strict_vector["given"]["rulesets"]["orders"]
+    strict_input = strict_vector["expect"]["output"]["input_schema"]
+    strict_keys = ["late", "note", "tier"]
+
+    def current(**changes: Any) -> Any:
+        record = {"input": strict_input, "output": {"keys": strict_keys}}
+        record.update(changes)
+        return bundle(
+            id="acme/orders",
+            ruleset=strict_rules,
+            engine_record=engine("0.0.0"),
+            contract_record=load(dump(record)),
+        )
+
+    read(
+        "current-engine-verified",
+        "a bundle of this engine whose contract is the one this engine derives reads",
+        ["contract", "reading"],
+        current(),
+        current=True,
+    )
+    loose = with_changes(current(), "/bundle/contract/input/required", REMOVE)
+    refused(
+        "current-engine-input-mismatch",
+        "a bundle of this engine whose input schema is not the derived one is a decision_mismatch",
+        ["contract", "reading"],
+        loose,
+        "decision_mismatch",
+        "/bundle/contract/input",
+        current=True,
+    )
+    fewer = with_changes(current(), "/bundle/contract/output/keys", ["late", "note"])
+    refused(
+        "current-engine-output-mismatch",
+        "a bundle of this engine whose output keys are"
+        " not those of the rules is a decision_mismatch",
+        ["contract"],
+        fewer,
+        "decision_mismatch",
+        "/bundle/contract/output",
+        current=True,
+    )
+    both_wrong = with_changes(fewer, "/bundle/ruleset_digest", other)
+    refused(
+        "current-engine-digest-first",
+        "the rule set digest is verified before the contract",
+        ["reading"],
+        both_wrong,
+        "decision_mismatch",
+        "/bundle/ruleset_digest",
+        current=True,
+    )
+    read(
+        "other-engine-not-verified",
+        "the same bundle made by another version of this engine is read, its contract as recorded",
+        ["contract", "engine"],
+        with_changes(loose, "/bundle/engine/version", SEMVER_OTHER),
+    )
+
+    # Canonical bytes and digests.
+    def canonical_vector(name: str, description: str, document: Any, ruleset: str) -> None:
+        form = canonical_bundle(document)
+        text = canonical_text(form)
+        add(
+            name,
+            description,
+            ["digest-of-a-bundle"],
+            {"kind": "canonical", "document": document},
+            {"canonical": text, "digest": digest(text), "ruleset_digest": ruleset},
+        )
+
+    canonical_vector(
+        "canonical-ruleset",
+        "a bundle's canonical bytes sort every member,"
+        " the contract's too, and its rule set digest is its rules'",
+        bundle(
+            contract_record=contract('{"z": -0, "a": {"$schema": "x"}}', ["b", "a"]),
+            cases=[case("cases/a.json", "[]")],
+        ),
+        ruleset_digest_of(example_rules()),
+    )
+    canonical_vector(
+        "canonical-table",
+        "a bundle of a table has the rule set digest of the rule set the table compiles to",
+        bundle(table=table),
+        ruleset_digest_of(compiled),
+    )
+
+    # Making a bundle.
+    def make(name: str, description: str, given: Any, expect: Any) -> None:
+        add(name, description, ["making-a-bundle"], {"kind": "bundle", **given}, expect)
+
+    made = bundle(
+        engine_record=engine("0.0.0"),
+        contract_record=contract(EXAMPLE_INPUT),
+        cases=[case("cases/vip.json", '{"cases": []}\n'), case("cases/more.json", "")],
+    )
+    make(
+        "make-ruleset",
+        "a bundle made from a rule set records this engine, the default"
+        " limits, the derived contract and each case file's digest",
+        {
+            "document": load(EXAMPLE),
+            "id": "acme/discounts",
+            "revision": "1",
+            "cases": [
+                {"path": "cases/vip.json", "text": '{"cases": []}\n'},
+                {"path": "cases/more.json", "text": ""},
+            ],
+        },
+        {"document": canonical_bundle(made)},
+    )
+    table_made = bundle(
+        table=table,
+        id="acme/table",
+        revision="2026-11-16.1",
+        engine_record=engine("0.0.0", max_depth=64, max_values=10),
+        contract_record=contract(TABLE_INPUT, ["discount", "label"]),
+    )
+    make(
+        "make-table",
+        "a bundle made from a decision table, with limits",
+        {
+            "document": table_document,
+            "id": "acme/table",
+            "revision": "2026-11-16.1",
+            "limits": {"max_depth": IntLit("64"), "max_values": IntLit("10")},
+        },
+        {"document": canonical_bundle(table_made)},
+    )
+    make(
+        "make-bad-id",
+        "making a bundle checks the identifier",
+        {"document": load(EXAMPLE), "id": "Acme", "revision": "1"},
+        {"error": {"code": "format_error"}},
+    )
+    make(
+        "make-bad-revision",
+        "making a bundle checks the revision",
+        {"document": load(EXAMPLE), "id": "acme", "revision": "a b"},
+        {"error": {"code": "format_error"}},
+    )
+    make(
+        "make-bad-path",
+        "making a bundle checks the case paths",
+        {
+            "document": load(EXAMPLE),
+            "id": "acme",
+            "revision": "1",
+            "cases": [{"path": "../x.json", "text": ""}],
+        },
+        {"error": {"code": "format_error"}},
+    )
+    make(
+        "make-repeated-path",
+        "making a bundle refuses a case path given twice",
+        {
+            "document": load(EXAMPLE),
+            "id": "acme",
+            "revision": "1",
+            "cases": [{"path": "x.json", "text": "1"}, {"path": "x.json", "text": "2"}],
+        },
+        {"error": {"code": "format_error"}},
+    )
+    make(
+        "make-limit-zero",
+        "a limit of 0, which a reader would refuse, is not recorded",
+        {
+            "document": load(EXAMPLE),
+            "id": "acme",
+            "revision": "1",
+            "limits": {"max_depth": IntLit("0")},
+        },
+        {"error": {"code": "unsupported"}},
+    )
+
+    # Comparing bundles.
+    def compare(
+        name: str, description: str, a: Any, b: Any, relation: str, differences: list[str]
+    ) -> None:
+        add(
+            name,
+            description,
+            ["comparing-bundles"],
+            {"kind": "bundle_compare", "a": a, "b": b},
+            {
+                "comparison": {
+                    "relation": relation,
+                    "identical": not differences,
+                    "differences": differences,
+                }
+            },
+        )
+
+    a = bundle(cases=[case("cases/a.json", "[]")])
+    compare(
+        "compare-identical", "a bundle and itself are identical", a, a, "same_rules_same_engine", []
+    )
+    relaid = load(dump(a))
+    relaid["bundle"]["ruleset"]["rules"][0]["then"]["discount"]["value"] = {"$decimal": "1.5e-1"}
+    compare(
+        "compare-identical-other-layout",
+        "the same bundle written another way is identical",
+        a,
+        relaid,
+        "same_rules_same_engine",
+        [],
+    )
+    compare(
+        "compare-other-engine-version",
+        "the same rules under another engine version",
+        a,
+        with_changes(a, "/bundle/engine/version", SEMVER_OTHER_2),
+        "same_rules_other_engine",
+        ["engine.version"],
+    )
+    compare(
+        "compare-other-limits",
+        "the same rules under another configuration",
+        a,
+        bundle(cases=[case("cases/a.json", "[]")], engine_record=engine(max_values=10)),
+        "same_rules_other_engine",
+        ["engine.limits.max_values"],
+    )
+    compare(
+        "compare-other-engine-name",
+        "the same rules under an engine of another name",
+        a,
+        with_changes(a, "/bundle/engine/name", "other-engine"),
+        "same_rules_other_engine",
+        ["engine.name"],
+    )
+    b = bundle(revision="2", ruleset=example_rules(6), cases=[case("cases/a.json", "[]")])
+    compare(
+        "compare-other-rules",
+        "other rules under the same engine",
+        a,
+        b,
+        "other_rules_same_engine",
+        ["revision", "rules"],
+    )
+    compare(
+        "compare-other-rules-other-engine",
+        "other rules under another engine, with another contract",
+        a,
+        with_changes(
+            with_changes(b, "/bundle/engine/version", SEMVER_OTHER_2),
+            "/bundle/contract/input",
+            load('{"type": "object", "x": 1}'),
+        ),
+        "other_rules_other_engine",
+        ["revision", "rules", "engine.version", "contract.input"],
+    )
+    compare(
+        "compare-conflict",
+        "the same identifier and revision with other rules is a conflict",
+        a,
+        with_changes(b, "/bundle/revision", "1"),
+        "conflict",
+        ["rules"],
+    )
+    compare(
+        "compare-conflict-other-engine",
+        "a conflict takes precedence over the engine",
+        a,
+        with_changes(
+            with_changes(b, "/bundle/revision", "1"), "/bundle/engine/version", SEMVER_OTHER_2
+        ),
+        "conflict",
+        ["rules", "engine.version"],
+    )
+    compare(
+        "compare-table-and-its-ruleset",
+        "a table and the rule set it compiles to are the same rules from another source",
+        bundle(table=table, contract_record=contract(keys=["discount", "label"])),
+        bundle(ruleset=compiled, contract_record=contract(keys=["discount", "label"])),
+        "same_rules_same_engine",
+        ["source"],
+    )
+    compare(
+        "compare-cases-only",
+        "the same rules on the same engine with other cases",
+        a,
+        bundle(cases=[case("cases/a.json", "[1]")]),
+        "same_rules_same_engine",
+        ["cases"],
+    )
+    compare(
+        "compare-cases-order",
+        "case files in another order differ",
+        bundle(cases=[case("a.json", "1"), case("b.json", "2")]),
+        bundle(cases=[case("b.json", "2"), case("a.json", "1")]),
+        "same_rules_same_engine",
+        ["cases"],
+    )
+    compare(
+        "compare-other-id",
+        "another identifier with the same rules",
+        a,
+        with_changes(a, "/bundle/id", "acme/other"),
+        "same_rules_same_engine",
+        ["id"],
+    )
+    compare(
+        "compare-output-contract",
+        "another output contract is a difference",
+        a,
+        bundle(cases=[case("cases/a.json", "[]")], contract_record=contract(keys=["x"])),
+        "same_rules_same_engine",
+        ["contract.output"],
+    )
+    return {"version": 1, "area": "format", "vectors": vectors}
+
+
 # --- Writing and checking ---------------------------------------------------------
 
 
 FILES = {
     "canonical.json": canonical_vectors,
     "digests.json": decision_vectors,
+    "bundles.json": bundle_vectors,
 }
 
 

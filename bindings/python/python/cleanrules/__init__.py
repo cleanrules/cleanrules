@@ -10,6 +10,7 @@ format and the conformance vectors with every other language.
 
 from cleanrules import errors
 from cleanrules._agents import TOOLS, Catalog, Tool, ToolResult
+from cleanrules._bundles import Bundle, BundleComparison, BundleEngine, BundleRelation, CaseFile
 from cleanrules._cleanrules import FORMAT_VERSION, __version__
 from cleanrules._documents import (
     Format,
@@ -76,6 +77,11 @@ __all__ = [
     "ActionContext",
     "ActionError",
     "Aggregate",
+    "Bundle",
+    "BundleComparison",
+    "BundleEngine",
+    "BundleRelation",
+    "CaseFile",
     "Catalog",
     "Cause",
     "CauseGroup",

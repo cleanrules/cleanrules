@@ -13,7 +13,9 @@ use crate::error::cr_error;
 use crate::limits::cr_limits;
 use crate::node::cr_node;
 use crate::rule::cr_rule;
+use crate::ruleset::cr_ruleset;
 use crate::{cr_format, cr_status};
+use cleanrules::rules::RuleSet;
 
 /// What a document holds, its content (`CR_DOCUMENT_*`).
 pub type cr_document_content = i32;
@@ -26,9 +28,12 @@ pub const CR_DOCUMENT_RULE: cr_document_content = 2;
 pub const CR_DOCUMENT_RULESET: cr_document_content = 3;
 /// A document holding a decision table.
 pub const CR_DOCUMENT_DECISION_TABLE: cr_document_content = 4;
+/// A document holding a bundle (`spec/bundles.md`): read and written in JSON
+/// or YAML, made with `cr_bundle_new`.
+pub const CR_DOCUMENT_BUNDLE: cr_document_content = 5;
 
-/// A document read in any format: a condition, a rule, a rule set or a decision
-/// table.
+/// A document read in any format: a condition, a rule, a rule set, a decision
+/// table or a bundle.
 pub struct cr_document {
     pub(crate) document: Document,
 }
@@ -81,6 +86,7 @@ pub unsafe extern "C" fn cr_document_kind(document: *const cr_document) -> cr_do
         Some(Document::Rule(_)) => CR_DOCUMENT_RULE,
         Some(Document::RuleSet(_)) => CR_DOCUMENT_RULESET,
         Some(Document::DecisionTable(_)) => CR_DOCUMENT_DECISION_TABLE,
+        Some(Document::Bundle(_)) => CR_DOCUMENT_BUNDLE,
         _ => 0,
     }
 }
@@ -244,6 +250,29 @@ pub unsafe extern "C" fn cr_document_new_rule(
     unsafe { make(out, error, content) }
 }
 
+/// A document holding a rule set (copied), to write it with
+/// `cr_document_write` or make a bundle of it with `cr_bundle_new`.
+///
+/// # Safety
+///
+/// `ruleset` is `NULL` or a live `cr_ruleset`; `out` is `NULL` or points to a
+/// writable `cr_document *`; `error` is `NULL` or points to a writable
+/// `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_document_new_ruleset(
+    ruleset: *const cr_ruleset,
+    out: *mut *mut cr_document,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let content = || {
+        // SAFETY: `ruleset` is NULL or live (# Safety).
+        let ruleset = unsafe { handle(ruleset, "ruleset") }?;
+        Ok(Document::RuleSet(RuleSet::clone(&ruleset.ruleset)))
+    };
+    // SAFETY: `out` and `error` (# Safety).
+    unsafe { make(out, error, content) }
+}
+
 /// A document of another kind than the function reads.
 pub(crate) fn not_holding(what: &str, document: &Document) -> Failure {
     let held = match document {
@@ -251,6 +280,7 @@ pub(crate) fn not_holding(what: &str, document: &Document) -> Failure {
         Document::Rule(_) => "a rule",
         Document::RuleSet(_) => "a rule set",
         Document::DecisionTable(_) => "a decision table",
+        Document::Bundle(_) => "a bundle",
         _ => "something else",
     };
     Failure::Invalid(

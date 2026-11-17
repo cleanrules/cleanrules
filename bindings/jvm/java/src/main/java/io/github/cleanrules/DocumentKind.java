@@ -11,7 +11,12 @@ public enum DocumentKind {
     /** A rule set. */
     RULESET,
     /** A decision table ({@code spec/tables.md}). */
-    DECISION_TABLE;
+    DECISION_TABLE,
+    /**
+     * A bundle ({@code spec/bundles.md}): read, written and hashed through
+     * {@code ffi.Document}; the idiomatic API has no bundles yet.
+     */
+    BUNDLE;
 
     /**
      * The name in documents and in the JSON forms, such as {@code decision_table}.

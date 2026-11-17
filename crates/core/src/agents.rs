@@ -638,6 +638,7 @@ fn validate(args: &Arguments<'_>) -> Result<Json> {
         Document::Rule(_) => "rule",
         Document::RuleSet(_) => "ruleset",
         Document::DecisionTable(_) => "decision_table",
+        Document::Bundle(_) => "bundle",
     };
     let mut members = vec![("valid", Json::Bool(true)), ("content", string(content))];
     if !matches!(document, Document::Condition(_)) {

@@ -22,7 +22,7 @@
 //! functions (`build` in each front end), which build conditions and rules
 //! through the core's constructors and give values back in a private encoding
 //! (`common::out`), and read and write documents, result trees and decision
-//! tables (`documents` in each front end).
+//! tables, and make, read and compare bundles (`documents` in each front end).
 
 // napi-rs and wasm-bindgen hand arguments over by value, and napi-rs ties
 // JavaScript values to the lifetime of `&'env Env`: these two lints would ask
@@ -45,15 +45,16 @@ pub use napi::build::{
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use napi::classes::{
-    ActionCall, Aggregate, Decision, Document, DocumentKind, Format, HitPolicy, Limits, Node,
-    ReadOptions, RuleSet, TreeOptions, Truth, ValueTreeOptions,
+    ActionCall, Aggregate, BundleCaseInput, Decision, Document, DocumentKind, Format, HitPolicy,
+    Limits, Node, ReadOptions, RuleSet, TreeOptions, Truth, ValueTreeOptions,
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use napi::documents::{
-    NativeGrid, NativeTable, NativeTree, canonical_condition, canonical_rule, digest_condition,
-    digest_rule, document_condition, document_rule, document_table, file_size_check, grid_new,
-    node_tree, rule_nodes, rule_parts, rule_set_rules, rule_text, rule_tree, stringifiable,
-    write_condition, write_rule,
+    NativeGrid, NativeTable, NativeTree, bundle_case_matches, bundle_data, bundle_of_ruleset,
+    bundle_of_table, bundle_ruleset, bundle_table, canonical_condition, canonical_rule,
+    digest_condition, digest_rule, document_condition, document_rule, document_table,
+    file_size_check, grid_new, node_tree, rule_nodes, rule_parts, rule_set_rules, rule_text,
+    rule_tree, stringifiable, write_condition, write_rule,
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use napi::hooks::set_hooks;
@@ -71,10 +72,11 @@ pub use wasm::build::{
 pub use wasm::classes::{Decision, Document, Node, RuleSet};
 #[cfg(target_arch = "wasm32")]
 pub use wasm::documents::{
-    NativeGrid, NativeTable, NativeTree, canonical_condition, canonical_rule, digest_condition,
-    digest_rule, document_condition, document_rule, document_table, file_size_check, grid_new,
-    node_tree, rule_nodes, rule_parts, rule_set_rules, rule_text, rule_tree, stringifiable,
-    write_condition, write_rule,
+    NativeGrid, NativeTable, NativeTree, bundle_case_matches, bundle_data, bundle_of_ruleset,
+    bundle_of_table, bundle_ruleset, bundle_table, canonical_condition, canonical_rule,
+    digest_condition, digest_rule, document_condition, document_rule, document_table,
+    file_size_check, grid_new, node_tree, rule_nodes, rule_parts, rule_set_rules, rule_text,
+    rule_tree, stringifiable, write_condition, write_rule,
 };
 #[cfg(target_arch = "wasm32")]
 pub use wasm::{decimal_problem, format_version, not_a_document, set_hooks, version};

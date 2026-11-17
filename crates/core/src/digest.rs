@@ -117,7 +117,7 @@ impl FromStr for Digest {
 }
 
 /// A document's canonical bytes from its content key and written content.
-fn canonical(key: &str, content: Json) -> Vec<u8> {
+pub(crate) fn canonical(key: &str, content: Json) -> Vec<u8> {
     let document = Json::Object(vec![
         (
             "version".into(),

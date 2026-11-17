@@ -2,7 +2,9 @@
 
 use crate::FORMAT_VERSION;
 use crate::ast::{Kind, Node};
+use crate::bundle::Bundle;
 use crate::error::{Error, ErrorCode, Result};
+use crate::format::bundle::{read_bundle, write_bundle};
 use crate::format::condition::{build, shape, write_node};
 use crate::format::decision::read_decision;
 use crate::format::rules::{
@@ -14,7 +16,7 @@ use crate::rules::{Decision, Rule, RuleSet};
 use crate::table::DecisionTable;
 
 /// The content keys a document may have, in the order of the spec.
-const CONTENT_KEYS: [&str; 7] = [
+const CONTENT_KEYS: [&str; 8] = [
     "condition",
     "rule",
     "ruleset",
@@ -22,6 +24,7 @@ const CONTENT_KEYS: [&str; 7] = [
     "explanation",
     "summary",
     "decision_table",
+    "bundle",
 ];
 
 /// What a document holds.
@@ -36,6 +39,8 @@ pub enum Document {
     RuleSet(RuleSet),
     /// A decision table (`spec/tables.md`).
     DecisionTable(DecisionTable),
+    /// A bundle: a reproducible package of rules (`spec/bundles.md`).
+    Bundle(Box<Bundle>),
 }
 
 impl Document {
@@ -59,8 +64,9 @@ impl Document {
     }
 
     /// The rule set the document gives (`spec/json-format.md`, *A rule set from
-    /// a document*): its rule set, the one its decision table compiles to, or a
-    /// rule set of its one rule with the default settings.
+    /// a document*): its rule set, the one its decision table compiles to, the
+    /// one its bundle gives, or a rule set of its one rule with the default
+    /// settings.
     ///
     /// # Errors
     ///
@@ -69,6 +75,7 @@ impl Document {
         match self {
             Document::RuleSet(ruleset) => Ok(ruleset),
             Document::DecisionTable(table) => Ok(table.ruleset().clone()),
+            Document::Bundle(bundle) => Ok(bundle.ruleset().clone()),
             Document::Rule(rule) => RuleSet::new(vec![rule], crate::rules::Config::default()),
             Document::Condition(_) => Err(Error::new(
                 ErrorCode::FormatError,
@@ -146,6 +153,12 @@ pub fn read_parsed_document(json: &Json, limits: &Limits) -> Result<Document> {
                 limits,
             )?))
         }
+        "bundle" => Ok(Document::Bundle(Box::new(read_bundle(
+            get("bundle").unwrap_or(&Json::Null),
+            "/bundle",
+            limits,
+            check_top_level,
+        )?))),
         "explanation" | "summary" => {
             check_top_level()?;
             Err(Error::new(
@@ -313,6 +326,10 @@ pub fn write_document(document: &Document) -> Json {
         Document::DecisionTable(table) => Json::Object(vec![
             ("version".into(), version),
             ("decision_table".into(), write_table(table)),
+        ]),
+        Document::Bundle(bundle) => Json::Object(vec![
+            ("version".into(), version),
+            ("bundle".into(), write_bundle(bundle)),
         ]),
     }
 }

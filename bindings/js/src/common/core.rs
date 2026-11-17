@@ -67,6 +67,7 @@ impl DocumentCore {
             Document::Rule(_) => "rule",
             Document::RuleSet(_) => "ruleset",
             Document::DecisionTable(_) => "decision_table",
+            Document::Bundle(_) => "bundle",
             // The core's documents are `#[non_exhaustive]`.
             _ => "unknown",
         }
@@ -572,10 +573,18 @@ impl DecisionCore {
         Ok(self.rule_output_text(self.position(rule)?))
     }
 
-    /// The decision document: JSON by default.
-    pub(crate) fn write(&self, format: &Raw) -> Outcome<String> {
+    /// The decision document: JSON by default. With `ruleset_digest`, it
+    /// carries the digest of the rule set that made it (`spec/json-format.md`,
+    /// *In decisions*); a decision read with one keeps it either way.
+    pub(crate) fn write(&self, format: &Raw, ruleset_digest: &Raw) -> Outcome<String> {
         let format = super::format(format, DocumentFormat::Json)?;
-        self.with(|d| write_decision_as(d, format))
+        let carry = super::flag(ruleset_digest, "rulesetDigest")?;
+        self.with(|d| {
+            let carried = d
+                .clone()
+                .with_ruleset_digest(carry || d.carries_ruleset_digest());
+            write_decision_as(&carried, format)
+        })
     }
 
     /// The explanation: its text by default, as in C++.

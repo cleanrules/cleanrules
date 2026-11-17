@@ -1,8 +1,9 @@
 //! What the napi-rs and wasm-bindgen front ends share: checking arguments as
 //! JavaScript gives them, the reader's encoding (`wire`), the documents, rule
 //! sets, decisions and nodes over the core (`core`), conditions and rules
-//! built in code (`build`), documents and decision tables for the idiomatic
-//! API (`documents`, `tables`), and the encoding of what comes back (`out`).
+//! built in code (`build`), documents, decision tables and bundles for the
+//! idiomatic API (`documents`, `tables`, `bundles`), and the encoding of what
+//! comes back (`out`).
 //!
 //! Nothing here touches a JavaScript engine. Each front end turns its
 //! arguments into [`Raw`] values and [`RawOptions`], calls this code, and turns
@@ -10,6 +11,7 @@
 //! arguments and throw the same errors.
 
 pub(crate) mod build;
+pub(crate) mod bundles;
 pub(crate) mod core;
 pub(crate) mod documents;
 pub(crate) mod out;
@@ -277,6 +279,19 @@ pub(crate) fn tree_options(options: Option<&RawOptions>) -> Outcome<TreeOptions>
         strict,
         limits: limits(&options.limits)?,
     })
+}
+
+/// An optional boolean argument, such as `rulesetDigest`: `false` when it is
+/// left out (`undefined` or `null`).
+pub(crate) fn flag(raw: &Raw, what: &str) -> Outcome<bool> {
+    match raw {
+        Raw::Undefined | Raw::Null => Ok(false),
+        Raw::Bool(value) => Ok(*value),
+        other => Err(Problem::Type(format!(
+            "{what} is a boolean, not {}",
+            other.describe()
+        ))),
+    }
 }
 
 /// A rule's position, below `count`.

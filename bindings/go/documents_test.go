@@ -437,3 +437,32 @@ func TestReadDecisionOpaque(t *testing.T) {
 		t.Errorf("read back: %#v", out)
 	}
 }
+
+// TestBundlesAreRefused: a bundle (spec/bundles.md) has no Go type yet, so
+// Loads refuses it instead of reading it as the rule set it holds; the core's
+// errors in a bundle come first.
+func TestBundlesAreRefused(t *testing.T) {
+	limits := `"limits": {"max_size": 1, "max_nesting": 1, "max_depth": 1, "max_path_segments": 1, "max_table_size": 1, "max_values": 1}`
+	bundle := `{"version": 1, "bundle": {"id": "a", "revision": "1",
+		"ruleset": {"rules": []},
+		"ruleset_digest": "sha256:a0c9f3a9d8a2e0f0a1f5c6c1c2e8c6f4a5c6e7d8f9a0b1c2d3e4f5a6b7c8d9e0",
+		"engine": {"name": "cleanrules", "version": "1.0.0-other", ` + limits + `},
+		"contract": {"input": {}, "output": {"keys": []}}}}`
+	_, err := Loads(bundle)
+	var e *Error
+	if !errors.As(err, &e) || e.Code != CodeDecisionMismatch {
+		t.Fatalf("a wrong rule set digest: got %v", err)
+	}
+	rs, err := NewRuleSet(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, err := Digest(rs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Loads(strings.Replace(bundle, "sha256:a0c9f3a9d8a2e0f0a1f5c6c1c2e8c6f4a5c6e7d8f9a0b1c2d3e4f5a6b7c8d9e0", digest, 1))
+	if !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("a bundle: got %v", err)
+	}
+}

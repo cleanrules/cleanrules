@@ -533,9 +533,18 @@ impl PyDecision {
         }
     }
 
-    /// The decision in the JSON format, as text.
-    fn to_json(&self, py: Python<'_>) -> PyResult<String> {
-        Ok(to_string(&write_decision(&self.rebuild(py)?)))
+    /// The decision in the JSON format, as text; with its rule set's digest
+    /// when `ruleset_digest` is true or it was read with one
+    /// (`spec/json-format.md`, *In decisions*).
+    #[pyo3(signature = (ruleset_digest=false))]
+    fn to_json(&self, py: Python<'_>, ruleset_digest: bool) -> PyResult<String> {
+        let decision = self.rebuild(py)?;
+        let decision = if ruleset_digest {
+            decision.with_ruleset_digest(true)
+        } else {
+            decision
+        };
+        Ok(to_string(&write_decision(&decision)))
     }
 
     /// The explanation as Python data: per rule, a dict with `rule`, `status`,

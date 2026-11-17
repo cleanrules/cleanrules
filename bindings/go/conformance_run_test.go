@@ -137,7 +137,8 @@ func TestConformance(t *testing.T) {
 			if given.str("kind") == "evaluate" && given.has("limits") {
 				limited = append(limited, id)
 			}
-			if limits := given.obj("limits"); limits != nil {
+			// A bundle vector's limits are skipped as bundles, which Go cannot make.
+			if limits := given.obj("limits"); limits != nil && given.str("kind") != "bundle" {
 				for _, value := range limits.values {
 					if fmt.Sprint(value) == "0" {
 						zero = append(zero, id)

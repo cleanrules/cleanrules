@@ -74,13 +74,18 @@ export declare class Decision {
    */
   ruleOutputJson(rule: number): string | null
   /**
-   * The decision document in `format`: JSON (the default) or YAML.
+   * The decision document in `format`: JSON (the default) or YAML. With
+   * `rulesetDigest`, it carries the digest of the rule set that made it as
+   * `ruleset_digest` (`spec/json-format.md`, *In decisions*), which
+   * `RuleSet.readDecision` verifies; a decision read with one keeps it
+   * either way.
    *
    * # Errors
    *
-   * `UnsupportedError` for the rule syntax and CSV.
+   * `UnsupportedError` for the rule syntax and CSV; a `TypeError` for a
+   * `rulesetDigest` that is not a boolean.
    */
-  write(format?: Format | null): string
+  write(format?: Format | null, rulesetDigest?: boolean | null): string
   /**
    * The explanation (`spec/explain.md`) in `format`: its text (the
    * default, as in C++), or a `"json"` or `"yaml"` document.
@@ -114,8 +119,8 @@ export declare class Document {
    */
   static read(text: string | Uint8Array, options?: ReadOptions | null): Document
   /**
-   * What the document holds: `"condition"`, `"rule"`, `"ruleset"` or
-   * `"decision_table"`.
+   * What the document holds: `"condition"`, `"rule"`, `"ruleset"`,
+   * `"decision_table"` or `"bundle"`.
    */
   get kind(): DocumentKind
   /**
@@ -143,6 +148,32 @@ export declare class Document {
    * `RuleSet.fromDocument(document).digest()`.
    */
   digest(): string
+  /**
+   * Make a bundle (`spec/bundles.md`, *Making a bundle*) of the rules that
+   * `rules` holds, a rule set or decision table document, with this
+   * engine: the identifier and revision its author gives, its case files in
+   * order, and the limits it runs with, which it records (`maxYamlSize`
+   * and `maxTextSize` are not recorded, and are a `TypeError`). The result
+   * is a bundle document; it holds actions by name, as every document does.
+   *
+   * # Errors
+   *
+   * `FormatError` for an identifier, revision or case path that does not
+   * have its form, or a path given twice; a `TypeError` for a document of
+   * another kind or an argument of the wrong type.
+   */
+  static makeBundle(rules: Document, id: string, revision: string, cases?: BundleCaseInput[] | null, limits?: Limits | null): Document
+  /**
+   * Compare this bundle with `other` (`spec/bundles.md`, *Comparing
+   * bundles*): the JSON object `{"relation", "identical", "differences"}`,
+   * such as `{"relation":"same_rules_other_engine","identical":false,
+   * "differences":["engine.version"]}`.
+   *
+   * # Errors
+   *
+   * A `TypeError` when either document is not a bundle.
+   */
+  compareBundle(other: Document): string
 }
 
 /**
@@ -583,6 +614,77 @@ export declare function actionErrorData(rule: string, action: string | undefined
 export type Aggregate = 'sum' | 'min' | 'max' | 'count'
 
 /**
+ * A file of test cases given to `Document.makeBundle`: its path, relative to
+ * the bundle's directory, and its content, whose SHA-256 digest the bundle
+ * records (a string as its UTF-8 bytes).
+ */
+export interface BundleCaseInput {
+  /**
+   * The path, such as `"cases/basic.json"`: segments of letters, digits,
+   * `.`, `_` and `-` separated by `/`, none `.` or `..`.
+   */
+  path: string
+  /** The file's content. */
+  content: string | Uint8Array
+}
+
+/**
+ * Whether `bytes` are the case file at `path` the bundle was made with.
+ *
+ * # Errors
+ *
+ * A `RangeError` for a path the bundle does not refer to; a `TypeError` for
+ * arguments of the wrong type.
+ */
+export declare function bundleCaseMatches(document: Document, path: string, bytes: string | Uint8Array): boolean
+
+/**
+ * What the idiomatic `Bundle` reads of a bundle document, as JSON
+ * (`common::bundles`).
+ *
+ * # Errors
+ *
+ * For a document of another kind.
+ */
+export declare function bundleData(document: Document): string
+
+/**
+ * A bundle of a rule set, made with this engine (`Document.makeBundle`).
+ *
+ * # Errors
+ *
+ * As `Document.makeBundle`.
+ */
+export declare function bundleOfRuleset(ruleset: RuleSet, id: string, revision: string, cases?: BundleCaseInput[] | null, limits?: Limits | null): Document
+
+/**
+ * A bundle of a decision table, made with this engine (`Document.makeBundle`).
+ *
+ * # Errors
+ *
+ * As `Document.makeBundle`.
+ */
+export declare function bundleOfTable(table: NativeTable, id: string, revision: string, cases?: BundleCaseInput[] | null, limits?: Limits | null): Document
+
+/**
+ * The rule set a bundle gives.
+ *
+ * # Errors
+ *
+ * For a document of another kind.
+ */
+export declare function bundleRuleset(document: Document): RuleSet
+
+/**
+ * The decision table a bundle holds.
+ *
+ * # Errors
+ *
+ * For a bundle of a rule set, or a document of another kind.
+ */
+export declare function bundleTable(document: Document): NativeTable
+
+/**
  * The canonical bytes of the condition document of a node. The JavaScript
  * half refuses value nodes first, as `dumps` does.
  */
@@ -617,7 +719,7 @@ export declare function digestRule(rule: NativeRule): string
 export declare function documentCondition(document: Document): Node
 
 /** What a document holds. */
-export type DocumentKind = 'condition' | 'rule' | 'ruleset' | 'decision_table'
+export type DocumentKind = 'condition' | 'rule' | 'ruleset' | 'decision_table' | 'bundle'
 
 /**
  * The rule of a rule document.

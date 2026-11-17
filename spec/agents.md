@@ -135,7 +135,7 @@ reading an explanation or a summary is.
 | Member | Required | JSON type |
 |---|---|---|
 | `valid` | yes | boolean: whether the document reads |
-| `content` | when it reads | its content key: `"condition"`, `"rule"`, `"ruleset"` or `"decision_table"` |
+| `content` | when it reads | its content key: `"condition"`, `"rule"`, `"ruleset"`, `"decision_table"` or `"bundle"` |
 | `summary` | when it gives a rule set | the summary of the rule set it gives (`json-format.md`, *A rule set from a document*) |
 | `input_schema` | with `summary` | that rule set's input schema |
 | `error` | when it does not read | the reader's error, as an agent error (*Errors*) |

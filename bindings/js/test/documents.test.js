@@ -210,7 +210,7 @@ describe('loads and dumps', () => {
   })
 
   test('what dumps and loads refuse', () => {
-    throwsWith(() => dumps({}), TypeError, /dumps takes a condition, a rule, a rule set or a decision table, not a Object/)
+    throwsWith(() => dumps({}), TypeError, /dumps takes a condition, a rule, a rule set, a decision table, a bundle or a decision, not a Object/)
     throwsWith(() => dumps(F.x.gt(1), { formt: 'json' }), TypeError, /unknown option "formt"/)
     throwsWith(() => loads('{}', { action: {} }), TypeError, /unknown option "action"/)
     throwsWith(() => loads('{}'), FormatError, /.+/)
@@ -340,7 +340,7 @@ describe('canonicalBytes and digest', () => {
       throwsWith(() => call(F.x.add(1)), ExpressionError, /only a condition can be a document, not the value x \+ 1/, (error) => {
         assert.match(error.hint, /F\.x\.gt\(0\)/)
       })
-      throwsWith(() => call({}), TypeError, new RegExp(`${name} takes a condition, a rule, a rule set or a decision table, not a Object`))
+      throwsWith(() => call({}), TypeError, new RegExp(`${name} takes a condition, a rule, a rule set, a decision table or a bundle, not a Object`))
       throwsWith(() => call(dumps(F.x.gt(1))), TypeError, /not the string/)
     }
   })

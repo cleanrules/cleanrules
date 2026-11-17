@@ -315,6 +315,55 @@ pub unsafe extern "C" fn cr_decision_write(
     unsafe { call(error, body) }
 }
 
+/// A flag of `cr_decision_write_with`: write the rule set digest of the rule
+/// set that made the decision under `ruleset_digest` (`spec/json-format.md`,
+/// *In decisions*), which readers verify.
+pub const CR_WRITE_RULESET_DIGEST: u32 = 1;
+
+/// Write a decision as `cr_decision_write` does, with options: `flags` is 0 or
+/// `CR_WRITE_RULESET_DIGEST`. A decision read with a `ruleset_digest` keeps it
+/// either way. Unknown flags are `CR_INVALID_ARGUMENT`.
+///
+/// # Safety
+///
+/// `decision` is `NULL` or a live `cr_decision`; `out` is `NULL` or points to a
+/// writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+/// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cr_decision_write_with(
+    decision: *const cr_decision,
+    format: cr_format,
+    flags: u32,
+    out: *mut *mut c_char,
+    len: *mut usize,
+    error: *mut *mut cr_error,
+) -> cr_status {
+    let body = || {
+        // SAFETY: `out` is NULL or writable (# Safety).
+        unsafe { clear(out, "out") }?;
+        // SAFETY: `decision` is NULL or live (# Safety).
+        let decision = unsafe { handle(decision, "decision") }?;
+        let format = self::format(format)?;
+        if flags & !CR_WRITE_RULESET_DIGEST != 0 {
+            return Err(Failure::Invalid(
+                format!("flags {flags} are not CR_WRITE_* flags"),
+                "pass 0 or CR_WRITE_RULESET_DIGEST",
+            ));
+        }
+        let digest = flags & CR_WRITE_RULESET_DIGEST != 0;
+        let text = decision.with(|d| {
+            let carried = d
+                .clone()
+                .with_ruleset_digest(digest || d.carries_ruleset_digest());
+            Ok(write_decision_as(&carried, format)?)
+        })?;
+        // SAFETY: `out` passed `clear`; `len` is NULL or writable (# Safety).
+        unsafe { give_text(out, len, text) }
+    };
+    // SAFETY: `error` is NULL or writable (# Safety).
+    unsafe { call(error, body) }
+}
+
 /// The decision's single output (`spec/rules.md`, *Outputs*), as a JSON data
 /// value: the winner's payload as an object, the aggregate, or `null` when no
 /// rule was selected. Policies with several outputs (`rule_order`, `collect`

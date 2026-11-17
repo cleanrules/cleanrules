@@ -16,10 +16,19 @@ Every vector runs twice:
 texts (`rules_text`, `spec/text.md`) are read with `cleanrules.loads` and
 compared with their document and canonical text. Text renderings of
 explanations and summaries (`text` in their vectors) arrive with task D.2b.
+
+Bundles (`spec/bundles.md`, `format/bundles/*`) run on both: `read` vectors
+through `_read_document` (`json`) and through `cleanrules.loads`, `dumps` and
+the `Bundle` properties (`native`); `bundle` vectors make a bundle with
+`_make_bundle` or `cleanrules.Bundle`, and `bundle_compare` vectors compare
+with `_compare_bundles` or `Bundle.compare`. A `current_engine` vector, and
+the expected document of a `bundle` vector, name this engine's version
+(`cleanrules.__version__`).
 """
 
 from __future__ import annotations
 
+import copy
 import datetime as dt
 import functools
 import json
@@ -447,8 +456,11 @@ def run_canonical(given: dict[str, Any], expect: dict[str, Any], *, built: bool)
     assert cleanrules.digest(value) == expect["digest"]
     # The bytes read back as the same document.
     assert cleanrules.canonical_bytes(cleanrules.loads(canonical)) == canonical
-    if isinstance(value, cleanrules.RuleSet):
-        ruleset: cleanrules.RuleSet | None = value
+    if isinstance(value, cleanrules.Bundle):
+        assert value.ruleset_digest == expect["ruleset_digest"]
+        ruleset: cleanrules.RuleSet | None = value.ruleset
+    elif isinstance(value, cleanrules.RuleSet):
+        ruleset = value
     elif isinstance(value, cleanrules.Rule):
         ruleset = cleanrules.RuleSet([value])
     elif isinstance(value, cleanrules.DecisionTable):
@@ -459,9 +471,161 @@ def run_canonical(given: dict[str, Any], expect: dict[str, Any], *, built: bool)
     assert (None if ruleset is None else cleanrules.digest(ruleset)) == wanted
 
 
+# --- Bundles ----------------------------------------------------------------------------
+
+
+def is_bundle_vector(vector: dict[str, Any]) -> bool:
+    return str(vector["id"]).startswith("format/bundles/")
+
+
+def this_engine(document: Any) -> Any:
+    """A copy of a bundle document that names this engine's version (`current_engine`)."""
+    fixed = copy.deepcopy(document)
+    engine = fixed.get("bundle", {}).get("engine") if isinstance(fixed, dict) else None
+    if isinstance(engine, dict) and "version" in engine:
+        engine["version"] = cleanrules.__version__
+    return fixed
+
+
+def bundle_limits(given: dict[str, Any]) -> dict[str, int]:
+    return {name: int(value) for name, value in given.get("limits", {}).items()}
+
+
+def check_bundle(bundle: cleanrules.Bundle, document: dict[str, Any]) -> None:
+    """The properties of a bundle agree with its document as written."""
+    content = document["bundle"]
+    assert bundle.id == content["id"]
+    assert bundle.revision == content["revision"]
+    assert bundle.ruleset_digest == content["ruleset_digest"]
+    assert bundle.ruleset_digest == cleanrules.digest(bundle.ruleset)
+    held = "decision_table" if "decision_table" in content else "ruleset"
+    assert isinstance(
+        bundle.rules, cleanrules.DecisionTable if held == "decision_table" else cleanrules.RuleSet
+    )
+    engine = bundle.engine
+    assert engine.name == content["engine"]["name"]
+    assert engine.version == content["engine"]["version"]
+    assert dict(engine.limits) == content["engine"]["limits"]
+    assert engine.is_current == (
+        engine.name == "cleanrules" and engine.version == cleanrules.__version__
+    )
+    assert same(bundle.contract, content["contract"])
+    cases = [{"path": case.path, "digest": case.digest} for case in bundle.cases]
+    assert cases == content.get("cases", [])
+    # The bytes read back as the same bundle, in JSON and YAML.
+    assert cleanrules.loads(cleanrules.canonical_bytes(bundle)) == bundle
+    assert cleanrules.loads(cleanrules.dumps(bundle, format="yaml"), format="yaml") == bundle
+
+
+def run_read_bundle(vector: dict[str, Any], route: str) -> None:
+    """A `read` vector of a bundle: read, then written back."""
+    given, expect = vector["given"], vector["expect"]
+    current = bool(given.get("current_engine", False))
+    fmt: Any = "yaml" if "yaml" in given else "json"
+    if "yaml" in given:
+        source = given["yaml"]
+    else:
+        document = given["document"]
+        source = dumps(this_engine(document) if current else document)
+    wanted = dict(expect)
+    if current and "document" in wanted:
+        wanted["document"] = this_engine(wanted["document"])
+
+    def read() -> Any:
+        if route == "json":
+            return json.loads(_cleanrules._read_document(source, format=fmt))  # pyright: ignore[reportPrivateUsage]
+        bundle = cleanrules.loads(source, format=fmt)
+        assert isinstance(bundle, cleanrules.Bundle), f"read {bundle!r}"
+        written = json.loads(cleanrules.dumps(bundle))
+        check_bundle(bundle, written)
+        return written
+
+    expect_result(read, wanted, "document", read=True)
+
+
+def run_make_bundle(vector: dict[str, Any], route: str) -> None:
+    """A `bundle` vector: make a bundle with this engine, write it, read it back."""
+    given, expect = vector["given"], vector["expect"]
+    limits = bundle_limits(given)
+    cases = [(case["path"], case["text"]) for case in given.get("cases", [])]
+    wanted = dict(expect)
+    if "document" in wanted:
+        wanted["document"] = this_engine(wanted["document"])
+
+    def make() -> Any:
+        if route == "json":
+            text = _cleanrules._make_bundle(  # pyright: ignore[reportPrivateUsage]
+                dumps(given["document"]), given["id"], given["revision"], cases, **limits
+            )
+            return json.loads(text)
+        content = given["document"]
+        rules: Any = (
+            build_ruleset(content["ruleset"])
+            if "ruleset" in content
+            else cleanrules.loads(dumps(content))
+        )
+        bundle = cleanrules.Bundle(
+            rules,
+            id=given["id"],
+            revision=given["revision"],
+            cases=cases,
+            max_size=limits.get("max_size"),
+            max_nesting=limits.get("max_nesting"),
+            max_depth=limits.get("max_depth"),
+            max_path_segments=limits.get("max_path_segments"),
+            max_table_size=limits.get("max_table_size"),
+            max_values=limits.get("max_values"),
+        )
+        written = json.loads(cleanrules.dumps(bundle))
+        # This engine reads what it made, verifying its digest and contract.
+        again = cleanrules.loads(cleanrules.dumps(bundle))
+        assert again == bundle and json.loads(cleanrules.dumps(again)) == written
+        check_bundle(bundle, written)
+        for path, text in cases:
+            assert bundle.case_matches(path, text)
+        return written
+
+    # Errors are compared by their code only.
+    expect_result(make, wanted, "document", read=True)
+
+
+def run_compare_bundles(vector: dict[str, Any], route: str) -> None:
+    """A `bundle_compare` vector: read both bundles, compare `a` with `b`."""
+    given, expect = vector["given"], vector["expect"]
+    a, b = dumps(given["a"]), dumps(given["b"])
+    if route == "json":
+        forth = json.loads(_cleanrules._compare_bundles(a, b))  # pyright: ignore[reportPrivateUsage]
+        back = json.loads(_cleanrules._compare_bundles(b, a))  # pyright: ignore[reportPrivateUsage]
+    else:
+        first, second = cleanrules.loads(a), cleanrules.loads(b)
+        assert isinstance(first, cleanrules.Bundle) and isinstance(second, cleanrules.Bundle)
+        comparison = first.compare(second)
+        assert comparison.identical == (first == second)
+        forth, back = comparison.to_dict(), second.compare(first).to_dict()
+    # Symmetric, but for which bundle is first.
+    assert back == forth, f"not symmetric: {forth} and {back}"
+    expect_result(lambda: forth, expect, "comparison")
+
+
+def run_bundle(vector: dict[str, Any], route: str) -> bool:
+    """Run a vector of `format/bundles`; whether it was one that this runs."""
+    kind = vector["given"]["kind"]
+    if kind == "read" and is_bundle_vector(vector):
+        run_read_bundle(vector, route)
+    elif kind == "bundle":
+        run_make_bundle(vector, route)
+    elif kind == "bundle_compare":
+        run_compare_bundles(vector, route)
+    else:
+        return False
+    return True
+
+
 def run_json(vector: dict[str, Any]) -> None:
     given, expect = vector["given"], vector["expect"]
     kind = given["kind"]
+    if run_bundle(vector, "json"):
+        return
     if kind == "canonical":
         run_canonical(given, expect, built=False)
         return
@@ -581,6 +745,8 @@ def given_by_key(decision: cleanrules.Decision) -> cleanrules.Decision:
 def run_native(vector: dict[str, Any]) -> None:
     given, expect = vector["given"], vector["expect"]
     kind = given["kind"]
+    if run_bundle(vector, "native"):
+        return
     if kind == "canonical":
         run_canonical(given, expect, built=True)
         return
@@ -679,7 +845,7 @@ def collect() -> list[Any]:
                     )
                 continue
             params.append(pytest.param(vector, "json", id=f"json:{vector['id']}"))
-            if vector["given"]["kind"] != "read":
+            if vector["given"]["kind"] != "read" or is_bundle_vector(vector):
                 params.append(pytest.param(vector, "native", id=f"native:{vector['id']}"))
     return params
 

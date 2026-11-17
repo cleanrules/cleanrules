@@ -1,6 +1,6 @@
 // Types of the `cleanrules` package (`index.js`, `index.wasm.js`, `index.deno.js`):
 // the idiomatic API (conditions, rules, rule sets, decisions, explanations,
-// summaries, result trees, decision tables and documents), the errors, the
+// summaries, result trees, decision tables, bundles and documents), the errors, the
 // marker values and the versions. The native
 // classes are in `cleanrules/native` (`native.d.ts`, over the `binding.d.ts`
 // napi-rs writes).
@@ -10,7 +10,10 @@ import type { Decision as NativeDecision, Limits } from './binding.js'
 /** The version of the JSON format this build reads and writes. */
 export declare const FORMAT_VERSION: number
 
-/** The version of the package. */
+/**
+ * The version of the package, which is the version of the engine: the
+ * `engine.version` of the bundles it makes.
+ */
 export declare const version: string
 
 /** An exact decimal, given by its literal text, such as `"0.10"`. */
@@ -730,9 +733,9 @@ export declare class Decision {
    * text reads back as the same decision (`RuleSet.readDecision` reads it),
    * except that a float zero loses its sign (`JSON.stringify(-0)` is `0`);
    * integer-like keys, such as a payload key `"10"`, come first, as in any
-   * plain object, which changes nothing: members have no order. The native
-   * layer's `Decision.write()` (`cleanrules/native`)
-   * writes it exactly.
+   * plain object, which changes nothing: members have no order. `dumps(decision)`
+   * writes it exactly, and `dumps(decision, { rulesetDigest: true })` with
+   * the digest of its rule set; a decision read with one keeps it here too.
    */
   toJSON(): Record<string, unknown>
 }
@@ -1049,13 +1052,153 @@ export declare class DecisionTable {
   toJSON(): Record<string, unknown>
 }
 
+// --- Bundles -------------------------------------------------------------
+
+/** A file of test cases given to `Bundle`: its path and its content. */
+export interface BundleCaseInput {
+  /**
+   * The path, relative to the bundle's directory, such as
+   * `'cases/basic.json'`: segments of ASCII letters, digits, `.`, `_` and
+   * `-` separated by `/`, none `.` or `..`.
+   */
+  path: string
+  /** The file's content: its bytes, or a string as its UTF-8 bytes. */
+  content: string | Uint8Array
+}
+
+/** The limits a bundle records: those that can change a result. */
+export interface BundleLimits {
+  maxSize?: number | null
+  maxNesting?: number | null
+  maxDepth?: number | null
+  maxPathSegments?: number | null
+  maxTableSize?: number | null
+  maxValues?: number | null
+}
+
+export interface BundleOptions {
+  /** The stable identifier of the rules, such as `'acme/discounts'`. */
+  id: string
+  /** One immutable revision of them, such as `'2026-11-16.1'` or `'v1.2.0'`. */
+  revision: string
+  /** The files of test cases, in the order they are run; none by default. */
+  cases?: Iterable<BundleCaseInput> | null
+  /** Make a bundle of rules whose actions are code, without them, instead of refusing; `null` is `false`. */
+  omitActions?: boolean | null
+  /** The limits the rules run with, which the bundle records; the defaults for those left out. */
+  limits?: BundleLimits | null
+}
+
+/** The engine and configuration that made a bundle. */
+export interface BundleEngine {
+  /** `'cleanrules'` for this engine. */
+  readonly name: string
+  /** Its exact version, a Semantic Versioning version. */
+  readonly version: string
+  /** The six limits it ran with, by the names of the `limits` option. */
+  readonly limits: Readonly<Required<{ [K in keyof BundleLimits]: number }>>
+  /** Whether it is this engine: the same name and version, whatever the limits. */
+  readonly isCurrent: boolean
+}
+
+/** The contract of a bundle's rules, in its JSON form. */
+export interface BundleContract {
+  /** A JSON Schema (draft 2020-12) of the input the rules read. */
+  readonly input: Readonly<Record<string, unknown>>
+  readonly output: {
+    /** The payload keys any rule may output, sorted by Unicode code point. */
+    readonly keys: readonly string[]
+  }
+}
+
+/** A reference to a file of test cases. */
+export interface CaseFile {
+  readonly path: string
+  /** `sha256:` and the 64 lowercase hexadecimal digits of the SHA-256 hash of its bytes. */
+  readonly digest: string
+}
+
+/** How two bundles relate (`spec/bundles.md`, *Comparing bundles*). */
+export type BundleRelation =
+  | 'conflict'
+  | 'same_rules_same_engine'
+  | 'same_rules_other_engine'
+  | 'other_rules_same_engine'
+  | 'other_rules_other_engine'
+
+/** The comparison of two bundles. */
+export interface BundleComparison {
+  readonly relation: BundleRelation
+  /** Whether the two bundles have the same digest: no difference. */
+  readonly identical: boolean
+  /**
+   * What differs, in this order: `id`, `revision`, `rules`, `source`,
+   * `engine.name`, `engine.version`, `engine.limits.<key>` (by the JSON
+   * names, such as `engine.limits.max_depth`), `contract.input`,
+   * `contract.output`, `cases`.
+   */
+  readonly differences: readonly string[]
+}
+
+/**
+ * A reproducible package of rules (`spec/bundles.md`); immutable: the rules,
+ * their identifier and revision, their rule set digest, the engine and limits
+ * that made it, the contract of their input and output, and the digests of
+ * their files of test cases. Made from a rule set or a decision table with
+ * this engine, or read with `loads` and `load` (JSON or YAML); written with
+ * `dumps` and `dump`; its digest is `digest(bundle)`.
+ *
+ * Errors: a `FormatError` for an `id`, `revision` or case path that does not
+ * have its form, or a path given twice; an `UnsupportedError` for an action
+ * given as code (unless `omitActions`); a `TypeError` for arguments of the
+ * wrong type, and for `maxYamlSize` or `maxTextSize`, which a bundle does
+ * not record.
+ *
+ * @example
+ * const bundle = new Bundle(rules, {
+ *   id: 'acme/discounts',
+ *   revision: '2026-11-16.1',
+ *   cases: [{ path: 'cases/vip.json', content: await readFile('cases/vip.json') }],
+ * })
+ * await dump(bundle, 'discounts.bundle.json')
+ * (await load('discounts.bundle.json')).compare(bundle).relation  // 'same_rules_same_engine'
+ */
+export declare class Bundle {
+  constructor(rules: RuleSet | DecisionTable, options: BundleOptions)
+  readonly id: string
+  readonly revision: string
+  /** The rules it holds, as its document holds them: actions are names, unbound (`RuleSet.bind`). */
+  readonly rules: RuleSet | DecisionTable
+  /** The rule set it gives: the one it holds, or the one its table compiles to. */
+  readonly ruleset: RuleSet
+  /** The rule set digest of its rules: `digest(bundle.ruleset)`. */
+  readonly rulesetDigest: string
+  readonly engine: BundleEngine
+  readonly contract: BundleContract
+  /** Its case files, in order. */
+  readonly cases: readonly CaseFile[]
+  /**
+   * Whether `content` is the case file at `path` the bundle was made with
+   * (its SHA-256 digest is the one recorded); a `RangeError` for a path the
+   * bundle does not refer to.
+   */
+  caseMatches(path: string, content: string | Uint8Array): boolean
+  /** Compare with another bundle; symmetric, but for which one is first. */
+  compare(other: Bundle): BundleComparison
+  /**
+   * The bundle document of the JSON format, as an object for
+   * `JSON.stringify`; `dumps(bundle)` writes it exactly.
+   */
+  toJSON(): Record<string, unknown>
+}
+
 // --- Documents -----------------------------------------------------------
 
 /** A document format: JSON, YAML, the text syntax of rules, or CSV for decision tables. */
 export type Format = 'json' | 'yaml' | 'text' | 'csv'
 
 /** What a document holds. */
-export type Loaded = Expr | Rule | RuleSet | DecisionTable
+export type Loaded = Expr | Rule | RuleSet | DecisionTable | Bundle
 
 /** An action registry: each name with its function. */
 export type Actions = Readonly<Record<string, Action>> | ReadonlyMap<string, Action>
@@ -1074,6 +1217,12 @@ export interface DumpOptions {
   format?: Format | null
   /** Write rules without their actions given as code, instead of refusing; `null` is `false`. */
   omitActions?: boolean | null
+  /**
+   * Decisions only: write the digest of the rule set that made the decision
+   * as its `ruleset_digest`, which `RuleSet.readDecision` verifies. A
+   * decision read with one keeps it either way; `null` is `false`.
+   */
+  rulesetDigest?: boolean | null
 }
 
 export interface RuleFromTextOptions {
@@ -1085,10 +1234,10 @@ export interface RuleFromTextOptions {
 }
 
 /**
- * Read a condition, rule, rule set or decision table document (`string` or
- * UTF-8 bytes). A rule's action is the name the document gives it, unbound
- * unless `actions` is given. CSV holds a decision table; the text syntax a
- * condition, a rule or a rule set.
+ * Read a condition, rule, rule set, decision table or bundle document
+ * (`string` or UTF-8 bytes). A rule's action is the name the document gives
+ * it, unbound unless `actions` is given. CSV holds a decision table; the text
+ * syntax a condition, a rule or a rule set; JSON and YAML any of them.
  *
  * @example
  * const rules = loads(text, { format: 'yaml' })
@@ -1098,14 +1247,19 @@ export declare function loads(text: string | Uint8Array, options: LoadOptions & 
 export declare function loads(text: string | Uint8Array, options?: LoadOptions | null): Loaded
 
 /**
- * Write a condition, rule, rule set or decision table in its canonical form.
+ * Write a condition, rule, rule set, decision table, bundle or decision in
+ * its canonical form. A decision is written as `toJSON()` gives it, and with
+ * `{ rulesetDigest: true }` it carries the digest of its rule set;
+ * `RuleSet.readDecision` reads it back.
  *
  * @example
  * const yaml = dumps(rules, { format: 'yaml' })
+ * const logged = dumps(decision, { rulesetDigest: true })
  * An `UnsupportedError` for an action given as code (unless `omitActions`),
- * for CSV of anything but a table, and for what the text syntax cannot hold.
+ * for CSV of anything but a table, and for what the text syntax cannot hold;
+ * a `TypeError` for `rulesetDigest` with anything but a decision.
  */
-export declare function dumps(value: Loaded, options?: DumpOptions | null): string
+export declare function dumps(value: Loaded | Decision, options?: DumpOptions | null): string
 
 /**
  * Read a document from a file (Node and Deno), its format from the extension
@@ -1127,7 +1281,7 @@ export declare function load(path: string | URLLike, options?: LoadOptions | nul
  * @example
  * await dump(rules, 'pricing.rules')
  */
-export declare function dump(value: Loaded, path: string | URLLike, options?: DumpOptions | null): Promise<void>
+export declare function dump(value: Loaded | Decision, path: string | URLLike, options?: DumpOptions | null): Promise<void>
 
 export interface DigestOptions {
   /** Give those of rules written without their actions given as code, instead of refusing; `null` is `false`. */
@@ -1135,8 +1289,8 @@ export interface DigestOptions {
 }
 
 /**
- * The canonical bytes of the document of a condition, rule, rule set or
- * decision table (`spec/json-format.md`, *Canonical bytes*): the UTF-8 JSON
+ * The canonical bytes of the document of a condition, rule, rule set,
+ * decision table or bundle (`spec/json-format.md`, *Canonical bytes*): the UTF-8 JSON
  * text of its canonical form, every object's members sorted by key, by
  * Unicode code point, with no whitespace. The same in every language, and
  * what `digest` hashes. The same errors as `dumps`: an `ExpressionError` for
@@ -1150,8 +1304,8 @@ export interface DigestOptions {
 export declare function canonicalBytes(value: Loaded, options?: DigestOptions | null): Uint8Array
 
 /**
- * The digest of the document of a condition, rule, rule set or decision
- * table (`spec/json-format.md`, *Digests*): `sha256:` and the 64 lowercase
+ * The digest of the document of a condition, rule, rule set, decision table
+ * or bundle (`spec/json-format.md`, *Digests*): `sha256:` and the 64 lowercase
  * hexadecimal digits of the SHA-256 hash of its canonical bytes, the same
  * string in every language. The same errors as `dumps`.
  *

@@ -14,11 +14,12 @@ use std::fs;
 
 use cleanrules::Error;
 use cleanrules::agents::Catalog;
+use cleanrules::bundle::{self, Bundle, BundleRules, CaseFile};
 use cleanrules::eval::{Options, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
-    Document, read_decision_document, read_document, read_parsed_document, write_explanation,
-    write_summary,
+    Document, DocumentFormat, read_decision_document, read_document, read_document_as,
+    read_parsed_document, write_document, write_document_as, write_explanation, write_summary,
 };
 use cleanrules::format::{
     ValueContext, read_node, read_ruleset, read_value, write_decision, write_path, write_result,
@@ -42,6 +43,16 @@ fn strip_detail(json: &Json) -> Json {
         Json::Array(items) => Json::Array(items.iter().map(strip_detail).collect()),
         other => other.clone(),
     }
+}
+
+/// The compared fields of an error read from a document: those of
+/// [`error_json`] and its pointer.
+fn read_error_json(error: &Error) -> Json {
+    let mut json = error_json(error);
+    if let (Json::Object(members), Some(pointer)) = (&mut json, &error.context().pointer) {
+        members.push(("pointer".into(), Json::String(pointer.clone())));
+    }
+    json
 }
 
 /// The compared fields of an error (`spec/errors.md`, *Comparing errors*).
@@ -96,6 +107,15 @@ fn same_error(actual: &Json, expected: &Json) -> bool {
 }
 
 fn compare(actual: Result<Json, Error>, expect: &Json, key: &str) -> Result<(), String> {
+    compare_with(actual, expect, key, error_json)
+}
+
+fn compare_with(
+    actual: Result<Json, Error>,
+    expect: &Json,
+    key: &str,
+    error_json: fn(&Error) -> Json,
+) -> Result<(), String> {
     match (actual, get(expect, "error")) {
         (Ok(json), None) => {
             let actual = strip_detail(&json);
@@ -400,9 +420,158 @@ fn run_canonical(vector: &Json) -> Result<(), String> {
     }
 }
 
+/// A copy of a bundle document with this engine's version, for the vectors
+/// whose bundle this engine made (`conformance/README.md`, `current_engine`).
+fn with_this_engine(document: &Json) -> Json {
+    let mut copy = document.clone();
+    if let Json::Object(top) = &mut copy
+        && let Some((_, Json::Object(bundle))) = top.iter_mut().find(|(k, _)| k == "bundle")
+        && let Some((_, Json::Object(engine))) = bundle.iter_mut().find(|(k, _)| k == "engine")
+        && let Some((_, version)) = engine.iter_mut().find(|(k, _)| k == "version")
+    {
+        *version = Json::String(bundle::ENGINE_VERSION.into());
+    }
+    copy
+}
+
+/// A `read` vector of a bundle (`spec/bundles.md`): read, then written back.
+fn run_read_bundle(vector: &Json) -> Result<(), String> {
+    let given = get(vector, "given").unwrap();
+    let current = matches!(get(given, "current_engine"), Some(Json::Bool(true)));
+    let fix = |json: &Json| {
+        if current {
+            with_this_engine(json)
+        } else {
+            json.clone()
+        }
+    };
+    let limits = Limits::default();
+    let read = match (get(given, "document"), text(get(given, "yaml"))) {
+        (Some(document), _) => read_document(&to_string(&fix(document)), &limits),
+        (None, Some(yaml)) => read_document_as(yaml.as_bytes(), DocumentFormat::Yaml, &limits),
+        _ => return Err("nothing given".into()),
+    };
+    let mut expect = get(vector, "expect").unwrap().clone();
+    if let Json::Object(members) = &mut expect
+        && let Some((_, document)) = members.iter_mut().find(|(k, _)| k == "document")
+    {
+        *document = fix(document);
+    }
+    let written = read.map(|document| {
+        let json = write_document(&document);
+        // Writing in YAML gives the same document back.
+        if cfg!(feature = "yaml") {
+            let yaml = write_document_as(&document, DocumentFormat::Yaml).unwrap();
+            let again = read_document_as(yaml.as_bytes(), DocumentFormat::Yaml, &limits).unwrap();
+            assert_eq!(write_document(&again), json, "YAML round trip");
+        }
+        json
+    });
+    compare_with(written, &expect, "document", read_error_json)
+}
+
+/// A `bundle` vector: make a bundle, write it, read it back
+/// (`spec/bundles.md`, *Making a bundle*).
+fn run_make_bundle(vector: &Json) -> Result<(), String> {
+    let given = get(vector, "given").unwrap();
+    let mut limits = Limits::default();
+    if let Some(Json::Object(members)) = get(given, "limits") {
+        for (name, value) in members {
+            let Json::Number(n) = value else { panic!() };
+            let n = usize::try_from(n.as_i128().unwrap()).unwrap();
+            match name.as_str() {
+                "max_size" => limits.max_size = n,
+                "max_nesting" => limits.max_nesting = n,
+                "max_depth" => limits.max_depth = n,
+                "max_path_segments" => limits.max_path_segments = n,
+                "max_table_size" => limits.max_table_size = n,
+                "max_values" => limits.max_values = n,
+                other => panic!("unknown limit {other}"),
+            }
+        }
+    }
+    let rules: BundleRules = match read_document(
+        &to_string(get(given, "document").unwrap()),
+        &Limits::default(),
+    )
+    .map_err(|e| format!("reading the rules: {e}"))?
+    {
+        Document::RuleSet(ruleset) => ruleset.into(),
+        Document::DecisionTable(table) => table.into(),
+        _ => return Err("the rules are a rule set or a table".into()),
+    };
+    let cases = match get(given, "cases") {
+        Some(Json::Array(items)) => items
+            .iter()
+            .map(|item| {
+                CaseFile::new(
+                    text(get(item, "path")).unwrap(),
+                    text(get(item, "text")).unwrap().as_bytes(),
+                )
+            })
+            .collect::<Result<Vec<_>, Error>>(),
+        _ => Ok(Vec::new()),
+    };
+    let made = cases.and_then(|cases| {
+        Bundle::new(
+            rules,
+            text(get(given, "id")).unwrap(),
+            text(get(given, "revision")).unwrap(),
+            cases,
+            &limits,
+        )
+    });
+    let mut expect = get(vector, "expect").unwrap().clone();
+    if let Json::Object(members) = &mut expect
+        && let Some((_, document)) = members.iter_mut().find(|(k, _)| k == "document")
+    {
+        *document = with_this_engine(document);
+    }
+    let written = made.map(|bundle| {
+        let json = write_document(&bundle.into_document());
+        // This engine reads what it made, verifying its digest and contract.
+        let again = read_document(&to_string(&json), &Limits::default()).unwrap();
+        assert_eq!(write_document(&again), json, "read back");
+        json
+    });
+    compare(written, &expect, "document")
+}
+
+/// A `bundle_compare` vector (`spec/bundles.md`, *Comparing bundles*).
+fn run_compare_bundles(vector: &Json) -> Result<(), String> {
+    let given = get(vector, "given").unwrap();
+    let read =
+        |key: &str| match read_document(&to_string(get(given, key).unwrap()), &Limits::default()) {
+            Ok(Document::Bundle(bundle)) => Ok(bundle),
+            Ok(_) => Err(format!("{key} is not a bundle")),
+            Err(e) => Err(format!("reading {key}: {e}")),
+        };
+    let (a, b) = (read("a")?, read("b")?);
+    let comparison = a.compare(&b);
+    // Symmetric, but for which bundle is first.
+    let back = b.compare(&a);
+    if back.relation() != comparison.relation() || back.differences() != comparison.differences() {
+        return Err("not symmetric".into());
+    }
+    compare(
+        Ok(comparison.to_json()),
+        get(vector, "expect").unwrap(),
+        "comparison",
+    )
+}
+
 fn run(vector: &Json) -> Result<(), String> {
     let given = get(vector, "given").unwrap();
     let kind = text(get(given, "kind")).unwrap();
+    if kind == "read" {
+        return run_read_bundle(vector);
+    }
+    if kind == "bundle" {
+        return run_make_bundle(vector);
+    }
+    if kind == "bundle_compare" {
+        return run_compare_bundles(vector);
+    }
     if kind == "canonical" {
         return run_canonical(vector);
     }
@@ -470,9 +639,30 @@ fn conformance_vectors() {
                     *pending.entry("native-only limits".to_owned()).or_default() += 1;
                     continue;
                 }
+                // The `read` vectors run through the C ABI (`crates/ffi`), but
+                // for bundles, which only this runner makes and compares too.
+                let bundle_file =
+                    text(get(vector, "id")).is_some_and(|id| id.starts_with("format/bundles/"));
+                if kind == "read"
+                    && bundle_file
+                    && !cfg!(feature = "yaml")
+                    && get(given, "yaml").is_some()
+                {
+                    *pending
+                        .entry("yaml without its feature".to_owned())
+                        .or_default() += 1;
+                    continue;
+                }
+                if kind == "read" && !bundle_file {
+                    *pending.entry(kind.to_owned()).or_default() += 1;
+                    continue;
+                }
                 if !matches!(
                     kind,
-                    "condition"
+                    "read"
+                        | "bundle"
+                        | "bundle_compare"
+                        | "condition"
                         | "value"
                         | "evaluate"
                         | "explain"

@@ -148,7 +148,12 @@ class Conformance {
             "diagrams (spec/visual.md) are drawn by the core and checked through the C ABI's runner; the Java and"
                     + " Scala APIs draw them from phase V.2",
             "graded",
-            "conditions under a graded logic: the binding evaluates one node under boolean only until task J.1b");
+            "conditions under a graded logic: the binding evaluates one node under boolean only until task J.1b",
+            "bundle",
+            "bundles (spec/bundles.md) have no Java or Scala type yet (a beta binding, docs/PLAN.md, R.5): loads"
+                    + " refuses a bundle once the core has read it, so vectors that make or compare bundles, hold one"
+                    + " of the running engine, or read one without an error outside the native layer run in the core,"
+                    + " C ABI, Python and JavaScript runners");
 
     /** The exception class of each error code (spec/errors.md, Codes). */
     private static final Map<String, Class<? extends CleanRulesException>> CLASSES = Map.ofEntries(
@@ -184,6 +189,37 @@ class Conformance {
         boolean passed() {
             return failure == null && skip == null;
         }
+    }
+
+    /**
+     * Whether {@code vector} needs bundles in the API {@code route} runs: one that makes or compares bundles,
+     * holds a bundle of the running engine, or, outside the native layer ({@code json}), reads one without an
+     * error. Vectors whose bundle the reader refuses run: the core's error comes first, and
+     * {@code canonical} vectors of bundles go through the native layer on every route.
+     */
+    static boolean needsBundles(Map<?, ?> vector, String route) {
+        Map<?, ?> given = (Map<?, ?>) vector.get("given");
+        Object kind = given.get("kind");
+        if ("bundle".equals(kind) || "bundle_compare".equals(kind) || Boolean.TRUE.equals(given.get("current_engine"))) {
+            return true;
+        }
+        Map<?, ?> expect = (Map<?, ?>) vector.get("expect");
+        return "read".equals(kind) && holdsBundle(given) && !expect.containsKey("error") && !"json".equals(route);
+    }
+
+    /** Whether a vector's {@code given} holds a bundle document ({@code spec/bundles.md}). */
+    static boolean holdsBundle(Map<?, ?> given) {
+        return given.get("document") instanceof Map<?, ?> document
+                ? document.containsKey("bundle")
+                : given.get("yaml") instanceof String yaml && yaml.contains("\nbundle:");
+    }
+
+    /**
+     * A {@code canonical} vector of a bundle, which no idiomatic type holds yet: through the native layer,
+     * on every route, since canonical vectors are never skipped.
+     */
+    protected String canonicalOfBundle(Map<?, ?> given, Map<?, ?> expect) {
+        return canonicalJson(given, expect);
     }
 
     /** Whether {@code vector} evaluates a condition under a graded logic (task J.1b). */
@@ -222,6 +258,9 @@ class Conformance {
         }
         if (isGraded(vector)) {
             return new Outcome(null, "graded");
+        }
+        if (needsBundles(vector, route)) {
+            return new Outcome(null, "bundle");
         }
         try {
             String failure = switch (route) {
@@ -787,6 +826,9 @@ class Conformance {
      * from it with Java data.
      */
     private String canonicalNative(Map<?, ?> given, Map<?, ?> expect) {
+        if (holdsBundle(given)) {
+            return canonicalOfBundle(given, expect);
+        }
         Source source = sourceOf(given);
         DocumentContent loaded = Documents.loads(source.text(), source.format());
         List<String> issues = new ArrayList<>();

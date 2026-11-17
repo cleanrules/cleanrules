@@ -50,7 +50,7 @@ A vector file is a JSON document:
 
 | Kind | Given | Runner calls | Expected |
 |---|---|---|---|
-| `read` | `text` (a JSON text, for lexical cases), `yaml` (a YAML text, `json-format.md`, *YAML*) or `document`; `ruleset` when reading a decision; optional `limits` (`max_size` in bytes, `max_nesting`, `max_depth`, `max_table_size`, `max_path_segments`) | the document reader | `document`: the canonical form that is read back, or `error` |
+| `read` | `text` (a JSON text, for lexical cases), `yaml` (a YAML text, `json-format.md`, *YAML*) or `document`; `ruleset` when reading a decision; optional `limits` (`max_size` in bytes, `max_nesting`, `max_depth`, `max_table_size`, `max_path_segments`); optional `current_engine` (below) | the document reader | `document`: the canonical form that is read back, or `error` |
 | `condition` | `condition` (a condition node), `input` (a data value), optional `logic` and `strict` | `evaluate_tree` (`spec/ast.md`, *Evaluating one node*) | `result`: its result tree, or `error` |
 | `value` | `value` (a value node), `input`, optional `strict` | `evaluate_value_tree` | `result`: its result tree, or `error` |
 | `evaluate` | `ruleset` (a rule set document's content), and `input` or `inputs` (a batch); optional `limits` (`max_values`, `spec/data-model.md`, *Reading native data*, *Limits*) | `evaluate`, or its batch form | `decision`, or `decisions` for a batch, or `error` |
@@ -58,9 +58,19 @@ A vector file is a JSON document:
 | `summary` | `ruleset` | `summary` | `summary`, and optionally `text` |
 | `tool` | `rulesets` (an object: each name with a rule set document's content; none for an empty catalog), `tool`, and `arguments` (JSON) or `arguments_text` (JSON text, for texts a vector cannot hold, such as repeated keys) | the tool call on a catalog of those rule sets (`spec/agents.md`) | `output`: the result, or `error`: the tool error |
 | `canonical` | `document` (a condition, rule, rule set or decision table document), or `text` (its JSON text, for lexical cases) | the reader, then the document's canonical bytes and digest, and the digest of the rule set it gives (`spec/json-format.md`, *Canonical bytes*, *Digests*) | `canonical`: the exact canonical bytes as UTF-8 text, compared as a string; `digest`; `ruleset_digest`, absent for a condition |
+| `bundle` | `document` (a rule set or decision table document: the rules), `id`, `revision`; optional `cases` (an array of `{"path", "text"}`: each case file's path and content as UTF-8 text) and `limits` (any of the six that a bundle records, `spec/bundles.md`, *Engine*) | make a bundle of the rules with this engine (`spec/bundles.md`, *Making a bundle*), write it, and read it back | `document`: the bundle, whose `engine.version` the runner first sets to its own engine's; or `error` (its `code` only) |
+| `bundle_compare` | `a`, `b`: two bundle documents | read both, then compare `a` with `b` (`spec/bundles.md`, *Comparing bundles*) | `comparison`: `relation`, `identical` and `differences` |
 | `draw` | `format` (`dot`, `mermaid`, `html` or `html_fragment`), `document` (a condition, rule, rule set or decision table document); optional `input`, with a rule set or a table; optional `limits` (`max_diagram_size`) | `draw_document` (`spec/visual.md`); with an `input`, the rule set (or the table's rule set) evaluates it, and the runner draws the decision's explanation for a rule set (`draw_explanation`), and the table with the decision for a table (`draw_document` with the decision) | `diagram`: the exact text, compared as a string, or `error` (`code` and `name`) |
 
-Optional flags such as `strict` are omitted when false. A `condition` vector's
+Optional flags such as `strict` are omitted when false. A bundle's `engine.version`
+says which engine made it, and a reader verifies the contract of a bundle of
+its own engine only (`spec/bundles.md`, *Contract*), so the vectors never name
+a real version: the bundles of other engines name pre-release versions such as
+`1.0.0-conformance.1`, which no build has, and a `read` vector with
+`"current_engine": true` holds a bundle of the engine that runs it: the runner
+sets `engine.version` of `given.document` and of `expect.document` to its
+engine's version (`cr_version()`, `cleanrules.__version__`, ...) before
+running it. A `bundle` vector does the same with `expect.document`. A `condition` vector's
 `logic` is a logic in its JSON form (`spec/json-format.md`, *Logics*): a name,
 or an object with the name, a parameter and a complement. Until the bindings
 evaluate one node under a graded logic (task J.1b), only the core runs the
@@ -111,7 +121,7 @@ output, never stopping at the first one.
   and data with the core's own JSON reader, and runs the `draw` vectors.
 - **Python**: `cd bindings/python && uv run pytest tests/test_conformance.py`
   runs every vector through the binding's JSON entry points (`json:<id>`) and,
-  except the `read` vectors, with native Python data and the Python API
+  except the `read` vectors other than those of bundles, with native Python data and the Python API
   (`native:<id>`).
 - **C ABI**: `cargo test -p cleanrules-ffi --test conformance` runs every
   vector through the C functions, from JSON and from native `cr_value`s;
@@ -125,6 +135,20 @@ output, never stopping at the first one.
   builds documents in code, its native route also builds the condition, rule
   or rule set from the vector's document (a decision table is read). Erlang
   has no conformance runner yet (task N.4).
+- **Bundles** (`spec/bundles.md`): the `read` and `canonical` vectors of
+  bundles go through each runner's document reader like the others, and the
+  core, C ABI, Python and JavaScript runners also make bundles (`bundle`) and
+  compare them (`bundle_compare`). The C++, Java, Scala and Go APIs have no
+  bundles of their own yet (they are beta, `docs/PLAN.md`, R.5): their
+  `Loads`/`loads` refuse a bundle with `unsupported` once the core has read
+  it, so the vectors that read a bundle with an error still run there. C++
+  reads bundles as `cr::document` and Java's native layer as
+  `ffi.Document`, so they also run the `read` vectors of bundles (C++ with
+  `current_engine` too) and Java and Scala every `canonical` vector of a
+  bundle through `ffi.Document`. What they cannot run (making and comparing
+  bundles; the vectors with `current_engine` in Go, Java and Scala; reading a
+  bundle without an error in Go and in the idiomatic Java and Scala routes) is
+  counted and skipped with the reason `bundle`.
 - **Diagrams in the bindings**: until each binding draws diagrams (phase V.2),
   the Python, C++, JavaScript, Java, Scala and Go runners skip the `draw`
   vectors, count them and state the reason (`diagram` in the JavaScript, Go
@@ -252,8 +276,8 @@ conformance/tools/decimal_vectors.py --write`. With `--check`, which CI runs
 next to `check.py`, it also recomputes every arithmetic node of every result
 tree (`round` from its result's scale) and every aggregate of every decision
 in all the vectors, so a hand-written or generated vector cannot disagree with
-the arithmetic of the spec. `vectors/format/canonical.json` and
-`vectors/format/digests.json` are generated by `tools/canonical_vectors.py`,
+the arithmetic of the spec. `vectors/format/canonical.json`,
+`vectors/format/digests.json` and `vectors/format/bundles.json` are generated by `tools/canonical_vectors.py`,
 whose oracle lays out the canonical bytes of `spec/json-format.md`
 (*Canonical bytes*) with Python's own JSON parser, float `repr` and
 `decimal`, and hashes them with `hashlib`, independently of the core: `python3

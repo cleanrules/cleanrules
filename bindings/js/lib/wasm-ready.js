@@ -13,6 +13,12 @@ const INTERNAL = [
   'NodeList',
   'RuleList',
   'actionErrorData',
+  'bundleCaseMatches',
+  'bundleData',
+  'bundleOfRuleset',
+  'bundleOfTable',
+  'bundleRuleset',
+  'bundleTable',
   'canonicalCondition',
   'canonicalRule',
   'decisionData',
@@ -143,6 +149,26 @@ function layer(glue) {
       return fromDocument.call(this, document)
     },
   }.fromDocument
+  const makeBundle = native.Document.makeBundle
+  native.Document.makeBundle = {
+    makeBundle(rules, ...rest) {
+      if (!(rules instanceof native.Document)) throw glue.notADocument(rules)
+      void rules.kind
+      return makeBundle.call(this, rules, ...rest)
+    },
+  }.makeBundle
+  const compareBundle = Object.getOwnPropertyDescriptor(native.Document.prototype, 'compareBundle').value
+  Object.defineProperty(native.Document.prototype, 'compareBundle', {
+    value: {
+      compareBundle(other) {
+        if (!(other instanceof native.Document)) throw glue.notADocument(other)
+        void other.kind
+        return compareBundle.call(this, other)
+      },
+    }.compareBundle,
+    writable: true,
+    configurable: true,
+  })
   // Node's (or Deno's) type checks where the runtime has them, without
   // importing anything.
   const builtin = globalThis.process?.getBuiltinModule

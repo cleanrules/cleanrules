@@ -1,13 +1,16 @@
-//! The wasm-bindgen side of documents, result trees and decision tables for
-//! the idiomatic API, with the names, arguments and errors of the napi-rs
+//! The wasm-bindgen side of documents, result trees, decision tables and
+//! bundles for the idiomatic API, with the names, arguments and errors of the napi-rs
 //! build's (`src/napi/documents.rs`). Internal: no entry point exports them.
 
 use cleanrules::table::{Cell, HeaderItem};
 use wasm_bindgen::prelude::*;
 
 use super::build::NativeRule;
-use super::classes::{Decision, Document, Node, RuleSet, chained, read, undefined_input};
+use super::classes::{
+    Decision, Document, Node, RuleSet, chained, make_bundle, read, undefined_input,
+};
 use super::{OrFail, fail, raw, raw_limits, raw_options};
+use crate::common::bundles;
 use crate::common::core::{NodeCore, TreeData, TreeKind};
 use crate::common::documents;
 use crate::common::tables::{GridCore, TableCore};
@@ -469,4 +472,88 @@ pub fn rule_tree(decision: &Decision, position: &JsValue) -> Result<NativeTree, 
         .rule_tree(&raw(position))
         .map(NativeTree::from)
         .or_fail()
+}
+
+/// A bundle of a rule set, made with this engine.
+///
+/// # Errors
+///
+/// As in the napi-rs build.
+#[wasm_bindgen(js_name = bundleOfRuleset)]
+pub fn bundle_of_ruleset(
+    ruleset: &RuleSet,
+    id: &JsValue,
+    revision: &JsValue,
+    cases: &JsValue,
+    limits: &JsValue,
+) -> Result<Document, JsValue> {
+    let rules = bundles::ruleset_rules(&ruleset.core);
+    make_bundle(rules, id, revision, cases, limits).map(|core| Document { core })
+}
+
+/// A bundle of a decision table, made with this engine.
+///
+/// # Errors
+///
+/// As in the napi-rs build.
+#[wasm_bindgen(js_name = bundleOfTable)]
+pub fn bundle_of_table(
+    table: &NativeTable,
+    id: &JsValue,
+    revision: &JsValue,
+    cases: &JsValue,
+    limits: &JsValue,
+) -> Result<Document, JsValue> {
+    let rules = bundles::table_rules(&table.core);
+    make_bundle(rules, id, revision, cases, limits).map(|core| Document { core })
+}
+
+/// What the idiomatic `Bundle` reads of a bundle document, as JSON.
+///
+/// # Errors
+///
+/// As in the napi-rs build.
+#[wasm_bindgen(js_name = bundleData)]
+pub fn bundle_data(document: &Document) -> Result<String, JsValue> {
+    document.core.bundle_data().or_fail()
+}
+
+/// The rule set a bundle gives.
+///
+/// # Errors
+///
+/// As in the napi-rs build.
+#[wasm_bindgen(js_name = bundleRuleset)]
+pub fn bundle_ruleset(document: &Document) -> Result<RuleSet, JsValue> {
+    Ok(RuleSet::from_core(
+        document.core.bundle_ruleset().or_fail()?,
+    ))
+}
+
+/// The decision table a bundle holds.
+///
+/// # Errors
+///
+/// As in the napi-rs build.
+#[wasm_bindgen(js_name = bundleTable)]
+pub fn bundle_table(document: &Document) -> Result<NativeTable, JsValue> {
+    document
+        .core
+        .bundle_table()
+        .map(|core| NativeTable { core })
+        .or_fail()
+}
+
+/// Whether `bytes` are the case file at `path` the bundle was made with.
+///
+/// # Errors
+///
+/// As in the napi-rs build.
+#[wasm_bindgen(js_name = bundleCaseMatches)]
+pub fn bundle_case_matches(
+    document: &Document,
+    path: &JsValue,
+    bytes: &JsValue,
+) -> Result<bool, JsValue> {
+    document.core.case_matches(&raw(path), raw(bytes)).or_fail()
 }

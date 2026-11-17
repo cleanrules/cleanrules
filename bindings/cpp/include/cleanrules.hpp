@@ -101,6 +101,9 @@ enum class document_content : cr_document_content {
     rule = CR_DOCUMENT_RULE,
     ruleset = CR_DOCUMENT_RULESET,
     decision_table = CR_DOCUMENT_DECISION_TABLE,
+    // A bundle (spec/bundles.md): read, written and hashed as any document;
+    // cleanrules.hpp has no functions of its own for bundles yet.
+    bundle = CR_DOCUMENT_BUNDLE,
 };
 
 // A limit of `limits`.

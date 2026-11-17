@@ -10,8 +10,9 @@ use wasm_bindgen::prelude::*;
 
 use super::{
     OrFail, call_action, call_actions, call_read, core_error, fail, nullable, object, raw,
-    raw_limits, raw_list, raw_options,
+    raw_cases, raw_limits, raw_list, raw_options,
 };
+use crate::common::bundles;
 use crate::common::core::{
     ActionFailure, DecisionCore, DocumentCore, NodeCore, PathSegment, RulesCore, TreeKind,
     action_error, cause_index, max_values_error, not_a_batch, path_segments, undefined_row,
@@ -163,6 +164,49 @@ impl Document {
     pub fn digest(&self) -> String {
         self.core.digest()
     }
+
+    /// Make a bundle of the rules `rules` holds, as in the napi-rs build.
+    ///
+    /// # Errors
+    ///
+    /// As in the napi-rs build.
+    #[wasm_bindgen(js_name = makeBundle)]
+    pub fn make_bundle(
+        rules: &Document,
+        id: &JsValue,
+        revision: &JsValue,
+        cases: &JsValue,
+        limits: &JsValue,
+    ) -> Result<Document, JsValue> {
+        let rules = bundles::rules_of(&rules.core).or_fail()?;
+        Ok(Self {
+            core: make_bundle(rules, id, revision, cases, limits)?,
+        })
+    }
+
+    /// Compare this bundle with `other`, as in the napi-rs build.
+    ///
+    /// # Errors
+    ///
+    /// As in the napi-rs build.
+    #[wasm_bindgen(js_name = compareBundle)]
+    pub fn compare_bundle(&self, other: &Document) -> Result<String, JsValue> {
+        self.core.compare_bundle(&other.core).or_fail()
+    }
+}
+
+/// A bundle of `rules` made from the arguments of a JavaScript call, as a
+/// document.
+pub(crate) fn make_bundle(
+    rules: cleanrules::bundle::BundleRules,
+    id: &JsValue,
+    revision: &JsValue,
+    cases: &JsValue,
+    limits: &JsValue,
+) -> Result<DocumentCore, JsValue> {
+    let cases = raw_cases(cases)?;
+    let limits = raw_limits(limits)?;
+    bundles::make(rules, &raw(id), &raw(revision), cases, &limits).or_fail()
 }
 
 // --- RuleSet --------------------------------------------------------------
@@ -579,13 +623,16 @@ impl Decision {
         Ok(nullable(self.core.rule_output_json(&raw(rule)).or_fail()?))
     }
 
-    /// The decision document in `format`.
+    /// The decision document in `format`, with its rule set digest when
+    /// `rulesetDigest` is true.
     ///
     /// # Errors
     ///
     /// As in the napi-rs build.
-    pub fn write(&self, format: &JsValue) -> Result<String, JsValue> {
-        self.core.write(&raw(format)).or_fail()
+    pub fn write(&self, format: &JsValue, ruleset_digest: &JsValue) -> Result<String, JsValue> {
+        self.core
+            .write(&raw(format), &raw(ruleset_digest))
+            .or_fail()
     }
 
     /// The explanation in `format`: its text by default.

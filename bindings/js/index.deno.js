@@ -8,6 +8,7 @@ export * from './lib/public.js'
 export const FORMAT_VERSION = native.FORMAT_VERSION
 export const version = native.version()
 export const {
+  Bundle,
   Const,
   Decision,
   DecisionTable,

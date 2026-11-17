@@ -22,6 +22,7 @@ mod model;
 mod render;
 
 use crate::ast::Node;
+use crate::bundle::BundleRules;
 use crate::error::{Error, ErrorCode, Result};
 use crate::explain::{Explanation, Summary, summary};
 use crate::format::Document;
@@ -306,7 +307,7 @@ pub fn draw_table(
 
 /// A document's diagram: a condition's, a rule's, a rule set's (from its
 /// summary) or a decision table's grid, with the statuses of `decision` when
-/// one is given for a table.
+/// one is given for a table; a bundle's is that of the rules it holds.
 ///
 /// # Errors
 ///
@@ -318,7 +319,12 @@ pub fn draw_document(
     format: DiagramFormat,
     limits: &Limits,
 ) -> Result<String> {
-    if let (Some(_), false) = (decision, matches!(document, Document::DecisionTable(_))) {
+    let table = match document {
+        Document::DecisionTable(_) => true,
+        Document::Bundle(bundle) => matches!(bundle.rules(), BundleRules::DecisionTable(_)),
+        _ => false,
+    };
+    if let (Some(_), false) = (decision, table) {
         return Err(Error::new(
             ErrorCode::Unsupported,
             "a decision is drawn with a decision table's grid only",
@@ -331,6 +337,10 @@ pub fn draw_document(
         Document::Rule(rule) => draw_rule(rule, format, limits),
         Document::RuleSet(ruleset) => draw_ruleset(&summary(ruleset), format, limits),
         Document::DecisionTable(table) => draw_table(table, decision, format, limits),
+        Document::Bundle(bundle) => match bundle.rules() {
+            BundleRules::DecisionTable(table) => draw_table(table, decision, format, limits),
+            BundleRules::RuleSet(ruleset) => draw_ruleset(&summary(ruleset), format, limits),
+        },
     }
 }
 

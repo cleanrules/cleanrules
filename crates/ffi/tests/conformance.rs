@@ -16,9 +16,9 @@ use cleanrules_ffi::{
     CR_DIAGRAM_DOT, CR_DIAGRAM_HTML, CR_DIAGRAM_HTML_FRAGMENT, CR_DIAGRAM_MERMAID, CR_FORMAT_CSV,
     CR_FORMAT_JSON, CR_FORMAT_TEXT, CR_FORMAT_YAML, CR_LIMIT_MAX_DEPTH, CR_LIMIT_MAX_DIAGRAM_SIZE,
     CR_LIMIT_MAX_NESTING, CR_LIMIT_MAX_PATH_SEGMENTS, CR_LIMIT_MAX_SIZE, CR_LIMIT_MAX_TABLE_SIZE,
-    cr_decision_draw, cr_document_canonical_bytes, cr_document_condition, cr_document_digest,
-    cr_document_draw, cr_document_rule, cr_node_draw, cr_rule_draw, cr_ruleset_canonical_bytes,
-    cr_ruleset_digest, cr_ruleset_draw,
+    CR_LIMIT_MAX_VALUES, cr_decision_draw, cr_document_canonical_bytes, cr_document_condition,
+    cr_document_digest, cr_document_draw, cr_document_rule, cr_node_draw, cr_rule_draw,
+    cr_ruleset_canonical_bytes, cr_ruleset_digest, cr_ruleset_draw, cr_version,
 };
 use common::{Failure, Limits_, json, on_small_stack};
 
@@ -185,7 +185,130 @@ fn ruleset(given: &Json) -> common::RuleSet {
     common::read_ruleset(document.as_bytes(), CR_FORMAT_JSON).unwrap()
 }
 
+/// This library's version (`cr_version`).
+fn version() -> String {
+    // SAFETY: a static NUL-terminated string.
+    unsafe { std::ffi::CStr::from_ptr(cr_version()) }
+        .to_str()
+        .unwrap()
+        .to_owned()
+}
+
+/// A copy of a vector's JSON with the bundle's `engine.version` set to this
+/// engine's, under `key` (`conformance/README.md`, `current_engine`).
+fn with_this_engine(json: &Json, key: &str) -> Json {
+    let mut copy = json.clone();
+    let set = |document: &mut Json| {
+        if let Json::Object(top) = document
+            && let Some((_, Json::Object(bundle))) = top.iter_mut().find(|(k, _)| k == "bundle")
+            && let Some((_, Json::Object(engine))) = bundle.iter_mut().find(|(k, _)| k == "engine")
+            && let Some((_, slot)) = engine.iter_mut().find(|(k, _)| k == "version")
+        {
+            *slot = Json::String(version());
+        }
+    };
+    if let Json::Object(members) = &mut copy
+        && let Some((_, document)) = members.iter_mut().find(|(k, _)| k == key)
+    {
+        set(document);
+    }
+    copy
+}
+
+/// A `bundle` vector: make a bundle with `cr_bundle_new`, write it, read it
+/// back (`spec/bundles.md`, *Making a bundle*).
+fn run_make_bundle(given: &Json, expect: &Json) -> Result<(), String> {
+    let rules = common::read_document(
+        to_string(get(given, "document").unwrap()).as_bytes(),
+        CR_FORMAT_JSON,
+        None,
+    )
+    .map_err(|f| to_string(&f.json))?;
+    let limits = match get(given, "limits") {
+        Some(Json::Object(members)) => {
+            let values: Vec<(i32, usize)> = members
+                .iter()
+                .map(|(name, value)| {
+                    let Json::Number(n) = value else { panic!() };
+                    let which = match name.as_str() {
+                        "max_size" => CR_LIMIT_MAX_SIZE,
+                        "max_nesting" => CR_LIMIT_MAX_NESTING,
+                        "max_depth" => CR_LIMIT_MAX_DEPTH,
+                        "max_path_segments" => CR_LIMIT_MAX_PATH_SEGMENTS,
+                        "max_table_size" => CR_LIMIT_MAX_TABLE_SIZE,
+                        "max_values" => CR_LIMIT_MAX_VALUES,
+                        other => panic!("unknown limit {other}"),
+                    };
+                    (which, usize::try_from(n.as_i128().unwrap()).unwrap())
+                })
+                .collect();
+            Some(common::limits(&values))
+        }
+        _ => None,
+    };
+    let cases: Vec<(String, String)> = match get(given, "cases") {
+        Some(Json::Array(items)) => items
+            .iter()
+            .map(|item| {
+                (
+                    string(get(item, "path")).unwrap().to_owned(),
+                    string(get(item, "text")).unwrap().to_owned(),
+                )
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
+    let cases: Vec<(&str, &[u8])> = cases
+        .iter()
+        .map(|(path, text)| (path.as_str(), text.as_bytes()))
+        .collect();
+    let made = common::bundle(
+        &rules,
+        string(get(given, "id")).unwrap(),
+        string(get(given, "revision")).unwrap(),
+        &cases,
+        limits.as_ref(),
+    )
+    .and_then(|bundle| common::write_document(&bundle, CR_FORMAT_JSON))
+    .and_then(|text| {
+        // This engine reads what it made back, and writes the same.
+        let again = common::read_document(text.as_bytes(), CR_FORMAT_JSON, None)?;
+        assert_eq!(common::write_document(&again, CR_FORMAT_JSON)?, text);
+        Ok(json(&text))
+    });
+    compare(
+        made,
+        &with_this_engine(expect, "document"),
+        "document",
+        &READ_FIELDS,
+    )
+}
+
+/// A `bundle_compare` vector (`spec/bundles.md`, *Comparing bundles*).
+fn run_compare_bundles(given: &Json, expect: &Json) -> Result<(), String> {
+    let read = |key: &str| {
+        common::read_document(
+            to_string(get(given, key).unwrap()).as_bytes(),
+            CR_FORMAT_JSON,
+            None,
+        )
+        .map_err(|f| to_string(&f.json))
+    };
+    let (a, b) = (read("a")?, read("b")?);
+    let comparison = common::compare_bundles(&a, &b).map(|text| json(&text));
+    compare(comparison, expect, "comparison", &READ_FIELDS)
+}
+
 fn run_read(given: &Json, expect: &Json) -> Result<(), String> {
+    let current = matches!(get(given, "current_engine"), Some(Json::Bool(true)));
+    let (given, expect) = if current {
+        (
+            &with_this_engine(given, "document"),
+            &with_this_engine(expect, "document"),
+        )
+    } else {
+        (given, expect)
+    };
     let (source, format) = if let Some(text) = string(get(given, "text")) {
         (text.to_owned(), CR_FORMAT_JSON)
     } else if let Some(document) = get(given, "document") {
@@ -489,6 +612,8 @@ fn run(vector: &Json) -> Result<(), String> {
         "explain" => run_evaluate(given, expect, true),
         "draw" => run_draw(given, expect),
         "canonical" => run_canonical(given, expect),
+        "bundle" => run_make_bundle(given, expect),
+        "bundle_compare" => run_compare_bundles(given, expect),
         "summary" => {
             let summary = common::summary(&ruleset(given), CR_FORMAT_JSON)
                 .map(|text| content(&text, "summary"));

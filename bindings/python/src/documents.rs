@@ -8,6 +8,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyTuple};
 
+use crate::bundles::PyBundle;
 use crate::errors::IntoPyResult;
 use crate::node::PyNode;
 use crate::rules::{PyRule, PyRuleSet};
@@ -57,8 +58,9 @@ pub(crate) fn ruleset_parts<'py>(
 }
 
 /// Read a document: `("condition", Node)`, `("rule", Rule)`,
-/// `("ruleset", (rules, hit_policy, aggregate, logic, strict))` or
-/// `("decision_table", DecisionTable)`; CSV holds a decision table.
+/// `("ruleset", (rules, hit_policy, aggregate, logic, strict))`,
+/// `("decision_table", DecisionTable)` or `("bundle", Bundle)`; CSV holds a
+/// decision table.
 #[pyfunction]
 #[pyo3(signature = (text, format, max_size=None, max_nesting=None, max_depth=None, max_table_size=None, max_path_segments=None))]
 #[allow(clippy::too_many_arguments)] // The limits are keyword arguments in Python.
@@ -88,6 +90,10 @@ pub(crate) fn load_document<'py>(
         Document::DecisionTable(table) => (
             "decision_table",
             PyDecisionTable { table }.into_pyobject(py)?.into_any(),
+        ),
+        Document::Bundle(bundle) => (
+            "bundle",
+            PyBundle { bundle: *bundle }.into_pyobject(py)?.into_any(),
         ),
         // The core's documents are `#[non_exhaustive]`.
         _ => {
@@ -166,8 +172,18 @@ pub(crate) fn dump_table(table: &Bound<'_, PyDecisionTable>, format: &str) -> Py
     )
 }
 
-/// The document of a condition, rule, rule set or decision table, as the core
-/// holds it.
+/// The document of a bundle, in `format` (`json` or `yaml`).
+#[pyfunction]
+pub(crate) fn dump_bundle(bundle: &Bound<'_, PyBundle>, format: &str) -> PyResult<String> {
+    write(
+        bundle.py(),
+        &Document::Bundle(Box::new(bundle.get().bundle.clone())),
+        format,
+    )
+}
+
+/// The document of a condition, rule, rule set, decision table or bundle, as
+/// the core holds it.
 fn document_of(value: &Bound<'_, PyAny>) -> PyResult<Document> {
     if let Ok(node) = value.cast::<PyNode>() {
         Ok(Document::Condition(node.get().node.clone()))
@@ -177,9 +193,11 @@ fn document_of(value: &Bound<'_, PyAny>) -> PyResult<Document> {
         Ok(Document::RuleSet(ruleset.get().ruleset().clone()))
     } else if let Ok(table) = value.cast::<PyDecisionTable>() {
         Ok(Document::DecisionTable(table.get().table.clone()))
+    } else if let Ok(bundle) = value.cast::<PyBundle>() {
+        Ok(Document::Bundle(Box::new(bundle.get().bundle.clone())))
     } else {
         Err(PyValueError::new_err(
-            "a condition, a rule, a rule set or a decision table",
+            "a condition, a rule, a rule set, a decision table or a bundle",
         ))
     }
 }

@@ -9,6 +9,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Reproducible bundles (task R.5; `spec/bundles.md`): a new document,
+  `{"version": 1, "bundle": {...}}`, additive in format version 1 (older
+  readers reject it), read and written in JSON and YAML (not in text or CSV),
+  with its JSON Schema `spec/schemas/v1/bundle.schema.json`. A bundle holds
+  the rules (a rule set or a decision table), the `id` and `revision` its
+  author gives them (forms fixed by the spec; the core never invents them),
+  their `ruleset_digest`, the `engine` that made it (`name`, exact `version`,
+  and the six `limits` that can change a result), the `contract` (the input
+  schema of `spec/agents.md` and the output keys) and references to test case
+  files (relative path and SHA-256 of their bytes; their content is opaque
+  until T.1). Readers verify the rule set digest (`decision_mismatch` at
+  `/bundle/ruleset_digest`) and, for a bundle of their own engine and
+  version, the contract (`decision_mismatch` at `/bundle/contract/...`); a
+  bundle of another engine is read and its engine reported, never refused.
+  Comparing two bundles gives a relation (`same_rules_same_engine`,
+  `same_rules_other_engine`, `other_rules_same_engine`,
+  `other_rules_other_engine`, or `conflict` for one `id` and `revision` with
+  two rule sets), whether they are identical, and the parts that differ. A
+  bundle gives its rule set wherever a document gives one, is drawn as its
+  rules, and the `validate` tool reads it (`content` `"bundle"`). 81
+  conformance vectors (`format/bundles.json`, generated with their digests by
+  `conformance/tools/canonical_vectors.py`; new vector kinds `bundle` and
+  `bundle_compare`, and the flag `current_engine`), JSON Schema examples, and
+  the example `docs/examples/bundles.rs`.
+  - Core: module `bundle` (`Bundle::new`, `BundleRules`, `Engine`,
+    `EngineLimits`, `Contract`, `CaseFile`, `Comparison`, `Relation`,
+    `ENGINE_NAME`, `ENGINE_VERSION`; `Bundle::case_matches`),
+    `Document::Bundle` and `format::write_bundle`.
+  - C ABI: `CR_DOCUMENT_BUNDLE`, `cr_bundle_new` (with `cr_case_file`),
+    `cr_bundle_compare` and `cr_document_new_ruleset`; C++
+    `cr::document_content::bundle`.
+  - Python: `Bundle(rules, *, id, revision, cases=(), omit_actions=False,
+    max_...)` with `id`, `revision`, `rules`, `ruleset`, `ruleset_digest`,
+    `engine` (`BundleEngine`), `contract`, `cases` (`CaseFile`, with
+    `matches`), `case_matches` and `compare` (`BundleComparison`,
+    `BundleRelation`); `loads`, `dumps`, `load`, `dump`, `canonical_bytes`
+    and `digest` take bundles.
+  - JavaScript and wasm (Node, browsers, Deno): `new Bundle(rules, { id,
+    revision, cases, omitActions, limits })` with `id`, `revision`, `rules`,
+    `ruleset`, `rulesetDigest`, `engine` (`{ name, version, limits,
+    isCurrent }`), `contract`, `cases`, `caseMatches(path, content)`,
+    `compare(other)` and `toJSON()`; `loads`, `load`, `dumps`, `dump`,
+    `canonicalBytes` and `digest` take bundles; in `cleanrules/native`,
+    `Document.makeBundle`, `document.compareBundle` and the document kind
+    `'bundle'`.
+  - Java, Scala, Go and C++ (beta) have no bundle type yet: `loads`/`Loads`
+    refuse a bundle with `unsupported` once the core has read it, instead of
+    reading it as its rule set; C++ `cr::document` and Java's
+    `ffi.Document` read, write and hash it as any document
+    (`DocumentKind.BUNDLE`).
+- Decisions written with their rule set digest on request in every
+  supported interface (closes a deviation of R.2): Python
+  `Decision.to_dict(ruleset_digest=True)`, JavaScript `dumps(decision, { rulesetDigest: true })` (`dumps` and
+  `dump` now take decisions; `decision.write(format, rulesetDigest)` in
+  `cleanrules/native`),
+  and in the C ABI `cr_decision_write_with` with the flag
+  `CR_WRITE_RULESET_DIGEST`.
+
 - Rule identity (task R.3; `spec/rules.md`, *Identity*): a rule may have an
   optional `id`, a non-empty string; its **effective id** is the id, or the
   name when it has none, and effective ids are unique within a rule set
@@ -1362,6 +1420,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Java: `DocumentKind` has a new constant, `BUNDLE` (task R.5), so a
+  `switch` that lists every kind needs a case for it. Go's `Loads` and Java's
+  `Documents.loads` refuse a bundle document with `unsupported` instead of
+  failing (Java) or reading it as the rule set it holds (Go).
+- `decision_mismatch` also covers a bundle whose `ruleset_digest` or contract
+  is not that of the rules it holds (`spec/errors.md`).
 - Floats are written from their shortest round-trip digits with an exact tie
   broken towards the even last digit, as ECMAScript, Java and Python do
   (`201409170638417.125` is written `201409170638417.12`, which the core wrote

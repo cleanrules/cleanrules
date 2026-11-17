@@ -192,4 +192,24 @@ class DigestsTest {
         // The compiled rule set, written as a rule set document, keeps that digest.
         assertEquals(rulesetDigest, digest(loads(dumps(table.ruleSet()))));
     }
+
+    /**
+     * A bundle (spec/bundles.md) has no idiomatic Java type yet: {@code loads} refuses it, and the native layer
+     * reads, writes and hashes it.
+     */
+    @Test
+    void bundlesAreReadThroughTheNativeLayerOnly() {
+        RuleSet rules = RuleSet.of();
+        String limits = "\"limits\": {\"max_size\": 1, \"max_nesting\": 1, \"max_depth\": 1,"
+                + " \"max_path_segments\": 1, \"max_table_size\": 1, \"max_values\": 1}";
+        String bundle = "{\"version\": 1, \"bundle\": {\"id\": \"a\", \"revision\": \"1\","
+                + " \"ruleset\": {\"rules\": []}, \"ruleset_digest\": \"" + digest(rules) + "\","
+                + " \"engine\": {\"name\": \"cleanrules\", \"version\": \"1.0.0-other\", " + limits + "},"
+                + " \"contract\": {\"input\": {}, \"output\": {\"keys\": []}}}}";
+        assertThrows(UnsupportedException.class, () -> loads(bundle));
+        try (Document document = Document.read(bundle, Format.JSON)) {
+            assertEquals(io.github.cleanrules.DocumentKind.BUNDLE, document.kind());
+            assertTrue(document.digest().startsWith("sha256:"));
+        }
+    }
 }

@@ -66,3 +66,8 @@ path = "../../docs/examples/rule_ids.rs"
 [[example]]
 name = "digests"
 path = "../../docs/examples/digests.rs"
+
+# The example of reproducible bundles in the documentation (task R.5).
+[[example]]
+name = "bundles"
+path = "../../docs/examples/bundles.rs"

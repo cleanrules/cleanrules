@@ -679,6 +679,8 @@ function rules(native, expressions, trees, build) {
     Rule,
     RuleSet,
     checkActions,
+    /** The decision of the native layer of a `Decision`. */
+    decisionNative: (decision) => decisionParts(decision)[0],
     /** The `Rule` of a rule of the core. */
     fromNativeRule: (made) => new Rule(NATIVE, made),
     /** The `RuleSet` of a rule set of the core. */

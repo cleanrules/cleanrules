@@ -391,3 +391,39 @@ void manual.init(42)
 
 void [rootFormat, loadedBytes, dumped, loadedFile, dumpedFile, parsed, treeTruth, treeChildren, treeReason, treeNode, resultValueTree]
 void [tablePolicy, firstInput, tableSet, tableOut, outputs, contextTree, ready, manualSet, nativeSet]
+
+// --- Bundles (R.5) and decisions with their rule set digest ---
+
+import { Bundle, type BundleComparison, type BundleRelation } from 'cleanrules'
+import { type BundleCaseInput } from 'cleanrules/native'
+
+const bundle = new Bundle(rules, {
+  id: 'acme/discounts',
+  revision: '1',
+  cases: [{ path: 'cases/a.json', content: new Uint8Array() }, { path: 'cases/b.json', content: '[]' }],
+  omitActions: true,
+  limits: { maxDepth: 64, maxValues: null },
+})
+const bundleRules: RootRuleSet | DecisionTable = bundle.rules
+const bundleSet: RootRuleSet = bundle.ruleset
+const maxDepth: number = bundle.engine.limits.maxDepth
+const current: boolean = bundle.engine.isCurrent
+const outputKeys: readonly string[] = bundle.contract.output.keys
+const caseDigest: string | undefined = bundle.cases[0]?.digest
+const matches: boolean = bundle.caseMatches('cases/a.json', '[]')
+const comparison: BundleComparison = bundle.compare(bundle)
+const relation: BundleRelation = comparison.relation
+const bundled: Loaded = bundle
+const bundleText: string = dumps(bundle, { format: 'yaml' })
+const bundleDigest: string = digest(bundle)
+const loggedDecision: string = dumps(rules.evaluate({ x: 1 }), { rulesetDigest: true })
+const nativeCase: BundleCaseInput = { path: 'cases/a.json', content: 'x' }
+const nativeBundle: Document = Document.makeBundle(document, 'acme/a', '1', [nativeCase], { maxDepth: 64 })
+const nativeComparison: string = nativeBundle.compareBundle(nativeBundle)
+const nativeDecision: string = decision.write('json', true)
+// @ts-expect-error: a bundle needs an id and a revision.
+void new Bundle(rules, { id: 'acme/a' })
+// @ts-expect-error: a bundle holds a rule set or a table, not a rule.
+void new Bundle(new Rule('a', F.x.gt(1)), { id: 'a', revision: '1' })
+void [bundleRules, bundleSet, maxDepth, current, outputKeys, caseDigest, matches, relation, bundled, bundleText, bundleDigest]
+void [loggedDecision, nativeComparison, nativeDecision]

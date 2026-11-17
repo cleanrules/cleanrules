@@ -9,6 +9,7 @@
 //! global mutable state.
 
 mod agents;
+mod bundles;
 mod convert;
 mod documents;
 mod errors;
@@ -48,6 +49,10 @@ fn native_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<rules::PyRuleSet>()?;
     module.add_class::<rules::PyDecision>()?;
     module.add_class::<tables::PyDecisionTable>()?;
+    module.add_class::<bundles::PyBundle>()?;
+    module.add_function(wrap_pyfunction!(bundles::make_bundle, module)?)?;
+    module.add_function(wrap_pyfunction!(bundles::case_matches, module)?)?;
+    module.add_function(wrap_pyfunction!(documents::dump_bundle, module)?)?;
     module.add_function(wrap_pyfunction!(rules::rule, module)?)?;
     module.add_function(wrap_pyfunction!(rules::ruleset, module)?)?;
     module.add_function(wrap_pyfunction!(documents::load_document, module)?)?;
@@ -77,5 +82,7 @@ fn native_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(json_api::py_explain, module)?)?;
     module.add_function(wrap_pyfunction!(json_api::py_summary, module)?)?;
     module.add_function(wrap_pyfunction!(json_api::py_evaluate_node, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::py_make_bundle, module)?)?;
+    module.add_function(wrap_pyfunction!(json_api::py_compare_bundles, module)?)?;
     Ok(())
 }

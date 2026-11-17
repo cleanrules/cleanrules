@@ -916,12 +916,23 @@ class Decision:
         """
         return self.explain().for_rule(name)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, *, ruleset_digest: bool = False) -> dict[str, Any]:
         """The decision document of the JSON format (`spec/json-format.md`, *Decisions*).
 
+            record = decision.to_dict(ruleset_digest=True)
+            record["decision"]["ruleset_digest"]  # "sha256:…", digest(decision.ruleset)
+
         The `at` pointers of the explanation's JSON form point into this document.
+
+        Args:
+            ruleset_digest: Write the rule set digest of the rule set that
+                made the decision (`digest(decision.ruleset, omit_actions=True)`),
+                which ties the record to the exact rules, such as those of a
+                bundle: `RuleSet.read_decision` refuses it with another rule
+                set. A decision read with a digest is written with it either way.
         """
-        return _document("decision", json.loads(self._native.to_json()))
+        native = self._native.to_json(ruleset_digest)
+        return _document("decision", json.loads(native))
 
     def __repr__(self) -> str:
         names = ", ".join(result.rule.name for result in self.selected)

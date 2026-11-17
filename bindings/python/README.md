@@ -141,9 +141,49 @@ cleanrules.digest(table.ruleset)  # a decision table's rule set digest
 A digest does not say that two rule sets decide alike: `x > 5` and `5 < x`, or
 the decimals `1.0` and `1.00`, give different digests. A decision document
 that carries `ruleset_digest` is checked against it by `read_decision` and
-keeps it; decisions made in Python carry none. Actions given as code are not
+keeps it; `decision.to_dict(ruleset_digest=True)` writes one, so that a log of
+decisions names the exact rules that made them (it is read back with
+`rules.read_decision`, not `loads`, since a decision is read with its rule
+set). Actions given as code are not
 part of a document: the digest that decisions of such rules are checked
 against is `digest(rules, omit_actions=True)`.
+
+### Bundles
+
+A bundle is a reproducible package of rules
+([`spec/bundles.md`](../../spec/bundles.md)): the rule set or decision table,
+an identifier and a revision that you give them, their rule set digest, the
+engine version and limits that made it, the contract of their input and
+output, and the digest of each file of test cases. It is a JSON or YAML
+document, and two bundles compare to tell a change of engine from a change of
+rules:
+
+```python
+from pathlib import Path
+
+bundle = cleanrules.Bundle(
+    rules,
+    id="acme/discounts",
+    revision="2026-11-16.1",
+    cases=[("cases/discounts.json", Path("cases/discounts.json").read_bytes())],
+)
+cleanrules.dump(bundle, "discounts.bundle.json")
+bundle.ruleset_digest  # 'sha256:...', as cleanrules.digest(rules)
+bundle.engine.version  # cleanrules.__version__
+bundle.contract["output"]  # {'keys': ['discount']}
+
+old = cleanrules.load("discounts-1.bundle.json")
+comparison = old.compare(bundle)
+comparison.relation  # e.g. 'other_rules_same_engine': the rules changed
+comparison.differences  # e.g. ('revision', 'rules')
+bundle.case_matches("cases/discounts.json", Path("cases/discounts.json").read_bytes())
+```
+
+A bundle holds no code: rules with actions given as code are refused unless
+you pass `omit_actions=True`, and named actions come back unbound. Reading a
+bundle checks its `ruleset_digest`, and, when this engine and version made it,
+its contract (`FormatError` with the code `decision_mismatch`); a bundle made
+by another version is read as it was recorded.
 
 `evaluate` never has side effects; `run` evaluates and then calls the actions
 of the selected rules. An action is a function given to `Rule(do=...)`, or a

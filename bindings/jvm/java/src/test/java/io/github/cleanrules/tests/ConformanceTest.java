@@ -34,8 +34,8 @@ class ConformanceTest {
 
     /** The skips each route may have; any other is a failure. */
     private static final Map<String, Set<String>> ALLOWED_SKIPS =
-            Map.of("json", Set.of("grid", "native", "agents", "diagram", "graded"), "native",
-                    Set.of("decimal_infinity", "zone_unknown_to_java", "agents", "diagram", "graded"));
+            Map.of("json", Set.of("grid", "native", "agents", "diagram", "graded", "bundle"), "native",
+                    Set.of("decimal_infinity", "zone_unknown_to_java", "agents", "diagram", "graded", "bundle"));
 
     /** What a route did with the vectors. */
     private static final class Counts {

@@ -158,6 +158,14 @@ public final class Documents {
                 case Native.CR_DOCUMENT_RULE -> Rule.fromCore(Scope.value((out, error) -> Native.documentRule(document, out, error)));
                 case Native.CR_DOCUMENT_RULESET -> RuleSet.fromNative(Bridge.ffi().ruleSet(
                         Scope.value((out, error) -> Native.rulesetFromDocument(document, out, error))));
+                case Native.CR_DOCUMENT_BUNDLE -> {
+                    // A bundle (spec/bundles.md) has no Java type yet: refused,
+                    // rather than read as the rule set it holds.
+                    String message = "bundles are not in the Java binding yet";
+                    String hint = "read bundles with the Rust, Python or JavaScript API, or through ffi.Document";
+                    throw new UnsupportedException(
+                            "unsupported", message, hint, Build.json("unsupported", message, hint, null, null), null);
+                }
                 default -> throw new IllegalStateException("cleanrules read a document of an unknown kind");
             };
         } finally {

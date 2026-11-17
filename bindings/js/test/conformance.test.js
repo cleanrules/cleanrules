@@ -156,6 +156,13 @@ test('a wrong expected output fails both ways', () => {
     ['format/canonical/ruleset-example', '\\"0.15\\"', '\\"0.150\\"'],
     ['format/canonical/condition', 'sha256:2eb0', 'sha256:2eb1'],
     ['format/canonical/decision-table', '"ruleset_digest":"sha256:', '"ruleset_digest":"sha256:0'],
+    // Bundles: what is made, a comparison, an error's code, and a bundle of
+    // this engine whose contract is verified on reading.
+    ['format/bundles/make-table', '"max_depth":64', '"max_depth":65'],
+    ['format/bundles/compare-other-limits', '"engine.limits.max_values"', '"engine.limits.max_size"'],
+    ['format/bundles/compare-other-limits', '"same_rules_other_engine"', '"same_rules_same_engine"'],
+    ['format/bundles/make-bad-id', '"format_error"', '"unsupported"'],
+    ['format/bundles/current-engine-verified', '"acme/orders"', '"acme/order"'],
   ]
   for (const [id, from, to] of wrong) {
     const vector = mutated(id, from, to)

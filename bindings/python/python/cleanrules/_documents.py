@@ -1,4 +1,4 @@
-"""Loading and dumping conditions, rules, rule sets and decision tables.
+"""Loading and dumping conditions, rules, rule sets, decision tables and bundles.
 
     rules = cleanrules.load("pricing.yaml")
     text = cleanrules.dumps(rules, format="yaml")
@@ -8,7 +8,8 @@ The documents are the JSON format of `spec/json-format.md`, the contract between
 languages: a rule set written here is read the same way in Rust, Java or Go.
 YAML files hold the same documents (`spec/json-format.md`, *YAML*), the text
 syntax (`spec/text.md`) the same model, as people write rules on paper, and CSV
-holds decision tables (`spec/tables.md`), as spreadsheets write them. Reading
+holds decision tables (`spec/tables.md`), as spreadsheets write them; bundles
+(`spec/bundles.md`) are JSON or YAML documents too. Reading
 is strict and bounded: unknown keys, duplicate keys, malformed values and syntax
 errors are errors with a JSON Pointer or a line and column, and documents larger
 or deeper than the limits are refused.
@@ -19,13 +20,16 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import IO, Literal, TypeAlias
+from typing import IO, TYPE_CHECKING, Literal, TypeAlias
 
 from cleanrules import _cleanrules as _native
 from cleanrules._expr import Expr, _wrap  # pyright: ignore[reportPrivateUsage]
 from cleanrules._rules import Action, Rule, RuleSet
 from cleanrules._tables import DecisionTable
 from cleanrules.errors import ExpressionError, FormatError, UnsupportedError
+
+if TYPE_CHECKING:
+    from cleanrules._bundles import Bundle
 
 __all__ = [
     "Format",
@@ -67,8 +71,8 @@ def loads(
     max_table_size: int | None = None,
     max_path_segments: int | None = None,
     actions: Mapping[str, Action] | None = None,
-) -> Expr | Rule | RuleSet | DecisionTable:
-    """Read a condition, rule, rule set or decision table document.
+) -> Expr | Rule | RuleSet | DecisionTable | Bundle:
+    """Read a condition, rule, rule set, decision table or bundle document.
 
     Args:
         text: The document, in JSON, YAML, the text syntax or CSV; `bytes` are
@@ -90,17 +94,20 @@ def loads(
         actions: An action registry, each name with its callable: a rule or
             rule set read is bound to it (`RuleSet.bind`). Without it, rules
             keep the names of their actions, unbound: they evaluate, explain
-            and write, but `run` refuses them.
+            and write, but `run` refuses them. Decision tables and bundles
+            are not bound.
 
     Returns:
-        An `Expr` for a condition document, a `Rule`, a `RuleSet` or a
-        `DecisionTable`. A rule's action is the name the document gives it, if
-        any, never code.
+        An `Expr` for a condition document, a `Rule`, a `RuleSet`, a
+        `DecisionTable` or a `Bundle` (JSON or YAML, `spec/bundles.md`). A
+        rule's action is the name the document gives it, if any, never code.
 
     Raises:
         FormatError: For invalid JSON, YAML or CSV, an unknown or duplicate
             key, a wrong type or an unknown version, with a JSON Pointer or a
-            line and column; or a document beyond the limits.
+            line and column; or a document beyond the limits. With the code
+            `decision_mismatch`, a bundle whose `ruleset_digest`, or whose
+            contract when this engine made it, is not that of its rules.
         RuleSyntaxError: For a text that does not follow the syntax, with the
             line and column of the first token that cannot be read.
         ExpressionError: If a condition breaks a construction rule; read from
@@ -127,6 +134,14 @@ def loads(
         return rule if actions is None else RuleSet([rule]).bind(actions)[0]
     if kind == "decision_table":
         return DecisionTable._from_native(content)  # pyright: ignore[reportPrivateUsage]
+    if kind == "bundle":
+        from cleanrules._bundles import Bundle
+
+        if actions is not None:
+            raise TypeError(
+                "a bundle is not bound to actions: bind its rules with bundle.ruleset.bind(actions)"
+            )
+        return Bundle._from_native(content)  # pyright: ignore[reportPrivateUsage]
     ruleset = _ruleset(content)
     return ruleset if actions is None else ruleset.bind(actions)
 
@@ -171,17 +186,18 @@ def _rule(native: _native.Rule) -> Rule:
 
 
 def dumps(
-    value: Expr | Rule | RuleSet | DecisionTable,
+    value: Expr | Rule | RuleSet | DecisionTable | Bundle,
     *,
     format: Format = "json",
     omit_actions: bool = False,
 ) -> str:
-    """Write a condition, rule, rule set or decision table, in its canonical form.
+    """Write a condition, rule, rule set, decision table or bundle, in its canonical form.
 
     Args:
-        value: A condition, a rule, a rule set or a decision table.
+        value: A condition, a rule, a rule set, a decision table or a bundle.
         format: `"json"` (compact), `"yaml"` (block style), `"text"` (the
             canonical text, `IF … THEN …`) or `"csv"` (decision tables only).
+            Bundles are JSON or YAML.
         omit_actions: Write rules without their actions instead of refusing.
             Actions are code, which a document cannot hold.
 
@@ -192,12 +208,16 @@ def dumps(
         ExpressionError: If `value` is a value node, not a condition.
         UnsupportedError: If a rule has an action and `omit_actions` is false;
             its `pointer` locates the rule. In text, also for a rule with
-            metadata, which the text syntax cannot hold, and for a decision
-            table.
+            metadata, which the text syntax cannot hold, for a decision
+            table and for a bundle.
         UnsupportedError: Also for CSV and anything but a decision table.
     """
+    from cleanrules._bundles import Bundle
+
     if isinstance(value, DecisionTable):
         return _native.dump_table(value._native, format)  # pyright: ignore[reportPrivateUsage]
+    if isinstance(value, Bundle):
+        return _native.dump_bundle(value._native, format)  # pyright: ignore[reportPrivateUsage]
     if isinstance(value, Expr):
         if value.kind == "value":
             raise ExpressionError(
@@ -212,15 +232,15 @@ def dumps(
         _check_actions(list(value), "/ruleset/rules/{}", omit_actions)
         return _native.dump_ruleset(value._native, format)  # pyright: ignore[reportPrivateUsage]
     raise TypeError(
-        "dumps takes a condition, a rule, a rule set or a decision table,"
+        "dumps takes a condition, a rule, a rule set, a decision table or a bundle,"
         f" not {type(value).__name__}"
     )
 
 
 def canonical_bytes(
-    value: Expr | Rule | RuleSet | DecisionTable, *, omit_actions: bool = False
+    value: Expr | Rule | RuleSet | DecisionTable | Bundle, *, omit_actions: bool = False
 ) -> bytes:
-    """The canonical bytes of a condition, rule, rule set or decision table.
+    """The canonical bytes of a condition, rule, rule set, decision table or bundle.
 
     They are the UTF-8 JSON text of the document in its canonical form, every
     object's members sorted by key (by Unicode code point), without whitespace,
@@ -232,7 +252,7 @@ def canonical_bytes(
         # b'{"rule":{"name":"r","when":{"left":...,"op":"gt",...}},"version":1}'
 
     Args:
-        value: A condition, a rule, a rule set or a decision table.
+        value: A condition, a rule, a rule set, a decision table or a bundle.
         omit_actions: Give the bytes of the document written without the
             rules' actions given as code, instead of refusing, as `dumps`.
 
@@ -247,8 +267,10 @@ def canonical_bytes(
     return _native.canonical_bytes(_native_document(value, "canonical_bytes", omit_actions))
 
 
-def digest(value: Expr | Rule | RuleSet | DecisionTable, *, omit_actions: bool = False) -> str:
-    """The digest of a condition, rule, rule set or decision table.
+def digest(
+    value: Expr | Rule | RuleSet | DecisionTable | Bundle, *, omit_actions: bool = False
+) -> str:
+    """The digest of a condition, rule, rule set, decision table or bundle.
 
     The SHA-256 hash of its canonical bytes, written `sha256:` and 64 lowercase
     hexadecimal digits (`spec/json-format.md`, *Digests*). A digest identifies
@@ -256,10 +278,12 @@ def digest(value: Expr | Rule | RuleSet | DecisionTable, *, omit_actions: bool =
     alike (`x > 5` and `5 < x`, or the decimals `1.0` and `1.00`, give different
     digests). The digest of a rule set is its rule set digest, which a decision
     can carry; a decision table's rule set digest is `digest(table.ruleset)`,
-    and `digest(table)` that of the table's own document.
+    and `digest(table)` that of the table's own document. A bundle's digest
+    identifies the whole package (`spec/bundles.md`, *Digest of a bundle*);
+    its rule set digest is `bundle.ruleset_digest`.
 
     Args:
-        value: A condition, a rule, a rule set or a decision table.
+        value: A condition, a rule, a rule set, a decision table or a bundle.
         omit_actions: As in `canonical_bytes`.
 
     Returns:
@@ -274,10 +298,12 @@ def digest(value: Expr | Rule | RuleSet | DecisionTable, *, omit_actions: bool =
 
 
 def _native_document(
-    value: Expr | Rule | RuleSet | DecisionTable, function: str, omit_actions: bool
-) -> _native.Node | _native.Rule | _native.RuleSet | _native.DecisionTable:
+    value: Expr | Rule | RuleSet | DecisionTable | Bundle, function: str, omit_actions: bool
+) -> _native.Node | _native.Rule | _native.RuleSet | _native.DecisionTable | _native.Bundle:
     """The native object whose document `value` is, checked as `dumps` checks it."""
-    if isinstance(value, DecisionTable):
+    from cleanrules._bundles import Bundle
+
+    if isinstance(value, DecisionTable | Bundle):
         return value._native  # pyright: ignore[reportPrivateUsage]
     if isinstance(value, Expr):
         if value.kind == "value":
@@ -293,7 +319,7 @@ def _native_document(
         _check_actions(list(value), "/ruleset/rules/{}", omit_actions)
         return value._native  # pyright: ignore[reportPrivateUsage]
     raise TypeError(
-        f"{function} takes a condition, a rule, a rule set or a decision table,"
+        f"{function} takes a condition, a rule, a rule set, a decision table or a bundle,"
         f" not {type(value).__name__}"
     )
 
@@ -378,7 +404,7 @@ def load(
     max_table_size: int | None = None,
     max_path_segments: int | None = None,
     actions: Mapping[str, Action] | None = None,
-) -> Expr | Rule | RuleSet | DecisionTable:
+) -> Expr | Rule | RuleSet | DecisionTable | Bundle:
     """Read a document from a file, as `loads` does.
 
     Args:
@@ -428,7 +454,7 @@ def load(
 
 
 def dump(
-    value: Expr | Rule | RuleSet | DecisionTable,
+    value: Expr | Rule | RuleSet | DecisionTable | Bundle,
     target: str | os.PathLike[str] | IO[str],
     *,
     format: Format | None = None,
@@ -450,7 +476,7 @@ def dump(
 
 
 def _document_text(
-    value: Expr | Rule | RuleSet | DecisionTable, format: Format, omit_actions: bool
+    value: Expr | Rule | RuleSet | DecisionTable | Bundle, format: Format, omit_actions: bool
 ) -> str:
     """The text of a file: a rule text ends with a line break, as CSV does."""
     text = dumps(value, format=format, omit_actions=omit_actions)

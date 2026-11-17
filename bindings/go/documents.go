@@ -83,7 +83,8 @@ func (*DecisionTable) isDocument() {}
 // or a line and column, and a document beyond the limits a limit_exceeded.
 // Rules keep the core's own rules, so they write back exactly. A rule's
 // action is the name the document gives it: WithActions binds the names to
-// Go functions.
+// Go functions. A bundle (spec/bundles.md) has no Go type yet: once the core
+// has read it, it is an unsupported error.
 //
 //	doc, err := cleanrules.Loads(text, cleanrules.WithFormat(cleanrules.FormatYAML))
 //	rules, ok := doc.(*cleanrules.RuleSet)
@@ -202,6 +203,11 @@ func load(source string, settings documentSettings) (Document, error) {
 	defer C.cr_document_free(document)
 	var content Document
 	switch C.cr_document_kind(document) {
+	case C.CR_DOCUMENT_BUNDLE:
+		// A bundle (spec/bundles.md) has no Go type yet: refused, rather
+		// than read as the rule set it holds.
+		return nil, newError(CodeUnsupported, "bundles are not in the Go binding yet",
+			"read bundles with the Rust, Python or JavaScript API")
 	case C.CR_DOCUMENT_CONDITION:
 		var node *C.cr_node
 		if err := check(C.cr_document_condition(document, &node, &e), e); err != nil {

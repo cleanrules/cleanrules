@@ -305,9 +305,34 @@ cr::document read_grid(const json::value &grid, const std::optional<cr::limits> 
     return CALL0(m, table.finish);
 }
 
+// A copy of a vector's `given` or `expect` whose `document` is a bundle of the
+// engine that runs it: its `engine.version` set to this library's
+// (conformance/README.md, `current_engine`).
+json::value with_this_engine(json::value copy) {
+    auto member = [](json::value &object, const std::string &key) -> json::value * {
+        for (auto &entry : object.members) {
+            if (entry.first == key) {
+                return &entry.second;
+            }
+        }
+        return nullptr;
+    };
+    json::value *document = member(copy, "document");
+    json::value *bundle = document != nullptr ? member(*document, "bundle") : nullptr;
+    json::value *engine = bundle != nullptr ? member(*bundle, "engine") : nullptr;
+    if (json::value *version = engine != nullptr ? member(*engine, "version") : nullptr) {
+        version->text = cr_version();
+    }
+    return copy;
+}
+
 // A `read` vector: documents in every format, grids, and decisions read with
 // their rule set, written back in the forms the vector expects.
-std::string run_read(const json::value &given, const json::value &expect, mode m) {
+std::string run_read(const json::value &given_as_written, const json::value &expect_as_written,
+                     mode m) {
+    const bool current = given_as_written.get("current_engine") != nullptr;
+    const json::value given = current ? with_this_engine(given_as_written) : given_as_written;
+    const json::value expect = current ? with_this_engine(expect_as_written) : expect_as_written;
     std::string source;
     cr::format fmt = cr::format::json;
     if (const std::string *text = given.string_at("text")) {
@@ -1200,6 +1225,10 @@ int main(int argc, char **argv) {
     std::size_t tools = 0;
     std::size_t skipped_draw = 0;
     std::size_t graded = 0;
+    // cleanrules.hpp has no bundles yet (a beta binding, docs/PLAN.md, R.5):
+    // the vectors that make or compare them are counted and skipped; those
+    // that read one run, as any document.
+    std::size_t bundles = 0;
     std::size_t passed_json = 0;
     std::size_t ran_native = 0;
     std::size_t passed_native = 0;
@@ -1230,6 +1259,11 @@ int main(int argc, char **argv) {
                 }
                 if (need(given, "kind").text == "tool") {
                     ++tools;
+                    continue;
+                }
+                if (need(given, "kind").text == "bundle" ||
+                    need(given, "kind").text == "bundle_compare") {
+                    ++bundles;
                     continue;
                 }
                 // Conditions under a graded logic: the C ABI evaluates one
@@ -1268,10 +1302,11 @@ int main(int argc, char **argv) {
     }
     std::printf("conformance: %zu vectors; json %zu of %zu passed, native %zu of %zu passed; %zu "
                 "native-only, %zu tool vectors (agents, not in C++ yet), %zu diagrams "
-                "(spec/visual.md: checked through the C ABI until cleanrules.hpp draws them) "
-                "and %zu under a graded logic (task J.1b) skipped\n",
+                "(spec/visual.md: checked through the C ABI until cleanrules.hpp draws them),"
+                " %zu under a graded logic (task J.1b) and %zu that make or compare bundles (not in "
+                "C++ yet) skipped\n",
                 ran, passed_json, ran, passed_native, ran_native, skipped, tools, skipped_draw,
-                graded);
+                graded, bundles);
     if (!failures.empty()) {
         std::fprintf(stderr, "conformance: %zu failures\n", failures.size());
         return EXIT_FAILURE;

@@ -2,8 +2,8 @@
 
 **Status:** draft, format version `1`. This document covers documents, values
 and conditions (task A.1a), rules and rule sets (A.1b), decisions and reasons
-(A.1c), explanations and summaries (A.1d), and canonical bytes and digests
-(R.2).
+(A.1c), explanations and summaries (A.1d), canonical bytes and digests
+(R.2), and bundles (R.5, in [`bundles.md`](bundles.md)).
 
 The JSON format is the contract between languages and with users' files
 (`CLAUDE.md`, invariant 6). A condition written in Java and read in Go is the
@@ -22,7 +22,8 @@ other value is a `format_error` at the root) with:
 - `"version"`: the format version, the integer literal `1`;
 - exactly one **content key**, which says what the document holds:
   `"condition"`, `"rule"`, `"ruleset"`, `"decision"`, `"explanation"`,
-  `"summary"` or `"decision_table"`;
+  `"summary"`, `"decision_table"` or `"bundle"` (a reproducible package of
+  rules, [`bundles.md`](bundles.md));
 - optionally `"$schema"`, a string that readers ignore, so editors can find the
   schema. Writers do not emit it.
 
@@ -85,17 +86,19 @@ of a rule set and the results of a decision.
 
 **Formats.** Documents are also read and written in YAML (*YAML*); the
 documents of conditions, rules and rule sets in the rule syntax (`text.md`);
-and those of decision tables in CSV (`tables.md`). Decisions are read and
-written in JSON or YAML only, and explanations and summaries are written in
+and those of decision tables in CSV (`tables.md`). Decisions and bundles are
+read and written in JSON or YAML only, and explanations and summaries are written in
 JSON, YAML or as their text (`explain.md`). Any other combination is
 `unsupported`. Read from bytes, text that is not UTF-8 is a `format_error` at
 the line and column of the first invalid byte, in every format.
 
 **A rule set from a document.** Where an API asks for a rule set (the C ABI's
 `cr_ruleset_read`, for one), a rule set document gives it, a decision table
-gives the rule set it compiles to (`tables.md`), and a rule gives a rule set of
-that one rule with the default settings (*Rule sets*: `first`, `boolean`, not
-strict). A condition is a `format_error`: it is not a rule.
+gives the rule set it compiles to (`tables.md`), a bundle gives the rule set
+it holds, or the one its decision table compiles to (`bundles.md`), and a rule
+gives a rule set of that one rule with the default settings (*Rule sets*:
+`first`, `boolean`, not strict). A condition is a `format_error`: it is not a
+rule.
 
 **Versioning.** Adding a node, a content key or an optional key keeps the
 version, and so does accepting a new JSON form for an existing key, as long as
@@ -809,6 +812,14 @@ A summary document is the JSON form of `summary()` (`explain.md`,
 
 Every array is written even when it is empty.
 
+## Bundles
+
+A bundle document has the content key `"bundle"`: a package of rules with
+its identifier, revision, rule set digest, engine, contract and test cases.
+Its keys, the order in which it is checked and how it is written are in
+[`bundles.md`](bundles.md). It was added to version 1 (*Versioning*): older
+readers reject it with `format_error`.
+
 ## Decision tables
 
 A decision table document has the content key `"decision_table"`. Its keys,
@@ -995,7 +1006,8 @@ alter the bytes of an existing document increases the format version. A
 reader of a later version that reads such a document gives the same bytes.
 
 The core gives the canonical bytes and the digest of the documents that
-readers build: conditions, rules, rule sets and decision tables. The canonical
+readers build: conditions, rules, rule sets, decision tables and bundles
+(`bundles.md`, *Digest of a bundle*). The canonical
 bytes of decisions, explanations and summaries follow the same rules; this
 version defines no digest of them.
 
@@ -1022,10 +1034,13 @@ without them.
 A decision may carry the rule set digest of the rule set that made it, under
 `ruleset_digest` (*Decisions*), so that an audit log ties each decision to the
 exact rules that made it. Writers write it only when the caller asks, so
-decisions stay small and do not change with every edit of a description (in
-this version, only the core's Rust API asks: `Decision::with_ruleset_digest`;
-decisions made in the other languages carry none, and every language keeps
-one that it reads). A
+decisions stay small and do not change with every edit of a description
+(`Decision::with_ruleset_digest` in Rust, `Decision.to_dict(ruleset_digest=True)`
+in Python, `dumps(decision, { rulesetDigest: true })` in JavaScript, the flag `CR_WRITE_RULESET_DIGEST` of
+`cr_decision_write_with` in the C ABI; the Java, Scala, Go and C++ APIs do not
+ask yet, and every language keeps one that it reads). A bundle
+(`bundles.md`) states the same digest, so decisions written this way are tied
+to the bundle that made them. A
 reader verifies it before any other check against the rule set (*Reading a
 decision*):
 
@@ -1111,7 +1126,7 @@ it would have (`/condition/right`), and an unknown or extra key by its own
 | `expression_error` | the shape is valid, but a construction rule of a node (see *Reading*) is broken |
 | `rule_definition_error` | the shape is valid, but a construction rule of a rule or rule set is broken |
 | `registry_error` | a name that should be registered (a logic) is not |
-| `decision_mismatch` | a decision does not belong to, or is not consistent with, the rule set it is read with |
+| `decision_mismatch` | a decision does not belong to, or is not consistent with, the rule set it is read with; or a bundle's `ruleset_digest` or contract is not that of the rules it holds (`bundles.md`) |
 | `unsupported` | this build of the core, or this version of the format, cannot do the operation: a logic built out by a Cargo feature, a rule set or decision table under a graded logic, a writer given an action, reading an output-only document, or explaining a decision made with a graded logic |
 | `limit_exceeded` | the document is larger, or nested deeper, than the reader allows, or a field path is longer; also native data beyond `max_values` (below) |
 
@@ -1137,7 +1152,8 @@ A reader reports **one** error, the first it finds in this order:
    first, then the payload values by key (`expression_error`), then the
    rule's own rules. In a rule set, the rules come first, in order, then the
    rule set's own rules. A decision has no construction rules; its checks
-   against the rule set come here, as listed in *Reading a decision*.
+   against the rule set come here, as listed in *Reading a decision*, and so
+   do a bundle's checks of its digest and contract (`bundles.md`, *Reading*).
 
 Readers enforce four limits, so a hostile file cannot exhaust memory or the
 stack (`CLAUDE.md`, invariant 9):

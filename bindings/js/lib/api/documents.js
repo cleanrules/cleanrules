@@ -1,5 +1,6 @@
-// Loading and dumping conditions, rules, rule sets and decision tables, as
-// Python's `cleanrules._documents`, and their canonical bytes and digests:
+// Loading and dumping conditions, rules, rule sets, decision tables and
+// bundles, as Python's `cleanrules._documents`, and their canonical bytes and
+// digests; dumping decisions too:
 //
 //   const rules = await load('pricing.yaml')
 //   const text = dumps(rules, { format: 'yaml' })
@@ -9,7 +10,8 @@
 // The documents are the JSON format of `spec/json-format.md`, the contract
 // between languages; YAML files hold the same documents, the text syntax
 // (`spec/text.md`) the same model, and CSV holds decision tables
-// (`spec/tables.md`). The core reads and writes every document, strictly and
+// (`spec/tables.md`); JSON and YAML hold bundles too (`spec/bundles.md`). The
+// core reads and writes every document, strictly and
 // within limits, and makes its canonical bytes and digest
 // (`spec/json-format.md`, *Canonical bytes*, *Digests*); this module checks
 // the arguments, picks the format of a file from its extension, and makes the
@@ -23,7 +25,7 @@ import { options, sameBuild, show } from './shared.js'
 const EXTENSIONS = { '.json': 'json', '.yaml': 'yaml', '.yml': 'yaml', '.rules': 'text', '.csv': 'csv' }
 
 const LOAD_OPTIONS = ['format', 'limits', 'actions']
-const DUMP_OPTIONS = ['format', 'omitActions']
+const DUMP_OPTIONS = ['format', 'omitActions', 'rulesetDigest']
 const DIGEST_OPTIONS = ['omitActions']
 
 /** The file name of `path`, a string or a `file:` URL; a `TypeError` for anything else. */
@@ -58,24 +60,35 @@ function formatOf(name) {
 }
 
 /** The documents of one build (`build` names it). */
-function documents(native, expressions, rules, tables, build) {
+function documents(native, expressions, rules, tables, bundles, build) {
   const { Expr, nodeOf, wrap } = expressions
-  const { RuleSet, Rule, checkActions, fromNativeRule, fromNativeRuleSet, ruleNative, ruleSetNative, withAction } = rules
+  const { Decision, RuleSet, Rule, checkActions, decisionNative, fromNativeRule, fromNativeRuleSet, ruleNative, ruleSetNative, withAction } =
+    rules
   const { DecisionTable, fromNativeTable, tableNative } = tables
+  const { Bundle, bundleNative, fromNativeBundle } = bundles
 
   /** `rule` bound to the action registry `actions`, as `RuleSet.bind` binds. */
   const bindRule = (rule, actions) => new RuleSet([rule]).bind(actions).rules[0]
 
   /**
-   * Read a condition, rule, rule set or decision table document: an `Expr`,
-   * a `Rule`, a `RuleSet` or a `DecisionTable`. `format` is `'json'` (the
-   * default), `'yaml'`, `'text'` or `'csv'`; `limits` as the native layer
-   * takes them; `actions`, a registry that a rule or rule set read is bound
-   * to (`RuleSet.bind`); without it, named actions stay unbound.
+   * Read a condition, rule, rule set, decision table or bundle document: an
+   * `Expr`, a `Rule`, a `RuleSet`, a `DecisionTable` or a `Bundle`. `format`
+   * is `'json'` (the default), `'yaml'`, `'text'` or `'csv'`; `limits` as the
+   * native layer takes them; `actions`, a registry that a rule or rule set
+   * read is bound to (`RuleSet.bind`); without it, named actions stay unbound.
    */
   function loads(text, loadOptions) {
     const { format, limits, actions } = options(loadOptions, LOAD_OPTIONS, "{ format: 'yaml' }")
     const document = native.Document.read(text, { format, limits })
+    // A bundle keeps its document.
+    if (document.kind === 'bundle') {
+      if (actions !== undefined && actions !== null) {
+        throw new TypeError(
+          'a bundle is not bound to actions: bind its rules with bundle.ruleset.bind(actions)',
+        )
+      }
+      return fromNativeBundle(document)
+    }
     try {
       switch (document.kind) {
         case 'condition':
@@ -107,6 +120,7 @@ function documents(native, expressions, rules, tables, build) {
       throw new TypeError(`omitActions is a boolean, not ${show(omitActions)}`)
     }
     if (value instanceof DecisionTable) return ['table', tableNative(value)]
+    if (value instanceof Bundle) return ['bundle', bundleNative(value)]
     if (value instanceof Expr) {
       if (value.kind === 'value') {
         throw new ExpressionError(`only a condition can be a document, not the value ${value}`, {
@@ -124,18 +138,26 @@ function documents(native, expressions, rules, tables, build) {
       return ['ruleset', ruleSetNative(value)]
     }
     sameBuild(value, build)
-    throw new TypeError(`${operation} takes a condition, a rule, a rule set or a decision table, not ${show(value)}`)
+    const what = operation === 'dumps' ? 'a decision table, a bundle or a decision' : 'a decision table or a bundle'
+    throw new TypeError(`${operation} takes a condition, a rule, a rule set, ${what}, not ${show(value)}`)
   }
 
   /**
-   * Write a condition, rule, rule set or decision table, in its canonical
-   * form: `format` is `'json'` (compact, the default), `'yaml'`, `'text'` or
-   * `'csv'` (decision tables only). A rule whose action is code is refused
+   * Write a condition, rule, rule set, decision table, bundle or decision, in
+   * its canonical form: `format` is `'json'` (compact, the default),
+   * `'yaml'`, `'text'` (conditions, rules and rule sets) or `'csv'`
+   * (decision tables only). A rule whose action is code is refused
    * (`UnsupportedError`) unless `omitActions`: a document holds an action's
-   * name, never code.
+   * name, never code. With `rulesetDigest`, a decision carries the digest of
+   * the rule set that made it (`spec/json-format.md`, *In decisions*); a
+   * decision read with one keeps it either way.
    */
   function dumps(value, dumpOptions) {
-    const { format, omitActions } = options(dumpOptions, DUMP_OPTIONS, "{ format: 'yaml' }")
+    const { format, omitActions, rulesetDigest } = options(dumpOptions, DUMP_OPTIONS, "{ format: 'yaml' }")
+    if (value instanceof Decision) return decisionNative(value).write(format, rulesetDigest)
+    if (rulesetDigest !== undefined && rulesetDigest !== null) {
+      throw new TypeError(`rulesetDigest is an option of decisions, not of ${show(value)}`)
+    }
     const [kind, document] = documentOf(value, omitActions, 'dumps')
     switch (kind) {
       case 'condition':
@@ -148,8 +170,8 @@ function documents(native, expressions, rules, tables, build) {
   }
 
   /**
-   * The canonical bytes of the document of a condition, rule, rule set or
-   * decision table (`spec/json-format.md`, *Canonical bytes*): the UTF-8 JSON
+   * The canonical bytes of the document of a condition, rule, rule set,
+   * decision table or bundle (`spec/json-format.md`, *Canonical bytes*): the UTF-8 JSON
    * text of its canonical form, every object's members sorted by key, by code
    * point, without whitespace. The same checks as `dumps`.
    */
@@ -167,8 +189,8 @@ function documents(native, expressions, rules, tables, build) {
   }
 
   /**
-   * The digest of the document of a condition, rule, rule set or decision
-   * table (`spec/json-format.md`, *Digests*): `sha256:` and the 64 lowercase
+   * The digest of the document of a condition, rule, rule set, decision
+   * table or bundle (`spec/json-format.md`, *Digests*): `sha256:` and the 64 lowercase
    * hexadecimal digits of the SHA-256 hash of its canonical bytes. The same
    * checks as `dumps`.
    */

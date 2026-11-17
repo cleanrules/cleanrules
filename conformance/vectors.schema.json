@@ -147,6 +147,10 @@
                 "csv"
               ],
               "description": "Write what is read as text (compared with expect.printed) or, for a decision table, as CSV (compared with expect.csv)."
+            },
+            "current_engine": {
+              "const": true,
+              "description": "The document is a bundle made by the engine that runs the vector: the runner sets its engine.version, and that of expect.document, to its own engine's version (spec/bundles.md, Contract)."
             }
           },
           "required": [
@@ -441,6 +445,90 @@
             "document"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Make a bundle (spec/bundles.md, Making a bundle), write it and read it back.",
+          "properties": {
+            "kind": {
+              "const": "bundle"
+            },
+            "document": {
+              "type": "object",
+              "description": "A rule set or decision table document: the rules."
+            },
+            "id": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "string"
+            },
+            "cases": {
+              "type": "array",
+              "description": "The case files: each path, and the file's content as UTF-8 text.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "limits": {
+              "type": "object",
+              "propertyNames": {
+                "enum": [
+                  "max_size",
+                  "max_nesting",
+                  "max_depth",
+                  "max_path_segments",
+                  "max_table_size",
+                  "max_values"
+                ]
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "document",
+            "id",
+            "revision"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Read two bundles and compare the first with the second (spec/bundles.md, Comparing bundles).",
+          "properties": {
+            "kind": {
+              "const": "bundle_compare"
+            },
+            "a": {
+              "$ref": "https://cleanrules.github.io/schemas/v1/bundle.schema.json"
+            },
+            "b": {
+              "$ref": "https://cleanrules.github.io/schemas/v1/bundle.schema.json"
+            }
+          },
+          "required": [
+            "kind",
+            "a",
+            "b"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -592,6 +680,10 @@
             "code"
           ],
           "additionalProperties": false
+        },
+        "comparison": {
+          "$ref": "https://cleanrules.github.io/schemas/v1/bundle.schema.json#/$defs/comparison",
+          "description": "The comparison of two bundles (spec/bundles.md, Comparing bundles)."
         }
       },
       "additionalProperties": false
