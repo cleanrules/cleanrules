@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "audit": {
+    "source": "ruleset",
+    "hit_policy": "unique",
+    "logic": "boolean",
+    "ruleset_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "limits": {
+      "max_terms": 256,
+      "max_steps": 1000000
+    },
+    "rules": [
+      {
+        "name": "adult"
+      },
+      {
+        "name": "senior",
+        "id": "AGE-2"
+      }
+    ],
+    "checks": [
+      {
+        "check": "types",
+        "status": "complete"
+      },
+      {
+        "check": "fields",
+        "status": "not_applicable"
+      },
+      {
+        "check": "unsatisfiable",
+        "status": "complete"
+      },
+      {
+        "check": "shadowed",
+        "status": "not_applicable"
+      },
+      {
+        "check": "overlap",
+        "status": "complete"
+      },
+      {
+        "check": "gap",
+        "status": "complete"
+      }
+    ],
+    "not_modelled": [],
+    "undecided": [],
+    "diagnostics": [
+      {
+        "code": "overlap",
+        "severity": "error",
+        "rules": [
+          "adult",
+          "senior"
+        ],
+        "message": "rules adult and senior both fire for the witness, so the unique hit policy raises hit_policy_error: make their conditions exclusive, or use first or priority",
+        "witness": {
+          "age": 65
+        }
+      },
+      {
+        "code": "gap",
+        "severity": "warning",
+        "rules": [],
+        "message": "no rule fires for the witness, so the decision has no output: add a rule whose condition covers it; a rule with the condition TRUE would fire with every other rule",
+        "witness": {
+          "age": 0
+        }
+      }
+    ]
+  }
+}

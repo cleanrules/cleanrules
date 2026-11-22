@@ -1,0 +1,439 @@
+{
+  "version": 1,
+  "area": "audit",
+  "vectors": [
+    {
+      "id": "audit/types/never-comparable",
+      "spec": [
+        "audit.md#types",
+        "audit.md#values-of-a-subject",
+        "audit.md#tests"
+      ],
+      "description": "ordering booleans, comparing an arithmetic result with a string and a constant test that is UNKNOWN are incompatible types, and their rules never fire",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "flag"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": true
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "or",
+                  "operands": [
+                    {
+                      "op": "eq",
+                      "left": {
+                        "op": "add",
+                        "left": {
+                          "op": "field",
+                          "path": [
+                            "x"
+                          ]
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 1
+                        }
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": "one"
+                      }
+                    },
+                    {
+                      "op": "lt",
+                      "left": {
+                        "op": "const",
+                        "value": 1
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": "a"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "const",
+                  "value": true
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            },
+            {
+              "name": "c"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "incompatible_types",
+              "severity": "warning",
+              "rules": [
+                "a"
+              ],
+              "pointer": "/ruleset/rules/0/when"
+            },
+            {
+              "code": "incompatible_types",
+              "severity": "warning",
+              "rules": [
+                "b"
+              ],
+              "pointer": "/ruleset/rules/1/when/operands/0"
+            },
+            {
+              "code": "incompatible_types",
+              "severity": "warning",
+              "rules": [
+                "b"
+              ],
+              "pointer": "/ruleset/rules/1/when/operands/1"
+            },
+            {
+              "code": "unsatisfiable",
+              "severity": "warning",
+              "rules": [
+                "a"
+              ]
+            },
+            {
+              "code": "unsatisfiable",
+              "severity": "warning",
+              "rules": [
+                "b"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/types/mixed-groups",
+      "spec": [
+        "audit.md#types",
+        "audit.md#overlaps"
+      ],
+      "description": "a field compared with a number in one rule and a string in another has mixed types; under first, overlaps are information",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "age"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 18
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "eq",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "age"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": "18"
+                  }
+                }
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "const",
+                  "value": true
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            },
+            {
+              "name": "c"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "mixed_types",
+              "severity": "warning",
+              "rules": [
+                "a",
+                "b"
+              ],
+              "path": [
+                "age"
+              ],
+              "groups": [
+                "number",
+                "string"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "a",
+                "c"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "b",
+                "c"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/types/constants-are-folded",
+      "spec": [
+        "audit.md#tests",
+        "audit.md#types"
+      ],
+      "description": "a value expression without fields is evaluated, so years > 10 - 5 is read as years > 5, and a field used as a condition expects a boolean",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "field",
+                      "path": [
+                        "vip"
+                      ]
+                    },
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "sub",
+                        "left": {
+                          "op": "const",
+                          "value": 10
+                        },
+                        "right": {
+                          "op": "const",
+                          "value": 5
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "const",
+                  "value": true
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "a",
+                "b"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

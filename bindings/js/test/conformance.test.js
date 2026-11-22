@@ -103,7 +103,10 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
   const graded = [...vectors.values()]
     .filter((v) => v.get('given').has('logic') && v.get('given').get('logic') !== 'boolean')
     .map((v) => v.get('id'))
+  // And the static audit, until task T.9.
+  const audited = [...vectors.values()].filter((v) => v.get('given').get('kind') === 'audit').map((v) => v.get('id'))
   const agents = tools.length > 0 ? ['agents'] : []
+  const audits = audited.length > 0 ? ['audit'] : []
   const diagrams = drawn.length > 0 ? ['diagram'] : []
   const grades = graded.length > 0 ? ['graded'] : []
   // The native route skips case files that the idiomatic API would load.
@@ -116,6 +119,7 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
       ...(limited.length > 0 ? ['native'] : []),
       ...diagrams,
       ...agents,
+      ...audits,
       ...grades,
     ].sort(),
   )
@@ -124,11 +128,13 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
   assert.deepEqual(counts.json.skipped.get('diagram') ?? [], drawn)
   assert.deepEqual(counts.json.skipped.get('agents') ?? [], tools)
   assert.deepEqual(counts.json.skipped.get('graded') ?? [], graded)
-  assert.deepEqual([...counts.native.skipped.keys()].sort(), [...diagrams, ...agents, ...grades, ...cases].sort())
+  assert.deepEqual(counts.json.skipped.get('audit') ?? [], audited)
+  assert.deepEqual([...counts.native.skipped.keys()].sort(), [...diagrams, ...agents, ...audits, ...grades, ...cases].sort())
   assert.deepEqual(counts.native.skipped.get('cases') ?? [], caseFiles)
   assert.deepEqual(counts.native.skipped.get('diagram') ?? [], drawn)
   assert.deepEqual(counts.native.skipped.get('agents') ?? [], tools)
   assert.deepEqual(counts.native.skipped.get('graded') ?? [], graded)
+  assert.deepEqual(counts.native.skipped.get('audit') ?? [], audited)
 })
 
 /** `vector` with `from` replaced by `to` in its expected output only. */

@@ -1,0 +1,17 @@
+---
+source: crates/core/src/audit/tests.rs
+expression: "format!(\"{report}{limited}\")"
+---
+Audit of a rule set: 2 rules, hit policy unique, logic boolean
+error    overlap  adult, senior: rules adult and senior both fire for the witness, so the unique hit policy raises hit_policy_error: make their conditions exclusive, or use first or priority
+           witness: {"age":65}
+warning  gap  no rule fires for the witness, so the decision has no output: add a rule whose condition covers it; a rule with the condition TRUE would fire with every other rule
+           witness: {"age":0}
+Checks: types complete, fields not applicable, unsatisfiable complete, shadowed not applicable, overlap complete, gap complete
+Audit of a rule set: 2 rules, hit policy unique, logic boolean
+No findings.
+Checks: types complete, fields not applicable, unsatisfiable partial, shadowed not applicable, overlap partial, gap partial
+Undecided (3):
+  unsatisfiable  limit (max_steps), 2 not reached
+  overlap  limit (max_steps), 1 not reached
+  gap  limit (max_steps), 1 not reached

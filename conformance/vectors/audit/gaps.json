@@ -1,0 +1,466 @@
+{
+  "version": 1,
+  "area": "audit",
+  "vectors": [
+    {
+      "id": "audit/gaps/boundary",
+      "spec": [
+        "audit.md#gaps",
+        "audit.md#witnesses"
+      ],
+      "description": "under first, no rule fires for age 18: a gap with a witness, as a warning",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "lt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "age"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 18
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "age"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 18
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/gaps/ruleset-digest",
+      "spec": [
+        "audit.md#json"
+      ],
+      "description": "asked for it, the report gives the digest of the rule set audited, as a decision does",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "lt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "age"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 18
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "age"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 18
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "ruleset_digest": true
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "ruleset_digest": "sha256:c0141f7b7a0451e2bf29419abbcf14c973b4b714642ceda9e1290b1c926864e4",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/gaps/default-rule",
+      "spec": [
+        "audit.md#gaps"
+      ],
+      "description": "a last rule TRUE leaves no gap",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "const",
+                  "value": true
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "a",
+                "b"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/gaps/no-rules",
+      "spec": [
+        "audit.md#gaps",
+        "audit.md#json"
+      ],
+      "description": "a rule set without rules has a gap, whose witness is an empty input",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": []
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/gaps/null-is-not-supported",
+      "spec": [
+        "audit.md#gaps"
+      ],
+      "description": "a supported input gives every field a value, so a rule that tests for null leaves a gap",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "is_null",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

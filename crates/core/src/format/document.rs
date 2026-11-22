@@ -18,7 +18,7 @@ use crate::rules::{Decision, Rule, RuleSet};
 use crate::table::DecisionTable;
 
 /// The content keys a document may have, in the order of the spec.
-const CONTENT_KEYS: [&str; 9] = [
+const CONTENT_KEYS: [&str; 10] = [
     "condition",
     "rule",
     "ruleset",
@@ -28,6 +28,7 @@ const CONTENT_KEYS: [&str; 9] = [
     "decision_table",
     "bundle",
     "cases",
+    "audit",
 ];
 
 /// What a document holds.
@@ -175,7 +176,7 @@ pub fn read_parsed_document(json: &Json, limits: &Limits) -> Result<Document> {
             check_top_level()?;
             Ok(Document::Cases(cases))
         }
-        "explanation" | "summary" => {
+        "explanation" | "summary" | "audit" => {
             check_top_level()?;
             Err(Error::new(
                 ErrorCode::Unsupported,
@@ -568,6 +569,21 @@ pub fn write_summary_as(
         "summary",
         || crate::format::write_summary(summary),
         Some(&|| summary.to_string()),
+        format,
+    )
+}
+
+/// Write an audit document in JSON or YAML, or its text (`spec/audit.md`,
+/// *Text*) for [`DocumentFormat::Text`].
+///
+/// # Errors
+///
+/// `unsupported` for CSV.
+pub fn write_audit_as(audit: &crate::audit::Audit, format: DocumentFormat) -> Result<String> {
+    write_output_as(
+        "audit",
+        || crate::format::write_audit(audit),
+        Some(&|| audit.to_string()),
         format,
     )
 }

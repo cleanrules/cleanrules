@@ -149,6 +149,9 @@ class Conformance {
                     + " Scala APIs draw them from phase V.2",
             "graded",
             "conditions under a graded logic: the binding evaluates one node under boolean only until task J.1b",
+            "audit",
+            "the static audit (spec/audit.md) is made by the core and checked by its runner; the Java and Scala"
+                    + " APIs are beta and do not audit yet (docs/PLAN.md, T.7)",
             "bundle",
             "bundles (spec/bundles.md) have no Java or Scala type yet (a beta binding, docs/PLAN.md, R.5): loads"
                     + " refuses a bundle once the core has read it, so vectors that make or compare bundles, hold one"
@@ -276,6 +279,9 @@ class Conformance {
         Object kind = vector.get("given") instanceof Map<?, ?> given ? given.get("kind") : null;
         if ("tool".equals(kind)) {
             return new Outcome(null, "agents");
+        }
+        if ("audit".equals(kind)) {
+            return new Outcome(null, "audit");
         }
         if ("draw".equals(kind)) {
             return new Outcome(null, "diagram");

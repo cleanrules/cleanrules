@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Static audit of rule sets and decision tables (task T.7;
+  [`spec/audit.md`](spec/audit.md)): in the Rust core, `audit::audit` and
+  `audit::audit_table` (both return `Result<Audit>`: `unsupported` for a
+  logic other than `boolean`) read every condition into the sets of inputs
+  that make it `TRUE` and `FALSE` (per-field intervals over comparisons,
+  `in`, `between`, `is_null` and fields used as conditions, combined with
+  Kleene's tables) and report diagnostics with stable codes
+  (`incompatible_types`, `mixed_types`, `unlisted_field`, `unsatisfiable`,
+  `shadowed`, `overlap`, `gap`), a severity that depends on the hit policy
+  (an overlap is an `error` under `unique`, and under `any` when the outputs
+  differ, but `info` under `first` and `priority`), the rules involved and,
+  for overlaps and gaps, a witness: an input that the rule set itself has
+  evaluated, with its logic and strictness, before the finding is reported.
+  The audit is sound but incomplete: what it cannot decide (tests it does
+  not model, such as `matches` or `a > b`, witnesses it cannot build or
+  whose evaluation raises, limits reached) is listed in the report with its
+  reason, and it is bounded by `AuditLimits` (`max_terms`, `max_steps`; when
+  the steps run out, each check gives one entry with the number of items it
+  did not reach). `Audit::max_severity`, `Audit::with_ruleset_digest` (the
+  report's optional `ruleset_digest`, as in decisions), `CheckResult`, and
+  `from_name` on `Severity`, `DiagnosticCode` and `Check`. A new output-only
+  document, `{"version": 1, "audit": {...}}`, additive in format version 1
+  (readers reject it with `unsupported`; new codes, checks, reasons and
+  limits may be added within the version, and consumers ignore those they
+  do not know), with its JSON Schema `spec/schemas/v1/audit.schema.json`,
+  `format::write_audit` and `format::write_audit_as` (JSON, YAML or the text
+  the command line will print). 30 conformance vectors of a new kind,
+  `audit`, run by the core's runner, which checks each witness with the rule
+  set's own evaluation; the C ABI, Python, C++, JavaScript, Java, Scala and
+  Go runners skip and count them until the bindings audit (task T.9).
+  Example: `docs/examples/audit.rs`.
 - Test cases (task T.1; `spec/tests.md`): a new document, the case file,
   `{"version": 1, "cases": {"description": ..., "metadata": {...}, "items":
   [...]}}`, additive in format version 1 (older readers reject it), read and

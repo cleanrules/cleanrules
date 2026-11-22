@@ -1,0 +1,740 @@
+{
+  "version": 1,
+  "area": "audit",
+  "vectors": [
+    {
+      "id": "audit/checked/not-modelled",
+      "spec": [
+        "audit.md#what-was-checked",
+        "audit.md#tests"
+      ],
+      "description": "matches and a comparison of two fields are not modelled: they are listed, and what they leave undecided is said, with the reason not_modelled",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "matches",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "name"
+                    ]
+                  },
+                  "pattern": "^a"
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "field",
+                    "path": [
+                      "y"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "partial"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "partial"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [
+            {
+              "rule": "a",
+              "op": "matches",
+              "pointer": "/ruleset/rules/0/when"
+            },
+            {
+              "rule": "b",
+              "op": "gt",
+              "pointer": "/ruleset/rules/1/when"
+            }
+          ],
+          "undecided": [
+            {
+              "check": "unsatisfiable",
+              "rules": [
+                "a"
+              ],
+              "reason": "not_modelled"
+            },
+            {
+              "check": "unsatisfiable",
+              "rules": [
+                "b"
+              ],
+              "reason": "not_modelled"
+            },
+            {
+              "check": "overlap",
+              "rules": [
+                "a",
+                "b"
+              ],
+              "reason": "not_modelled"
+            }
+          ],
+          "diagnostics": [
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/checked/expression-subject",
+      "spec": [
+        "audit.md#what-was-checked",
+        "audit.md#witnesses",
+        "audit.md#values-of-a-subject"
+      ],
+      "description": "a box on an expression gives no witness by itself: what it would show is undecided with the reason no_witness",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "mul",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 2
+                    }
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 10
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "mul",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 2
+                    }
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 20
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "partial"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "partial"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [
+            {
+              "check": "unsatisfiable",
+              "rules": [
+                "a"
+              ],
+              "reason": "no_witness"
+            },
+            {
+              "check": "unsatisfiable",
+              "rules": [
+                "b"
+              ],
+              "reason": "no_witness"
+            },
+            {
+              "check": "overlap",
+              "rules": [
+                "a",
+                "b"
+              ],
+              "reason": "no_witness"
+            }
+          ],
+          "diagnostics": [
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/checked/related-paths",
+      "spec": [
+        "audit.md#what-was-checked",
+        "audit.md#witnesses",
+        "audit.md#combining-tests"
+      ],
+      "description": "c IS NULL and c.age > 1 meet as boxes, but no input has both: undecided with the reason no_witness",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "is_null",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "c"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "c",
+                      "age"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "partial"
+            },
+            {
+              "check": "gap",
+              "status": "partial"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [
+            {
+              "check": "overlap",
+              "rules": [
+                "a",
+                "b"
+              ],
+              "reason": "no_witness"
+            },
+            {
+              "check": "gap",
+              "rules": [],
+              "reason": "no_witness"
+            }
+          ],
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "audit/checked/max-terms",
+      "spec": [
+        "audit.md#limits",
+        "audit.md#combining-tests",
+        "audit.md#what-was-checked"
+      ],
+      "description": "an and of two ors of two needs four boxes: with max_terms 3 it is read as a test not modelled, listed with the limit",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "or",
+                      "operands": [
+                        {
+                          "op": "eq",
+                          "left": {
+                            "op": "field",
+                            "path": [
+                              "x"
+                            ]
+                          },
+                          "right": {
+                            "op": "const",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "op": "eq",
+                          "left": {
+                            "op": "field",
+                            "path": [
+                              "x"
+                            ]
+                          },
+                          "right": {
+                            "op": "const",
+                            "value": 2
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "op": "or",
+                      "operands": [
+                        {
+                          "op": "eq",
+                          "left": {
+                            "op": "field",
+                            "path": [
+                              "y"
+                            ]
+                          },
+                          "right": {
+                            "op": "const",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "op": "eq",
+                          "left": {
+                            "op": "field",
+                            "path": [
+                              "y"
+                            ]
+                          },
+                          "right": {
+                            "op": "const",
+                            "value": 2
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_terms": 3
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 3,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "partial"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "partial"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [
+            {
+              "rule": "a",
+              "op": "and",
+              "pointer": "/ruleset/rules/0/when",
+              "limit": "max_terms"
+            }
+          ],
+          "undecided": [
+            {
+              "check": "unsatisfiable",
+              "rules": [
+                "a"
+              ],
+              "reason": "limit",
+              "limit": "max_terms"
+            },
+            {
+              "check": "overlap",
+              "rules": [
+                "a",
+                "b"
+              ],
+              "reason": "limit",
+              "limit": "max_terms"
+            }
+          ],
+          "diagnostics": [
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/checked/no-steps",
+      "spec": [
+        "audit.md#limits",
+        "audit.md#what-was-checked"
+      ],
+      "description": "with max_steps 0 nothing that needs a step is done: each check gives one entry with the limit and the number of items it did not reach",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "y"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_steps": 0
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 0
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "partial"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "partial"
+            },
+            {
+              "check": "gap",
+              "status": "partial"
+            }
+          ],
+          "not_modelled": [
+            {
+              "rule": "a",
+              "op": "and",
+              "pointer": "/ruleset/rules/0/when",
+              "limit": "max_steps"
+            }
+          ],
+          "undecided": [
+            {
+              "check": "unsatisfiable",
+              "rules": [],
+              "reason": "limit",
+              "limit": "max_steps",
+              "remaining": 2
+            },
+            {
+              "check": "overlap",
+              "rules": [],
+              "reason": "limit",
+              "limit": "max_steps",
+              "remaining": 1
+            },
+            {
+              "check": "gap",
+              "rules": [],
+              "reason": "limit",
+              "limit": "max_steps",
+              "remaining": 1
+            }
+          ],
+          "diagnostics": []
+        }
+      }
+    }
+  ]
+}

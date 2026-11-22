@@ -1,5 +1,6 @@
 //! The JSON format of `spec/json-format.md`: reading and writing documents.
 
+mod audit;
 mod bundle;
 mod cases;
 mod condition;
@@ -13,13 +14,15 @@ mod rules;
 pub(crate) mod table;
 pub mod value;
 
+pub use audit::write_audit;
 pub use bundle::write_bundle;
 pub use cases::write_cases;
 pub use condition::write_node;
 pub use document::{
     Document, DocumentFormat, parse_as, read_decision_document, read_decision_document_as,
     read_document, read_document_as, read_parsed_decision_document, read_parsed_document,
-    write_decision_as, write_document, write_document_as, write_explanation_as, write_summary_as,
+    write_audit_as, write_decision_as, write_document, write_document_as, write_explanation_as,
+    write_summary_as,
 };
 #[cfg(feature = "yaml")]
 pub use document::{read_yaml_decision_document, read_yaml_document};

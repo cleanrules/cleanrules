@@ -60,6 +60,7 @@ A vector file is a JSON document:
 | `canonical` | `document` (a condition, rule, rule set or decision table document), or `text` (its JSON text, for lexical cases) | the reader, then the document's canonical bytes and digest, and the digest of the rule set it gives (`spec/json-format.md`, *Canonical bytes*, *Digests*) | `canonical`: the exact canonical bytes as UTF-8 text, compared as a string; `digest`; `ruleset_digest`, absent for a condition |
 | `bundle` | `document` (a rule set or decision table document: the rules), `id`, `revision`; optional `cases` (an array of `{"path", "text"}`: each case file's path and content as UTF-8 text) and `limits` (any of the six that a bundle records, `spec/bundles.md`, *Engine*) | make a bundle of the rules with this engine (`spec/bundles.md`, *Making a bundle*), write it, and read it back | `document`: the bundle, whose `engine.version` the runner first sets to its own engine's; or `error` (its `code` only) |
 | `bundle_compare` | `a`, `b`: two bundle documents | read both, then compare `a` with `b` (`spec/bundles.md`, *Comparing bundles*) | `comparison`: `relation`, `identical` and `differences` |
+| `audit` | `document` (a rule set or decision table document); optional `limits` (`max_terms`, `max_steps`, `spec/audit.md`, *Limits*) and `ruleset_digest` (`true`: ask for the digest in the report) | `audit` or `audit_table` (`spec/audit.md`) | `audit`: the report without the `message` and `witness` of each diagnostic (below) |
 | `draw` | `format` (`dot`, `mermaid`, `html` or `html_fragment`), `document` (a condition, rule, rule set or decision table document); optional `input`, with a rule set or a table; optional `limits` (`max_diagram_size`) | `draw_document` (`spec/visual.md`); with an `input`, the rule set (or the table's rule set) evaluates it, and the runner draws the decision's explanation for a rule set (`draw_explanation`), and the table with the decision for a table (`draw_document` with the decision) | `diagram`: the exact text, compared as a string, or `error` (`code` and `name`) |
 
 Optional flags such as `strict` are omitted when false. A bundle's `engine.version`
@@ -98,6 +99,13 @@ because the spec says that they are informative:
 - any two opaque values (`{"$opaque": ...}`) are equal, whatever their type
   name;
 - errors are compared by code and compared fields only (`spec/errors.md`).
+- in `audit` vectors, the `message` and the `witness` of each diagnostic are
+  removed from the actual report before comparing. The runner checks each
+  witness instead, with the rule set's own evaluation, as `spec/audit.md`
+  (*Witnesses*) says: an `overlap` of severity `error` raises
+  `hit_policy_error` naming both its rules; any other `overlap` gives a
+  decision in which both fire; a `gap` gives a decision in which no rule
+  fires; and those two codes, and only those, have one;
 - in `tool` vectors, an agent error (a tool error, or the `error` of a
   `validate` result) must have a non-empty `hint`, and is compared on every
   member of its JSON form except `message`, `hint`, `cause`, `node`,
@@ -149,6 +157,11 @@ output, never stopping at the first one.
   bundles; the vectors with `current_engine` in Go, Java and Scala; reading a
   bundle without an error in Go and in the idiomatic Java and Scala routes) is
   counted and skipped with the reason `bundle`.
+- **Audits** (`spec/audit.md`): the core's runner runs the `audit` vectors.
+  The bindings audit from task T.9 (Python and JavaScript; Java, Scala, Go
+  and C++ are beta): until then the C ABI, Python, C++, JavaScript, Java,
+  Scala and Go runners skip them in every route, count them and say why
+  (`audit` in the JavaScript, Go and JVM reports).
 - **Diagrams in the bindings**: until each binding draws diagrams (phase V.2),
   the Python, C++, JavaScript, Java, Scala and Go runners skip the `draw`
   vectors, count them and state the reason (`diagram` in the JavaScript, Go

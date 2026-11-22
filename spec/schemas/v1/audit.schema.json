@@ -1,0 +1,399 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanrules.github.io/schemas/v1/audit.schema.json",
+  "title": "cleanrules audit document, format version 1",
+  "description": "The JSON form of a static audit, output only. See spec/audit.md, which is normative. The enums of codes, checks, reasons and limits list what this version writes: within format version 1 new ones may be added, and consumers ignore those they do not know (spec/audit.md, JSON); the severities are a closed set.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "audit": {
+      "$ref": "#/$defs/audit"
+    }
+  },
+  "required": [
+    "version",
+    "audit"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "audit": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "enum": [
+            "ruleset",
+            "decision_table"
+          ]
+        },
+        "hit_policy": {
+          "enum": [
+            "first",
+            "priority",
+            "unique",
+            "any",
+            "rule_order",
+            "output_order",
+            "collect"
+          ]
+        },
+        "aggregate": {
+          "$ref": "ruleset.schema.json#/$defs/ruleset/properties/aggregate"
+        },
+        "logic": {
+          "$ref": "ruleset.schema.json#/$defs/ruleset/properties/logic"
+        },
+        "strict": {
+          "const": true
+        },
+        "ruleset_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "The rule set digest of the rule set audited, when asked for (spec/json-format.md, Rule set digests)."
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "max_terms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_steps": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "max_terms",
+            "max_steps"
+          ],
+          "additionalProperties": false
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "row": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "check": {
+                "$ref": "#/$defs/check"
+              },
+              "status": {
+                "enum": [
+                  "complete",
+                  "partial",
+                  "not_applicable"
+                ]
+              }
+            },
+            "required": [
+              "check",
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "not_modelled": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "rule": {
+                "type": "string"
+              },
+              "op": {
+                "type": "string"
+              },
+              "pointer": {
+                "type": "string",
+                "format": "json-pointer"
+              },
+              "limit": {
+                "$ref": "#/$defs/limit"
+              }
+            },
+            "required": [
+              "rule",
+              "op",
+              "pointer"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "undecided": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "check": {
+                "$ref": "#/$defs/check"
+              },
+              "rules": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "reason": {
+                "enum": [
+                  "not_modelled",
+                  "no_witness",
+                  "limit"
+                ]
+              },
+              "limit": {
+                "$ref": "#/$defs/limit"
+              },
+              "remaining": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "For the items max_steps did not reach: how many; the entry then has no rules."
+              }
+            },
+            "required": [
+              "check",
+              "rules",
+              "reason"
+            ],
+            "if": {
+              "properties": {
+                "reason": {
+                  "const": "limit"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "limit"
+              ]
+            },
+            "else": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "limit"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "remaining"
+                    ]
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/diagnostic"
+          }
+        }
+      },
+      "required": [
+        "source",
+        "hit_policy",
+        "logic",
+        "limits",
+        "rules",
+        "checks",
+        "not_modelled",
+        "undecided",
+        "diagnostics"
+      ],
+      "additionalProperties": false
+    },
+    "check": {
+      "enum": [
+        "types",
+        "fields",
+        "unsatisfiable",
+        "shadowed",
+        "overlap",
+        "gap"
+      ]
+    },
+    "limit": {
+      "enum": [
+        "max_terms",
+        "max_steps"
+      ]
+    },
+    "diagnostic": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "enum": [
+            "incompatible_types",
+            "mixed_types",
+            "unlisted_field",
+            "unsatisfiable",
+            "shadowed",
+            "overlap",
+            "gap"
+          ]
+        },
+        "severity": {
+          "enum": [
+            "error",
+            "warning",
+            "info"
+          ]
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pointer": {
+          "type": "string",
+          "format": "json-pointer"
+        },
+        "path": {
+          "$ref": "condition.schema.json#/$defs/field/properties/path"
+        },
+        "groups": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "enum": [
+              "number",
+              "string",
+              "boolean",
+              "date",
+              "naive_datetime",
+              "aware_datetime",
+              "other"
+            ]
+          }
+        },
+        "witness": {
+          "$ref": "value.schema.json#/$defs/value"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "rules",
+        "message"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "enum": [
+                  "overlap",
+                  "gap"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "witness"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "witness"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "enum": [
+                  "incompatible_types",
+                  "unlisted_field"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "pointer"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "enum": [
+                  "mixed_types",
+                  "unlisted_field"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "path"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "mixed_types"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "groups"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "groups"
+              ]
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

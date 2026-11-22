@@ -77,3 +77,8 @@ path = "../../docs/examples/bundles.rs"
 name = "cases"
 path = "../../docs/examples/cases.rs"
 required-features = ["yaml"]
+
+# The example of the static audit in the documentation (task T.7).
+[[example]]
+name = "audit"
+path = "../../docs/examples/audit.rs"

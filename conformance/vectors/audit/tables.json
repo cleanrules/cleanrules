@@ -1,0 +1,788 @@
+{
+  "version": 1,
+  "area": "audit",
+  "vectors": [
+    {
+      "id": "audit/tables/unlisted-fields",
+      "spec": [
+        "audit.md#fields-of-decision-tables",
+        "audit.md#overlaps",
+        "audit.md#json"
+      ],
+      "description": "cells that read a field of one key that no input reads, such as ES for 'ES', are reported; tests in cells point to their cell",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "unique",
+            "inputs": [
+              "country",
+              "age"
+            ],
+            "outputs": [
+              {
+                "name": "label"
+              }
+            ],
+            "rows": [
+              {
+                "name": "es",
+                "inputs": [
+                  "ES",
+                  ">= 18"
+                ],
+                "outputs": [
+                  "'adult'"
+                ]
+              },
+              {
+                "name": "pt",
+                "inputs": [
+                  "'PT'",
+                  ">= 18"
+                ],
+                "outputs": [
+                  "VIP"
+                ]
+              },
+              {
+                "name": "young",
+                "inputs": [
+                  "-",
+                  "< 18"
+                ],
+                "outputs": [
+                  "'young'"
+                ]
+              },
+              {
+                "inputs": [
+                  "'PT'",
+                  "> 60"
+                ],
+                "outputs": [
+                  "'senior'"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "decision_table",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "es",
+              "row": 0
+            },
+            {
+              "name": "pt",
+              "row": 1
+            },
+            {
+              "name": "young",
+              "row": 2
+            },
+            {
+              "name": "row_4",
+              "row": 3
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "complete"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "partial"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "partial"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [
+            {
+              "rule": "es",
+              "op": "eq",
+              "pointer": "/decision_table/rows/0/inputs/0"
+            }
+          ],
+          "undecided": [
+            {
+              "check": "unsatisfiable",
+              "rules": [
+                "es"
+              ],
+              "reason": "not_modelled"
+            },
+            {
+              "check": "overlap",
+              "rules": [
+                "es",
+                "pt"
+              ],
+              "reason": "not_modelled"
+            },
+            {
+              "check": "overlap",
+              "rules": [
+                "es",
+                "row_4"
+              ],
+              "reason": "not_modelled"
+            }
+          ],
+          "diagnostics": [
+            {
+              "code": "unlisted_field",
+              "severity": "warning",
+              "rules": [
+                "es"
+              ],
+              "pointer": "/decision_table/rows/0/inputs/0",
+              "path": [
+                "ES"
+              ]
+            },
+            {
+              "code": "unlisted_field",
+              "severity": "warning",
+              "rules": [
+                "pt"
+              ],
+              "pointer": "/decision_table/rows/1/outputs/0",
+              "path": [
+                "VIP"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "error",
+              "rules": [
+                "pt",
+                "row_4"
+              ]
+            },
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/tables/output-order",
+      "spec": [
+        "audit.md#unsatisfiable-conditions",
+        "audit.md#gaps",
+        "audit.md#json"
+      ],
+      "description": "under output_order, rules are in output priority order, each with its row; overlaps and shadowed rules do not apply",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "output_order",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": "level",
+                "values": [
+                  "high",
+                  "low"
+                ]
+              }
+            ],
+            "rows": [
+              {
+                "name": "low",
+                "inputs": [
+                  "> 1"
+                ],
+                "outputs": [
+                  "'low'"
+                ]
+              },
+              {
+                "name": "high",
+                "inputs": [
+                  "> 5"
+                ],
+                "outputs": [
+                  "'high'"
+                ]
+              },
+              {
+                "name": "never",
+                "inputs": [
+                  "BETWEEN 5 AND 3"
+                ],
+                "outputs": [
+                  "'low'"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "decision_table",
+          "hit_policy": "output_order",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "high",
+              "row": 1
+            },
+            {
+              "name": "low",
+              "row": 0
+            },
+            {
+              "name": "never",
+              "row": 2
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "complete"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "not_applicable"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "unsatisfiable",
+              "severity": "warning",
+              "rules": [
+                "never"
+              ]
+            },
+            {
+              "code": "gap",
+              "severity": "info",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/tables/rows-combine-cells",
+      "spec": [
+        "audit.md#shadowed-rules",
+        "audit.md#tests"
+      ],
+      "description": "a row is the conjunction of its cells: under first, a row narrower than an earlier one is shadowed",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "first",
+            "inputs": [
+              "x",
+              "y"
+            ],
+            "outputs": [
+              {
+                "name": "z"
+              }
+            ],
+            "rows": [
+              {
+                "inputs": [
+                  "> 1",
+                  "-"
+                ],
+                "outputs": [
+                  "2"
+                ]
+              },
+              {
+                "inputs": [
+                  "> 1",
+                  "> 1"
+                ],
+                "outputs": [
+                  "1"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "decision_table",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "row_1",
+              "row": 0
+            },
+            {
+              "name": "row_2",
+              "row": 1
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "complete"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "shadowed",
+              "severity": "warning",
+              "rules": [
+                "row_2",
+                "row_1"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "row_1",
+                "row_2"
+              ]
+            },
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/tables/priority-by-output-values",
+      "spec": [
+        "audit.md#shadowed-rules",
+        "audit.md#overlaps",
+        "audit.md#gaps"
+      ],
+      "description": "under priority, the ranks of the output values are the rules' priorities: a low row whose inputs a higher row covers is shadowed, and overlaps are information",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "priority",
+            "inputs": [
+              "score"
+            ],
+            "outputs": [
+              {
+                "name": "risk",
+                "values": [
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              }
+            ],
+            "rows": [
+              {
+                "name": "r_low",
+                "inputs": [
+                  "> 0"
+                ],
+                "outputs": [
+                  "'low'"
+                ]
+              },
+              {
+                "name": "r_high",
+                "inputs": [
+                  "> 50"
+                ],
+                "outputs": [
+                  "'high'"
+                ]
+              },
+              {
+                "name": "r_mid",
+                "inputs": [
+                  "> 20"
+                ],
+                "outputs": [
+                  "'medium'"
+                ]
+              },
+              {
+                "name": "r_low2",
+                "inputs": [
+                  "> 60"
+                ],
+                "outputs": [
+                  "'low'"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "decision_table",
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "r_low",
+              "row": 0
+            },
+            {
+              "name": "r_high",
+              "row": 1
+            },
+            {
+              "name": "r_mid",
+              "row": 2
+            },
+            {
+              "name": "r_low2",
+              "row": 3
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "complete"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "shadowed",
+              "severity": "warning",
+              "rules": [
+                "r_low2",
+                "r_low",
+                "r_high",
+                "r_mid"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "r_low",
+                "r_high"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "r_low",
+                "r_mid"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "r_low",
+                "r_low2"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "r_high",
+                "r_mid"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "r_high",
+                "r_low2"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "r_mid",
+                "r_low2"
+              ]
+            },
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/tables/any",
+      "spec": [
+        "audit.md#overlaps",
+        "audit.md#witnesses"
+      ],
+      "description": "a table under any: rows with the same output overlap as information, rows with another output as errors, which the table's own evaluation of the witness raises",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "any",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": "v"
+              }
+            ],
+            "rows": [
+              {
+                "name": "a",
+                "inputs": [
+                  "> 1"
+                ],
+                "outputs": [
+                  "1"
+                ]
+              },
+              {
+                "name": "b",
+                "inputs": [
+                  "> 2"
+                ],
+                "outputs": [
+                  "1"
+                ]
+              },
+              {
+                "name": "c",
+                "inputs": [
+                  "> 3"
+                ],
+                "outputs": [
+                  "2"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "decision_table",
+          "hit_policy": "any",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a",
+              "row": 0
+            },
+            {
+              "name": "b",
+              "row": 1
+            },
+            {
+              "name": "c",
+              "row": 2
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "complete"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "shadowed",
+              "severity": "warning",
+              "rules": [
+                "b",
+                "a"
+              ]
+            },
+            {
+              "code": "shadowed",
+              "severity": "warning",
+              "rules": [
+                "c",
+                "a",
+                "b"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "a",
+                "b"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "error",
+              "rules": [
+                "a",
+                "c"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "error",
+              "rules": [
+                "b",
+                "c"
+              ]
+            },
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

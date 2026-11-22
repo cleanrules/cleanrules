@@ -1,0 +1,24 @@
+---
+source: crates/core/src/audit/tests.rs
+expression: report.to_string()
+---
+Audit of a decision table: 3 rules, hit policy collect, logic boolean
+warning  incompatible_types  pt: in rule pt, age > TRUE is UNKNOWN for every input: the values it tests can never be compared with its constant (booleans are not ordered, arithmetic gives numbers): compare with a value of the type the field holds
+           at /decision_table/rows/1/inputs/1
+warning  mixed_types  es, young: the field age is used with values of different types (number, string) in rules es and young: a value matches one type only, so use one type for the field, such as 5 or '5' but not both
+           field age
+           groups number, string
+warning  unlisted_field  es: the cell of row es under the input country reads the field ES, which no input reads: if it is text, write it between single quotes ('ES'), or add an input for the field
+           at /decision_table/rows/0/inputs/0
+           field ES
+warning  unlisted_field  pt: the cell of row pt under the output label reads the field VIP, which no input reads: if it is text, write it between single quotes ('VIP'), or add an input for the field
+           at /decision_table/rows/1/outputs/0
+           field VIP
+warning  unsatisfiable  pt: rule pt never fires: no input makes its condition TRUE; fix the condition, or remove the rule
+info     gap  no rule fires for the witness, so the decision selects no rule: add a rule for it if it needs an output
+           witness: {"ES":0,"age":0,"country":""}
+Checks: types complete, fields complete, unsatisfiable partial, shadowed not applicable, overlap not applicable, gap complete
+Not modelled (1):
+  es  eq at /decision_table/rows/0/inputs/0
+Undecided (1):
+  unsatisfiable  es  not_modelled

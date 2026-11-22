@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "audit": {
+    "source": "ruleset",
+    "hit_policy": "first",
+    "logic": "boolean",
+    "limits": {
+      "max_terms": 256,
+      "max_steps": 1000000
+    },
+    "rules": [],
+    "checks": [],
+    "not_modelled": [],
+    "undecided": [],
+    "diagnostics": [
+      {
+        "code": "gap",
+        "severity": "warning",
+        "rules": [],
+        "message": "no rule fires for the witness",
+        "witness": {}
+      }
+    ]
+  }
+}

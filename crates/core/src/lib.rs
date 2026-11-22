@@ -10,6 +10,7 @@
 
 pub mod agents;
 pub mod ast;
+pub mod audit;
 pub mod build;
 pub mod bundle;
 pub mod cases;

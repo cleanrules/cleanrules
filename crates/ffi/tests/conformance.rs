@@ -632,6 +632,9 @@ fn the_vectors_pass_through_the_c_abi() {
         // The tools for agents (`spec/agents.md`) are not in the C ABI yet
         // (`docs/PLAN.md`, O.1): their vectors are counted and skipped.
         let mut tools = 0;
+        // Nor is the static audit (`spec/audit.md`; `docs/PLAN.md`, T.7 and
+        // T.9): its vectors are counted and skipped too.
+        let mut audits = 0;
         for file in files() {
             let document = json(&fs::read_to_string(&file).unwrap());
             let Some(Json::Array(vectors)) = get(&document, "vectors") else {
@@ -648,6 +651,10 @@ fn the_vectors_pass_through_the_c_abi() {
                 }
                 if string(get(given, "kind")) == Some("tool") {
                     tools += 1;
+                    continue;
+                }
+                if string(get(given, "kind")) == Some("audit") {
+                    audits += 1;
                     continue;
                 }
                 // Conditions under a graded logic: the C ABI evaluates one
@@ -672,7 +679,7 @@ fn the_vectors_pass_through_the_c_abi() {
         assert!(skipped >= 14, "{skipped} native-only vectors skipped");
         assert!(graded >= 96, "{graded} graded-logic vectors skipped");
         println!(
-            "{ran} ran, {skipped} native-only, {tools} tool vectors (agents) and {graded} graded-logic vectors skipped"
+            "{ran} ran, {skipped} native-only, {tools} tool vectors (agents), {audits} audit vectors and {graded} graded-logic vectors skipped"
         );
     });
 }

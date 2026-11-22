@@ -352,6 +352,39 @@
       }
     },
     {
+      "id": "format/documents/audit-is-output-only",
+      "spec": [
+        "json-format.md#documents",
+        "json-format.md#audits"
+      ],
+      "description": "audits are output only",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "audit": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "limits": {
+              "max_terms": 256,
+              "max_steps": 1000000
+            },
+            "rules": [],
+            "checks": [],
+            "not_modelled": [],
+            "undecided": [],
+            "diagnostics": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
       "id": "format/documents/lone-surrogate",
       "spec": [
         "json-format.md#documents",

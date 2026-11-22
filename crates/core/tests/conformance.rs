@@ -14,6 +14,7 @@ use std::fs;
 
 use cleanrules::Error;
 use cleanrules::agents::Catalog;
+use cleanrules::audit::{AuditLimits, audit, audit_table};
 use cleanrules::bundle::{self, Bundle, BundleId, BundleRules, CaseFileRef, Revision};
 use cleanrules::eval::{Options, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
@@ -569,6 +570,79 @@ fn run_compare_bundles(vector: &Json) -> Result<(), String> {
     )
 }
 
+/// An `audit` vector (`spec/audit.md`): the report, with each witness checked
+/// by the rule set's own evaluation (`conformance/README.md`, *Comparing*),
+/// then compared without the messages and witnesses of its diagnostics.
+fn run_audit(vector: &Json) -> Result<(), String> {
+    let given = get(vector, "given").unwrap();
+    let mut limits = AuditLimits::default();
+    if let Some(Json::Object(members)) = get(given, "limits") {
+        for (key, value) in members {
+            let Json::Number(n) = value else {
+                return Err(format!("limit {key} is not a number"));
+            };
+            let n = usize::try_from(n.as_i128().unwrap()).unwrap();
+            limits = match key.as_str() {
+                "max_terms" => limits.with_max_terms(n),
+                "max_steps" => limits.with_max_steps(n),
+                other => return Err(format!("unknown limit {other}")),
+            };
+        }
+    }
+    let document = read_document(
+        &to_string(get(given, "document").unwrap()),
+        &Limits::default(),
+    )
+    .map_err(|e| format!("reading the document: {e}"))?;
+    let (report, ruleset) = match &document {
+        Document::RuleSet(ruleset) => (audit(ruleset, &limits), ruleset),
+        Document::DecisionTable(table) => (audit_table(table, &limits), table.ruleset()),
+        _ => return Err("not a rule set or a decision table".into()),
+    };
+    let report = report.map_err(|e| format!("auditing: {e}"))?;
+    let report = report.with_ruleset_digest(matches!(
+        get(given, "ruleset_digest"),
+        Some(Json::Bool(true))
+    ));
+    for d in &report.diagnostics {
+        let evaluated = d.witness.as_ref().map(|w| ruleset.evaluate(w));
+        let fired = |decision: &cleanrules::rules::Decision<'_>, name: &str| {
+            decision
+                .results()
+                .iter()
+                .any(|r| r.fired && r.rule.name() == name)
+        };
+        let shown = match (d.code.as_str(), d.severity.as_str(), evaluated) {
+            ("overlap", "error", Some(Err(e))) => {
+                e.code().as_str() == "hit_policy_error"
+                    && d.rules.iter().all(|r| e.context().rules.contains(r))
+            }
+            ("overlap", _, Some(Ok(decision))) => d.rules.iter().all(|r| fired(&decision, r)),
+            ("gap", _, Some(Ok(decision))) => decision.results().iter().all(|r| !r.fired),
+            ("overlap" | "gap", _, _) => false,
+            (_, _, evaluated) => evaluated.is_none(),
+        };
+        if !shown {
+            return Err(format!("the witness does not show {d:?}"));
+        }
+    }
+    let mut written = cleanrules::format::write_audit(&report);
+    if let Json::Object(members) = &mut written {
+        for (key, value) in members.iter_mut() {
+            if key == "diagnostics"
+                && let Json::Array(items) = value
+            {
+                for item in items {
+                    if let Json::Object(fields) = item {
+                        fields.retain(|(k, _)| k != "message" && k != "witness");
+                    }
+                }
+            }
+        }
+    }
+    compare(Ok(written), get(vector, "expect").unwrap(), "audit")
+}
+
 fn run(vector: &Json) -> Result<(), String> {
     let given = get(vector, "given").unwrap();
     let kind = text(get(given, "kind")).unwrap();
@@ -595,6 +669,9 @@ fn run(vector: &Json) -> Result<(), String> {
     }
     if kind == "tool" {
         return run_tool(vector);
+    }
+    if kind == "audit" {
+        return run_audit(vector);
     }
     let limits = Limits::default();
     let node_key = if kind == "condition" {
@@ -681,6 +758,7 @@ fn conformance_vectors() {
                         | "tool"
                         | "draw"
                         | "canonical"
+                        | "audit"
                 ) {
                     *pending.entry(kind.to_owned()).or_default() += 1;
                     continue;

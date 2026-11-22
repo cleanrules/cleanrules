@@ -3,8 +3,8 @@
 **Status:** draft, format version `1`. This document covers documents, values
 and conditions (task A.1a), rules and rule sets (A.1b), decisions and reasons
 (A.1c), explanations and summaries (A.1d), canonical bytes and digests
-(R.2), bundles (R.5, in [`bundles.md`](bundles.md)) and case files (T.1, in
-[`tests.md`](tests.md)).
+(R.2), bundles (R.5, in [`bundles.md`](bundles.md)), case files (T.1, in
+[`tests.md`](tests.md)) and audits (T.7, in [`audit.md`](audit.md)).
 
 The JSON format is the contract between languages and with users' files
 (`CLAUDE.md`, invariant 6). A condition written in Java and read in Go is the
@@ -24,8 +24,9 @@ other value is a `format_error` at the root) with:
 - exactly one **content key**, which says what the document holds:
   `"condition"`, `"rule"`, `"ruleset"`, `"decision"`, `"explanation"`,
   `"summary"`, `"decision_table"`, `"bundle"` (a reproducible package of
-  rules, [`bundles.md`](bundles.md)) or `"cases"` (test cases,
-  [`tests.md`](tests.md));
+  rules, [`bundles.md`](bundles.md)), `"cases"` (test cases,
+  [`tests.md`](tests.md)) or `"audit"` (the report of a static audit,
+  [`audit.md`](audit.md));
 - optionally `"$schema"`, a string that readers ignore, so editors can find the
   schema. Writers do not emit it.
 
@@ -89,8 +90,8 @@ of a rule set and the results of a decision.
 **Formats.** Documents are also read and written in YAML (*YAML*); the
 documents of conditions, rules and rule sets in the rule syntax (`text.md`);
 and those of decision tables in CSV (`tables.md`). Decisions, bundles and case
-files are read and written in JSON or YAML only, and explanations and summaries are written in
-JSON, YAML or as their text (`explain.md`). Any other combination is
+files are read and written in JSON or YAML only, and explanations, summaries and audits are
+written in JSON, YAML or as their text (`explain.md`, `audit.md`). Any other combination is
 `unsupported`. Read from bytes, text that is not UTF-8 is a `format_error` at
 the line and column of the first invalid byte, in every format.
 
@@ -813,6 +814,17 @@ A summary document is the JSON form of `summary()` (`explain.md`,
 | `tags` | yes | array of `{"tag", "rules"}`, sorted by tag |
 
 Every array is written even when it is empty.
+
+## Audits
+
+An audit document has the content key `"audit"`: the report of a static audit
+of a rule set or a decision table. Its keys and what they hold are in
+[`audit.md`](audit.md) (*JSON*). Like an explanation, it is output only, so
+readers reject it with `unsupported`, and the *Versioning* rules apply: it was
+added to version 1, and consumers should expect new optional keys, and new
+codes, checks, reasons and limits (`audit.md`, *JSON*, *Extensions*).
+Writers write its keys in the order of its table, and every array even when
+it is empty.
 
 ## Bundles
 

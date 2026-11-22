@@ -1,0 +1,12 @@
+---
+source: crates/core/src/audit/tests.rs
+expression: report.to_string()
+---
+Audit of a rule set: 2 rules, hit policy collect, aggregate sum, logic boolean, strict
+info     gap  no rule fires for the witness, so the decision selects no rule: add a rule for it if it needs an output
+           witness: {"name":"","x":1}
+Checks: types complete, fields not applicable, unsatisfiable partial, shadowed not applicable, overlap not applicable, gap complete
+Not modelled (1):
+  b  matches at /ruleset/rules/1/when
+Undecided (1):
+  unsatisfiable  b  not_modelled

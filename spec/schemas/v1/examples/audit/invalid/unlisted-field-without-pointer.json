@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "audit": {
+    "source": "decision_table",
+    "hit_policy": "output_order",
+    "logic": "boolean",
+    "strict": true,
+    "limits": {
+      "max_terms": 256,
+      "max_steps": 0
+    },
+    "rules": [
+      {
+        "name": "high",
+        "row": 1
+      },
+      {
+        "name": "low",
+        "row": 0
+      }
+    ],
+    "checks": [
+      {
+        "check": "types",
+        "status": "complete"
+      },
+      {
+        "check": "fields",
+        "status": "complete"
+      },
+      {
+        "check": "unsatisfiable",
+        "status": "partial"
+      },
+      {
+        "check": "shadowed",
+        "status": "not_applicable"
+      },
+      {
+        "check": "overlap",
+        "status": "not_applicable"
+      },
+      {
+        "check": "gap",
+        "status": "partial"
+      }
+    ],
+    "not_modelled": [
+      {
+        "rule": "low",
+        "op": "eq",
+        "pointer": "/decision_table/rows/0/inputs/0"
+      }
+    ],
+    "undecided": [
+      {
+        "check": "unsatisfiable",
+        "rules": [
+          "low"
+        ],
+        "reason": "limit",
+        "limit": "max_steps"
+      },
+      {
+        "check": "gap",
+        "rules": [],
+        "reason": "limit",
+        "limit": "max_steps"
+      }
+    ],
+    "diagnostics": [
+      {
+        "code": "unlisted_field",
+        "severity": "warning",
+        "rules": [
+          "low"
+        ],
+        "message": "the cell of row low under the input country reads the field ES, which no input reads: if it is text, write it between single quotes ('ES'), or add an input for the field",
+        "path": [
+          "ES"
+        ]
+      },
+      {
+        "code": "mixed_types",
+        "severity": "warning",
+        "rules": [
+          "high",
+          "low"
+        ],
+        "message": "the field x is used with values of different types (number, string)",
+        "path": [
+          "x"
+        ],
+        "groups": [
+          "number",
+          "string"
+        ]
+      }
+    ]
+  }
+}

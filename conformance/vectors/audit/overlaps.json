@@ -1,0 +1,946 @@
+{
+  "version": 1,
+  "area": "audit",
+  "vectors": [
+    {
+      "id": "audit/overlaps/unique",
+      "spec": [
+        "audit.md#overlaps",
+        "audit.md#witnesses",
+        "audit.md#json",
+        "json-format.md#audits"
+      ],
+      "description": "under unique, two rules that fire together are an error with a witness; the report names rules with their ids",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "adult",
+                "when": {
+                  "op": "ge",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "age"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 18
+                  }
+                },
+                "then": {
+                  "band": {
+                    "op": "const",
+                    "value": "adult"
+                  }
+                }
+              },
+              {
+                "name": "senior",
+                "id": "AGE-2",
+                "when": {
+                  "op": "ge",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "age"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 65
+                  }
+                },
+                "then": {
+                  "band": {
+                    "op": "const",
+                    "value": "senior"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "adult"
+            },
+            {
+              "name": "senior",
+              "id": "AGE-2"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "overlap",
+              "severity": "error",
+              "rules": [
+                "adult",
+                "senior"
+              ]
+            },
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/overlaps/exclusive-and-complete",
+      "spec": [
+        "audit.md#overlaps",
+        "audit.md#gaps",
+        "audit.md#what-was-checked"
+      ],
+      "description": "exclusive rules that cover every supported input give no finding, and every check is complete",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "minor",
+                "when": {
+                  "op": "lt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "age"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 18
+                  }
+                }
+              },
+              {
+                "name": "adult",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "ge",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "age"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 18
+                      }
+                    },
+                    {
+                      "op": "lt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "age"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 65
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "senior",
+                "when": {
+                  "op": "ge",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "age"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 65
+                  }
+                }
+              },
+              {
+                "name": "unknown",
+                "when": {
+                  "op": "is_null",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "age"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "minor"
+            },
+            {
+              "name": "adult"
+            },
+            {
+              "name": "senior"
+            },
+            {
+              "name": "unknown"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": []
+        }
+      }
+    },
+    {
+      "id": "audit/overlaps/any-compares-outputs",
+      "spec": [
+        "audit.md#overlaps",
+        "audit.md#shadowed-rules"
+      ],
+      "description": "under any, an overlap is an error when the witness raises hit_policy_error because the two outputs differ; a witness of a and d also fires c, whose output differs, so it shows nothing about a and d",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "any",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 3
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              },
+              {
+                "name": "d",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 6
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "add",
+                    "left": {
+                      "op": "sub",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      }
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "any",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "c"
+            },
+            {
+              "name": "d"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "partial"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [
+            {
+              "check": "overlap",
+              "rules": [
+                "a",
+                "d"
+              ],
+              "reason": "no_witness"
+            }
+          ],
+          "diagnostics": [
+            {
+              "code": "shadowed",
+              "severity": "warning",
+              "rules": [
+                "c",
+                "a"
+              ]
+            },
+            {
+              "code": "shadowed",
+              "severity": "warning",
+              "rules": [
+                "d",
+                "a",
+                "c"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "error",
+              "rules": [
+                "a",
+                "c"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "error",
+              "rules": [
+                "c",
+                "d"
+              ]
+            },
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/overlaps/strings-booleans-dates",
+      "spec": [
+        "audit.md#overlaps",
+        "audit.md#values-of-a-subject"
+      ],
+      "description": "strings, booleans and dates are compared exactly: these rules are exclusive on their fields, and rules on different fields overlap",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "f",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "in",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "s"
+                        ]
+                      },
+                      "values": [
+                        "a",
+                        "b"
+                      ]
+                    },
+                    {
+                      "op": "field",
+                      "path": [
+                        "flag"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "g",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "not",
+                      "operand": {
+                        "op": "in",
+                        "operand": {
+                          "op": "field",
+                          "path": [
+                            "s"
+                          ]
+                        },
+                        "values": [
+                          "a",
+                          "b"
+                        ]
+                      }
+                    },
+                    {
+                      "op": "not",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "flag"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "h",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "eq",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "flag"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": false
+                      }
+                    },
+                    {
+                      "op": "eq",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "s"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": "a"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "i",
+                "when": {
+                  "op": "between",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "d"
+                    ]
+                  },
+                  "low": {
+                    "op": "const",
+                    "value": {
+                      "$date": "2026-01-01"
+                    }
+                  },
+                  "high": {
+                    "op": "const",
+                    "value": {
+                      "$date": "2026-12-31"
+                    }
+                  },
+                  "closed": "left"
+                }
+              },
+              {
+                "name": "j",
+                "when": {
+                  "op": "ge",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "d"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": {
+                      "$date": "2026-12-31"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "f"
+            },
+            {
+              "name": "g"
+            },
+            {
+              "name": "h"
+            },
+            {
+              "name": "i"
+            },
+            {
+              "name": "j"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "overlap",
+              "severity": "error",
+              "rules": [
+                "f",
+                "i"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "error",
+              "rules": [
+                "f",
+                "j"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "error",
+              "rules": [
+                "g",
+                "i"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "error",
+              "rules": [
+                "g",
+                "j"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "error",
+              "rules": [
+                "h",
+                "i"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "error",
+              "rules": [
+                "h",
+                "j"
+              ]
+            },
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/overlaps/strict-witness-raises",
+      "spec": [
+        "audit.md#witnesses",
+        "audit.md#overlaps",
+        "audit.md#what-was-checked"
+      ],
+      "description": "witnesses are evaluated with the rule set's strictness: y is compared with a string and a number, so in strict mode every input raises type_mismatch, and no overlap or gap is shown",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "or",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 3
+                      }
+                    },
+                    {
+                      "op": "eq",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "y"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": "k"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "y"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "strict": true,
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            },
+            {
+              "name": "c"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "partial"
+            },
+            {
+              "check": "gap",
+              "status": "partial"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [
+            {
+              "check": "overlap",
+              "rules": [
+                "a",
+                "b"
+              ],
+              "reason": "no_witness"
+            },
+            {
+              "check": "overlap",
+              "rules": [
+                "a",
+                "c"
+              ],
+              "reason": "no_witness"
+            },
+            {
+              "check": "overlap",
+              "rules": [
+                "b",
+                "c"
+              ],
+              "reason": "no_witness"
+            },
+            {
+              "check": "gap",
+              "rules": [],
+              "reason": "no_witness"
+            }
+          ],
+          "diagnostics": [
+            {
+              "code": "mixed_types",
+              "severity": "warning",
+              "rules": [
+                "b",
+                "c"
+              ],
+              "path": [
+                "y"
+              ],
+              "groups": [
+                "number",
+                "string"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

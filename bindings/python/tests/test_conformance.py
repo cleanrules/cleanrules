@@ -840,6 +840,11 @@ DRAW_SKIP = (
     " the binding draws them from phase V.2"
 )
 
+AUDIT_SKIP = (
+    "audits (spec/audit.md) are made by the core and checked by its runner;"
+    " the binding audits from task T.9"
+)
+
 
 def collect() -> list[Any]:
     params: list[Any] = []
@@ -866,6 +871,18 @@ def collect() -> list[Any]:
                             run,
                             id=f"{run}:{vector['id']}",
                             marks=pytest.mark.skip(reason=CASES_SKIP),
+                        )
+                    )
+                continue
+            if given["kind"] == "audit":
+                # The static audit is the core's; the Python API to it comes with T.9.
+                for run in ("json", "native"):
+                    params.append(
+                        pytest.param(
+                            vector,
+                            run,
+                            id=f"{run}:{vector['id']}",
+                            marks=pytest.mark.skip(reason=AUDIT_SKIP),
                         )
                     )
                 continue

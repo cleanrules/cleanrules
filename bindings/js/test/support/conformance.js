@@ -54,6 +54,7 @@ export const SKIPS = {
   graded: 'conditions under a graded logic: the binding evaluates one node under boolean only until task J.1b',
   cases:
     'case files (spec/tests.md) have no type in the idiomatic API yet: loads refuses them, so their vectors run through cleanrules/native (the JSON route), and those whose file does not read run in both',
+  audit: 'the static audit (spec/audit.md) is made by the core and checked by its runner; the JavaScript API audits from task T.9',
 }
 
 /**
@@ -1439,6 +1440,7 @@ not
   function run(vector, route) {
     current = `${route}:${vector.get('id')}`
     if (vector.get('given').get('kind') === 'tool') return { skip: 'agents' }
+    if (vector.get('given').get('kind') === 'audit') return { skip: 'audit' }
     const logic = vector.get('given').get('logic')
     if (logic !== undefined && logic !== 'boolean') return { skip: 'graded' }
     try {

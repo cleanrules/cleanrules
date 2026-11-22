@@ -1,0 +1,431 @@
+{
+  "version": 1,
+  "area": "audit",
+  "vectors": [
+    {
+      "id": "audit/unsatisfiable/empty-ranges",
+      "spec": [
+        "audit.md#unsatisfiable-conditions",
+        "audit.md#values-of-a-subject",
+        "audit.md#combining-tests",
+        "audit.md#gaps"
+      ],
+      "description": "contradictory comparisons, a between with crossed bounds, a value in and not in a list, no date after 9999-12-31 and none between two consecutive days: these rules never fire",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "rule_order",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "lt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 3
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "between",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "low": {
+                    "op": "const",
+                    "value": 10
+                  },
+                  "high": {
+                    "op": "const",
+                    "value": 1
+                  },
+                  "closed": "both"
+                }
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "in",
+                      "operand": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "values": [
+                        1,
+                        2
+                      ]
+                    },
+                    {
+                      "op": "not",
+                      "operand": {
+                        "op": "in",
+                        "operand": {
+                          "op": "field",
+                          "path": [
+                            "x"
+                          ]
+                        },
+                        "values": [
+                          1,
+                          2
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "d",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "d"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": {
+                      "$date": "9999-12-31"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "e",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "d"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$date": "2026-01-01"
+                        }
+                      }
+                    },
+                    {
+                      "op": "lt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "d"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": {
+                          "$date": "2026-01-02"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "f",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "rule_order",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            },
+            {
+              "name": "c"
+            },
+            {
+              "name": "d"
+            },
+            {
+              "name": "e"
+            },
+            {
+              "name": "f"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "not_applicable"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "unsatisfiable",
+              "severity": "warning",
+              "rules": [
+                "a"
+              ]
+            },
+            {
+              "code": "unsatisfiable",
+              "severity": "warning",
+              "rules": [
+                "b"
+              ]
+            },
+            {
+              "code": "unsatisfiable",
+              "severity": "warning",
+              "rules": [
+                "c"
+              ]
+            },
+            {
+              "code": "unsatisfiable",
+              "severity": "warning",
+              "rules": [
+                "d"
+              ]
+            },
+            {
+              "code": "unsatisfiable",
+              "severity": "warning",
+              "rules": [
+                "e"
+              ]
+            },
+            {
+              "code": "gap",
+              "severity": "info",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/unsatisfiable/two-groups-at-once",
+      "spec": [
+        "audit.md#unsatisfiable-conditions",
+        "audit.md#types",
+        "audit.md#json"
+      ],
+      "description": "a value cannot be a string and a number at once; the report gives the aggregate and strictness, and in strict mode every supported input raises type_mismatch, so no witness shows a gap",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "collect",
+            "aggregate": "sum",
+            "logic": "boolean",
+            "strict": true,
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "eq",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": "a"
+                      }
+                    },
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "n": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "strict": true,
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "not_applicable"
+            },
+            {
+              "check": "gap",
+              "status": "partial"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [
+            {
+              "check": "gap",
+              "rules": [],
+              "reason": "no_witness"
+            }
+          ],
+          "diagnostics": [
+            {
+              "code": "mixed_types",
+              "severity": "warning",
+              "rules": [
+                "a"
+              ],
+              "path": [
+                "x"
+              ],
+              "groups": [
+                "number",
+                "string"
+              ]
+            },
+            {
+              "code": "unsatisfiable",
+              "severity": "warning",
+              "rules": [
+                "a"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

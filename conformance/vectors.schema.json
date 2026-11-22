@@ -529,6 +529,42 @@
             "b"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Audit a rule set or decision table (spec/audit.md).",
+          "properties": {
+            "kind": {
+              "const": "audit"
+            },
+            "document": {
+              "type": "object",
+              "description": "A rule set or decision table document (spec/json-format.md)."
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "max_terms": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "max_steps": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            },
+            "ruleset_digest": {
+              "const": true,
+              "description": "Ask for the rule set digest in the report (spec/audit.md, JSON)."
+            }
+          },
+          "required": [
+            "kind",
+            "document"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -684,6 +720,10 @@
         "comparison": {
           "$ref": "https://cleanrules.github.io/schemas/v1/bundle.schema.json#/$defs/comparison",
           "description": "The comparison of two bundles (spec/bundles.md, Comparing bundles)."
+        },
+        "audit": {
+          "type": "object",
+          "description": "The audit (spec/audit.md, JSON) without the message and witness of each diagnostic, which the runner checks instead (conformance/README.md)."
         }
       },
       "additionalProperties": false

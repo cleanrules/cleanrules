@@ -1,0 +1,667 @@
+{
+  "version": 1,
+  "area": "audit",
+  "vectors": [
+    {
+      "id": "audit/shadowed/first",
+      "spec": [
+        "audit.md#shadowed-rules",
+        "audit.md#overlaps"
+      ],
+      "description": "under first, a rule that fires only when an earlier one fires is shadowed; a last rule TRUE is not",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 3
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                }
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "const",
+                  "value": true
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            },
+            {
+              "name": "c"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "shadowed",
+              "severity": "warning",
+              "rules": [
+                "b",
+                "a"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "a",
+                "b"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "a",
+                "c"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "b",
+                "c"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/shadowed/priority",
+      "spec": [
+        "audit.md#shadowed-rules",
+        "audit.md#overlaps",
+        "audit.md#gaps"
+      ],
+      "description": "under priority, the rules ahead are those of higher priority, and of equal priority earlier in rule order",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "low",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "priority": 1
+              },
+              {
+                "name": "high",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 3
+                  }
+                },
+                "priority": 2
+              },
+              {
+                "name": "tie",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 4
+                  }
+                },
+                "priority": 2
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "low"
+            },
+            {
+              "name": "high"
+            },
+            {
+              "name": "tie"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "shadowed",
+              "severity": "warning",
+              "rules": [
+                "low",
+                "high",
+                "tie"
+              ]
+            },
+            {
+              "code": "shadowed",
+              "severity": "warning",
+              "rules": [
+                "tie",
+                "high"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "low",
+                "high"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "low",
+                "tie"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "high",
+                "tie"
+              ]
+            },
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/shadowed/any",
+      "spec": [
+        "audit.md#shadowed-rules",
+        "audit.md#overlaps"
+      ],
+      "description": "under any, rules ahead are earlier ones, and an overlap with structurally identical payloads is information",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "any",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 3
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "any",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "shadowed",
+              "severity": "warning",
+              "rules": [
+                "b",
+                "a"
+              ]
+            },
+            {
+              "code": "overlap",
+              "severity": "info",
+              "rules": [
+                "a",
+                "b"
+              ]
+            },
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/shadowed/not-applicable-under-rule-order",
+      "spec": [
+        "audit.md#shadowed-rules",
+        "audit.md#overlaps",
+        "audit.md#gaps"
+      ],
+      "description": "under rule_order every rule that fires is selected: shadowed rules and overlaps do not apply, and a gap is information",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "rule_order",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 3
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "rule_order",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "not_applicable"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "gap",
+              "severity": "info",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/shadowed/not-applicable-under-collect",
+      "spec": [
+        "audit.md#shadowed-rules",
+        "audit.md#overlaps",
+        "audit.md#gaps"
+      ],
+      "description": "under collect every rule that fires is selected: shadowed rules and overlaps do not apply, and a gap is information",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "collect",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 3
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "hit_policy": "collect",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "a"
+            },
+            {
+              "name": "b"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "not_applicable"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "gap",
+              "severity": "info",
+              "rules": []
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
