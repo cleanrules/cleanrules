@@ -3,7 +3,7 @@
 //! task D.1 gives the binding its public reading and writing API.
 
 use cleanrules::Value;
-use cleanrules::bundle::{BundleRules, CaseFile};
+use cleanrules::bundle::{BundleRules, CaseFileRef};
 use cleanrules::eval::{Options, evaluate_tree, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
@@ -108,7 +108,7 @@ pub(crate) fn py_make_bundle(
     };
     let cases = cases
         .iter()
-        .map(|(path, text)| CaseFile::new(path, text.as_bytes()))
+        .map(|(path, text)| CaseFileRef::new(path, text.as_bytes()))
         .collect::<cleanrules::Result<Vec<_>>>()
         .or_raise(py)?;
     let limits = recorded_limits(

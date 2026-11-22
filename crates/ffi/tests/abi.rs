@@ -664,6 +664,35 @@ fn bundles_are_made_compared_and_read_back() {
 }
 
 #[test]
+fn case_files_are_read_written_and_hashed() {
+    let text = br#"{"version":1,"cases":{"items":[{"id":"vip","input":{"years":7},"expect":{"selected":["vip"]}}]}}"#;
+    let cases = common::read_document(text, CR_FORMAT_JSON, None).unwrap();
+    assert_eq!(common::kind(&cases), CR_DOCUMENT_CASES);
+    let written = common::write_document(&cases, CR_FORMAT_JSON).unwrap();
+    assert_eq!(written.as_bytes(), text);
+    let yaml = common::write_document(&cases, CR_FORMAT_YAML).unwrap();
+    let again = common::read_document(yaml.as_bytes(), CR_FORMAT_YAML, None).unwrap();
+    assert_eq!(common::kind(&again), CR_DOCUMENT_CASES);
+    // SAFETY: live documents.
+    let (digest, again_digest) = unsafe {
+        (
+            common::text(|out, len, error| cr_document_digest(cases.0, out, len, error)),
+            common::text(|out, len, error| cr_document_digest(again.0, out, len, error)),
+        )
+    };
+    assert_eq!(digest.unwrap(), again_digest.unwrap());
+    // A case file holds no rules, has no text form and makes no bundle.
+    let failure = common::ruleset_of(&cases).err().unwrap();
+    assert_eq!(failure.status, CR_FORMAT_ERROR);
+    let failure = common::write_document(&cases, CR_FORMAT_TEXT)
+        .err()
+        .unwrap();
+    assert_eq!(failure.status, CR_UNSUPPORTED);
+    let failure = common::bundle(&cases, "a", "1", &[], None).err().unwrap();
+    assert_eq!(failure.status, CR_INVALID_ARGUMENT);
+}
+
+#[test]
 fn bundle_arguments_are_checked() {
     let document = common::read_document(RULES.as_bytes(), CR_FORMAT_JSON, None).unwrap();
     let bundle = common::bundle(&document, "a", "1", &[], None).unwrap();

@@ -5,7 +5,7 @@
 
 use std::ffi::c_char;
 
-use cleanrules::bundle::{Bundle, BundleId, BundleRules, CaseFile, Revision};
+use cleanrules::bundle::{Bundle, BundleId, BundleRules, CaseFileRef, Revision};
 use cleanrules::format::Document;
 
 use crate::boundary::{
@@ -111,7 +111,7 @@ pub unsafe extern "C" fn cr_document_new_bundle(
 /// # Safety
 ///
 /// As `cr_document_new_bundle`'s `cases` and `case_count`.
-unsafe fn case_files(cases: *const cr_case_input, count: usize) -> Outcome<Vec<CaseFile>> {
+unsafe fn case_files(cases: *const cr_case_input, count: usize) -> Outcome<Vec<CaseFileRef>> {
     if count == 0 {
         return Ok(Vec::new());
     }
@@ -134,7 +134,7 @@ unsafe fn case_files(cases: *const cr_case_input, count: usize) -> Outcome<Vec<C
             // SAFETY: each item's `bytes` and `bytes_len` (# Safety).
             let content =
                 unsafe { bytes(item.bytes.cast(), item.bytes_len, "a case file's bytes") }?;
-            Ok(CaseFile::new(path, content)?)
+            Ok(CaseFileRef::new(path, content)?)
         })
         .collect()
 }

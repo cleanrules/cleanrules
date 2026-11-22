@@ -28,6 +28,29 @@ pub enum ValueContext {
     /// A value recorded in a decision or an explanation: like data, plus opaque
     /// values.
     Recorded,
+    /// A value a test case expects (`spec/tests.md`): lists and maps as in
+    /// data, but out of range is an error, as for a constant, so that a case
+    /// never expects a null it did not write.
+    Expected,
+}
+
+impl ValueContext {
+    /// Whether a number out of range is an error here, rather than null.
+    fn refuses_out_of_range(self) -> bool {
+        matches!(self, Self::Constant | Self::Expected)
+    }
+}
+
+/// The error of a number out of range where `context` refuses it.
+fn out_of_range(pointer: &str, message: impl Into<String>, context: ValueContext) -> Error {
+    let error = format_error(pointer, message);
+    if context == ValueContext::Expected {
+        error.with_hint(
+            "write the value the rules give, such as {\"$decimal\": \"...\"}, or expect null",
+        )
+    } else {
+        error
+    }
 }
 
 /// The largest int written bare: beyond it JavaScript and Go lose precision.
@@ -144,12 +167,13 @@ fn read_number(n: &JsonNumber, pointer: &str, context: ValueContext) -> Result<V
     if n.is_integer_literal() {
         return match n.as_i128().and_then(|i| i64::try_from(i).ok()) {
             Some(i) => Ok(Value::Int(i)),
-            None if context == ValueContext::Constant => Err(format_error(
+            None if context.refuses_out_of_range() => Err(out_of_range(
                 pointer,
                 format!(
                     "the integer {} is outside the signed 64-bit range",
                     n.text()
                 ),
+                context,
             )),
             None => Ok(Value::Null(NullCause::IntOverflow)),
         };
@@ -235,10 +259,10 @@ fn read_object<'j>(
             };
             match Decimal::parse(text) {
                 Ok(d) => Ok(Value::Decimal(d)),
-                Err(DecimalError::DoesNotFit) if context != ValueContext::Constant => {
+                Err(DecimalError::DoesNotFit) if !context.refuses_out_of_range() => {
                     Ok(Value::Null(NullCause::DecimalOverflow))
                 }
-                Err(error) => Err(format_error(&at, format!("{text:?}: {error}"))),
+                Err(error) => Err(out_of_range(&at, format!("{text:?}: {error}"), context)),
             }
         }
         "$date" => {
@@ -295,9 +319,10 @@ fn read_typed_int(inner: &Json, at: &str, context: ValueContext) -> Result<Value
     };
     match parsed.and_then(|i| i64::try_from(i).ok()) {
         Some(i) => Ok(Value::Int(i)),
-        None if context == ValueContext::Constant => Err(format_error(
+        None if context.refuses_out_of_range() => Err(out_of_range(
             at,
             "the integer is outside the signed 64-bit range",
+            context,
         )),
         None => Ok(Value::Null(NullCause::IntOverflow)),
     }
@@ -578,6 +603,27 @@ mod tests {
 
     fn read(text: &str, context: ValueContext) -> crate::Result<Value> {
         read_value(&parse(text, &Limits::default()).unwrap(), "", context)
+    }
+
+    #[test]
+    fn expected_values_refuse_out_of_range() {
+        let error = read("123456789012345678901234567890", ValueContext::Expected).unwrap_err();
+        assert!(
+            error
+                .hint()
+                .is_some_and(|hint| hint.contains("expect null"))
+        );
+        let error = read(
+            r#"{"$int": "123456789012345678901234567890"}"#,
+            ValueContext::Expected,
+        )
+        .unwrap_err();
+        assert_eq!(error.context().pointer.as_deref(), Some("/$int"));
+        let decimal = format!(r#"{{"$decimal": "1{}"}}"#, "0".repeat(38));
+        let error = read(&decimal, ValueContext::Expected).unwrap_err();
+        assert_eq!(error.context().pointer.as_deref(), Some("/$decimal"));
+        assert!(read(r#"[1, {"a": null}]"#, ValueContext::Expected).is_ok());
+        assert!(read(r#"{"$opaque": "bytes"}"#, ValueContext::Expected).is_err());
     }
 
     #[test]

@@ -8,14 +8,14 @@
 //!
 //! ```
 //! use cleanrules::build::{constant, field};
-//! use cleanrules::bundle::{Bundle, BundleId, CaseFile, Difference, Relation, Revision};
+//! use cleanrules::bundle::{Bundle, BundleId, CaseFileRef, Difference, Relation, Revision};
 //! use cleanrules::rules::{Config, Rule, RuleSet};
 //!
 //! let rule = Rule::new("adult", field("age").ge(constant(18)).build()?)?;
 //! let rules = RuleSet::new(vec![rule], Config::default())?;
 //! let (id, revision) = (BundleId::new("acme/adults")?, Revision::new("1")?);
 //! let bundle = Bundle::new(rules, id.clone(), revision.clone())
-//!     .with_cases([CaseFile::new("cases/adults.json", b"[]")?])?;
+//!     .with_cases([CaseFileRef::new("cases/adults.json", b"[]")?])?;
 //! assert_eq!(bundle.ruleset_digest(), bundle.ruleset().digest());
 //! assert!(bundle.engine().is_current());
 //!
@@ -460,12 +460,12 @@ impl PartialEq for Contract {
 /// A reference to a file of test cases (`spec/bundles.md`, *Cases*): its path,
 /// relative to the bundle's directory, and the digest of its bytes.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct CaseFile {
+pub struct CaseFileRef {
     path: String,
     digest: Digest,
 }
 
-impl CaseFile {
+impl CaseFileRef {
     /// The reference to the file at `path` whose bytes are `bytes`.
     ///
     /// # Errors
@@ -502,7 +502,7 @@ impl CaseFile {
 
     /// Whether `bytes` are the file the bundle was made with.
     #[must_use]
-    pub fn matches(&self, bytes: &[u8]) -> bool {
+    pub fn digest_matches(&self, bytes: &[u8]) -> bool {
         Digest::of(bytes) == self.digest
     }
 }
@@ -617,7 +617,7 @@ pub struct Bundle {
     rules: BundleRules,
     engine: Engine,
     contract: Contract,
-    cases: Vec<CaseFile>,
+    cases: Vec<CaseFileRef>,
     digest: OnceLock<Digest>,
 }
 
@@ -650,8 +650,8 @@ impl Bundle {
     /// # Errors
     ///
     /// `format_error` for a path given twice.
-    pub fn with_cases(mut self, cases: impl IntoIterator<Item = CaseFile>) -> Result<Self> {
-        let cases: Vec<CaseFile> = cases.into_iter().collect();
+    pub fn with_cases(mut self, cases: impl IntoIterator<Item = CaseFileRef>) -> Result<Self> {
+        let cases: Vec<CaseFileRef> = cases.into_iter().collect();
         if let Some(repeated) = repeated_path(&cases) {
             return Err(Error::new(
                 ErrorCode::FormatError,
@@ -694,7 +694,7 @@ impl Bundle {
         rules: BundleRules,
         engine: Engine,
         contract: Contract,
-        cases: Vec<CaseFile>,
+        cases: Vec<CaseFileRef>,
     ) -> Self {
         Self {
             id,
@@ -752,18 +752,18 @@ impl Bundle {
 
     /// The references to its case files, in order.
     #[must_use]
-    pub fn cases(&self) -> &[CaseFile] {
+    pub fn cases(&self) -> &[CaseFileRef] {
         &self.cases
     }
 
     /// Whether `bytes` are the case file at `path` the bundle was made with;
     /// `None` when the bundle refers to no file at `path`.
     #[must_use]
-    pub fn case_matches(&self, path: &str, bytes: &[u8]) -> Option<bool> {
+    pub fn case_digest_matches(&self, path: &str, bytes: &[u8]) -> Option<bool> {
         self.cases
             .iter()
             .find(|case| case.path == path)
-            .map(|case| case.matches(bytes))
+            .map(|case| case.digest_matches(bytes))
     }
 
     /// The bundle's digest: that of its document (`spec/bundles.md`, *Digest of
@@ -1174,11 +1174,11 @@ fn int(n: u64) -> Json {
 }
 
 /// The first path given twice.
-fn repeated_path(cases: &[CaseFile]) -> Option<&str> {
+fn repeated_path(cases: &[CaseFileRef]) -> Option<&str> {
     let mut seen = std::collections::BTreeSet::new();
     cases
         .iter()
-        .map(CaseFile::path)
+        .map(CaseFileRef::path)
         .find(|path| !seen.insert(*path))
 }
 
@@ -1193,7 +1193,7 @@ mod tests {
         rules: impl Into<BundleRules>,
         id: &str,
         revision: &str,
-        cases: Vec<CaseFile>,
+        cases: Vec<CaseFileRef>,
         limits: &Limits,
     ) -> Result<Bundle> {
         Bundle::new(rules, BundleId::new(id)?, Revision::new(revision)?)
@@ -1324,15 +1324,15 @@ mod tests {
 
     #[test]
     fn making_checks_what_the_author_gives() {
-        let made = |id: &str, revision: &str, cases: Vec<CaseFile>| {
+        let made = |id: &str, revision: &str, cases: Vec<CaseFileRef>| {
             make(rules(5), id, revision, cases, &Limits::default())
         };
         assert!(made("Bad", "1", vec![]).is_err());
         assert!(made("ok", " ", vec![]).is_err());
-        let case = CaseFile::new("a.json", b"x").unwrap();
+        let case = CaseFileRef::new("a.json", b"x").unwrap();
         let error = made("ok", "1", vec![case.clone(), case]).unwrap_err();
         assert_eq!(error.code(), ErrorCode::FormatError);
-        assert!(CaseFile::new("../a", b"x").is_err());
+        assert!(CaseFileRef::new("../a", b"x").is_err());
         let mut limits = Limits {
             max_values: usize::MAX,
             ..Limits::default()
@@ -1360,12 +1360,18 @@ mod tests {
 
     #[test]
     fn case_files_match_their_bytes() {
-        let case = CaseFile::new("cases/a.json", b"[1]").unwrap();
-        assert!(case.matches(b"[1]"));
+        let case = CaseFileRef::new("cases/a.json", b"[1]").unwrap();
+        assert!(case.digest_matches(b"[1]"));
         let bundle = make(rules(5), "r", "1", vec![case.clone()], &Limits::default()).unwrap();
-        assert_eq!(bundle.case_matches("cases/a.json", b"[1]"), Some(true));
-        assert_eq!(bundle.case_matches("cases/a.json", b"[2]"), Some(false));
-        assert_eq!(bundle.case_matches("cases/b.json", b"[1]"), None);
+        assert_eq!(
+            bundle.case_digest_matches("cases/a.json", b"[1]"),
+            Some(true)
+        );
+        assert_eq!(
+            bundle.case_digest_matches("cases/a.json", b"[2]"),
+            Some(false)
+        );
+        assert_eq!(bundle.case_digest_matches("cases/b.json", b"[1]"), None);
         // Contracts compare without member order.
         let reordered = match bundle.contract().input() {
             Json::Object(members) => Json::Object(members.iter().rev().cloned().collect()),
@@ -1373,7 +1379,7 @@ mod tests {
         };
         let contract = Contract::recorded(reordered, bundle.contract().output_keys().to_vec());
         assert_eq!(&contract, bundle.contract());
-        assert!(!case.matches(b"[1] "));
+        assert!(!case.digest_matches(b"[1] "));
         assert_eq!(case.digest(), Digest::of(b"[1]"));
         assert_eq!(case.path(), "cases/a.json");
     }
@@ -1507,7 +1513,7 @@ mod tests {
         // The cached digest follows the builders.
         let digest = a.digest();
         let with_case = a
-            .with_cases([CaseFile::new("a.json", b"x").unwrap()])
+            .with_cases([CaseFileRef::new("a.json", b"x").unwrap()])
             .unwrap();
         assert_ne!(with_case.digest(), digest);
         let tighter = Limits {

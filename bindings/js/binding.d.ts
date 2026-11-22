@@ -121,7 +121,7 @@ export declare class Document {
   static read(text: string | Uint8Array, options?: ReadOptions | null): Document
   /**
    * What the document holds: `"condition"`, `"rule"`, `"ruleset"`,
-   * `"decision_table"` or `"bundle"`.
+   * `"decision_table"`, `"bundle"` or `"cases"`.
    */
   get kind(): DocumentKind
   /**
@@ -618,6 +618,16 @@ export declare function actionErrorData(rule: string, action: string | undefined
 export type Aggregate = 'sum' | 'min' | 'max' | 'count'
 
 /**
+ * Whether `bytes` are the case file at `path` the bundle was made with.
+ *
+ * # Errors
+ *
+ * A `RangeError` for a path the bundle does not refer to; a `TypeError` for
+ * arguments of the wrong type.
+ */
+export declare function bundleCaseDigestMatches(document: Document, path: string, bytes: string | Uint8Array): boolean
+
+/**
  * A file of test cases given to `Document.makeBundle`: its path, relative to
  * the bundle's directory, and its content, whose SHA-256 digest the bundle
  * records (a string as its UTF-8 bytes).
@@ -632,16 +642,6 @@ export interface BundleCaseInput {
   /** The file's content. */
   content: string | Uint8Array
 }
-
-/**
- * Whether `bytes` are the case file at `path` the bundle was made with.
- *
- * # Errors
- *
- * A `RangeError` for a path the bundle does not refer to; a `TypeError` for
- * arguments of the wrong type.
- */
-export declare function bundleCaseMatches(document: Document, path: string, bytes: string | Uint8Array): boolean
 
 /**
  * What the idiomatic `Bundle` reads of a bundle document, as JSON
@@ -704,21 +704,21 @@ export declare function canonicalRule(rule: NativeRule): Uint8Array
  *
  * # Errors
  *
- * As `checkCaseFile`, and a `TypeError` for content that is neither a string
+ * As `checkCaseFileRef`, and a `TypeError` for content that is neither a string
  * nor bytes.
  */
-export declare function caseFileMatches(path: string, digest: string, content: string | Uint8Array): boolean
+export declare function caseFileRefDigestMatches(path: string, digest: string, content: string | Uint8Array): boolean
 
 /**
  * Check the path and digest of a case file (`spec/bundles.md`, *Cases*), for
- * the idiomatic `CaseFile`.
+ * the idiomatic `CaseFileRef`.
  *
  * # Errors
  *
  * A `TypeError` for a path or digest that is not a string; a `FormatError`
  * for a digest or a path without its form.
  */
-export declare function checkCaseFile(path: string, digest: string): void
+export declare function checkCaseFileRef(path: string, digest: string): void
 
 /**
  * Why `text` is not a decimal literal, or `null` when it is one; for the
@@ -756,7 +756,7 @@ export declare function digestRule(rule: NativeRule): string
 export declare function documentCondition(document: Document): Node
 
 /** What a document holds. */
-export type DocumentKind = 'condition' | 'rule' | 'ruleset' | 'decision_table' | 'bundle'
+export type DocumentKind = 'condition' | 'rule' | 'ruleset' | 'decision_table' | 'bundle' | 'cases'
 
 /**
  * The rule of a rule document.

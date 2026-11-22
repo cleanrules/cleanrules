@@ -17,7 +17,7 @@
 // the arguments, picks the format of a file from its extension, and makes the
 // objects of the API of its build.
 
-import { ExpressionError, RuleDefinitionError } from '../errors.js'
+import { ExpressionError, RuleDefinitionError, UnsupportedError } from '../errors.js'
 import { fileSystem } from '../files.js'
 import { options, sameBuild, show } from './shared.js'
 
@@ -80,6 +80,14 @@ function documents(native, expressions, rules, tables, bundles, build) {
   function loads(text, loadOptions) {
     const { format, limits, actions } = options(loadOptions, LOAD_OPTIONS, "{ format: 'yaml' }")
     const document = native.Document.read(text, { format, limits })
+    // A case file (spec/tests.md) has no type in this API yet.
+    if (document.kind === 'cases') {
+      document.free?.()
+      throw new UnsupportedError('case files (spec/tests.md) are not loaded in JavaScript yet', {
+        hint: 'read it as a document with Document.read of cleanrules/native, or with the Rust crate',
+        context: { operation: 'loads', reason: 'JavaScript has no type for test cases yet' },
+      })
+    }
     // A bundle keeps its document.
     if (document.kind === 'bundle') {
       if (actions !== undefined && actions !== null) {

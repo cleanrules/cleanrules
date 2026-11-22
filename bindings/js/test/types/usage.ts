@@ -396,7 +396,7 @@ void [tablePolicy, firstInput, tableSet, tableOut, outputs, contextTree, ready, 
 
 import {
   Bundle,
-  CaseFile,
+  CaseFileRef,
   type BundleComparison,
   type BundleDifference,
   type BundleDocument,
@@ -419,7 +419,7 @@ const maxDepth: number = bundle.engine.limits.maxDepth
 const current: boolean = bundle.engine.isCurrent
 const outputKeys: readonly string[] = bundle.contract.output.keys
 const caseDigest: string | undefined = bundle.cases[0]?.digest
-const matches: boolean = bundle.caseMatches('cases/a.json', '[]')
+const matches: boolean = bundle.caseDigestMatches('cases/a.json', '[]')
 const comparison: BundleComparison = bundle.compare(bundle)
 const relation: BundleRelation = comparison.relation
 const bundled: Loaded = bundle
@@ -433,9 +433,9 @@ const writeOptions: DecisionWriteOptions = { rulesetDigest: true }
 const nativeDecision: string = decision.write('json', writeOptions)
 // @ts-expect-error: the native layer takes the digest as an option, not a positional boolean.
 void decision.write('json', true)
-const firstCase: CaseFile | undefined = bundle.cases[0]
-const caseFile = new CaseFile('cases/a.json', 'sha256:' + '0'.repeat(64))
-const caseMatches: boolean = caseFile.matches(new Uint8Array())
+const firstCase: CaseFileRef | undefined = bundle.cases[0]
+const caseFile = new CaseFileRef('cases/a.json', 'sha256:' + '0'.repeat(64))
+const caseDigestMatches: boolean = caseFile.digestMatches(new Uint8Array())
 const differences: readonly BundleDifference[] = comparison.differences
 const limitDifference: BundleDifference = 'engine.limits.max_depth'
 const limitName: BundleLimitName = 'max_path_segments'
@@ -452,7 +452,7 @@ void dump(rules, 'rules.json', { rulesetDigest: true })
 // @ts-expect-error: a decision has no text form.
 void dumps(rules.evaluate({ x: 1 }), { format: 'text' })
 void dump(rules.evaluate({ x: 1 }), 'decision.json', { rulesetDigest: true })
-void [firstCase, caseMatches, differences, limitDifference, limitName, camelDifference, recordedDepth, decisionYaml]
+void [firstCase, caseDigestMatches, differences, limitDifference, limitName, camelDifference, recordedDepth, decisionYaml]
 // @ts-expect-error: a bundle needs an id and a revision.
 void new Bundle(rules, { id: 'acme/a' })
 // @ts-expect-error: a bundle holds a rule set or a table, not a rule.

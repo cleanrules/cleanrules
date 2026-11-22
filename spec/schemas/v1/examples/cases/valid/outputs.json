@@ -1,0 +1,39 @@
+{
+  "$schema": "https://cleanrules.github.io/schemas/v1/cases.schema.json",
+  "version": 1,
+  "cases": {
+    "items": [
+      {
+        "id": "two-rules",
+        "input": {
+          "order": {
+            "total": 1200,
+            "items": [
+              1,
+              2
+            ]
+          }
+        },
+        "expect": {
+          "selected": [
+            "big-order",
+            "PRICING-12"
+          ],
+          "outputs": [
+            {
+              "shipping": 0
+            },
+            {
+              "$note": "literal key",
+              "tags": [
+                "a",
+                "b"
+              ]
+            }
+          ],
+          "unknown": []
+        }
+      }
+    ]
+  }
+}

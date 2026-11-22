@@ -107,6 +107,24 @@ def test_shape_errors_have_pointers() -> None:
     assert info.value.pointer == "/condition/note"
 
 
+def test_case_files_are_not_loaded_yet() -> None:
+    # A case file (spec/tests.md) reads in the core; Python has no type for it yet.
+    text = '{"version": 1, "cases": {"items": [{"id": "a", "input": {"x": 1}}]}}'
+    with pytest.raises(UnsupportedError, match="case files") as refused:
+        loads(text)
+    assert refused.value.operation == "loads"
+    assert "Catalog" in (refused.value.hint or "")
+    with pytest.raises(UnsupportedError):
+        loads("version: 1\ncases: {items: []}\n", format="yaml")
+    # Errors in the file come first, located in it.
+    with pytest.raises(FormatError) as info:
+        loads(
+            '{"version": 1, "cases": {"items":'
+            ' [{"id": "a", "input": {}}, {"id": "a", "input": {}}]}}'
+        )
+    assert info.value.pointer == "/cases/items/1/id"
+
+
 def test_limits() -> None:
     text = dumps(shop())
     with pytest.raises(FormatError) as info:

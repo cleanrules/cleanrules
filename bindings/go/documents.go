@@ -208,6 +208,15 @@ func load(source string, settings documentSettings) (Document, error) {
 		// than read as the rule set it holds.
 		return nil, newError(CodeUnsupported, "bundles are not in the Go binding yet",
 			"read bundles with the Rust, Python or JavaScript API")
+	case C.CR_DOCUMENT_CASES:
+		// A case file (spec/tests.md) has no Go type yet, and holds no rules.
+		return nil, formError(errorForm{
+			Code:      CodeUnsupported,
+			Message:   "case files (spec/tests.md) are not loaded in Go yet",
+			Hint:      "read it with the Rust crate",
+			Operation: "Loads",
+			Reason:    "Go has no type for test cases yet",
+		})
 	case C.CR_DOCUMENT_CONDITION:
 		var node *C.cr_node
 		if err := check(C.cr_document_condition(document, &node, &e), e); err != nil {

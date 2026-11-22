@@ -326,7 +326,7 @@ pinned = cleanrules.load("discounts.bundle.json")
 comparison = pinned.compare(cleanrules.Bundle(rules, id="acme/discounts", revision="2026-11-16.1"))
 comparison.relation  # BundleRelation.SAME_RULES_SAME_ENGINE, or e.g. SAME_RULES_OTHER_ENGINE after an upgrade
 comparison.differences  # (BundleDifference.CASES,): no case files given this time
-pinned.case_matches("cases/vip.json", Path("cases/vip.json").read_bytes())  # the file is unchanged
+pinned.case_digest_matches("cases/vip.json", Path("cases/vip.json").read_bytes())  # unchanged
 ```
 
 ```js
@@ -339,12 +339,12 @@ await dump(bundle, 'discounts.bundle.json')
 
 const pinned = await load('discounts.bundle.json')
 pinned.compare(bundle) // { relation: 'same_rules_same_engine', identical: true, differences: [] }
-pinned.cases[0].matches(await readFile('cases/vip.json')) // true
+pinned.cases[0].digestMatches(await readFile('cases/vip.json')) // true
 ```
 
 ```rust
 let bundle = Bundle::new(rules, BundleId::new("acme/discounts")?, Revision::new("2026-11-16.1")?)
-    .with_cases([CaseFile::new("cases/vip.json", &bytes)?])?
+    .with_cases([CaseFileRef::new("cases/vip.json", &bytes)?])?
     .with_limits(&limits)?;
 ```
 
@@ -373,9 +373,9 @@ than decisions, are a `TypeError`.
 | `Relation` | `BundleRelation` | `BundleRelation` | (JSON) |
 | `Difference` | `BundleDifference` | `BundleDifference` | (JSON) |
 | `Comparison` | `BundleComparison` | `BundleComparison` | `cr_document_compare_bundle` |
-| `CaseFile` (path and digest), `.matches(bytes)` | `CaseFile`, `.matches(content)` | `CaseFile`, `.matches(content)` | — |
-| `CaseFile::new(path, bytes)` | `(path, content)` pairs | `BundleCaseInput` `{ path, content }` | `struct cr_case_input` |
-| `Bundle::case_matches(path, bytes)` | `Bundle.case_matches(path, content)` | `bundle.caseMatches(path, content)` | — |
+| `CaseFileRef` (path and digest), `.digest_matches(bytes)` | `CaseFileRef`, `.digest_matches(content)` | `CaseFileRef`, `.digestMatches(content)` | — |
+| `CaseFileRef::new(path, bytes)` | `(path, content)` pairs | `BundleCaseInput` `{ path, content }` | `struct cr_case_input` |
+| `Bundle::case_digest_matches(path, bytes)` | `Bundle.case_digest_matches(path, content)` | `bundle.caseDigestMatches(path, content)` | — |
 | `PartialEq` by digest | `==` by digest | `digest(a) === digest(b)` | `cr_document_digest` |
 
 Java, Scala, Go and C++ (beta) have no bundle type yet. They read, write and

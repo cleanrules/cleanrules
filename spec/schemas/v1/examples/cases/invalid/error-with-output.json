@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "cases": {
+    "items": [
+      {
+        "id": "a",
+        "input": {},
+        "expect": {
+          "error": {
+            "code": "missing_field"
+          },
+          "output": null
+        }
+      }
+    ]
+  }
+}

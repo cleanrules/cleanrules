@@ -257,8 +257,9 @@ uv run --no-project --with jsonschema python conformance/tools/check.py
 
 `check.py` validates every vector file against `vectors.schema.json` and the
 spec's JSON Schemas, checks that ids are unique, that every cited spec section
-exists and that every normative section is cited, and sanity-checks the error
-locations of `read` vectors.
+exists and that every normative section is cited, sanity-checks the error
+locations of `read` vectors, and validates the expected result of each `tool`
+vector without an agent error against `spec/schemas/v1/agents.schema.json`.
 
 ## Where the vectors come from
 

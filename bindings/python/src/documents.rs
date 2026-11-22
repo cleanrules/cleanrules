@@ -60,7 +60,8 @@ pub(crate) fn ruleset_parts<'py>(
 /// Read a document: `("condition", Node)`, `("rule", Rule)`,
 /// `("ruleset", (rules, hit_policy, aggregate, logic, strict))`,
 /// `("decision_table", DecisionTable)` or `("bundle", Bundle)`; CSV holds a
-/// decision table.
+/// decision table. A case file (`spec/tests.md`) is `UnsupportedError`: Python
+/// has no type for it yet.
 #[pyfunction]
 #[pyo3(signature = (text, format, max_size=None, max_nesting=None, max_depth=None, max_table_size=None, max_path_segments=None))]
 #[allow(clippy::too_many_arguments)] // The limits are keyword arguments in Python.
@@ -95,6 +96,18 @@ pub(crate) fn load_document<'py>(
             "bundle",
             PyBundle { bundle: *bundle }.into_pyobject(py)?.into_any(),
         ),
+        Document::Cases(_) => {
+            let error = cleanrules::Error::new(
+                cleanrules::ErrorCode::Unsupported,
+                "case files (spec/tests.md) are not loaded in Python yet",
+            )
+            .with_hint(
+                "check one with cleanrules.Catalog({}).call(\"validate\", {\"document\": text}), \
+                 or read it with the Rust crate",
+            )
+            .unsupported("loads", "Python has no type for test cases yet");
+            return Err::<_, cleanrules::Error>(error).or_raise(py);
+        }
         // The core's documents are `#[non_exhaustive]`.
         _ => {
             return Err(PyValueError::new_err(

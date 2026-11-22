@@ -9,7 +9,7 @@
 //! digest, as it does any other document.
 
 use cleanrules::bundle::{
-    Bundle, BundleId, BundleRules, CaseFile, EngineLimit, EngineLimits, Revision,
+    Bundle, BundleId, BundleRules, CaseFileRef, EngineLimit, EngineLimits, Revision,
 };
 use cleanrules::digest::Digest;
 use cleanrules::format::Document;
@@ -125,7 +125,7 @@ fn name(raw: &Raw, what: &str, example: &str) -> Outcome<String> {
 
 /// The case files of `cases`, in order: each path checked by the core, each
 /// content's bytes digested (a string as its UTF-8 bytes).
-fn case_files(cases: Vec<RawCase>) -> Outcome<Vec<CaseFile>> {
+fn case_files(cases: Vec<RawCase>) -> Outcome<Vec<CaseFileRef>> {
     cases
         .into_iter()
         .enumerate()
@@ -133,7 +133,7 @@ fn case_files(cases: Vec<RawCase>) -> Outcome<Vec<CaseFile>> {
             RawCase::Given { path, content } => {
                 let path = name(&path, &format!("cases[{i}].path"), "cases/basic.json")?;
                 let bytes = text(content, &format!("cases[{i}].content"))?;
-                Ok(CaseFile::new(&path, &bytes)?)
+                Ok(CaseFileRef::new(&path, &bytes)?)
             }
             RawCase::Wrong(kind) => Err(Problem::Type(format!(
                 "cases[{i}] must be an object {{ path, content }}, not {kind}"
@@ -169,23 +169,27 @@ pub(crate) fn make(
 /// The case file of `path` and `digest` (`spec/bundles.md`, *Cases*), both
 /// checked: a `TypeError` for one that is not a string, then a `FormatError`
 /// for a digest or a path without its form.
-fn case_file(path: &Raw, digest: &Raw) -> Outcome<CaseFile> {
+fn case_file(path: &Raw, digest: &Raw) -> Outcome<CaseFileRef> {
     let path = name(path, "path", "cases/basic.json")?;
     let digest = name(digest, "digest", "sha256:e3b0c442…")?;
     let digest: Digest = digest.parse()?;
-    Ok(CaseFile::with_digest(&path, digest)?)
+    Ok(CaseFileRef::with_digest(&path, digest)?)
 }
 
-/// Check the path and digest of a `CaseFile` of the idiomatic API.
-pub(crate) fn check_case_file(path: &Raw, digest: &Raw) -> Outcome<()> {
+/// Check the path and digest of a `CaseFileRef` of the idiomatic API.
+pub(crate) fn check_case_file_ref(path: &Raw, digest: &Raw) -> Outcome<()> {
     case_file(path, digest).map(drop)
 }
 
 /// Whether `content` (a string as its UTF-8 bytes, or bytes) is the case file
 /// of `path` and `digest`: whether its digest is `digest`.
-pub(crate) fn case_file_matches(path: &Raw, digest: &Raw, content: Raw) -> Outcome<bool> {
+pub(crate) fn case_file_ref_digest_matches(
+    path: &Raw,
+    digest: &Raw,
+    content: Raw,
+) -> Outcome<bool> {
     let case = case_file(path, digest)?;
-    Ok(case.matches(&text(content, "content")?))
+    Ok(case.digest_matches(&text(content, "content")?))
 }
 
 /// The rules of a document, to make a bundle of: its rule set or its decision
@@ -303,7 +307,7 @@ impl DocumentCore {
 
     /// Whether `bytes` are the case file at `path` the bundle was made with; a
     /// `RangeError` for a path the bundle does not refer to.
-    pub(crate) fn case_matches(&self, path: &Raw, bytes: Raw) -> Outcome<bool> {
+    pub(crate) fn case_digest_matches(&self, path: &Raw, bytes: Raw) -> Outcome<bool> {
         let bundle = self.held()?;
         let Raw::String(path) = path else {
             return Err(Problem::Type(format!(
@@ -312,7 +316,7 @@ impl DocumentCore {
             )));
         };
         let bytes = text(bytes, "the case file's content")?;
-        bundle.case_matches(path, &bytes).ok_or_else(|| {
+        bundle.case_digest_matches(path, &bytes).ok_or_else(|| {
             let known: Vec<String> = bundle
                 .cases()
                 .iter()

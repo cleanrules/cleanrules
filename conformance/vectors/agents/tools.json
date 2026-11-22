@@ -1889,6 +1889,44 @@
       }
     },
     {
+      "id": "agents/tools/validate-cases",
+      "spec": [
+        "agents.md#validate",
+        "tests.md#case-files"
+      ],
+      "description": "a case file reads, but holds no rules, so it has no summary",
+      "given": {
+        "kind": "tool",
+        "tool": "validate",
+        "arguments": {
+          "document": {
+            "version": 1,
+            "cases": {
+              "items": [
+                {
+                  "id": "adult",
+                  "input": {
+                    "age": 20
+                  },
+                  "expect": {
+                    "selected": [
+                      "adult"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "output": {
+          "valid": true,
+          "content": "cases"
+        }
+      }
+    },
+    {
       "id": "agents/tools/validate-csv",
       "spec": [
         "agents.md#validate"

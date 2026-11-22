@@ -1,0 +1,2421 @@
+{
+  "version": 1,
+  "area": "format",
+  "vectors": [
+    {
+      "id": "format/cases/read-example",
+      "spec": [
+        "tests.md#case-files",
+        "tests.md#cases",
+        "tests.md#expectations",
+        "json-format.md#test-cases"
+      ],
+      "description": "a case file reads, and is written back as it was",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "description": "the cases of the discount rules",
+            "items": [
+              {
+                "id": "vip-gets-15",
+                "description": "a customer of more than five years gets 15%",
+                "input": {
+                  "years": 7
+                },
+                "expect": {
+                  "selected": [
+                    "vip"
+                  ],
+                  "output": {
+                    "discount": {
+                      "$decimal": "0.15"
+                    }
+                  }
+                }
+              },
+              {
+                "id": "years-unknown",
+                "input": {},
+                "expect": {
+                  "selected": [],
+                  "output": null,
+                  "unknown": [
+                    "vip"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "description": "the cases of the discount rules",
+            "items": [
+              {
+                "id": "vip-gets-15",
+                "description": "a customer of more than five years gets 15%",
+                "input": {
+                  "years": 7
+                },
+                "expect": {
+                  "selected": [
+                    "vip"
+                  ],
+                  "output": {
+                    "discount": {
+                      "$decimal": "0.15"
+                    }
+                  }
+                }
+              },
+              {
+                "id": "years-unknown",
+                "input": {},
+                "expect": {
+                  "selected": [],
+                  "output": null,
+                  "unknown": [
+                    "vip"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-empty",
+      "spec": [
+        "tests.md#case-files"
+      ],
+      "description": "a case file may hold no cases",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": []
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-description-and-metadata",
+      "spec": [
+        "tests.md#case-files"
+      ],
+      "description": "a case file has a description and metadata, whose keys are literal and whose values are data, an int out of range reading as null as in rule metadata",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [],
+            "metadata": {
+              "$owner": "risk",
+              "reviewed": {
+                "$date": "2026-11-22"
+              },
+              "n": 99999999999999999999,
+              "m": {
+                "$map": {
+                  "$k": 1
+                }
+              }
+            },
+            "description": "d"
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "description": "d",
+            "metadata": {
+              "$owner": "risk",
+              "reviewed": {
+                "$date": "2026-11-22"
+              },
+              "n": null,
+              "m": {
+                "$map": {
+                  "$k": 1
+                }
+              }
+            },
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-empty-metadata",
+      "spec": [
+        "tests.md#case-files"
+      ],
+      "description": "empty metadata is written without the key",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "metadata": {},
+            "items": []
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": []
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-no-expectation",
+      "spec": [
+        "tests.md#cases",
+        "tests.md#expectations"
+      ],
+      "description": "a case without an expectation, or with an empty one, is written without it",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {
+                  "x": 1
+                }
+              },
+              {
+                "id": "b",
+                "input": {
+                  "x": 2
+                },
+                "expect": {}
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {
+                  "x": 1
+                }
+              },
+              {
+                "id": "b",
+                "input": {
+                  "x": 2
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-member-order",
+      "spec": [
+        "tests.md#reading-and-writing"
+      ],
+      "description": "the members of a case and of its expectation are read in any order",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "expect": {
+                  "unknown": [],
+                  "output": {
+                    "b": 2,
+                    "a": 1
+                  },
+                  "selected": [
+                    "r"
+                  ]
+                },
+                "input": {
+                  "y": 1,
+                  "x": 2
+                },
+                "description": "d",
+                "id": "a"
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "description": "d",
+                "input": {
+                  "y": 1,
+                  "x": 2
+                },
+                "expect": {
+                  "selected": [
+                    "r"
+                  ],
+                  "output": {
+                    "b": 2,
+                    "a": 1
+                  },
+                  "unknown": []
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-unknown-sorted",
+      "spec": [
+        "tests.md#expectations",
+        "tests.md#rules-in-expectations"
+      ],
+      "description": "unknown is a set, written sorted by code point",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "unknown": [
+                    "b",
+                    "é",
+                    "a",
+                    "Z"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "unknown": [
+                    "Z",
+                    "a",
+                    "b",
+                    "é"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-selected-order-kept",
+      "spec": [
+        "tests.md#expectations",
+        "tests.md#rules-in-expectations"
+      ],
+      "description": "selected keeps its order, the selection order",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "selected": [
+                    "b",
+                    "a",
+                    "PRICING-12"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "selected": [
+                    "b",
+                    "a",
+                    "PRICING-12"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-output-null",
+      "spec": [
+        "tests.md#expectations"
+      ],
+      "description": "an output of null expects that no rule is selected",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "selected": [],
+                  "output": null
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "selected": [],
+                  "output": null
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-outputs",
+      "spec": [
+        "tests.md#expectations"
+      ],
+      "description": "outputs hold one object per selected rule, whose values may be lists and maps",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {
+                  "order": {
+                    "items": [
+                      1,
+                      2
+                    ],
+                    "total": 1200
+                  }
+                },
+                "expect": {
+                  "outputs": [
+                    {
+                      "shipping": 0
+                    },
+                    {
+                      "tags": [
+                        "a",
+                        "b"
+                      ],
+                      "limits": {
+                        "max": 3
+                      }
+                    },
+                    {}
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {
+                  "order": {
+                    "items": [
+                      1,
+                      2
+                    ],
+                    "total": 1200
+                  }
+                },
+                "expect": {
+                  "outputs": [
+                    {
+                      "shipping": 0
+                    },
+                    {
+                      "tags": [
+                        "a",
+                        "b"
+                      ],
+                      "limits": {
+                        "max": 3
+                      }
+                    },
+                    {}
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-output-literal-keys",
+      "spec": [
+        "tests.md#expectations"
+      ],
+      "description": "the keys of an expected output are payload keys, taken literally, even with a $",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {
+                  "$map": {
+                    "$ref": 1
+                  }
+                },
+                "expect": {
+                  "output": {
+                    "$decimal": "1",
+                    "$ref": {
+                      "$map": {
+                        "$x": 2
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {
+                  "$map": {
+                    "$ref": 1
+                  }
+                },
+                "expect": {
+                  "output": {
+                    "$decimal": "1",
+                    "$ref": {
+                      "$map": {
+                        "$x": 2
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-values-canonical",
+      "spec": [
+        "tests.md#inputs",
+        "tests.md#expectations",
+        "json-format.md#values"
+      ],
+      "description": "inputs and expected values are written in their canonical form, decimals keeping their scale",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {
+                  "i": {
+                    "$int": "007"
+                  },
+                  "f": 1e2,
+                  "d": {
+                    "$decimal": "1.5e-3"
+                  },
+                  "s": {
+                    "$decimal": "1.00"
+                  },
+                  "t": {
+                    "$datetime": "2026-10-31T09:30:00.500+01:00"
+                  }
+                },
+                "expect": {
+                  "output": {
+                    "total": {
+                      "$float": 1
+                    },
+                    "price": {
+                      "$decimal": "19.990"
+                    },
+                    "big": {
+                      "$int": "9007199254740993"
+                    },
+                    "day": {
+                      "$date": "2026-10-31"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {
+                  "i": 7,
+                  "f": 100.0,
+                  "d": {
+                    "$decimal": "0.0015"
+                  },
+                  "s": {
+                    "$decimal": "1.00"
+                  },
+                  "t": {
+                    "$datetime": "2026-10-31T09:30:00.500000+01:00"
+                  }
+                },
+                "expect": {
+                  "output": {
+                    "total": 1.0,
+                    "price": {
+                      "$decimal": "19.990"
+                    },
+                    "big": {
+                      "$int": "9007199254740993"
+                    },
+                    "day": {
+                      "$date": "2026-10-31"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-int-overflow",
+      "spec": [
+        "tests.md#inputs"
+      ],
+      "description": "an int outside the signed 64-bit range reads as null in an input, as in any input",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {
+                  "n": 99999999999999999999,
+                  "m": {
+                    "$int": "-99999999999999999999"
+                  },
+                  "d": {
+                    "$decimal": "100000000000000000000000000000000000000"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {
+                  "n": null,
+                  "m": null,
+                  "d": null
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-errors",
+      "spec": [
+        "tests.md#errors"
+      ],
+      "description": "an expected error is an object with its code, one of the three evaluation can raise",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "error": {
+                    "code": "missing_field"
+                  }
+                }
+              },
+              {
+                "id": "b",
+                "input": {},
+                "expect": {
+                  "error": {
+                    "code": "type_mismatch"
+                  }
+                }
+              },
+              {
+                "id": "c",
+                "input": {},
+                "expect": {
+                  "error": {
+                    "code": "hit_policy_error"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "error": {
+                    "code": "missing_field"
+                  }
+                }
+              },
+              {
+                "id": "b",
+                "input": {},
+                "expect": {
+                  "error": {
+                    "code": "type_mismatch"
+                  }
+                }
+              },
+              {
+                "id": "c",
+                "input": {},
+                "expect": {
+                  "error": {
+                    "code": "hit_policy_error"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-ids-literal",
+      "spec": [
+        "tests.md#identity"
+      ],
+      "description": "ids are any non-empty strings, taken literally: ids that differ only in case differ",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "Vip ✓",
+                "input": {}
+              },
+              {
+                "id": "vip ✓",
+                "input": {}
+              },
+              {
+                "id": "a/b",
+                "input": {}
+              },
+              {
+                "id": " ",
+                "input": {}
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "Vip ✓",
+                "input": {}
+              },
+              {
+                "id": "vip ✓",
+                "input": {}
+              },
+              {
+                "id": "a/b",
+                "input": {}
+              },
+              {
+                "id": " ",
+                "input": {}
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-scalar-input",
+      "spec": [
+        "tests.md#inputs"
+      ],
+      "description": "an input may be any data value, not only a map",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": [
+                  1,
+                  "x",
+                  null
+                ]
+              },
+              {
+                "id": "b",
+                "input": 5
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": [
+                  1,
+                  "x",
+                  null
+                ]
+              },
+              {
+                "id": "b",
+                "input": 5
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/read-yaml",
+      "spec": [
+        "tests.md#case-files"
+      ],
+      "description": "a case file reads from YAML",
+      "given": {
+        "kind": "read",
+        "yaml": "version: 1\ncases:\n  items:\n  - id: vip-gets-15\n    input: {years: 7}\n    expect:\n      selected: [vip]\n      output:\n        discount: {$decimal: '0.15'}\n  - id: years-unknown\n    input: {}\n    expect: {selected: [], output: null, unknown: [vip]}\n"
+      },
+      "expect": {
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "vip-gets-15",
+                "input": {
+                  "years": 7
+                },
+                "expect": {
+                  "selected": [
+                    "vip"
+                  ],
+                  "output": {
+                    "discount": {
+                      "$decimal": "0.15"
+                    }
+                  }
+                }
+              },
+              {
+                "id": "years-unknown",
+                "input": {},
+                "expect": {
+                  "selected": [],
+                  "output": null,
+                  "unknown": [
+                    "vip"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "format/cases/write-text",
+      "spec": [
+        "tests.md#case-files"
+      ],
+      "description": "a case file has no text form",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "description": "the cases of the discount rules",
+            "items": [
+              {
+                "id": "vip-gets-15",
+                "description": "a customer of more than five years gets 15%",
+                "input": {
+                  "years": 7
+                },
+                "expect": {
+                  "selected": [
+                    "vip"
+                  ],
+                  "output": {
+                    "discount": {
+                      "$decimal": "0.15"
+                    }
+                  }
+                }
+              },
+              {
+                "id": "years-unknown",
+                "input": {},
+                "expect": {
+                  "selected": [],
+                  "output": null,
+                  "unknown": [
+                    "vip"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "write": "text"
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
+      "id": "format/cases/write-csv",
+      "spec": [
+        "tests.md#case-files"
+      ],
+      "description": "a case file has no csv form",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "description": "the cases of the discount rules",
+            "items": [
+              {
+                "id": "vip-gets-15",
+                "description": "a customer of more than five years gets 15%",
+                "input": {
+                  "years": 7
+                },
+                "expect": {
+                  "selected": [
+                    "vip"
+                  ],
+                  "output": {
+                    "discount": {
+                      "$decimal": "0.15"
+                    }
+                  }
+                }
+              },
+              {
+                "id": "years-unknown",
+                "input": {},
+                "expect": {
+                  "selected": [],
+                  "output": null,
+                  "unknown": [
+                    "vip"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "write": "csv"
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
+      "id": "format/cases/content-not-object",
+      "spec": [
+        "tests.md#case-files"
+      ],
+      "description": "the content of a case file is an object, not the array of its cases",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": [
+            {
+              "id": "a",
+              "input": {}
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases"
+        }
+      }
+    },
+    {
+      "id": "format/cases/items-missing",
+      "spec": [
+        "tests.md#case-files"
+      ],
+      "description": "a case file holds its cases under items",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "description": "none"
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items"
+        }
+      }
+    },
+    {
+      "id": "format/cases/items-not-array",
+      "spec": [
+        "tests.md#case-files"
+      ],
+      "description": "items is an array of cases",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": {}
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items"
+        }
+      }
+    },
+    {
+      "id": "format/cases/file-description-not-string",
+      "spec": [
+        "tests.md#case-files"
+      ],
+      "description": "a case file's description is a string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "description": 1,
+            "items": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/description"
+        }
+      }
+    },
+    {
+      "id": "format/cases/metadata-before-items",
+      "spec": [
+        "tests.md#case-files",
+        "tests.md#reading-and-writing"
+      ],
+      "description": "a case file's metadata is read before its items, and is an object",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": ""
+              }
+            ],
+            "metadata": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/metadata"
+        }
+      }
+    },
+    {
+      "id": "format/cases/file-unknown-key",
+      "spec": [
+        "tests.md#case-files"
+      ],
+      "description": "a case file has no other keys: tags are not one in this version",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [],
+            "tags": [
+              "a"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/tags"
+        }
+      }
+    },
+    {
+      "id": "format/cases/case-not-object",
+      "spec": [
+        "tests.md#cases"
+      ],
+      "description": "a case is an object",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              [
+                "a",
+                {}
+              ]
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0"
+        }
+      }
+    },
+    {
+      "id": "format/cases/id-missing",
+      "spec": [
+        "tests.md#cases"
+      ],
+      "description": "a case has an id",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "input": {}
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/id"
+        }
+      }
+    },
+    {
+      "id": "format/cases/id-not-string",
+      "spec": [
+        "tests.md#identity"
+      ],
+      "description": "an id is a string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": 1,
+                "input": {}
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/id"
+        }
+      }
+    },
+    {
+      "id": "format/cases/id-empty",
+      "spec": [
+        "tests.md#identity"
+      ],
+      "description": "an id is not empty",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "",
+                "input": {}
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/id"
+        }
+      }
+    },
+    {
+      "id": "format/cases/id-repeated",
+      "spec": [
+        "tests.md#identity",
+        "tests.md#reading-and-writing"
+      ],
+      "description": "a case whose id repeats an earlier case's is refused at its id",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {}
+              },
+              {
+                "id": "b",
+                "input": {}
+              },
+              {
+                "id": "a",
+                "input": {}
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/2/id"
+        }
+      }
+    },
+    {
+      "id": "format/cases/description-not-string",
+      "spec": [
+        "tests.md#cases"
+      ],
+      "description": "a description is a string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "description": 1,
+                "input": {}
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/description"
+        }
+      }
+    },
+    {
+      "id": "format/cases/input-missing",
+      "spec": [
+        "tests.md#cases",
+        "tests.md#reading-and-writing"
+      ],
+      "description": "a case has an input, checked before unknown keys",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "name": "a"
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/input"
+        }
+      }
+    },
+    {
+      "id": "format/cases/input-opaque",
+      "spec": [
+        "tests.md#inputs"
+      ],
+      "description": "an opaque value is not data",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {
+                  "x": {
+                    "$opaque": "bytes"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/input/x"
+        }
+      }
+    },
+    {
+      "id": "format/cases/unknown-key",
+      "spec": [
+        "tests.md#cases"
+      ],
+      "description": "a case has no other keys",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "name": "a"
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/name"
+        }
+      }
+    },
+    {
+      "id": "format/cases/expect-not-object",
+      "spec": [
+        "tests.md#cases"
+      ],
+      "description": "an expectation is an object",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": []
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect"
+        }
+      }
+    },
+    {
+      "id": "format/cases/expect-unknown-key",
+      "spec": [
+        "tests.md#expectations"
+      ],
+      "description": "an expectation has no other keys: fired is not one in this version",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "fired": [
+                    "vip"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/fired"
+        }
+      }
+    },
+    {
+      "id": "format/cases/selected-not-array",
+      "spec": [
+        "tests.md#expectations"
+      ],
+      "description": "selected is an array",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "selected": "vip"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/selected"
+        }
+      }
+    },
+    {
+      "id": "format/cases/selected-not-string",
+      "spec": [
+        "tests.md#rules-in-expectations"
+      ],
+      "description": "a rule is named by a string",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "selected": [
+                    1
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/selected/0"
+        }
+      }
+    },
+    {
+      "id": "format/cases/selected-empty",
+      "spec": [
+        "tests.md#rules-in-expectations"
+      ],
+      "description": "an empty string names no rule",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "selected": [
+                    "vip",
+                    ""
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/selected/1"
+        }
+      }
+    },
+    {
+      "id": "format/cases/selected-repeated",
+      "spec": [
+        "tests.md#rules-in-expectations"
+      ],
+      "description": "a rule is named once in selected",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "selected": [
+                    "a",
+                    "b",
+                    "a",
+                    1
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/selected/2"
+        }
+      }
+    },
+    {
+      "id": "format/cases/unknown-repeated",
+      "spec": [
+        "tests.md#rules-in-expectations"
+      ],
+      "description": "a rule is named once in unknown",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "unknown": [
+                    "a",
+                    "a"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/unknown/1"
+        }
+      }
+    },
+    {
+      "id": "format/cases/output-not-object",
+      "spec": [
+        "tests.md#expectations"
+      ],
+      "description": "an output is an object or null",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "output": "x"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/output"
+        }
+      }
+    },
+    {
+      "id": "format/cases/outputs-not-array",
+      "spec": [
+        "tests.md#expectations"
+      ],
+      "description": "outputs is an array",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "outputs": {}
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/outputs"
+        }
+      }
+    },
+    {
+      "id": "format/cases/outputs-null-item",
+      "spec": [
+        "tests.md#expectations"
+      ],
+      "description": "each item of outputs is an object: a selected rule always has an output",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "outputs": [
+                    {},
+                    null
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/outputs/1"
+        }
+      }
+    },
+    {
+      "id": "format/cases/output-value-opaque",
+      "spec": [
+        "tests.md#expectations"
+      ],
+      "description": "an expected value is a data value",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "output": {
+                    "x": {
+                      "$opaque": "bytes"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/output/x"
+        }
+      }
+    },
+    {
+      "id": "format/cases/output-int-overflow",
+      "spec": [
+        "tests.md#expectations",
+        "tests.md#reading-and-writing"
+      ],
+      "description": "an expected int outside the signed 64-bit range is refused, not read as null",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "output": {
+                    "n": 99999999999999999999
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/output/n"
+        }
+      }
+    },
+    {
+      "id": "format/cases/output-typed-int-overflow",
+      "spec": [
+        "tests.md#expectations"
+      ],
+      "description": "an expected $int outside the signed 64-bit range is refused at its typed value",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "output": {
+                    "n": {
+                      "$int": "-99999999999999999999"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/output/n/$int"
+        }
+      }
+    },
+    {
+      "id": "format/cases/output-decimal-overflow",
+      "spec": [
+        "tests.md#expectations"
+      ],
+      "description": "an expected decimal that does not fit is refused, not read as null",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "output": {
+                    "d": {
+                      "$decimal": "100000000000000000000000000000000000000"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/output/d/$decimal"
+        }
+      }
+    },
+    {
+      "id": "format/cases/outputs-int-overflow",
+      "spec": [
+        "tests.md#expectations"
+      ],
+      "description": "an int out of range is refused in outputs too",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "outputs": [
+                    {},
+                    {
+                      "n": [
+                        1,
+                        99999999999999999999
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/outputs/1/n/1"
+        }
+      }
+    },
+    {
+      "id": "format/cases/error-as-string",
+      "spec": [
+        "tests.md#errors"
+      ],
+      "description": "an expected error is an object with its code",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "error": "missing_field"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/error"
+        }
+      }
+    },
+    {
+      "id": "format/cases/error-code-missing",
+      "spec": [
+        "tests.md#errors"
+      ],
+      "description": "an expected error has a code",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "error": {}
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/error/code"
+        }
+      }
+    },
+    {
+      "id": "format/cases/error-code-format",
+      "spec": [
+        "tests.md#errors"
+      ],
+      "description": "an expected error is not a code that evaluation never raises",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "error": {
+                    "code": "format_error"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/error/code"
+        }
+      }
+    },
+    {
+      "id": "format/cases/error-code-parent",
+      "spec": [
+        "tests.md#errors"
+      ],
+      "description": "an expected error is not a parent code, which this version does not match",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "error": {
+                    "code": "evaluation_error"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/error/code"
+        }
+      }
+    },
+    {
+      "id": "format/cases/error-code-unknown",
+      "spec": [
+        "tests.md#errors"
+      ],
+      "description": "an expected error is not a string that is not a code",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "error": {
+                    "code": "oops"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/error/code"
+        }
+      }
+    },
+    {
+      "id": "format/cases/error-unknown-key",
+      "spec": [
+        "tests.md#errors"
+      ],
+      "description": "an expected error holds its code only in this version",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "error": {
+                    "code": "missing_field",
+                    "rule": "vip"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/error/rule"
+        }
+      }
+    },
+    {
+      "id": "format/cases/error-with-others",
+      "spec": [
+        "tests.md#expectations",
+        "tests.md#reading-and-writing"
+      ],
+      "description": "an expected error is given alone",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "output": null,
+                  "error": {
+                    "code": "missing_field"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/error"
+        }
+      }
+    },
+    {
+      "id": "format/cases/error-alone-after-keys",
+      "spec": [
+        "tests.md#reading-and-writing"
+      ],
+      "description": "an error given with others is checked after the expectation's unknown keys",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a",
+                "input": {},
+                "expect": {
+                  "selected": [],
+                  "fired": [],
+                  "error": {
+                    "code": "missing_field"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/expect/fired"
+        }
+      }
+    },
+    {
+      "id": "format/cases/first-case-first",
+      "spec": [
+        "tests.md#reading-and-writing"
+      ],
+      "description": "cases are read in order: the first case's error is reported",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "a"
+              },
+              {
+                "input": {}
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/input"
+        }
+      }
+    },
+    {
+      "id": "format/cases/content-before-top-level",
+      "spec": [
+        "tests.md#reading-and-writing",
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "the content's shape is checked before the document's unknown keys",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "x": 1,
+          "cases": {
+            "items": [
+              {
+                "input": {}
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/cases/items/0/id"
+        }
+      }
+    },
+    {
+      "id": "format/cases/top-level-unknown-key",
+      "spec": [
+        "tests.md#case-files"
+      ],
+      "description": "a case file has no other top-level keys",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": []
+          },
+          "x": 1
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "pointer": "/x"
+        }
+      }
+    },
+    {
+      "id": "format/cases/version-unknown",
+      "spec": [
+        "tests.md#case-files",
+        "json-format.md#documents"
+      ],
+      "description": "a case file of another format version is refused",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 2,
+          "cases": {
+            "items": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported_version",
+          "pointer": "/version"
+        }
+      }
+    },
+    {
+      "id": "format/cases/canonical-example",
+      "spec": [
+        "tests.md#reading-and-writing",
+        "json-format.md#digests"
+      ],
+      "description": "a case file has canonical bytes and a digest, and gives no rule set",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "cases": {
+            "description": "the cases of the discount rules",
+            "items": [
+              {
+                "id": "vip-gets-15",
+                "description": "a customer of more than five years gets 15%",
+                "input": {
+                  "years": 7
+                },
+                "expect": {
+                  "selected": [
+                    "vip"
+                  ],
+                  "output": {
+                    "discount": {
+                      "$decimal": "0.15"
+                    }
+                  }
+                }
+              },
+              {
+                "id": "years-unknown",
+                "input": {},
+                "expect": {
+                  "selected": [],
+                  "output": null,
+                  "unknown": [
+                    "vip"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"cases\":{\"description\":\"the cases of the discount rules\",\"items\":[{\"description\":\"a customer of more than five years gets 15%\",\"expect\":{\"output\":{\"discount\":{\"$decimal\":\"0.15\"}},\"selected\":[\"vip\"]},\"id\":\"vip-gets-15\",\"input\":{\"years\":7}},{\"expect\":{\"output\":null,\"selected\":[],\"unknown\":[\"vip\"]},\"id\":\"years-unknown\",\"input\":{}}]},\"version\":1}",
+        "digest": "sha256:299975fe3e306fe2532cf3414418e75392188b8597a39c10ef5c02da411d1afb"
+      }
+    },
+    {
+      "id": "format/cases/canonical-sorted",
+      "spec": [
+        "tests.md#reading-and-writing",
+        "json-format.md#digests"
+      ],
+      "description": "canonical bytes sort every member and the unknown rules, and keep selected in order",
+      "given": {
+        "kind": "canonical",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "input": {
+                  "b": 1e2,
+                  "a": {
+                    "$decimal": "1.50"
+                  }
+                },
+                "id": "z",
+                "expect": {
+                  "unknown": [
+                    "y",
+                    "x"
+                  ],
+                  "selected": [
+                    "y",
+                    "x"
+                  ],
+                  "outputs": [
+                    {
+                      "$k": 1,
+                      "a": null
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "canonical": "{\"cases\":{\"items\":[{\"expect\":{\"outputs\":[{\"$k\":1,\"a\":null}],\"selected\":[\"y\",\"x\"],\"unknown\":[\"x\",\"y\"]},\"id\":\"z\",\"input\":{\"a\":{\"$decimal\":\"1.50\"},\"b\":100.0}}]},\"version\":1}",
+        "digest": "sha256:86f6ae17e02cc786c1f427169fa0ac977b9a6d09d32e7ddc53ffea094aa08cf7"
+      }
+    }
+  ]
+}

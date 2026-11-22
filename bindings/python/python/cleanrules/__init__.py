@@ -19,7 +19,7 @@ from cleanrules._bundles import (
     BundleEngine,
     BundleLimits,
     BundleRelation,
-    CaseFile,
+    CaseFileRef,
 )
 from cleanrules._cleanrules import FORMAT_VERSION, __version__
 from cleanrules._documents import (
@@ -95,7 +95,7 @@ __all__ = [
     "BundleEngine",
     "BundleLimits",
     "BundleRelation",
-    "CaseFile",
+    "CaseFileRef",
     "Catalog",
     "Cause",
     "CauseGroup",

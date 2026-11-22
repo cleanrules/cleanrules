@@ -8,19 +8,19 @@
 
 #![allow(clippy::print_stdout)]
 
-use cleanrules::bundle::{Bundle, BundleId, CaseFile, Difference, Relation, Revision};
+use cleanrules::bundle::{Bundle, BundleId, CaseFileRef, Difference, Relation, Revision};
 use cleanrules::format::{Document, DocumentFormat, read_document, write_document_as};
 use cleanrules::json::Limits;
 use cleanrules::text;
 
 const V1: &str = "RULE vip IF customer.years > 5 THEN discount = 0.15";
 const V2: &str = "RULE vip IF customer.years > 3 THEN discount = 0.15";
-// The bytes of a case file; until task T.1 their format is opaque.
-const CASES: &[u8] = br#"[{"input": {"customer": {"years": 7}}}]"#;
+// The bytes of a case file (`spec/tests.md`); the bundle records their digest.
+const CASES: &[u8] = br#"{"version": 1, "cases": {"items": [{"id": "vip", "input": {"customer": {"years": 7}}, "expect": {"selected": ["vip"]}}]}}"#;
 
 fn main() -> cleanrules::Result<()> {
     let limits = Limits::default();
-    let cases = [CaseFile::new("cases/vip.json", CASES)?];
+    let cases = [CaseFileRef::new("cases/vip.json", CASES)?];
     // The author names the rules and their revision; the core never does.
     let id = BundleId::new("acme/discounts")?;
     let v1 = text::parse(V1, &limits)?.into_ruleset()?;
@@ -41,7 +41,7 @@ fn main() -> cleanrules::Result<()> {
         unreachable!("a bundle document gives a bundle")
     };
     assert_eq!(*read, first, "bundles are equal by digest");
-    assert!(read.cases()[0].matches(CASES));
+    assert!(read.cases()[0].digest_matches(CASES));
 
     // A new revision of the rules, on the same engine.
     let v2 = text::parse(V2, &limits)?.into_ruleset()?;

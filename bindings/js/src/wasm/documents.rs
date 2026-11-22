@@ -549,23 +549,26 @@ pub fn bundle_table(document: &Document) -> Result<NativeTable, JsValue> {
 /// # Errors
 ///
 /// As in the napi-rs build.
-#[wasm_bindgen(js_name = bundleCaseMatches)]
-pub fn bundle_case_matches(
+#[wasm_bindgen(js_name = bundleCaseDigestMatches)]
+pub fn bundle_case_digest_matches(
     document: &Document,
     path: &JsValue,
     bytes: &JsValue,
 ) -> Result<bool, JsValue> {
-    document.core.case_matches(&raw(path), raw(bytes)).or_fail()
+    document
+        .core
+        .case_digest_matches(&raw(path), raw(bytes))
+        .or_fail()
 }
 
-/// Check the path and digest of a case file, for the idiomatic `CaseFile`.
+/// Check the path and digest of a case file, for the idiomatic `CaseFileRef`.
 ///
 /// # Errors
 ///
 /// As in the napi-rs build.
-#[wasm_bindgen(js_name = checkCaseFile)]
-pub fn check_case_file(path: &JsValue, digest: &JsValue) -> Result<(), JsValue> {
-    bundles::check_case_file(&raw(path), &raw(digest)).or_fail()
+#[wasm_bindgen(js_name = checkCaseFileRef)]
+pub fn check_case_file_ref(path: &JsValue, digest: &JsValue) -> Result<(), JsValue> {
+    bundles::check_case_file_ref(&raw(path), &raw(digest)).or_fail()
 }
 
 /// Whether `content` is the case file of `path` and `digest`.
@@ -573,11 +576,11 @@ pub fn check_case_file(path: &JsValue, digest: &JsValue) -> Result<(), JsValue> 
 /// # Errors
 ///
 /// As in the napi-rs build.
-#[wasm_bindgen(js_name = caseFileMatches)]
-pub fn case_file_matches(
+#[wasm_bindgen(js_name = caseFileRefDigestMatches)]
+pub fn case_file_ref_digest_matches(
     path: &JsValue,
     digest: &JsValue,
     content: &JsValue,
 ) -> Result<bool, JsValue> {
-    bundles::case_file_matches(&raw(path), &raw(digest), raw(content)).or_fail()
+    bundles::case_file_ref_digest_matches(&raw(path), &raw(digest), raw(content)).or_fail()
 }

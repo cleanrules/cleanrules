@@ -68,6 +68,7 @@ impl DocumentCore {
             Document::RuleSet(_) => "ruleset",
             Document::DecisionTable(_) => "decision_table",
             Document::Bundle(_) => "bundle",
+            Document::Cases(_) => "cases",
             // The core's documents are `#[non_exhaustive]`.
             _ => "unknown",
         }

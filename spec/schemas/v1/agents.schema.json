@@ -428,7 +428,8 @@
             "rule",
             "ruleset",
             "decision_table",
-            "bundle"
+            "bundle",
+            "cases"
           ]
         },
         "summary": {

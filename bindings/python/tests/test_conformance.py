@@ -24,6 +24,11 @@ the `Bundle` properties (`native`); `bundle` vectors make a bundle with
 with `_compare_bundles` or `Bundle.compare`. A `current_engine` vector, and
 the expected document of a `bundle` vector, name this engine's version
 (`cleanrules.__version__`).
+
+Case files (`spec/tests.md`, `format/cases/*`) have no Python type yet:
+`loads` refuses them with `UnsupportedError`. Their `read` vectors run through
+`_read_document` (`json`); those that write a case file in another format, and
+their `canonical` vectors, are skipped.
 """
 
 from __future__ import annotations
@@ -582,7 +587,7 @@ def run_make_bundle(vector: dict[str, Any], route: str) -> None:
         assert again == bundle and json.loads(cleanrules.dumps(again)) == written
         check_bundle(bundle, written)
         for path, text in cases:
-            assert bundle.case_matches(path, text)
+            assert bundle.case_digest_matches(path, text)
         return written
 
     # Errors are compared by their code only.
@@ -607,6 +612,29 @@ def run_compare_bundles(vector: dict[str, Any], route: str) -> None:
     expect_result(lambda: forth, expect, "comparison")
 
 
+def is_case_file_vector(vector: dict[str, Any]) -> bool:
+    return str(vector["id"]).startswith("format/cases/")
+
+
+CASES_SKIP = (
+    "case files (spec/tests.md) have no Python type yet: cleanrules.loads refuses them, and"
+    " the core and C ABI runners write them and check their canonical bytes"
+)
+
+
+def run_read_case_file(vector: dict[str, Any]) -> None:
+    """A `read` vector of a case file, through the private JSON entry point."""
+    given, expect = vector["given"], vector["expect"]
+    fmt: Any = "yaml" if "yaml" in given else "json"
+    source = given["yaml"] if "yaml" in given else dumps(given["document"])
+    expect_result(
+        lambda: json.loads(_cleanrules._read_document(source, format=fmt)),  # pyright: ignore[reportPrivateUsage]
+        expect,
+        "document",
+        read=True,
+    )
+
+
 def run_bundle(vector: dict[str, Any], route: str) -> bool:
     """Run a vector of `format/bundles`; whether it was one that this runs."""
     kind = vector["given"]["kind"]
@@ -624,6 +652,9 @@ def run_bundle(vector: dict[str, Any], route: str) -> bool:
 def run_json(vector: dict[str, Any]) -> None:
     given, expect = vector["given"], vector["expect"]
     kind = given["kind"]
+    if kind == "read" and is_case_file_vector(vector):
+        run_read_case_file(vector)
+        return
     if run_bundle(vector, "json"):
         return
     if kind == "canonical":
@@ -826,6 +857,17 @@ def collect() -> list[Any]:
                         marks=pytest.mark.skip(reason=DRAW_SKIP),
                     )
                 )
+                continue
+            if is_case_file_vector(vector) and (given["kind"] == "canonical" or "write" in given):
+                for run in ("json", "native") if given["kind"] == "canonical" else ("json",):
+                    params.append(
+                        pytest.param(
+                            vector,
+                            run,
+                            id=f"{run}:{vector['id']}",
+                            marks=pytest.mark.skip(reason=CASES_SKIP),
+                        )
+                    )
                 continue
             if given["kind"] == "evaluate" and "limits" in given:
                 # `max_values` bounds native data only: no JSON run.

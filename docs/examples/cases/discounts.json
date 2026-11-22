@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "cases": {
+    "description": "the cases of the discount rules (docs/examples/discounts.json)",
+    "items": [
+      {
+        "id": "vip-gets-15",
+        "description": "a customer of seven years with a large order gets 15%; whether they are blocked is not known",
+        "input": { "customer": { "years": 7 }, "order": { "total": 1500 } },
+        "expect": {
+          "selected": ["vip"],
+          "output": { "discount": { "$decimal": "0.15" } },
+          "unknown": ["blocked"]
+        }
+      },
+      {
+        "id": "blocked-gets-nothing",
+        "input": { "customer": { "years": 7, "blocked": true }, "order": { "total": 1500 } },
+        "expect": { "selected": ["blocked"], "output": { "discount": 0 } }
+      },
+      {
+        "id": "newsletter-is-loyal",
+        "input": { "customer": { "years": 1, "newsletter": true, "blocked": false }, "order": { "total": 10 } },
+        "expect": { "selected": ["loyal"], "output": { "discount": { "$decimal": "0.05" } }, "unknown": [] }
+      },
+      {
+        "id": "new-customer-gets-nothing",
+        "input": { "customer": { "years": 1, "newsletter": false, "blocked": false }, "order": { "total": 50 } },
+        "expect": { "selected": [], "output": null, "unknown": [] }
+      }
+    ]
+  }
+}

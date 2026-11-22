@@ -45,7 +45,7 @@ __all__ = [
     "BundleEngine",
     "BundleLimits",
     "BundleRelation",
-    "CaseFile",
+    "CaseFileRef",
 ]
 
 
@@ -159,8 +159,10 @@ class BundleEngine:
 
 
 @dataclass(frozen=True, slots=True)
-class CaseFile:
-    """A file of test cases a bundle refers to (`spec/bundles.md`, *Cases*).
+class CaseFileRef:
+    """A bundle's reference to a case file (`spec/bundles.md`, *Cases*): its path and digest.
+
+    The case file itself is a document of test cases (`spec/tests.md`).
 
     Attributes:
         path: The file's path, relative to the bundle's directory, with `/`
@@ -178,13 +180,13 @@ class CaseFile:
                 raise TypeError(f"{name} must be a str, got {type(text).__name__}")
         _native.check_case_file(self.path, self.digest)
 
-    def matches(self, content: bytes | str) -> bool:
-        """Whether `content` is the file the bundle was made with: the same bytes.
+    def digest_matches(self, content: bytes | str) -> bool:
+        """Whether `content` has the digest the bundle recorded: the same bytes.
 
         Args:
             content: The file's content; a `str` is encoded as UTF-8.
         """
-        return _native.case_matches(self.path, self.digest, _bytes(content, "content"))
+        return _native.case_digest_matches(self.path, self.digest, _bytes(content, "content"))
 
 
 @dataclass(frozen=True, slots=True)
@@ -384,14 +386,14 @@ class Bundle:
         return cast(BundleContract, json.loads(self._native.contract_json()))
 
     @property
-    def cases(self) -> tuple[CaseFile, ...]:
+    def cases(self) -> tuple[CaseFileRef, ...]:
         """The case files, in the order they run."""
-        return tuple(CaseFile(path, digest) for path, digest in self._native.cases())
+        return tuple(CaseFileRef(path, digest) for path, digest in self._native.cases())
 
-    def case_matches(self, path: str, content: bytes | str) -> bool:
-        """Whether `content` is the case file at `path` the bundle was made with.
+    def case_digest_matches(self, path: str, content: bytes | str) -> bool:
+        """Whether `content` has the digest the bundle recorded for the case file at `path`.
 
-            bundle.case_matches("cases/vip.json", Path("cases/vip.json").read_bytes())
+            bundle.case_digest_matches("cases/vip.json", Path("cases/vip.json").read_bytes())
 
         Args:
             path: The case file's path, as the bundle holds it.
@@ -401,7 +403,7 @@ class Bundle:
             KeyError: If the bundle has no case file at `path`; the message
                 lists the paths it has.
         """
-        return self._native.case_matches(path, _bytes(content, "content"))
+        return self._native.case_digest_matches(path, _bytes(content, "content"))
 
     def compare(self, other: Bundle) -> BundleComparison:
         """Compare this bundle with another (`spec/bundles.md`, *Comparing bundles*).

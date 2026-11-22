@@ -178,7 +178,7 @@ comparison = old.compare(bundle)
 comparison.relation  # e.g. 'other_rules_same_engine': the rules changed
 comparison.differences  # e.g. (BundleDifference.REVISION, BundleDifference.RULES)
 bundle.engine.limits.max_depth  # 256
-bundle.case_matches("cases/discounts.json", Path("cases/discounts.json").read_bytes())
+bundle.case_digest_matches("cases/discounts.json", Path("cases/discounts.json").read_bytes())
 ```
 
 A bundle holds no code: rules with actions given as code are refused unless
@@ -186,6 +186,14 @@ you pass `omit_actions=True`, and named actions come back unbound. Reading a
 bundle checks its `ruleset_digest`, and, when this engine and version made it,
 its contract (`FormatError` with the code `decision_mismatch`); a bundle made
 by another version is read as it was recorded.
+
+A case file is a document of test cases
+([`spec/tests.md`](../../spec/tests.md),
+[`docs/examples/cases/discounts.json`](../../docs/examples/cases/discounts.json)):
+each case has an id, an input, and what evaluating it must give (the
+selected rules, the output, the rules left unknown, or the error). The bundle
+records the digest of its bytes; `loads` does not load case files yet
+(`UnsupportedError`), and running them comes in a later release.
 
 `evaluate` never has side effects; `run` evaluates and then calls the actions
 of the selected rules. An action is a function given to `Rule(do=...)`, or a

@@ -9,6 +9,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Test cases (task T.1; `spec/tests.md`): a new document, the case file,
+  `{"version": 1, "cases": {"description": ..., "metadata": {...}, "items":
+  [...]}}`, additive in format version 1 (older readers reject it), read and
+  written in JSON and YAML (not in text or CSV), with its JSON Schema
+  `spec/schemas/v1/cases.schema.json`. `description` and `metadata` (as a
+  rule's) are optional; each item is a case with an `id` (any non-empty
+  string, unique in its file), an `input` (a data value) and an optional
+  `expect`: `selected` (rules by effective id, in selection order), `output`
+  (`null` for no output, or an object whose keys the output must have with
+  equal values; other keys unchecked), `outputs` (one such object per
+  selected rule), `unknown` (the rules whose condition is unknown, as a set)
+  and `error` (`{"code": ...}`: `missing_field`, `type_mismatch` or
+  `hit_policy_error`, given alone). A rule is named once in `selected` and
+  `unknown`. Expected values are never out of range (`format_error`, unlike
+  an input, where an int out of range reads as null), and match when they
+  have the same canonical bytes: an int, a float and a decimal differ, and so
+  do decimals of different scale. The spec also fixes the outcome of a case
+  for the case runner to come: `error` only for an evaluation error the case
+  does not expect, otherwise `failed` listing every key that does not match,
+  in table order (an `output` asked of a decision without a single output
+  fails), or `passed`. A case file gives no rule set (`format_error`) and has
+  no diagram (`unsupported`); the `validate` tool reads it (`content`
+  `"cases"`, also in `agents.schema.json`); a bundle's case files are these
+  documents. 63 conformance vectors (`format/cases.json`, generated with their
+  canonical bytes by `conformance/tools/canonical_vectors.py`) and one
+  `validate` vector; `conformance/tools/check.py` now also validates the
+  expected results of `tool` vectors against `agents.schema.json`; JSON Schema
+  examples; the example case file `docs/examples/cases/discounts.json` and
+  `docs/examples/cases.rs`.
+  - Core: module `cases` (`Cases` with `with_description`, `with_metadata`
+    and `items`; `Case`; `Expectation` with `with_selected`, `with_output`,
+    `with_outputs`, `with_unknown` and `with_error`, and the getter `error`;
+    `ExpectedOutput::{NothingSelected, Includes}`; `EXPECTED_ERROR_CODES`, a
+    slice). The builders refuse what the reader refuses: an opaque value
+    anywhere, and a null out of range in metadata and expected values.
+    `ValueContext::Expected`, `Document::Cases` and `format::write_cases`.
+  - C ABI: `CR_DOCUMENT_CASES`, read, written and hashed as any document.
+  - Python and JavaScript: `loads`/`load` refuse a case file with
+    `UnsupportedError` (`operation` `loads`), after the reader's own errors;
+    JavaScript's `Document.read` of `cleanrules/native` reads it (`kind`
+    `"cases"`).
+  - Beta: C++ `cr::document_content::cases`; Java `DocumentKind.CASES`, read
+    through `ffi.Document`; Java, Scala and Go `loads`/`Loads` refuse a case
+    file with `unsupported`, with `operation` and `reason`.
+  - So that "case file" names the document, the bundle's reference to one
+    (task R.5, unreleased) is now `CaseFileRef` in Rust, Python and
+    JavaScript, checked with `digest_matches`/`digestMatches`, and a bundle's
+    `case_matches`/`caseMatches` is `case_digest_matches`/`caseDigestMatches`
+    (in `cleanrules/native`, `bundleCaseDigestMatches`); the C ABI's
+    `cr_case_input` is unchanged. The R.5 entries below use the new names.
 - Migration guide to the 1.0 contract (task R.6,
   [`docs/migration-1.0.md`](docs/migration-1.0.md)): every observable change
   of phase R since the draft format and APIs, with before and after examples
@@ -52,10 +102,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `Revision` (`new`, `FromStr`, `TryFrom<&str>`, `Display`, `as_str`);
     `BundleRules`, `Engine` (`is_current`), `EngineLimits` (`of`, `get`,
     `with`, `iter`, `check`, `to_limits`, `to_json`), the enum
-    `EngineLimit`, `Contract` (`to_json`), `CaseFile`, `Comparison`
+    `EngineLimit`, `Contract` (`to_json`), `CaseFileRef` (the reference to
+    a case file: path and digest, `digest_matches`), `Comparison`
     (`differences()` gives the enum `Difference`), `Relation`,
     `ENGINE_NAME`, `ENGINE_VERSION` and `MAX_RECORDED_LIMIT`;
-    `Bundle::case_matches`; `Bundle` is `Eq` and `Hash` by its digest,
+    `Bundle::case_digest_matches`; `Bundle` is `Eq` and `Hash` by its digest,
     computed once. `Document::Bundle` and `format::write_bundle`.
   - C ABI: `CR_DOCUMENT_BUNDLE`, `cr_document_new_bundle` (with
     `struct cr_case_input { path, path_len, bytes, bytes_len }`),
@@ -64,9 +115,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Python: `Bundle(rules, *, id, revision, cases=(), omit_actions=False,
     max_...)` with `id`, `revision`, `rules`, `ruleset`, `ruleset_digest`,
     `engine` (`BundleEngine`, whose `limits` is a frozen `BundleLimits`),
-    `contract` (the `TypedDict` `BundleContract`), `cases` (`CaseFile`,
-    checked when made, with `matches(content)`), `case_matches(path,
-    content)` (a `KeyError` naming the bundle's paths) and `compare`
+    `contract` (the `TypedDict` `BundleContract`), `cases` (`CaseFileRef`,
+    checked when made, with `digest_matches(content)`),
+    `case_digest_matches(path, content)` (a `KeyError` naming the bundle's
+    paths) and `compare`
     (`BundleComparison`, `BundleRelation`, and `differences` as
     `BundleDifference`, a `StrEnum`); `loads`, `dumps`, `load`, `dump`,
     `canonical_bytes` and `digest` take bundles, and a bundle pickles under
@@ -74,9 +126,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - JavaScript and wasm (Node, browsers, Deno): `new Bundle(rules, { id,
     revision, cases, omitActions, limits })` with `id`, `revision`, `rules`,
     `ruleset`, `rulesetDigest`, `engine` (`{ name, version, limits,
-    isCurrent }`), `contract`, `cases` (frozen `CaseFile` objects, also
-    exported and checked when made, with `matches(content)`),
-    `caseMatches(path, content)`, `compare(other)` and `toJSON()` (typed
+    isCurrent }`), `contract`, `cases` (frozen `CaseFileRef` objects, also
+    exported and checked when made, with `digestMatches(content)`),
+    `caseDigestMatches(path, content)`, `compare(other)` and `toJSON()` (typed
     `BundleDocument`); the types `BundleDifference` and `BundleLimitName`;
     `loads`, `load`, `dumps`, `dump`, `canonicalBytes` and `digest` take
     bundles; a limit of 0 or above `Number.MAX_SAFE_INTEGER` is an

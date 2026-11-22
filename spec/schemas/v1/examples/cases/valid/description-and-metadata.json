@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "cases": {
+    "description": "the cases of the discount rules",
+    "metadata": { "owner": "risk", "reviewed": { "$date": "2026-11-22" } },
+    "items": [{ "id": "smoke", "input": { "years": 2 } }]
+  }
+}

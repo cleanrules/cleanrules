@@ -493,6 +493,13 @@ std::string run_canonical(const json::value &given, const json::value &expect, m
             }
             break;
         }
+        case cr::document_content::cases:
+            // A case file (spec/tests.md) gives no rule set.
+            if (want_ruleset_digest != nullptr) {
+                return "a case file gives no rule set, expected the rule set digest " +
+                       json::write(*want_ruleset_digest);
+            }
+            return {};
         case cr::document_content::ruleset: {
             cr::ruleset rules = CALL(m, cr::ruleset::read, source, cr::format::json);
             if (std::string issue =

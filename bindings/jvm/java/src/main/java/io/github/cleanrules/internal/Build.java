@@ -109,6 +109,17 @@ public final class Build {
     }
 
     /**
+     * The JSON form of an {@code unsupported} error that the binding finds
+     * ({@code spec/errors.md}): its message and hint, and the operation and
+     * the reason it is not supported.
+     */
+    public static String unsupportedJson(String message, String hint, String operation, String reason) {
+        String json = json("unsupported", message, hint, null, null);
+        return json.substring(0, json.length() - 1) + ",\"operation\":" + quote(operation) + ",\"reason\":"
+                + quote(reason) + "}";
+    }
+
+    /**
      * The JSON form of an error that the binding finds ({@code spec/errors.md}):
      * its code, message and hint, and a pointer and a rule when not null.
      */

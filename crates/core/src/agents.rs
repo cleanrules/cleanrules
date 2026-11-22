@@ -639,9 +639,10 @@ fn validate(args: &Arguments<'_>) -> Result<Json> {
         Document::RuleSet(_) => "ruleset",
         Document::DecisionTable(_) => "decision_table",
         Document::Bundle(_) => "bundle",
+        Document::Cases(_) => "cases",
     };
     let mut members = vec![("valid", Json::Bool(true)), ("content", string(content))];
-    if !matches!(document, Document::Condition(_)) {
+    if !matches!(document, Document::Condition(_) | Document::Cases(_)) {
         let ruleset = document.into_ruleset()?;
         let overview = summary(&ruleset);
         members.push(("summary", write_summary(&overview)));

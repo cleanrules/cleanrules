@@ -507,6 +507,21 @@ void bundles_are_documents() {
     CHECK(cr::ruleset::from_document(doc).digest() == rules.digest());
 }
 
+void case_files_are_documents() {
+    const std::string text = R"({"version":1,"cases":{"items":[{"id":"a","input":{"x":1}}]}})";
+    auto doc = cr::document::read(text, cr::format::json);
+    CHECK(doc.content() == cr::document_content::cases);
+    CHECK(doc.write(cr::format::json) == text);
+    CHECK(doc.digest().rfind("sha256:", 0) == 0);
+    bool refused = false;
+    try {
+        static_cast<void>(cr::ruleset::from_document(doc));
+    } catch (const cr::format_error &) {
+        refused = true;
+    }
+    CHECK(refused);
+}
+
 void grids_nodes_and_batches() {
     auto table = cr::grid::make(cr::value::list({"RULE", "customer.years", "THEN discount"}),
                                 {"priority", {}, {}, false});
@@ -866,6 +881,7 @@ int main() {
     actions();
     grids_nodes_and_batches();
     bundles_are_documents();
+    case_files_are_documents();
     building();
     rules_and_documents();
     identity();

@@ -466,3 +466,17 @@ func TestBundlesAreRefused(t *testing.T) {
 		t.Fatalf("a bundle: got %v", err)
 	}
 }
+
+// TestCaseFilesAreRefused: a case file (spec/tests.md) has no Go type yet, so
+// Loads refuses it; the core's errors in a case file come first.
+func TestCaseFilesAreRefused(t *testing.T) {
+	_, err := Loads(`{"version": 1, "cases": {"items": [{"id": "a", "input": {}}, {"id": "a", "input": {}}]}}`)
+	var e *Error
+	if !errors.As(err, &e) || e.Code != CodeFormat || e.Pointer == nil || *e.Pointer != "/cases/items/1/id" {
+		t.Fatalf("a repeated id: got %v", err)
+	}
+	_, err = Loads(`{"version": 1, "cases": {"items": [{"id": "a", "input": {"x": 1}}]}}`)
+	if !errors.Is(err, ErrUnsupported) || !errors.As(err, &e) || e.Operation != "Loads" || e.Reason == "" {
+		t.Fatalf("a case file: got %v", err)
+	}
+}

@@ -20,7 +20,8 @@ class ScalaConformanceSuite extends munit.FunSuite:
    * The skips the Scala route may have, as the Java route's: values no JVM value holds, the tools for agents (O.1),
    * diagrams (V.2) and conditions under a graded logic until task J.1b. Any other is a failure.
    */
-  private val allowedSkips = Set("decimal_infinity", "zone_unknown_to_java", "agents", "diagram", "graded", "bundle")
+  private val allowedSkips =
+    Set("decimal_infinity", "zone_unknown_to_java", "agents", "diagram", "graded", "bundle", "cases")
 
   private val files = Conformance.files().asScala.toVector
   private val runner = ScalaConformance()

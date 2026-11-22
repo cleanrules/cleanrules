@@ -153,7 +153,11 @@ class Conformance {
             "bundles (spec/bundles.md) have no Java or Scala type yet (a beta binding, docs/PLAN.md, R.5): loads"
                     + " refuses a bundle once the core has read it, so vectors that make or compare bundles, hold one"
                     + " of the running engine, or read one without an error outside the native layer run in the core,"
-                    + " C ABI, Python and JavaScript runners");
+                    + " C ABI, Python and JavaScript runners",
+            "cases",
+            "case files (spec/tests.md) have no Java or Scala type yet (a beta binding): loads refuses a case file"
+                    + " once the core has read it, so outside the native layer the vectors that read one without an"
+                    + " error or write it in another format run in the native layer only");
 
     /** The exception class of each error code (spec/errors.md, Codes). */
     private static final Map<String, Class<? extends CleanRulesException>> CLASSES = Map.ofEntries(
@@ -207,6 +211,26 @@ class Conformance {
         return "read".equals(kind) && holdsBundle(given) && !expect.containsKey("error") && !"json".equals(route);
     }
 
+    /**
+     * Whether {@code vector} needs case files in the API {@code route} runs: outside the native layer
+     * ({@code json}), a {@code read} vector of {@code format/cases} that reads one without an error or writes
+     * one in another format. Vectors whose case file the reader refuses run: the core's error comes first;
+     * and {@code canonical} vectors of case files go through the native layer on every route.
+     */
+    static boolean needsCaseFiles(Map<?, ?> vector, String route) {
+        if (!String.valueOf(vector.get("id")).startsWith("format/cases/") || "json".equals(route)) {
+            return false;
+        }
+        Map<?, ?> given = (Map<?, ?>) vector.get("given");
+        Map<?, ?> expect = (Map<?, ?>) vector.get("expect");
+        return "read".equals(given.get("kind")) && (given.containsKey("write") || !expect.containsKey("error"));
+    }
+
+    /** Whether a vector's {@code given} holds a case file ({@code spec/tests.md}), given as an object. */
+    static boolean holdsCaseFile(Map<?, ?> given) {
+        return given.get("document") instanceof Map<?, ?> document && document.containsKey("cases");
+    }
+
     /** Whether a vector's {@code given} holds a bundle document ({@code spec/bundles.md}). */
     static boolean holdsBundle(Map<?, ?> given) {
         return given.get("document") instanceof Map<?, ?> document
@@ -215,8 +239,8 @@ class Conformance {
     }
 
     /**
-     * A {@code canonical} vector of a bundle, which no idiomatic type holds yet: through the native layer,
-     * on every route, since canonical vectors are never skipped.
+     * A {@code canonical} vector of a bundle or a case file, which no idiomatic type holds yet: through the
+     * native layer, on every route, since canonical vectors are never skipped.
      */
     protected String canonicalOfBundle(Map<?, ?> given, Map<?, ?> expect) {
         return canonicalJson(given, expect);
@@ -261,6 +285,9 @@ class Conformance {
         }
         if (needsBundles(vector, route)) {
             return new Outcome(null, "bundle");
+        }
+        if (needsCaseFiles(vector, route)) {
+            return new Outcome(null, "cases");
         }
         try {
             String failure = switch (route) {
@@ -783,7 +810,8 @@ class Conformance {
     private String canonicalJson(Map<?, ?> given, Map<?, ?> expect) {
         Source source = sourceOf(given);
         try (Document document = Document.read(source.text(), source.format())) {
-            if (document.kind() == io.github.cleanrules.DocumentKind.CONDITION) {
+            if (document.kind() == io.github.cleanrules.DocumentKind.CONDITION
+                    || document.kind() == io.github.cleanrules.DocumentKind.CASES) {
                 return checkCanonical("Document", document.canonicalBytes(), document.digest(), null, expect);
             }
             try (io.github.cleanrules.ffi.RuleSet compiled = io.github.cleanrules.ffi.RuleSet.fromDocument(document);
@@ -826,7 +854,7 @@ class Conformance {
      * from it with Java data.
      */
     private String canonicalNative(Map<?, ?> given, Map<?, ?> expect) {
-        if (holdsBundle(given)) {
+        if (holdsBundle(given) || holdsCaseFile(given)) {
             return canonicalOfBundle(given, expect);
         }
         Source source = sourceOf(given);

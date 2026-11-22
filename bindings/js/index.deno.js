@@ -9,7 +9,7 @@ export const FORMAT_VERSION = native.FORMAT_VERSION
 export const version = native.version()
 export const {
   Bundle,
-  CaseFile,
+  CaseFileRef,
   Const,
   Decision,
   DecisionTable,

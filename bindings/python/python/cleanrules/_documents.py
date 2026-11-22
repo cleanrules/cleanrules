@@ -115,6 +115,8 @@ def loads(
         RuleDefinitionError: If a rule or rule set breaks a construction rule.
         RegistryError: For an unknown logic, or a named action that `actions`
             lacks.
+        UnsupportedError: For a case file (`spec/tests.md`), which Python does
+            not load yet.
     """
     text = _text(
         text,

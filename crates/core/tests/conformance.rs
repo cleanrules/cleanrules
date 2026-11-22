@@ -14,7 +14,7 @@ use std::fs;
 
 use cleanrules::Error;
 use cleanrules::agents::Catalog;
-use cleanrules::bundle::{self, Bundle, BundleId, BundleRules, CaseFile, Revision};
+use cleanrules::bundle::{self, Bundle, BundleId, BundleRules, CaseFileRef, Revision};
 use cleanrules::eval::{Options, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
@@ -434,7 +434,9 @@ fn with_this_engine(document: &Json) -> Json {
     copy
 }
 
-/// A `read` vector of a bundle (`spec/bundles.md`): read, then written back.
+/// A `read` vector of a bundle (`spec/bundles.md`) or a case file
+/// (`spec/tests.md`): read, then written back, or written in the format of
+/// `write`.
 fn run_read_bundle(vector: &Json) -> Result<(), String> {
     let given = get(vector, "given").unwrap();
     let current = matches!(get(given, "current_engine"), Some(Json::Bool(true)));
@@ -456,6 +458,13 @@ fn run_read_bundle(vector: &Json) -> Result<(), String> {
         && let Some((_, document)) = members.iter_mut().find(|(k, _)| k == "document")
     {
         *document = fix(document);
+    }
+    if let Some(name) = text(get(given, "write")) {
+        let format = DocumentFormat::from_name(name).unwrap();
+        let written = read
+            .and_then(|document| write_document_as(&document, format))
+            .map(Json::String);
+        return compare_with(written, &expect, "printed", read_error_json);
     }
     let written = read.map(|document| {
         let json = write_document(&document);
@@ -504,7 +513,7 @@ fn run_make_bundle(vector: &Json) -> Result<(), String> {
         Some(Json::Array(items)) => items
             .iter()
             .map(|item| {
-                CaseFile::new(
+                CaseFileRef::new(
                     text(get(item, "path")).unwrap(),
                     text(get(item, "text")).unwrap().as_bytes(),
                 )
@@ -640,9 +649,11 @@ fn conformance_vectors() {
                     continue;
                 }
                 // The `read` vectors run through the C ABI (`crates/ffi`), but
-                // for bundles, which only this runner makes and compares too.
-                let bundle_file =
-                    text(get(vector, "id")).is_some_and(|id| id.starts_with("format/bundles/"));
+                // for bundles, which only this runner makes and compares too,
+                // and case files.
+                let bundle_file = text(get(vector, "id")).is_some_and(|id| {
+                    id.starts_with("format/bundles/") || id.starts_with("format/cases/")
+                });
                 if kind == "read"
                     && bundle_file
                     && !cfg!(feature = "yaml")

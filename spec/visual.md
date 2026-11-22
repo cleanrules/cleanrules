@@ -18,7 +18,8 @@ HTML.
 | HTML fragment | `html_fragment` | The same content as an element and its style, to embed in a page or a notebook |
 
 A bundle (`bundles.md`) is drawn as the rule set or the decision table it
-holds. Every diagram is drawn in every format, except decision tables, which are
+holds; a case file (`tests.md`) has no diagram, and drawing one is
+`unsupported`. Every diagram is drawn in every format, except decision tables, which are
 drawn in HTML only (*Decision tables*). The same object, format and limits
 always give the same text, byte for byte, on every platform.
 

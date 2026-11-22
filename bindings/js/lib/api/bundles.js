@@ -57,12 +57,12 @@ function bundles(native, rules, tables, build) {
   }
 
   /**
-   * A reference to a file of test cases (`spec/bundles.md`, *Cases*): its
-   * path, relative to the bundle's directory, and the SHA-256 digest of its
+   * A bundle's reference to a case file (`spec/bundles.md`, *Cases*; the file
+   * itself is a document of test cases, `spec/tests.md`): its path, relative to the bundle's directory, and the SHA-256 digest of its
    * bytes; immutable. `bundle.cases` gives them; made by hand, both are
    * checked by the core.
    */
-  class CaseFile {
+  class CaseFileRef {
     /**
      * @param path The path: lowercase ASCII letters, digits, `.`, `_` and
      *   `-`, in segments separated by `/`, none ending with `.`, at most 1024
@@ -71,7 +71,7 @@ function bundles(native, rules, tables, build) {
      *   hexadecimal digits.
      */
     constructor(path, digest) {
-      native.checkCaseFile(path, digest)
+      native.checkCaseFileRef(path, digest)
       /** The path, relative to the bundle's directory. */
       this.path = path
       /** The digest of the file's bytes. */
@@ -80,15 +80,15 @@ function bundles(native, rules, tables, build) {
     }
 
     /**
-     * Whether `content` (a `string`, as UTF-8, or a `Uint8Array`) is the file
-     * the bundle was made with: whether its SHA-256 digest is `digest`.
+     * Whether `content` (a `string`, as UTF-8, or a `Uint8Array`) has the digest
+     * the bundle recorded: whether its SHA-256 digest is `digest`.
      */
-    matches(content) {
-      return native.caseFileMatches(this.path, this.digest, content)
+    digestMatches(content) {
+      return native.caseFileRefDigestMatches(this.path, this.digest, content)
     }
 
     [INSPECT]() {
-      return `CaseFile(${this.path} ${this.digest})`
+      return `CaseFileRef(${this.path} ${this.digest})`
     }
 
     [DENO_INSPECT]() {
@@ -96,7 +96,7 @@ function bundles(native, rules, tables, build) {
     }
   }
 
-  brand(build, CaseFile)
+  brand(build, CaseFileRef)
 
   /** A bundle document of the core made from the constructor's arguments. */
   function make(held, bundleOptions) {
@@ -212,19 +212,19 @@ function bundles(native, rules, tables, build) {
       return this.#contract
     }
 
-    /** The references to its case files, in order (frozen): each a `CaseFile`. */
+    /** The references to its case files, in order (frozen): each a `CaseFileRef`. */
     get cases() {
-      this.#cases ??= Object.freeze(this.#data[6].map(([path, digest]) => new CaseFile(path, digest)))
+      this.#cases ??= Object.freeze(this.#data[6].map(([path, digest]) => new CaseFileRef(path, digest)))
       return this.#cases
     }
 
     /**
-     * Whether `content` (a `string`, as UTF-8, or a `Uint8Array`) is the case
-     * file at `path` the bundle was made with: whether its SHA-256 digest is
+     * Whether `content` (a `string`, as UTF-8, or a `Uint8Array`) has the digest
+     * the bundle recorded for the case file at `path`: whether its SHA-256 digest is
      * the one recorded. A `RangeError` for a path the bundle does not refer to.
      */
-    caseMatches(path, content) {
-      return native.bundleCaseMatches(this.#native, path, content)
+    caseDigestMatches(path, content) {
+      return native.bundleCaseDigestMatches(this.#native, path, content)
     }
 
     /**
@@ -268,7 +268,7 @@ function bundles(native, rules, tables, build) {
 
   return {
     Bundle,
-    CaseFile,
+    CaseFileRef,
     /** The `Bundle` of a bundle document of the native layer, which it keeps. */
     fromNativeBundle: (made) => new Bundle(NATIVE, made),
     /** The bundle document of the native layer of a `Bundle`. */

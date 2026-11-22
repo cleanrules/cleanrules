@@ -757,7 +757,8 @@ final class ScalaConformance extends Conformance:
    * of `loads(dumps(x))`, and of the condition, rule or rule set built in Scala from a document given as an object.
    */
   private def canonical(setup: JsonMap, expect: JsonMap): String =
-    if Conformance.holdsBundle(setup) then canonicalOfBundle(setup, expect) else canonicalOfContent(setup, expect)
+    if Conformance.holdsBundle(setup) || Conformance.holdsCaseFile(setup) then canonicalOfBundle(setup, expect)
+    else canonicalOfContent(setup, expect)
 
   private def canonicalOfContent(setup: JsonMap, expect: JsonMap): String =
     val source = Conformance.sourceOf(setup)

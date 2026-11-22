@@ -1,0 +1,13 @@
+{
+  "tool": "validate",
+  "arguments": {
+    "document": {
+      "version": 1,
+      "cases": { "items": [{ "id": "adult", "input": { "age": 20 }, "expect": { "selected": ["adult"] } }] }
+    }
+  },
+  "result": {
+    "valid": true,
+    "content": "cases"
+  }
+}

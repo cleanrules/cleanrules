@@ -13,7 +13,7 @@ import path from 'node:path'
 import test from 'node:test'
 
 import { build, deno, native, root } from './support/cr.js'
-import { MINIMUM_VECTORS, SKIPS, checkComparison, conformance } from './support/conformance.js'
+import { MINIMUM_VECTORS, SKIPS, checkComparison, conformance, needsCaseFiles } from './support/conformance.js'
 import { Obj, parse, write } from './support/json.js'
 
 const VECTORS = path.join(import.meta.dirname, '..', '..', '..', 'conformance', 'vectors')
@@ -106,6 +106,9 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
   const agents = tools.length > 0 ? ['agents'] : []
   const diagrams = drawn.length > 0 ? ['diagram'] : []
   const grades = graded.length > 0 ? ['graded'] : []
+  // The native route skips case files that the idiomatic API would load.
+  const caseFiles = [...vectors.values()].filter(needsCaseFiles).map((v) => v.get('id'))
+  const cases = caseFiles.length > 0 ? ['cases'] : []
   assert.deepEqual(
     [...counts.json.skipped.keys()].sort(),
     [
@@ -121,7 +124,8 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
   assert.deepEqual(counts.json.skipped.get('diagram') ?? [], drawn)
   assert.deepEqual(counts.json.skipped.get('agents') ?? [], tools)
   assert.deepEqual(counts.json.skipped.get('graded') ?? [], graded)
-  assert.deepEqual([...counts.native.skipped.keys()].sort(), [...diagrams, ...agents, ...grades].sort())
+  assert.deepEqual([...counts.native.skipped.keys()].sort(), [...diagrams, ...agents, ...grades, ...cases].sort())
+  assert.deepEqual(counts.native.skipped.get('cases') ?? [], caseFiles)
   assert.deepEqual(counts.native.skipped.get('diagram') ?? [], drawn)
   assert.deepEqual(counts.native.skipped.get('agents') ?? [], tools)
   assert.deepEqual(counts.native.skipped.get('graded') ?? [], graded)

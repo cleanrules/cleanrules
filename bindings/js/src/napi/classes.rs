@@ -159,6 +159,10 @@ pub enum DocumentKind {
     /// A bundle (`spec/bundles.md`).
     #[napi(value = "bundle")]
     Bundle,
+    /// A case file: test cases (`spec/tests.md`), read, written and hashed as
+    /// a document; the idiomatic API does not load it yet.
+    #[napi(value = "cases")]
+    Cases,
 }
 
 /// A file of test cases given to `Document.makeBundle`: its path, relative to
@@ -336,7 +340,7 @@ impl Document {
     }
 
     /// What the document holds: `"condition"`, `"rule"`, `"ruleset"`,
-    /// `"decision_table"` or `"bundle"`.
+    /// `"decision_table"`, `"bundle"` or `"cases"`.
     #[napi(getter, ts_return_type = "DocumentKind")]
     #[must_use]
     pub fn kind(&self) -> &'static str {

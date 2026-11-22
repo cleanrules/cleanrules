@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "cases": {
+    "items": [
+      {
+        "id": "vip-gets-15",
+        "description": "a customer of more than five years gets 15%",
+        "input": {
+          "years": 7
+        },
+        "expect": {
+          "selected": [
+            "vip"
+          ],
+          "output": {
+            "discount": {
+              "$decimal": "0.15"
+            }
+          }
+        }
+      },
+      {
+        "id": "years-unknown",
+        "input": {},
+        "expect": {
+          "selected": [],
+          "output": null,
+          "unknown": [
+            "vip"
+          ]
+        }
+      }
+    ]
+  }
+}

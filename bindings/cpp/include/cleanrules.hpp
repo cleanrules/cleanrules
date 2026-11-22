@@ -104,6 +104,9 @@ enum class document_content : cr_document_content {
     // A bundle (spec/bundles.md): read, written and hashed as any document;
     // cleanrules.hpp has no functions of its own for bundles yet.
     bundle = CR_DOCUMENT_BUNDLE,
+    // A case file of test cases (spec/tests.md): read, written and hashed as
+    // any document; it gives no rule set.
+    cases = CR_DOCUMENT_CASES,
 };
 
 // A limit of `limits`.
@@ -1750,7 +1753,8 @@ public:
         return read_(text, f, &l, &error);
     }
 
-    // The rule set a document gives; a condition is a `format_error`.
+    // The rule set a document gives; a condition or a case file is a
+    // `format_error`.
     CLEANRULES_THROWING([[nodiscard]] static ruleset from_document(const document &d) {
         return from_document_(d, nullptr);
     })

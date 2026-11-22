@@ -77,7 +77,7 @@ typedef struct cr_batch cr_batch;
 typedef struct cr_decision cr_decision;
 
 // A document read in any format: a condition, a rule, a rule set, a decision
-// table or a bundle.
+// table, a bundle or a case file.
 typedef struct cr_document cr_document;
 
 // An error: its status, message, hint and JSON form.
@@ -208,6 +208,10 @@ typedef int32_t cr_value_type;
 // A document holding a bundle (`spec/bundles.md`): read and written in JSON
 // or YAML, made with `cr_document_new_bundle`.
 #define CR_DOCUMENT_BUNDLE 5
+
+// A document holding test cases (`spec/tests.md`): read, written and hashed
+// in JSON or YAML; it gives no rule set and has no diagram.
+#define CR_DOCUMENT_CASES 6
 
 // `format_error`.
 #define CR_FORMAT_ERROR 1

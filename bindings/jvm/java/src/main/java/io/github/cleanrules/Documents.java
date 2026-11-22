@@ -166,6 +166,14 @@ public final class Documents {
                     throw new UnsupportedException(
                             "unsupported", message, hint, Build.json("unsupported", message, hint, null, null), null);
                 }
+                case Native.CR_DOCUMENT_CASES -> {
+                    // A case file (spec/tests.md) has no Java type yet, and holds no rules.
+                    String message = "case files (spec/tests.md) are not loaded in Java yet";
+                    String hint = "read it as a document with ffi.Document.read, or with the Rust crate";
+                    throw new UnsupportedException("unsupported", message, hint,
+                            Build.unsupportedJson(message, hint, "loads", "Java has no type for test cases yet"),
+                            null);
+                }
                 default -> throw new IllegalStateException("cleanrules read a document of an unknown kind");
             };
         } finally {

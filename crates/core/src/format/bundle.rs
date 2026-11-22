@@ -1,7 +1,7 @@
 //! Bundles in JSON (`spec/bundles.md`).
 
 use crate::bundle::{
-    Bundle, BundleId, BundleRules, CaseFile, Contract, Engine, EngineLimit, EngineLimits,
+    Bundle, BundleId, BundleRules, CaseFileRef, Contract, Engine, EngineLimit, EngineLimits,
     MAX_RECORDED_LIMIT, Revision, check_case_path, check_engine,
 };
 use crate::digest::Digest;
@@ -283,13 +283,13 @@ fn canonical_numbers(json: &mut Json) {
     }
 }
 
-fn read_cases(json: Option<&Json>, pointer: &str) -> Result<Vec<CaseFile>> {
+fn read_cases(json: Option<&Json>, pointer: &str) -> Result<Vec<CaseFileRef>> {
     let items = match json {
         None => return Ok(Vec::new()),
         Some(Json::Array(items)) => items,
         Some(_) => return Err(format_error(pointer, "\"cases\" must be an array")),
     };
-    let mut cases: Vec<CaseFile> = Vec::with_capacity(items.len());
+    let mut cases: Vec<CaseFileRef> = Vec::with_capacity(items.len());
     for (i, item) in items.iter().enumerate() {
         let here = format!("{pointer}/{i}");
         let Json::Object(members) = item else {
@@ -309,7 +309,7 @@ fn read_cases(json: Option<&Json>, pointer: &str) -> Result<Vec<CaseFile>> {
         }
         let digest = digest(get(members, "digest"), &at(&here, "digest"), "\"digest\"")?;
         no_unknown_keys(members, &CASE_KEYS, &here)?;
-        cases.push(CaseFile::with_digest(path, digest).map_err(|e| e.at_pointer(path_at))?);
+        cases.push(CaseFileRef::with_digest(path, digest).map_err(|e| e.at_pointer(path_at))?);
     }
     Ok(cases)
 }

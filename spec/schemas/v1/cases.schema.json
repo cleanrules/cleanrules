@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanrules.github.io/schemas/v1/cases.schema.json",
+  "title": "cleanrules case file, format version 1",
+  "description": "A document of test cases: a description, metadata and the cases, each with an id, an input and an expectation on what evaluating the input gives. See spec/tests.md, which is normative. The schema checks shapes; readers also check that case ids are unique, that a rule is named once in selected and unknown, the ranges of values (an expected value is never out of range), that inputs and expected values hold no opaque value, and that an expected error is given alone.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "cases": {
+      "$ref": "#/$defs/cases"
+    }
+  },
+  "required": [
+    "version",
+    "cases"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "cases": {
+      "description": "The content of a case file: an optional description and metadata, and the cases.",
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "value.schema.json#/$defs/value"
+          },
+          "default": {}
+        },
+        "items": {
+          "description": "The cases, in the order they are run.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/case"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "case": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The case's id: any non-empty string, unique within the file.",
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "input": {
+          "description": "The input that the rules evaluate: a data value.",
+          "$ref": "value.schema.json#/$defs/value"
+        },
+        "expect": {
+          "$ref": "#/$defs/expectation"
+        }
+      },
+      "required": [
+        "id",
+        "input"
+      ],
+      "additionalProperties": false
+    },
+    "expectation": {
+      "description": "What evaluating the input must give; an absent key checks nothing. An expected error is given alone.",
+      "type": "object",
+      "properties": {
+        "selected": {
+          "description": "The selected rules, by effective id, in selection order.",
+          "$ref": "#/$defs/rules"
+        },
+        "output": {
+          "description": "The single output: null when no rule is selected; an object matches an output that has its keys with equal values.",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/output"
+            }
+          ]
+        },
+        "outputs": {
+          "description": "The outputs of the selected rules, in selection order.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/output"
+          }
+        },
+        "unknown": {
+          "description": "The rules whose condition is unknown, by effective id, in any order.",
+          "$ref": "#/$defs/rules"
+        },
+        "error": {
+          "$ref": "#/$defs/error"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "error"
+        ]
+      },
+      "then": {
+        "maxProperties": 1
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "output": {
+      "description": "Payload keys, taken literally, mapped to data values.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "value.schema.json#/$defs/value"
+      }
+    },
+    "error": {
+      "description": "An error that evaluation raises, by its code.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "enum": [
+            "missing_field",
+            "type_mismatch",
+            "hit_policy_error"
+          ]
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

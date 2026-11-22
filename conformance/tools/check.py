@@ -124,6 +124,22 @@ def check_read(vector: dict[str, Any]) -> list[str]:
     return found
 
 
+def check_tool(vector: dict[str, Any], tools: Draft202012Validator) -> list[str]:
+    """A `tool` vector's expected result against the agents' schema.
+
+    Results with an agent error are left out: vectors drop its free text
+    (`message`, `hint`), which the schema requires.
+    """
+    given, output = vector["given"], vector["expect"].get("output")
+    if "arguments" not in given or not isinstance(output, dict) or "error" in output:
+        return []
+    call = {"tool": given["tool"], "arguments": given["arguments"], "result": output}
+    return [
+        f"{vector['id']}: the result does not follow agents.schema.json: {e.message[:200]}"
+        for e in tools.iter_errors(call)
+    ]
+
+
 def main() -> int:
     """Validate every vector file; print a summary and return the exit code."""
     schemas: list[Any] = [
@@ -134,6 +150,8 @@ def main() -> int:
         (s["$id"], Resource.from_contents(s)) for s in [*schemas, own]
     )
     validator = Draft202012Validator(own, registry=registry)
+    (agents,) = [s for s in schemas if s["$id"].endswith("/agents.schema.json")]
+    tools = Draft202012Validator(agents, registry=registry)
     known = anchors()
     problems: list[str] = []
     ids: set[str] = set()
@@ -154,6 +172,8 @@ def main() -> int:
                 problems.append(f"{name}: {vid} is not in <area>/{path.stem}/")
             if vector.get("given", {}).get("kind") == "read":
                 problems.extend(check_read(vector))
+            if vector.get("given", {}).get("kind") == "tool":
+                problems.extend(check_tool(vector, tools))
             problems.extend(
                 f"{name}: {vid}: unknown section {ref}"
                 for ref in vector.get("spec", [])

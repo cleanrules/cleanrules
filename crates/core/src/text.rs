@@ -2288,7 +2288,8 @@ pub(crate) fn check_keys(node: &Node) -> Result<()> {
 /// # Errors
 ///
 /// `unsupported` for a rule with metadata, a field key with a control
-/// character, which text cannot hold, a decision table or a bundle.
+/// character, which text cannot hold, a decision table, a bundle or a case
+/// file.
 ///
 /// # Examples
 ///
@@ -2314,6 +2315,12 @@ pub fn to_string(document: &Document) -> Result<String> {
                 .with_hint("write it as JSON or YAML, or write its rule set as text")
                 .unsupported("text", "bundles are written as JSON or YAML"),
         ),
+        Document::Cases(_) => Err(Error::new(
+            ErrorCode::Unsupported,
+            "a case file has no text form",
+        )
+        .with_hint("write it as JSON or YAML")
+        .unsupported("text", "case files are written as JSON or YAML")),
         Document::Condition(node) => {
             check_keys(node)?;
             Ok(node.to_string())

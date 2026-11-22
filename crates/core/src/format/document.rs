@@ -3,8 +3,10 @@
 use crate::FORMAT_VERSION;
 use crate::ast::{Kind, Node};
 use crate::bundle::Bundle;
+use crate::cases::Cases;
 use crate::error::{Error, ErrorCode, Result};
 use crate::format::bundle::{read_bundle, write_bundle};
+use crate::format::cases::{read_cases, write_cases};
 use crate::format::condition::{build, shape, write_node};
 use crate::format::decision::read_decision;
 use crate::format::rules::{
@@ -16,7 +18,7 @@ use crate::rules::{Decision, Rule, RuleSet};
 use crate::table::DecisionTable;
 
 /// The content keys a document may have, in the order of the spec.
-const CONTENT_KEYS: [&str; 8] = [
+const CONTENT_KEYS: [&str; 9] = [
     "condition",
     "rule",
     "ruleset",
@@ -25,6 +27,7 @@ const CONTENT_KEYS: [&str; 8] = [
     "summary",
     "decision_table",
     "bundle",
+    "cases",
 ];
 
 /// What a document holds.
@@ -41,6 +44,8 @@ pub enum Document {
     DecisionTable(DecisionTable),
     /// A bundle: a reproducible package of rules (`spec/bundles.md`).
     Bundle(Box<Bundle>),
+    /// A case file: test cases and their expectations (`spec/tests.md`).
+    Cases(Cases),
 }
 
 impl Document {
@@ -70,7 +75,8 @@ impl Document {
     ///
     /// # Errors
     ///
-    /// `format_error` for a condition, which is not a rule.
+    /// `format_error` for a condition, which is not a rule, and for a case
+    /// file, which holds no rules.
     pub fn into_ruleset(self) -> Result<RuleSet> {
         match self {
             Document::RuleSet(ruleset) => Ok(ruleset),
@@ -82,6 +88,11 @@ impl Document {
                 "this document holds a condition, not rules",
             )
             .with_hint("make it the condition of a rule (RULE name IF ...)")),
+            Document::Cases(_) => Err(Error::new(
+                ErrorCode::FormatError,
+                "this document holds test cases, not rules",
+            )
+            .with_hint("read the rules to test from their own document")),
         }
     }
 
@@ -159,6 +170,11 @@ pub fn read_parsed_document(json: &Json, limits: &Limits) -> Result<Document> {
             limits,
             check_top_level,
         )?))),
+        "cases" => {
+            let cases = read_cases(get("cases").unwrap_or(&Json::Null), "/cases")?;
+            check_top_level()?;
+            Ok(Document::Cases(cases))
+        }
         "explanation" | "summary" => {
             check_top_level()?;
             Err(Error::new(
@@ -330,6 +346,10 @@ pub fn write_document(document: &Document) -> Json {
         Document::Bundle(bundle) => Json::Object(vec![
             ("version".into(), version),
             ("bundle".into(), write_bundle(bundle)),
+        ]),
+        Document::Cases(cases) => Json::Object(vec![
+            ("version".into(), version),
+            ("cases".into(), write_cases(cases)),
         ]),
     }
 }

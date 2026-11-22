@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "cases": {
+    "items": [
+      {
+        "id": "a",
+        "input": {},
+        "name": "a"
+      }
+    ]
+  }
+}

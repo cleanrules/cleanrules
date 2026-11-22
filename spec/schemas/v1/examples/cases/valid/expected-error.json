@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "cases": {
+    "items": [
+      {
+        "id": "no-years",
+        "input": {},
+        "expect": {
+          "error": {
+            "code": "missing_field"
+          }
+        }
+      }
+    ]
+  }
+}

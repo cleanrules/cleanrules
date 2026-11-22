@@ -1123,12 +1123,14 @@ export interface BundleContract {
 }
 
 /**
- * A reference to a file of test cases (`spec/bundles.md`, *Cases*); immutable.
+ * A bundle's reference to a case file (`spec/bundles.md`, *Cases*): its path
+ * and digest; immutable. The case file itself is a document of test cases
+ * (`spec/tests.md`).
  * `bundle.cases` gives them. Made by hand, the path and the digest are
  * checked: a `FormatError` for one without its form, a `TypeError` for one
  * that is not a string.
  */
-export declare class CaseFile {
+export declare class CaseFileRef {
   /**
    * @param path The path, as in `BundleCaseInput`.
    * @param digest `'sha256:'` and the 64 lowercase hexadecimal digits of the
@@ -1139,8 +1141,8 @@ export declare class CaseFile {
   readonly path: string
   /** `sha256:` and the 64 lowercase hexadecimal digits of the SHA-256 hash of its bytes. */
   readonly digest: string
-  /** Whether `content` is the file the bundle was made with: whether its SHA-256 digest is `digest`. */
-  matches(content: string | Uint8Array): boolean
+  /** Whether `content` has the digest the bundle recorded: whether its SHA-256 digest is `digest`. */
+  digestMatches(content: string | Uint8Array): boolean
 }
 
 /** How two bundles relate (`spec/bundles.md`, *Comparing bundles*). */
@@ -1240,13 +1242,13 @@ export declare class Bundle {
   readonly engine: BundleEngine
   readonly contract: BundleContract
   /** Its case files, in order. */
-  readonly cases: readonly CaseFile[]
+  readonly cases: readonly CaseFileRef[]
   /**
-   * Whether `content` is the case file at `path` the bundle was made with
-   * (its SHA-256 digest is the one recorded); a `RangeError` for a path the
+   * Whether `content` has the digest the bundle recorded for the case file at
+   * `path` (its SHA-256 digest is the one recorded); a `RangeError` for a path the
    * bundle does not refer to.
    */
-  caseMatches(path: string, content: string | Uint8Array): boolean
+  caseDigestMatches(path: string, content: string | Uint8Array): boolean
   /** Compare with another bundle; symmetric: `b.compare(a)` gives the same result. */
   compare(other: Bundle): BundleComparison
   /**
@@ -1307,7 +1309,10 @@ export interface RuleFromTextOptions {
  * Read a condition, rule, rule set, decision table or bundle document
  * (`string` or UTF-8 bytes). A rule's action is the name the document gives
  * it, unbound unless `actions` is given. CSV holds a decision table; the text
- * syntax a condition, a rule or a rule set; JSON and YAML any of them.
+ * syntax a condition, a rule or a rule set; JSON and YAML any of them. A
+ * case file (`spec/tests.md`) is an `UnsupportedError`: this API does not
+ * load test cases yet (`Document.read` of `cleanrules/native` reads one as a
+ * document).
  *
  * @example
  * const rules = loads(text, { format: 'yaml' })

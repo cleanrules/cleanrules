@@ -1,6 +1,7 @@
 //! The JSON format of `spec/json-format.md`: reading and writing documents.
 
 mod bundle;
+mod cases;
 mod condition;
 mod decision;
 mod document;
@@ -13,6 +14,7 @@ pub(crate) mod table;
 pub mod value;
 
 pub use bundle::write_bundle;
+pub use cases::write_cases;
 pub use condition::write_node;
 pub use document::{
     Document, DocumentFormat, parse_as, read_decision_document, read_decision_document_as,

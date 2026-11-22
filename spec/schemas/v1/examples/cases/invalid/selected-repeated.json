@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "cases": {
+    "items": [
+      {
+        "id": "a",
+        "input": {},
+        "expect": {
+          "selected": [
+            "vip",
+            "vip"
+          ]
+        }
+      }
+    ]
+  }
+}

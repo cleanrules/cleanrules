@@ -71,3 +71,9 @@ path = "../../docs/examples/digests.rs"
 [[example]]
 name = "bundles"
 path = "../../docs/examples/bundles.rs"
+
+# The example of test cases in the documentation (task T.1).
+[[example]]
+name = "cases"
+path = "../../docs/examples/cases.rs"
+required-features = ["yaml"]

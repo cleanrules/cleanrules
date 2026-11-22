@@ -78,7 +78,7 @@ CommonJS) and [`docs/examples/discounts.deno.js`](../../docs/examples/discounts.
 ## Entry points
 
 - `cleanrules`: the idiomatic API (`F`, `field`, `constant`, `and`, `or`,
-  `not`, `Expr`, `Rule`, `RuleSet`, `Decision`, `DecisionTable`, `Bundle`, `CaseFile`, `loads`,
+  `not`, `Expr`, `Rule`, `RuleSet`, `Decision`, `DecisionTable`, `Bundle`, `CaseFileRef`, `loads`,
   `dumps`, `load`, `dump`, `canonicalBytes`, `digest`, `ruleFromText`,
   `evaluateTree`, `evaluateValueTree`, and the classes of explanations,
   summaries, result trees and tables), the errors, the marker values
@@ -611,7 +611,7 @@ const bundle = new Bundle(rules, {
 await dump(bundle, 'discounts.bundle.json')
 const kept = await load('discounts.bundle.json')
 kept.compare(bundle)        // { relation: 'same_rules_same_engine', identical: true, differences: [] }
-kept.caseMatches('cases/vip.json', await readFile('cases/vip.json'))  // true
+kept.caseDigestMatches('cases/vip.json', await readFile('cases/vip.json'))  // true
 ```
 
 A bundle (`spec/bundles.md`) is a reproducible package of rules: the rules
@@ -629,9 +629,9 @@ reads no clock.
 | `bundle.rules`, `ruleset`, `rulesetDigest` | the rules it holds (a `RuleSet` or a `DecisionTable`, actions as unbound names), the rule set it gives, and that rule set's digest |
 | `bundle.engine` | `{ name, version, limits, isCurrent }`, frozen: the engine that made it, its exact version, the six limits by the names of the `limits` option, and whether it is this engine (same name and version) |
 | `bundle.contract` | `{ input, output: { keys } }`, frozen: the JSON Schema of the input and the sorted output keys |
-| `bundle.cases` | its `CaseFile`s, frozen, in order: each with `path`, `digest` and `matches(content)` |
-| `bundle.caseMatches(path, content)` | whether `content` is the case file the bundle was made with (a `RangeError` for a path it does not refer to); the engine never opens files |
-| `new CaseFile(path, digest)` | a reference to a case file, its path and digest checked by the core (`FormatError`); `caseFile.matches(content)` |
+| `bundle.cases` | its `CaseFileRef`s, frozen, in order: each with `path`, `digest` and `digestMatches(content)` |
+| `bundle.caseDigestMatches(path, content)` | whether `content` is the case file the bundle was made with (a `RangeError` for a path it does not refer to); the engine never opens files |
+| `new CaseFileRef(path, digest)` | a reference to a case file, its path and digest checked by the core (`FormatError`); `caseFileRef.digestMatches(content)` |
 | `bundle.compare(other)` | `{ relation, identical, differences }`, frozen (*Comparing bundles*) |
 | `loads`, `load`, `dumps`, `dump`, `canonicalBytes`, `digest`, `toJSON()` | as for any document, in JSON or YAML |
 
@@ -644,6 +644,13 @@ a whole number from 1 to 2^53 − 1 (`Number.MAX_SAFE_INTEGER`): 0, or one above
 `UnsupportedError`, since a bundle cannot record it, and a negative or
 fractional one a `RangeError`; giving `maxYamlSize` or `maxTextSize`, which
 bound the reading of texts and not decisions, is a `TypeError`.
+
+A case file is a document of test cases (`spec/tests.md`,
+`docs/examples/cases/discounts.json`): each case has an id, an input, and what
+evaluating it must give (the selected rules, the output, the rules left
+unknown, or the error). The bundle records the digest of its bytes; `loads`
+does not load case files yet (`UnsupportedError`), while `Document.read` of
+`cleanrules/native` reads, writes and hashes one as a document.
 
 Reading a bundle checks its rule set digest against its rules, and, when it
 names this engine (`engine.isCurrent`), its contract against the one the

@@ -52,6 +52,19 @@ export const SKIPS = {
   diagram:
     "diagrams (spec/visual.md) are drawn by the core and checked through the C ABI's runner; the JavaScript API draws them from phase V.2",
   graded: 'conditions under a graded logic: the binding evaluates one node under boolean only until task J.1b',
+  cases:
+    'case files (spec/tests.md) have no type in the idiomatic API yet: loads refuses them, so their vectors run through cleanrules/native (the JSON route), and those whose file does not read run in both',
+}
+
+/**
+ * Whether the native route skips `vector`: a vector of a case file
+ * (`format/cases/*`) that needs a case file loaded by the idiomatic API,
+ * which refuses them; one whose file does not read still runs there.
+ */
+export function needsCaseFiles(vector) {
+  if (!String(vector.get('id')).startsWith('format/cases/')) return false
+  const given = vector.get('given')
+  return given.get('kind') === 'canonical' || given.has('write') || !vector.get('expect').has('error')
 }
 
 /** The class of each error code (`spec/errors.md`, *Codes*). */
@@ -433,8 +446,8 @@ not
     const text = R.dumps(bundle)
     const issues = [compare({ result: parse(text) }, want, 'document'), checkBundle(bundle, need(want, 'document'))]
     for (const { path, content } of cases) {
-      if (!bundle.caseMatches(path, content)) issues.push(`caseMatches(${JSON.stringify(path)}) is false for its own content`)
-      if (bundle.caseMatches(path, 'another content')) issues.push(`caseMatches(${JSON.stringify(path)}) is true for another content`)
+      if (!bundle.caseDigestMatches(path, content)) issues.push(`caseDigestMatches(${JSON.stringify(path)}) is false for its own content`)
+      if (bundle.caseDigestMatches(path, 'another content')) issues.push(`caseDigestMatches(${JSON.stringify(path)}) is true for another content`)
     }
     const again = attempt(R, () => R.loads(text))
     if (again.error !== undefined) return `loads(dumps(bundle)): ${again.error.code}: ${again.error.message}`
@@ -1301,6 +1314,7 @@ not
     const expect = need(vector, 'expect')
     const kind = need(given, 'kind')
     if (kind === 'draw') return { skip: 'diagram' }
+    if (needsCaseFiles(vector)) return { skip: 'cases' }
     if (kind === 'read') return readNative(given, expect)
     if (kind === 'canonical') return canonicalNative(given, expect)
     if (kind === 'bundle') return makeNative(given, expect)

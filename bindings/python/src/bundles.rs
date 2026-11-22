@@ -1,7 +1,7 @@
 //! Bundles (`spec/bundles.md`, task R.5): the core makes, reads, writes and
 //! compares them; Python wraps the result.
 
-use cleanrules::bundle::{Bundle, BundleId, BundleRules, CaseFile, Revision};
+use cleanrules::bundle::{Bundle, BundleId, BundleRules, CaseFileRef, Revision};
 use cleanrules::digest::Digest;
 use cleanrules::json::{Limits, to_string};
 use pyo3::exceptions::{PyKeyError, PyTypeError};
@@ -72,7 +72,7 @@ pub(crate) fn make_bundle(
     };
     let cases = cases
         .iter()
-        .map(|(path, bytes)| CaseFile::new(path, bytes.as_bytes()))
+        .map(|(path, bytes)| CaseFileRef::new(path, bytes.as_bytes()))
         .collect::<cleanrules::Result<Vec<_>>>()
         .or_raise(py)?;
     let limits = recorded_limits(
@@ -92,7 +92,7 @@ pub(crate) fn make(
     rules: BundleRules,
     id: &str,
     revision: &str,
-    cases: Vec<CaseFile>,
+    cases: Vec<CaseFileRef>,
     limits: &Limits,
 ) -> cleanrules::Result<Bundle> {
     Bundle::new(rules, BundleId::new(id)?, Revision::new(revision)?)
@@ -114,23 +114,23 @@ pub(crate) fn default_bundle_limits() -> Vec<(&'static str, u64)> {
 #[pyfunction]
 pub(crate) fn check_case_file(py: Python<'_>, path: &str, digest: &str) -> PyResult<()> {
     let digest: Digest = digest.parse().or_raise(py)?;
-    CaseFile::with_digest(path, digest).or_raise(py)?;
+    CaseFileRef::with_digest(path, digest).or_raise(py)?;
     Ok(())
 }
 
 /// Whether `content` is the case file whose digest is `digest`
 /// (`spec/bundles.md`, *Cases*).
 #[pyfunction]
-pub(crate) fn case_matches(
+pub(crate) fn case_digest_matches(
     py: Python<'_>,
     path: &str,
     digest: &str,
     content: &[u8],
 ) -> PyResult<bool> {
     let digest: Digest = digest.parse().or_raise(py)?;
-    Ok(CaseFile::with_digest(path, digest)
+    Ok(CaseFileRef::with_digest(path, digest)
         .or_raise(py)?
-        .matches(content))
+        .digest_matches(content))
 }
 
 #[pymethods]
@@ -215,17 +215,20 @@ impl PyBundle {
 
     /// Whether `content` is the case file at `path`; `KeyError` for a path
     /// the bundle does not have, with the paths it has.
-    fn case_matches(&self, path: &str, content: &[u8]) -> PyResult<bool> {
-        self.bundle.case_matches(path, content).ok_or_else(|| {
-            let cases = self.bundle.cases();
-            let known = if cases.is_empty() {
-                ": it has none".to_owned()
-            } else {
-                let paths: Vec<String> = cases.iter().map(|c| format!("{:?}", c.path())).collect();
-                format!("; its case files are {}", paths.join(", "))
-            };
-            PyKeyError::new_err(format!("the bundle refers to no case file {path:?}{known}"))
-        })
+    fn case_digest_matches(&self, path: &str, content: &[u8]) -> PyResult<bool> {
+        self.bundle
+            .case_digest_matches(path, content)
+            .ok_or_else(|| {
+                let cases = self.bundle.cases();
+                let known = if cases.is_empty() {
+                    ": it has none".to_owned()
+                } else {
+                    let paths: Vec<String> =
+                        cases.iter().map(|c| format!("{:?}", c.path())).collect();
+                    format!("; its case files are {}", paths.join(", "))
+                };
+                PyKeyError::new_err(format!("the bundle refers to no case file {path:?}{known}"))
+            })
     }
 
     /// Compare with another bundle: `(relation, identical, differences)`.

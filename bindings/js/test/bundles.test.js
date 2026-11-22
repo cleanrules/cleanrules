@@ -14,7 +14,7 @@ import { native, root } from './support/cr.js'
 
 const {
   Bundle,
-  CaseFile,
+  CaseFileRef,
   DecisionTable,
   F,
   FormatError,
@@ -251,25 +251,25 @@ describe('case files', () => {
     ],
   })
 
-  test('caseMatches checks the bytes against the recorded digest', () => {
-    assert.equal(bundle.caseMatches('cases/a.json', 'héllo'), true)
-    assert.equal(bundle.caseMatches('cases/a.json', new TextEncoder().encode('héllo')), true)
-    assert.equal(bundle.caseMatches('cases/a.json', 'hello'), false)
-    assert.equal(bundle.caseMatches('cases/b.bin', new Uint8Array([0, 255])), true)
-    assert.equal(bundle.caseMatches('cases/b.bin', new Uint8Array([0])), false)
+  test('caseDigestMatches checks the bytes against the recorded digest', () => {
+    assert.equal(bundle.caseDigestMatches('cases/a.json', 'héllo'), true)
+    assert.equal(bundle.caseDigestMatches('cases/a.json', new TextEncoder().encode('héllo')), true)
+    assert.equal(bundle.caseDigestMatches('cases/a.json', 'hello'), false)
+    assert.equal(bundle.caseDigestMatches('cases/b.bin', new Uint8Array([0, 255])), true)
+    assert.equal(bundle.caseDigestMatches('cases/b.bin', new Uint8Array([0])), false)
   })
 
   test('a path the bundle does not refer to is a RangeError naming its paths', () => {
-    assert.throws(() => bundle.caseMatches('cases/c.json', ''), {
+    assert.throws(() => bundle.caseDigestMatches('cases/c.json', ''), {
       name: 'RangeError',
       message: 'the bundle refers to no case file "cases/c.json"; its case files are "cases/a.json", "cases/b.bin"',
     })
-    assert.throws(() => make().caseMatches('a.json', ''), { name: 'RangeError', message: /it has none/ })
+    assert.throws(() => make().caseDigestMatches('a.json', ''), { name: 'RangeError', message: /it has none/ })
   })
 
   test('arguments of the wrong type are TypeErrors', () => {
-    assert.throws(() => bundle.caseMatches(1, ''), TypeError)
-    assert.throws(() => bundle.caseMatches('cases/a.json', 5), TypeError)
+    assert.throws(() => bundle.caseDigestMatches(1, ''), TypeError)
+    assert.throws(() => bundle.caseDigestMatches('cases/a.json', 5), TypeError)
   })
 })
 
@@ -465,30 +465,30 @@ describe('review fixes', () => {
     assert.throws(() => make(vip(), { limits: { maxTextSize: 10 } }), { name: 'TypeError', message: /does not record limits\.maxTextSize/ })
   })
 
-  test('the case files of a bundle are CaseFile objects, which check what they are made of', () => {
+  test('the case files of a bundle are CaseFileRef objects, which check what they are made of', () => {
     const bundle = make(vip(), { cases: [{ path: 'cases/a.json', content: '[]' }] })
     const [first] = bundle.cases
-    assert.ok(first instanceof CaseFile)
+    assert.ok(first instanceof CaseFileRef)
     assert.equal(first.path, 'cases/a.json')
-    assert.equal(first.matches('[]'), true)
-    assert.equal(first.matches(new TextEncoder().encode('[]')), true)
-    assert.equal(first.matches('[ ]'), false)
-    const again = new CaseFile(first.path, first.digest)
+    assert.equal(first.digestMatches('[]'), true)
+    assert.equal(first.digestMatches(new TextEncoder().encode('[]')), true)
+    assert.equal(first.digestMatches('[ ]'), false)
+    const again = new CaseFileRef(first.path, first.digest)
     assert.deepEqual(again, first)
     assert.ok(Object.isFrozen(again))
     assert.deepEqual(JSON.parse(JSON.stringify(again)), { path: 'cases/a.json', digest: first.digest })
-    assert.equal(again[Symbol.for('nodejs.util.inspect.custom')](), `CaseFile(cases/a.json ${first.digest})`)
+    assert.equal(again[Symbol.for('nodejs.util.inspect.custom')](), `CaseFileRef(cases/a.json ${first.digest})`)
     for (const [path, digest] of [
       ['Cases/A.json', first.digest],
       ['../a.json', first.digest],
       ['cases/a.json', 'sha256:00'],
       ['cases/a.json', first.digest.toUpperCase()],
     ]) {
-      assert.throws(() => new CaseFile(path, digest), FormatError, `${path} ${digest}`)
+      assert.throws(() => new CaseFileRef(path, digest), FormatError, `${path} ${digest}`)
     }
-    assert.throws(() => new CaseFile(1, first.digest), { name: 'TypeError', message: /path must be a string/ })
-    assert.throws(() => new CaseFile('a.json'), { name: 'TypeError', message: /digest must be a string/ })
-    assert.throws(() => first.matches(5), TypeError)
+    assert.throws(() => new CaseFileRef(1, first.digest), { name: 'TypeError', message: /path must be a string/ })
+    assert.throws(() => new CaseFileRef('a.json'), { name: 'TypeError', message: /digest must be a string/ })
+    assert.throws(() => first.digestMatches(5), TypeError)
   })
 
   test('the comparison is symmetric', () => {

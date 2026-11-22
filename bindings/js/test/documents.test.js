@@ -165,6 +165,23 @@ describe('loads and dumps', () => {
     assert.ok(loads(yaml, { format: 'yaml', limits: { maxSize: 2 * 1024 * 1024 } }) instanceof Expr)
   })
 
+  test('case files are read as documents, but loads does not load them yet', () => {
+    // A case file (spec/tests.md): the native layer reads, writes and hashes it.
+    const text = '{"version":1,"cases":{"items":[{"id":"a","input":{"x":1},"expect":{"selected":["vip"]}}]}}'
+    const document = native.Document.read(text)
+    assert.equal(document.kind, 'cases')
+    assert.equal(document.write(), text)
+    assert.match(document.digest(), /^sha256:[0-9a-f]{64}$/)
+    throwsWith(() => loads(text), UnsupportedError, /case files/, (error) => {
+      assert.equal(error.context.operation, 'loads')
+    })
+    throwsWith(() => loads('version: 1\ncases: {items: []}\n', { format: 'yaml' }), UnsupportedError, /case files/)
+    // Errors in the file come first, located in it.
+    throwsWith(() => loads('{"version":1,"cases":{"items":[{"id":"a"}]}}'), FormatError, /.+/, (error) => {
+      assert.equal(error.context.pointer, '/cases/items/0/input')
+    })
+  })
+
   test('value nodes are not documents', () => {
     throwsWith(() => dumps(F.x.add(1)), ExpressionError, /only a condition can be a document, not the value x \+ 1/, (error) => {
       assert.match(error.hint, /F\.x\.gt\(0\)/)

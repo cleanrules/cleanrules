@@ -31,9 +31,12 @@ pub const CR_DOCUMENT_DECISION_TABLE: cr_document_content = 4;
 /// A document holding a bundle (`spec/bundles.md`): read and written in JSON
 /// or YAML, made with `cr_document_new_bundle`.
 pub const CR_DOCUMENT_BUNDLE: cr_document_content = 5;
+/// A document holding test cases (`spec/tests.md`): read, written and hashed
+/// in JSON or YAML; it gives no rule set and has no diagram.
+pub const CR_DOCUMENT_CASES: cr_document_content = 6;
 
 /// A document read in any format: a condition, a rule, a rule set, a decision
-/// table or a bundle.
+/// table, a bundle or a case file.
 pub struct cr_document {
     pub(crate) document: Document,
 }
@@ -87,6 +90,7 @@ pub unsafe extern "C" fn cr_document_kind(document: *const cr_document) -> cr_do
         Some(Document::RuleSet(_)) => CR_DOCUMENT_RULESET,
         Some(Document::DecisionTable(_)) => CR_DOCUMENT_DECISION_TABLE,
         Some(Document::Bundle(_)) => CR_DOCUMENT_BUNDLE,
+        Some(Document::Cases(_)) => CR_DOCUMENT_CASES,
         _ => 0,
     }
 }
@@ -281,6 +285,7 @@ pub(crate) fn not_holding(what: &str, document: &Document) -> Failure {
         Document::RuleSet(_) => "a rule set",
         Document::DecisionTable(_) => "a decision table",
         Document::Bundle(_) => "a bundle",
+        Document::Cases(_) => "test cases",
         _ => "something else",
     };
     Failure::Invalid(

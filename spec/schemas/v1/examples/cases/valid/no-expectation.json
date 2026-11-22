@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "cases": {
+    "items": [
+      {
+        "id": "smoke",
+        "input": {
+          "years": 2
+        }
+      }
+    ]
+  }
+}

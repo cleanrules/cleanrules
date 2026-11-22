@@ -23,8 +23,9 @@ language-specific behaviour.
 | [`agents.md`](agents.md) | draft | The tools for AI agents (`list_rulesets`, `summary`, `evaluate`, `explain`, `validate`): arguments, results, agent errors with pointers and hints, input schemas generated from summaries, and compact explanations within a size budget |
 | [`visual.md`](visual.md) | draft | Diagrams of conditions, rules, rule sets, explanations and decision tables in DOT, Mermaid and standalone HTML: content, escaping and limits |
 | [`bundles.md`](bundles.md) | draft | Bundles: a reproducible package of rules with its identifier, immutable revision, rule set digest, engine version and configuration, input and output contract and test case files; comparing two bundles (same rules under another engine, other rules under the same engine) |
+| [`tests.md`](tests.md) | draft | Test cases: case files of identified inputs with expectations on the selected rules, outputs, unknown rules and errors, and how expectations match a decision |
 | [`json-format.md`](json-format.md) | draft, format version 1 | Documents, values, conditions, rules, rule sets, decisions, explanations, summaries and decision tables as JSON; their canonical bytes and SHA-256 digests |
-| [`schemas/v1/`](schemas/v1/) | draft | JSON Schemas (draft 2020-12) for values, logics and every document (condition, rule, rule set, decision, explanation, summary, decision table, bundle) and for the tools for agents, with valid and invalid examples checked by `schemas/check.py` |
+| [`schemas/v1/`](schemas/v1/) | draft | JSON Schemas (draft 2020-12) for values, logics and every document (condition, rule, rule set, decision, explanation, summary, decision table, bundle, case file) and for the tools for agents, with valid and invalid examples checked by `schemas/check.py` |
 
 ## Conventions that apply to every spec
 

@@ -16,7 +16,13 @@ public enum DocumentKind {
      * A bundle ({@code spec/bundles.md}): read, written and hashed through
      * {@code ffi.Document}; the idiomatic API has no bundles yet.
      */
-    BUNDLE;
+    BUNDLE,
+    /**
+     * A case file of test cases ({@code spec/tests.md}): read, written and
+     * hashed through {@code ffi.Document}; the idiomatic API has no case
+     * files yet.
+     */
+    CASES;
 
     /**
      * The name in documents and in the JSON forms, such as {@code decision_table}.

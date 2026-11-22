@@ -16,7 +16,7 @@ from cleanrules import (
     BundleEngine,
     BundleLimits,
     BundleRelation,
-    CaseFile,
+    CaseFileRef,
     DecisionTable,
     F,
     FormatError,
@@ -95,7 +95,7 @@ def test_a_bundle_records_rules_engine_contract_and_cases() -> None:
     assert made.contract["input"] == rules().input_schema()
     assert made.contract["output"] == {"keys": ["discount"]}
     assert made.cases == (
-        CaseFile(
+        CaseFileRef(
             "cases/discounts.json",
             "sha256:" + hashlib.sha256(CASES.encode()).hexdigest(),
         ),
@@ -134,31 +134,31 @@ def test_cases_as_a_mapping_and_bytes() -> None:
 
 def test_case_matches() -> None:
     made = bundle()
-    assert made.case_matches("cases/discounts.json", CASES)
-    assert made.case_matches("cases/discounts.json", CASES.encode())
-    assert not made.case_matches("cases/discounts.json", CASES + " ")
-    assert made.cases[0].matches(CASES)
-    assert not made.cases[0].matches(b"")
+    assert made.case_digest_matches("cases/discounts.json", CASES)
+    assert made.case_digest_matches("cases/discounts.json", CASES.encode())
+    assert not made.case_digest_matches("cases/discounts.json", CASES + " ")
+    assert made.cases[0].digest_matches(CASES)
+    assert not made.cases[0].digest_matches(b"")
     with pytest.raises(
         KeyError,
         match=r'no case file "cases/other.json"; its case files are "cases/discounts.json"',
     ):
-        made.case_matches("cases/other.json", CASES)
+        made.case_digest_matches("cases/other.json", CASES)
     with pytest.raises(KeyError, match="it has none"):
-        bundle(cases=()).case_matches("a.json", CASES)
-    assert made.case_matches(path="cases/discounts.json", content=CASES)
-    assert made.cases[0].matches(content=CASES)
+        bundle(cases=()).case_digest_matches("a.json", CASES)
+    assert made.case_digest_matches(path="cases/discounts.json", content=CASES)
+    assert made.cases[0].digest_matches(content=CASES)
 
 
 def test_case_files_are_checked_when_made() -> None:
     digest = "sha256:" + "0" * 64
-    assert CaseFile("cases/a.json", digest).path == "cases/a.json"
+    assert CaseFileRef("cases/a.json", digest).path == "cases/a.json"
     with pytest.raises(FormatError):
-        CaseFile("Cases/A.json", digest)
+        CaseFileRef("Cases/A.json", digest)
     with pytest.raises(FormatError):
-        CaseFile("cases/a.json", "sha256:00")
+        CaseFileRef("cases/a.json", "sha256:00")
     with pytest.raises(TypeError):
-        CaseFile(b"a.json", digest)  # pyright: ignore[reportArgumentType]
+        CaseFileRef(b"a.json", digest)  # pyright: ignore[reportArgumentType]
 
 
 def test_actions_given_as_code_are_refused_unless_omitted() -> None:

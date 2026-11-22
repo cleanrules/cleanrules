@@ -255,15 +255,18 @@ a bundle meant for Windows avoids them.) Two items with the same `path` are a
 `format_error` at the second one's `path`. The order of the items is kept: it
 is the order in which they are run.
 
-The content of a case file is opaque in this version: the format of test cases
-and their expectations is task T.1 (`tests.md`, to come). The digest covers the
-file's bytes as stored, whatever their format, so a reader that has the file
-can check that it is the one the bundle was made with, without understanding
-it. A reader of a bundle never opens files: the core has no file system, and
-checking a file against its digest is the work of the caller that has it
-(`case_matches` on a bundle in Rust and Python, `caseMatches` in JavaScript,
-and `matches` on a case in Rust, Python and JavaScript; the C ABI and the beta bindings
-give a bundle as a document only). Bytes as stored include line endings: a
+A case file holds test cases and their expectations (`tests.md`), in JSON
+or YAML. The bundle does not read it: the digest covers the file's bytes as
+stored, whatever their format and whether or not they read as a case file,
+so a reader that has the file can check that it is the one the bundle was
+made with, without reading it; reading and running the cases is the work of
+the case runner (task T.3). A reader of a bundle never opens files: the core
+has no file system, and checking a file against its digest is the work of the
+caller that has it
+(`case_digest_matches` on a bundle in Rust and Python, `caseDigestMatches` in
+JavaScript, and `digest_matches` or `digestMatches` on its `CaseFileRef`, the
+reference to one case file, in Rust, Python and JavaScript; the C ABI and the
+beta bindings give a bundle as a document only). Bytes as stored include line endings: a
 version control system that rewrites them on checkout (`core.autocrlf` in
 git) changes the file's digest, so case files are stored as they are (in
 git, `-text` or `eol=lf` in `.gitattributes`).

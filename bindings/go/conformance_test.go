@@ -76,12 +76,15 @@ var conformanceSkips = map[string]string{
 		" compare bundles run in the core, C ABI, Python and JavaScript runners",
 	"graded": "conditions under a graded logic: the binding evaluates one node under boolean only until task" +
 		" J.1b",
+	"cases": "case files (spec/tests.md) have no Go type yet (a beta binding): Loads refuses a case file once" +
+		" the core has read it, so vectors that read one without an error, write it in another format or" +
+		" check its canonical bytes run in the core, C ABI, Python and JavaScript runners",
 }
 
 // allowedSkips are the skips each route may have; any other fails.
 var allowedSkips = map[string][]string{
-	"json":   {"agents", "bundle", "diagram", "graded", "grid", "native"},
-	"native": {"agents", "bundle", "diagram", "graded", "zero_limit", "zone_unknown_to_go"},
+	"json":   {"agents", "bundle", "cases", "diagram", "graded", "grid", "native"},
+	"native": {"agents", "bundle", "cases", "diagram", "graded", "zero_limit", "zone_unknown_to_go"},
 }
 
 // conformance runs vectors; it counts the Go forms of the native route.
@@ -160,6 +163,9 @@ func (c *conformance) run(vector *jsonObject, route string) (failure, skip strin
 	if needsBundles(given, expect) {
 		return "", "bundle"
 	}
+	if needsCaseFiles(vector) {
+		return "", "cases"
+	}
 	if route == "json" {
 		return c.runJSON(given, expect), ""
 	}
@@ -187,6 +193,19 @@ func needsBundles(given, expect *jsonObject) bool {
 		return holds && !expect.has("error")
 	}
 	return false
+}
+
+// needsCaseFiles says whether a vector needs the Go type of a case file, which
+// the binding does not have yet: a vector of format/cases that reads one
+// without an error, writes one in another format, or checks its canonical
+// bytes. Vectors whose case file the reader refuses still run: Loads gives the
+// core's error.
+func needsCaseFiles(vector *jsonObject) bool {
+	if !strings.HasPrefix(vector.str("id"), "format/cases/") {
+		return false
+	}
+	given := vector.obj("given")
+	return given.str("kind") == "canonical" || given.has("write") || !vector.obj("expect").has("error")
 }
 
 // isGraded says whether a vector evaluates a condition under a graded logic,

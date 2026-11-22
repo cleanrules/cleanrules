@@ -3,7 +3,8 @@
 **Status:** draft, format version `1`. This document covers documents, values
 and conditions (task A.1a), rules and rule sets (A.1b), decisions and reasons
 (A.1c), explanations and summaries (A.1d), canonical bytes and digests
-(R.2), and bundles (R.5, in [`bundles.md`](bundles.md)).
+(R.2), bundles (R.5, in [`bundles.md`](bundles.md)) and case files (T.1, in
+[`tests.md`](tests.md)).
 
 The JSON format is the contract between languages and with users' files
 (`CLAUDE.md`, invariant 6). A condition written in Java and read in Go is the
@@ -22,8 +23,9 @@ other value is a `format_error` at the root) with:
 - `"version"`: the format version, the integer literal `1`;
 - exactly one **content key**, which says what the document holds:
   `"condition"`, `"rule"`, `"ruleset"`, `"decision"`, `"explanation"`,
-  `"summary"`, `"decision_table"` or `"bundle"` (a reproducible package of
-  rules, [`bundles.md`](bundles.md));
+  `"summary"`, `"decision_table"`, `"bundle"` (a reproducible package of
+  rules, [`bundles.md`](bundles.md)) or `"cases"` (test cases,
+  [`tests.md`](tests.md));
 - optionally `"$schema"`, a string that readers ignore, so editors can find the
   schema. Writers do not emit it.
 
@@ -86,8 +88,8 @@ of a rule set and the results of a decision.
 
 **Formats.** Documents are also read and written in YAML (*YAML*); the
 documents of conditions, rules and rule sets in the rule syntax (`text.md`);
-and those of decision tables in CSV (`tables.md`). Decisions and bundles are
-read and written in JSON or YAML only, and explanations and summaries are written in
+and those of decision tables in CSV (`tables.md`). Decisions, bundles and case
+files are read and written in JSON or YAML only, and explanations and summaries are written in
 JSON, YAML or as their text (`explain.md`). Any other combination is
 `unsupported`. Read from bytes, text that is not UTF-8 is a `format_error` at
 the line and column of the first invalid byte, in every format.
@@ -98,7 +100,7 @@ gives the rule set it compiles to (`tables.md`), a bundle gives the rule set
 it holds, or the one its decision table compiles to (`bundles.md`), and a rule
 gives a rule set of that one rule with the default settings (*Rule sets*:
 `first`, `boolean`, not strict). A condition is a `format_error`: it is not a
-rule.
+rule; and so is a case file, which holds no rules.
 
 **Versioning.** Adding a node, a content key or an optional key keeps the
 version, and so does accepting a new JSON form for an existing key, as long as
@@ -820,6 +822,15 @@ Its keys, the order in which it is checked and how it is written are in
 [`bundles.md`](bundles.md). It was added to version 1 (*Versioning*): older
 readers reject it with `format_error`.
 
+## Test cases
+
+A case file has the content key `"cases"`: an object with an optional
+`description` and `metadata`, and its test cases under `items`, each an id,
+an input and what evaluating the input must give. Its keys, how
+expectations match, the order in which it is checked and how it is written
+are in [`tests.md`](tests.md). It was added to version 1 (*Versioning*):
+older readers reject it with `format_error`.
+
 ## Decision tables
 
 A decision table document has the content key `"decision_table"`. Its keys,
@@ -1006,8 +1017,8 @@ alter the bytes of an existing document increases the format version. A
 reader of a later version that reads such a document gives the same bytes.
 
 The core gives the canonical bytes and the digest of the documents that
-readers build: conditions, rules, rule sets, decision tables and bundles
-(`bundles.md`, *Digest of a bundle*). The canonical
+readers build: conditions, rules, rule sets, decision tables, bundles
+(`bundles.md`, *Digest of a bundle*) and case files (`tests.md`). The canonical
 bytes of decisions, explanations and summaries follow the same rules; this
 version defines no digest of them.
 

@@ -8,7 +8,8 @@ below are written in their canonical structure (defaults written, `in` values
 sorted), so the oracle only canonicalizes values and lays the bytes out; the
 few vectors that check the structure give their canonical form explicitly.
 
-    python3 conformance/tools/canonical_vectors.py --write   # canonical.json, digests.json
+    python3 conformance/tools/canonical_vectors.py --write   # canonical.json, digests.json,
+                                                              # bundles.json, cases.json
     python3 conformance/tools/canonical_vectors.py --check   # CI: files up to date, and
                                                               # bytes and digests recomputed
 """
@@ -1666,6 +1667,656 @@ def bundle_vectors() -> dict[str, Any]:
     return {"version": 1, "area": "format", "vectors": vectors}
 
 
+TESTS = "tests.md"
+I64 = 2**63
+
+
+def data_value(value: Any) -> Any:
+    """The canonical form of a data value (*Values*).
+
+    An int outside the signed 64-bit range, or a decimal that does not fit,
+    reads as null, as in any input.
+    """
+    if isinstance(value, IntLit) and not -I64 <= int(value) < I64:
+        return None
+    if isinstance(value, dict) and set(value) == {"$int"} and not -I64 <= int(value["$int"]) < I64:
+        return None
+    if (
+        isinstance(value, dict)
+        and set(value) == {"$decimal"}
+        and not decimal_fits(value["$decimal"])
+    ):
+        return None
+    if isinstance(value, list):
+        return [data_value(v) for v in value]
+    if isinstance(value, dict):
+        typed = [k for k in value if k.startswith("$")]
+        if typed:
+            if typed == ["$map"]:
+                inner = {k: data_value(v) for k, v in value["$map"].items()}
+                return canonical_value({"$map": inner})
+            return canonical_value(value)
+        return {k: data_value(v) for k, v in value.items()}
+    return canonical_value(value)
+
+
+def decimal_fits(text: str) -> bool:
+    """Whether a decimal's text fits the data model (*Decimals*): coefficient below 10^38."""
+    if text in ("inf", "-inf"):
+        return True
+    _, digits, exponent = decimal.Decimal(text).as_tuple()
+    assert isinstance(exponent, int)
+    coefficient = int("".join(map(str, digits)) or "0")
+    if exponent > 0:
+        coefficient *= 10**exponent
+    return coefficient < 10**38 and -exponent <= 38
+
+
+def expected_output(output: Any) -> Any:
+    """An expected output: payload keys taken literally, data values (never out of range)."""
+    return {k: data_value(v) for k, v in output.items()}
+
+
+def canonical_cases(document: Any) -> Any:
+    """A case file's canonical form (`tests.md`, *Reading and writing*)."""
+    content = document["cases"]
+    cases = []
+    for case in content["items"]:
+        out: dict[str, Any] = {"id": case["id"]}
+        if "description" in case:
+            out["description"] = case["description"]
+        out["input"] = data_value(case["input"])
+        expect = dict(case.get("expect", {}))
+        written: dict[str, Any] = {}
+        if "selected" in expect:
+            written["selected"] = list(expect["selected"])
+        if "output" in expect:
+            output = expect["output"]
+            written["output"] = None if output is None else expected_output(output)
+        if "outputs" in expect:
+            written["outputs"] = [expected_output(o) for o in expect["outputs"]]
+        if "unknown" in expect:
+            # Python compares strings by code point.
+            written["unknown"] = sorted(expect["unknown"])
+        if "error" in expect:
+            written["error"] = {"code": expect["error"]["code"]}
+        if written:
+            out["expect"] = written
+        cases.append(out)
+    file: dict[str, Any] = {}
+    if "description" in content:
+        file["description"] = content["description"]
+    if content.get("metadata"):
+        file["metadata"] = {k: data_value(v) for k, v in content["metadata"].items()}
+    file["items"] = cases
+    return {"version": IntLit("1"), "cases": file}
+
+
+CASE_EXAMPLE = """{
+  "version": 1,
+  "cases": {
+    "description": "the cases of the discount rules",
+    "items": [
+      {
+        "id": "vip-gets-15",
+        "description": "a customer of more than five years gets 15%",
+        "input": { "years": 7 },
+        "expect": {
+          "selected": ["vip"],
+          "output": { "discount": { "$decimal": "0.15" } }
+        }
+      },
+      {
+        "id": "years-unknown",
+        "input": {},
+        "expect": { "selected": [], "output": null, "unknown": ["vip"] }
+      }
+    ]
+  }
+}"""
+
+
+def case_file(*cases: str) -> Any:
+    """A case file of cases given as JSON texts."""
+    return load('{"version": 1, "cases": {"items": [' + ", ".join(cases) + "]}}")
+
+
+def case_file_vectors() -> dict[str, Any]:
+    """The vectors of `format/cases.json` (`tests.md`)."""
+    vectors: list[dict[str, Any]] = []
+
+    def add(name: str, description: str, spec: list[str], given: Any, expect: Any) -> None:
+        vectors.append(
+            {
+                "id": f"format/cases/{name}",
+                "spec": [s if "#" in s else f"{TESTS}#{s}" for s in spec],
+                "description": description,
+                "given": given,
+                "expect": expect,
+            }
+        )
+
+    def read(name: str, description: str, spec: list[str], document: Any) -> None:
+        add(
+            name,
+            description,
+            spec,
+            {"kind": "read", "document": document},
+            {"document": canonical_cases(document)},
+        )
+
+    def refused(name: str, description: str, spec: list[str], document: Any, pointer: str) -> None:
+        add(
+            name,
+            description,
+            spec,
+            {"kind": "read", "document": document},
+            {"error": {"code": "format_error", "pointer": pointer}},
+        )
+
+    # Reading and writing.
+    example = load(CASE_EXAMPLE)
+    read(
+        "read-example",
+        "a case file reads, and is written back as it was",
+        ["case-files", "cases", "expectations", "json-format.md#test-cases"],
+        example,
+    )
+    read("read-empty", "a case file may hold no cases", ["case-files"], case_file())
+    read(
+        "read-description-and-metadata",
+        "a case file has a description and metadata, whose keys are literal and whose values"
+        " are data, an int out of range reading as null as in rule metadata",
+        ["case-files"],
+        load(
+            '{"version": 1, "cases": {"items": [], "metadata": {"$owner": "risk",'
+            ' "reviewed": {"$date": "2026-11-22"}, "n": 99999999999999999999,'
+            ' "m": {"$map": {"$k": 1}}}, "description": "d"}}'
+        ),
+    )
+    read(
+        "read-empty-metadata",
+        "empty metadata is written without the key",
+        ["case-files"],
+        load('{"version": 1, "cases": {"metadata": {}, "items": []}}'),
+    )
+    read(
+        "read-no-expectation",
+        "a case without an expectation, or with an empty one, is written without it",
+        ["cases", "expectations"],
+        case_file('{"id": "a", "input": {"x": 1}}', '{"id": "b", "input": {"x": 2}, "expect": {}}'),
+    )
+    read(
+        "read-member-order",
+        "the members of a case and of its expectation are read in any order",
+        ["reading-and-writing"],
+        case_file(
+            '{"expect": {"unknown": [], "output": {"b": 2, "a": 1}, "selected": ["r"]},'
+            ' "input": {"y": 1, "x": 2}, "description": "d", "id": "a"}'
+        ),
+    )
+    read(
+        "read-unknown-sorted",
+        "unknown is a set, written sorted by code point",
+        ["expectations", "rules-in-expectations"],
+        case_file('{"id": "a", "input": {}, "expect": {"unknown": ["b", "\\u00e9", "a", "Z"]}}'),
+    )
+    read(
+        "read-selected-order-kept",
+        "selected keeps its order, the selection order",
+        ["expectations", "rules-in-expectations"],
+        case_file('{"id": "a", "input": {}, "expect": {"selected": ["b", "a", "PRICING-12"]}}'),
+    )
+    read(
+        "read-output-null",
+        "an output of null expects that no rule is selected",
+        ["expectations"],
+        case_file('{"id": "a", "input": {}, "expect": {"selected": [], "output": null}}'),
+    )
+    read(
+        "read-outputs",
+        "outputs hold one object per selected rule, whose values may be lists and maps",
+        ["expectations"],
+        case_file(
+            '{"id": "a", "input": {"order": {"items": [1, 2], "total": 1200}},'
+            ' "expect": {"outputs": [{"shipping": 0},'
+            ' {"tags": ["a", "b"], "limits": {"max": 3}}, {}]}}'
+        ),
+    )
+    read(
+        "read-output-literal-keys",
+        "the keys of an expected output are payload keys, taken literally, even with a $",
+        ["expectations"],
+        case_file(
+            '{"id": "a", "input": {"$map": {"$ref": 1}},'
+            ' "expect": {"output": {"$decimal": "1", "$ref": {"$map": {"$x": 2}}}}}'
+        ),
+    )
+    read(
+        "read-values-canonical",
+        "inputs and expected values are written in their canonical form, decimals keeping"
+        " their scale",
+        ["inputs", "expectations", "json-format.md#values"],
+        case_file(
+            '{"id": "a", "input": {"i": {"$int": "007"}, "f": 1e2, "d": {"$decimal": "1.5e-3"},'
+            ' "s": {"$decimal": "1.00"}, "t": {"$datetime": "2026-10-31T09:30:00.500+01:00"}},'
+            ' "expect": {"output": {"total": {"$float": 1}, "price": {"$decimal": "19.990"},'
+            ' "big": {"$int": "9007199254740993"}, "day": {"$date": "2026-10-31"}}}}'
+        ),
+    )
+    read(
+        "read-int-overflow",
+        "an int outside the signed 64-bit range reads as null in an input, as in any input",
+        ["inputs"],
+        case_file(
+            '{"id": "a", "input": {"n": 99999999999999999999,'
+            ' "m": {"$int": "-99999999999999999999"},'
+            f' "d": {{"$decimal": "1{"0" * 38}"}}}}}}'
+        ),
+    )
+    read(
+        "read-errors",
+        "an expected error is an object with its code, one of the three evaluation can raise",
+        ["errors"],
+        case_file(
+            '{"id": "a", "input": {}, "expect": {"error": {"code": "missing_field"}}}',
+            '{"id": "b", "input": {}, "expect": {"error": {"code": "type_mismatch"}}}',
+            '{"id": "c", "input": {}, "expect": {"error": {"code": "hit_policy_error"}}}',
+        ),
+    )
+    read(
+        "read-ids-literal",
+        "ids are any non-empty strings, taken literally: ids that differ only in case differ",
+        ["identity"],
+        case_file(
+            '{"id": "Vip \\u2713", "input": {}}',
+            '{"id": "vip \\u2713", "input": {}}',
+            '{"id": "a/b", "input": {}}',
+            '{"id": " ", "input": {}}',
+        ),
+    )
+    read(
+        "read-scalar-input",
+        "an input may be any data value, not only a map",
+        ["inputs"],
+        case_file('{"id": "a", "input": [1, "x", null]}', '{"id": "b", "input": 5}'),
+    )
+    add(
+        "read-yaml",
+        "a case file reads from YAML",
+        ["case-files"],
+        {
+            "kind": "read",
+            "yaml": (
+                "version: 1\n"
+                "cases:\n"
+                "  items:\n"
+                "  - id: vip-gets-15\n"
+                "    input: {years: 7}\n"
+                "    expect:\n"
+                "      selected: [vip]\n"
+                "      output:\n"
+                "        discount: {$decimal: '0.15'}\n"
+                "  - id: years-unknown\n"
+                "    input: {}\n"
+                "    expect: {selected: [], output: null, unknown: [vip]}\n"
+            ),
+        },
+        {
+            "document": canonical_cases(
+                case_file(
+                    '{"id": "vip-gets-15", "input": {"years": 7}, "expect": {"selected": ["vip"],'
+                    ' "output": {"discount": {"$decimal": "0.15"}}}}',
+                    '{"id": "years-unknown", "input": {}, "expect": {"selected": [],'
+                    ' "output": null, "unknown": ["vip"]}}',
+                )
+            )
+        },
+    )
+    for name, write in (("write-text", "text"), ("write-csv", "csv")):
+        add(
+            name,
+            f"a case file has no {write} form",
+            ["case-files"],
+            {"kind": "read", "document": example, "write": write},
+            {"error": {"code": "unsupported"}},
+        )
+
+    # Errors.
+    refused(
+        "content-not-object",
+        "the content of a case file is an object, not the array of its cases",
+        ["case-files"],
+        load('{"version": 1, "cases": [{"id": "a", "input": {}}]}'),
+        "/cases",
+    )
+    refused(
+        "items-missing",
+        "a case file holds its cases under items",
+        ["case-files"],
+        load('{"version": 1, "cases": {"description": "none"}}'),
+        "/cases/items",
+    )
+    refused(
+        "items-not-array",
+        "items is an array of cases",
+        ["case-files"],
+        load('{"version": 1, "cases": {"items": {}}}'),
+        "/cases/items",
+    )
+    refused(
+        "file-description-not-string",
+        "a case file's description is a string",
+        ["case-files"],
+        load('{"version": 1, "cases": {"description": 1, "items": []}}'),
+        "/cases/description",
+    )
+    refused(
+        "metadata-before-items",
+        "a case file's metadata is read before its items, and is an object",
+        ["case-files", "reading-and-writing"],
+        load('{"version": 1, "cases": {"items": [{"id": ""}], "metadata": []}}'),
+        "/cases/metadata",
+    )
+    refused(
+        "file-unknown-key",
+        "a case file has no other keys: tags are not one in this version",
+        ["case-files"],
+        load('{"version": 1, "cases": {"items": [], "tags": ["a"]}}'),
+        "/cases/tags",
+    )
+    refused(
+        "case-not-object",
+        "a case is an object",
+        ["cases"],
+        case_file('["a", {}]'),
+        "/cases/items/0",
+    )
+    refused(
+        "id-missing", "a case has an id", ["cases"], case_file('{"input": {}}'), "/cases/items/0/id"
+    )
+    refused(
+        "id-not-string",
+        "an id is a string",
+        ["identity"],
+        case_file('{"id": 1, "input": {}}'),
+        "/cases/items/0/id",
+    )
+    refused(
+        "id-empty",
+        "an id is not empty",
+        ["identity"],
+        case_file('{"id": "", "input": {}}'),
+        "/cases/items/0/id",
+    )
+    refused(
+        "id-repeated",
+        "a case whose id repeats an earlier case's is refused at its id",
+        ["identity", "reading-and-writing"],
+        case_file(
+            '{"id": "a", "input": {}}', '{"id": "b", "input": {}}', '{"id": "a", "input": {}}'
+        ),
+        "/cases/items/2/id",
+    )
+    refused(
+        "description-not-string",
+        "a description is a string",
+        ["cases"],
+        case_file('{"id": "a", "description": 1, "input": {}}'),
+        "/cases/items/0/description",
+    )
+    refused(
+        "input-missing",
+        "a case has an input, checked before unknown keys",
+        ["cases", "reading-and-writing"],
+        case_file('{"id": "a", "name": "a"}'),
+        "/cases/items/0/input",
+    )
+    refused(
+        "input-opaque",
+        "an opaque value is not data",
+        ["inputs"],
+        case_file('{"id": "a", "input": {"x": {"$opaque": "bytes"}}}'),
+        "/cases/items/0/input/x",
+    )
+    refused(
+        "unknown-key",
+        "a case has no other keys",
+        ["cases"],
+        case_file('{"id": "a", "input": {}, "name": "a"}'),
+        "/cases/items/0/name",
+    )
+    refused(
+        "expect-not-object",
+        "an expectation is an object",
+        ["cases"],
+        case_file('{"id": "a", "input": {}, "expect": []}'),
+        "/cases/items/0/expect",
+    )
+    refused(
+        "expect-unknown-key",
+        "an expectation has no other keys: fired is not one in this version",
+        ["expectations"],
+        case_file('{"id": "a", "input": {}, "expect": {"fired": ["vip"]}}'),
+        "/cases/items/0/expect/fired",
+    )
+    refused(
+        "selected-not-array",
+        "selected is an array",
+        ["expectations"],
+        case_file('{"id": "a", "input": {}, "expect": {"selected": "vip"}}'),
+        "/cases/items/0/expect/selected",
+    )
+    refused(
+        "selected-not-string",
+        "a rule is named by a string",
+        ["rules-in-expectations"],
+        case_file('{"id": "a", "input": {}, "expect": {"selected": [1]}}'),
+        "/cases/items/0/expect/selected/0",
+    )
+    refused(
+        "selected-empty",
+        "an empty string names no rule",
+        ["rules-in-expectations"],
+        case_file('{"id": "a", "input": {}, "expect": {"selected": ["vip", ""]}}'),
+        "/cases/items/0/expect/selected/1",
+    )
+    refused(
+        "selected-repeated",
+        "a rule is named once in selected",
+        ["rules-in-expectations"],
+        case_file('{"id": "a", "input": {}, "expect": {"selected": ["a", "b", "a", 1]}}'),
+        "/cases/items/0/expect/selected/2",
+    )
+    refused(
+        "unknown-repeated",
+        "a rule is named once in unknown",
+        ["rules-in-expectations"],
+        case_file('{"id": "a", "input": {}, "expect": {"unknown": ["a", "a"]}}'),
+        "/cases/items/0/expect/unknown/1",
+    )
+    refused(
+        "output-not-object",
+        "an output is an object or null",
+        ["expectations"],
+        case_file('{"id": "a", "input": {}, "expect": {"output": "x"}}'),
+        "/cases/items/0/expect/output",
+    )
+    refused(
+        "outputs-not-array",
+        "outputs is an array",
+        ["expectations"],
+        case_file('{"id": "a", "input": {}, "expect": {"outputs": {}}}'),
+        "/cases/items/0/expect/outputs",
+    )
+    refused(
+        "outputs-null-item",
+        "each item of outputs is an object: a selected rule always has an output",
+        ["expectations"],
+        case_file('{"id": "a", "input": {}, "expect": {"outputs": [{}, null]}}'),
+        "/cases/items/0/expect/outputs/1",
+    )
+    refused(
+        "output-value-opaque",
+        "an expected value is a data value",
+        ["expectations"],
+        case_file('{"id": "a", "input": {}, "expect": {"output": {"x": {"$opaque": "bytes"}}}}'),
+        "/cases/items/0/expect/output/x",
+    )
+    refused(
+        "output-int-overflow",
+        "an expected int outside the signed 64-bit range is refused, not read as null",
+        ["expectations", "reading-and-writing"],
+        case_file('{"id": "a", "input": {}, "expect": {"output": {"n": 99999999999999999999}}}'),
+        "/cases/items/0/expect/output/n",
+    )
+    refused(
+        "output-typed-int-overflow",
+        "an expected $int outside the signed 64-bit range is refused at its typed value",
+        ["expectations"],
+        case_file(
+            '{"id": "a", "input": {},'
+            ' "expect": {"output": {"n": {"$int": "-99999999999999999999"}}}}'
+        ),
+        "/cases/items/0/expect/output/n/$int",
+    )
+    refused(
+        "output-decimal-overflow",
+        "an expected decimal that does not fit is refused, not read as null",
+        ["expectations"],
+        case_file(
+            '{"id": "a", "input": {},'
+            f' "expect": {{"output": {{"d": {{"$decimal": "1{"0" * 38}"}}}}}}}}'
+        ),
+        "/cases/items/0/expect/output/d/$decimal",
+    )
+    refused(
+        "outputs-int-overflow",
+        "an int out of range is refused in outputs too",
+        ["expectations"],
+        case_file(
+            '{"id": "a", "input": {},'
+            ' "expect": {"outputs": [{}, {"n": [1, 99999999999999999999]}]}}'
+        ),
+        "/cases/items/0/expect/outputs/1/n/1",
+    )
+    refused(
+        "error-as-string",
+        "an expected error is an object with its code",
+        ["errors"],
+        case_file('{"id": "a", "input": {}, "expect": {"error": "missing_field"}}'),
+        "/cases/items/0/expect/error",
+    )
+    refused(
+        "error-code-missing",
+        "an expected error has a code",
+        ["errors"],
+        case_file('{"id": "a", "input": {}, "expect": {"error": {}}}'),
+        "/cases/items/0/expect/error/code",
+    )
+    for name, code, why in (
+        ("error-code-format", "format_error", "a code that evaluation never raises"),
+        (
+            "error-code-parent",
+            "evaluation_error",
+            "a parent code, which this version does not match",
+        ),
+        ("error-code-unknown", "oops", "a string that is not a code"),
+    ):
+        refused(
+            name,
+            f"an expected error is not {why}",
+            ["errors"],
+            case_file(f'{{"id": "a", "input": {{}}, "expect": {{"error": {{"code": "{code}"}}}}}}'),
+            "/cases/items/0/expect/error/code",
+        )
+    refused(
+        "error-unknown-key",
+        "an expected error holds its code only in this version",
+        ["errors"],
+        case_file(
+            '{"id": "a", "input": {},'
+            ' "expect": {"error": {"code": "missing_field", "rule": "vip"}}}'
+        ),
+        "/cases/items/0/expect/error/rule",
+    )
+    refused(
+        "error-with-others",
+        "an expected error is given alone",
+        ["expectations", "reading-and-writing"],
+        case_file(
+            '{"id": "a", "input": {},'
+            ' "expect": {"output": null, "error": {"code": "missing_field"}}}'
+        ),
+        "/cases/items/0/expect/error",
+    )
+    refused(
+        "error-alone-after-keys",
+        "an error given with others is checked after the expectation's unknown keys",
+        ["reading-and-writing"],
+        case_file(
+            '{"id": "a", "input": {}, "expect": {"selected": [], "fired": [],'
+            ' "error": {"code": "missing_field"}}}'
+        ),
+        "/cases/items/0/expect/fired",
+    )
+    refused(
+        "first-case-first",
+        "cases are read in order: the first case's error is reported",
+        ["reading-and-writing"],
+        case_file('{"id": "a"}', '{"input": {}}'),
+        "/cases/items/0/input",
+    )
+    refused(
+        "content-before-top-level",
+        "the content's shape is checked before the document's unknown keys",
+        ["reading-and-writing", "json-format.md#errors-and-limits"],
+        load('{"version": 1, "x": 1, "cases": {"items": [{"input": {}}]}}'),
+        "/cases/items/0/id",
+    )
+    refused(
+        "top-level-unknown-key",
+        "a case file has no other top-level keys",
+        ["case-files"],
+        load('{"version": 1, "cases": {"items": []}, "x": 1}'),
+        "/x",
+    )
+    add(
+        "version-unknown",
+        "a case file of another format version is refused",
+        ["case-files", "json-format.md#documents"],
+        {"kind": "read", "document": load('{"version": 2, "cases": {"items": []}}')},
+        {"error": {"code": "unsupported_version", "pointer": "/version"}},
+    )
+
+    # Canonical bytes and digests.
+    def canonical_vector(name: str, description: str, document: Any) -> None:
+        text = canonical_text(canonical_cases(document))
+        add(
+            name,
+            description,
+            ["reading-and-writing", DIGESTS],
+            {"kind": "canonical", "document": document},
+            {"canonical": text, "digest": digest(text)},
+        )
+
+    canonical_vector(
+        "canonical-example",
+        "a case file has canonical bytes and a digest, and gives no rule set",
+        example,
+    )
+    canonical_vector(
+        "canonical-sorted",
+        "canonical bytes sort every member and the unknown rules, and keep selected in order",
+        case_file(
+            '{"input": {"b": 1e2, "a": {"$decimal": "1.50"}}, "id": "z",'
+            ' "expect": {"unknown": ["y", "x"], "selected": ["y", "x"],'
+            ' "outputs": [{"$k": 1, "a": null}]}}'
+        ),
+    )
+    return {"version": 1, "area": "format", "vectors": vectors}
+
+
 # --- Writing and checking ---------------------------------------------------------
 
 
@@ -1673,6 +2324,7 @@ FILES = {
     "canonical.json": canonical_vectors,
     "digests.json": decision_vectors,
     "bundles.json": bundle_vectors,
+    "cases.json": case_file_vectors,
 }
 
 

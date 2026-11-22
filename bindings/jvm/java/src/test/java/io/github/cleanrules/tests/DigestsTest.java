@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.cleanrules.DecisionTable;
 import io.github.cleanrules.DocumentContent;
 import io.github.cleanrules.ExpressionException;
+import io.github.cleanrules.FormatException;
 import io.github.cleanrules.Format;
 import io.github.cleanrules.HitPolicy;
 import io.github.cleanrules.Rule;
@@ -209,6 +210,27 @@ class DigestsTest {
         assertThrows(UnsupportedException.class, () -> loads(bundle));
         try (Document document = Document.read(bundle, Format.JSON)) {
             assertEquals(io.github.cleanrules.DocumentKind.BUNDLE, document.kind());
+            assertTrue(document.digest().startsWith("sha256:"));
+        }
+    }
+
+    /**
+     * A case file (spec/tests.md) has no idiomatic Java type yet: {@code loads} refuses it, after the core's
+     * errors in it, and the native layer reads, writes and hashes it.
+     */
+    @Test
+    void caseFilesAreReadThroughTheNativeLayerOnly() {
+        String cases = "{\"version\":1,\"cases\":{\"items\":[{\"id\":\"a\",\"input\":{\"x\":1}}]}}";
+        UnsupportedException refused = assertThrows(UnsupportedException.class, () -> loads(cases));
+        assertEquals("loads", refused.operation().orElseThrow());
+        FormatException repeated = assertThrows(FormatException.class,
+                () -> loads("{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"a\", \"input\": {}},"
+                        + " {\"id\": \"a\", \"input\": {}}]}}"));
+        assertEquals("/cases/items/1/id", repeated.pointer().orElseThrow());
+        try (Document document = Document.read(cases, Format.JSON)) {
+            assertEquals(io.github.cleanrules.DocumentKind.CASES, document.kind());
+            assertEquals("cases", document.kind().jsonName());
+            assertEquals(cases, document.write(Format.JSON));
             assertTrue(document.digest().startsWith("sha256:"));
         }
     }

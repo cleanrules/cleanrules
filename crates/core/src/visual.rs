@@ -312,7 +312,8 @@ pub fn draw_table(
 /// # Errors
 ///
 /// As the function for its content; `unsupported` for a decision given with
-/// a document that is not a decision table.
+/// a document that is not a decision table, and for a case file, which has
+/// no diagram.
 pub fn draw_document(
     document: &Document,
     decision: Option<&Decision<'_>>,
@@ -341,6 +342,11 @@ pub fn draw_document(
             BundleRules::DecisionTable(table) => draw_table(table, decision, format, limits),
             BundleRules::RuleSet(ruleset) => draw_ruleset(&summary(ruleset), format, limits),
         },
+        Document::Cases(_) => Err(
+            Error::new(ErrorCode::Unsupported, "a case file has no diagram")
+                .with_hint("draw the rules that the cases test")
+                .unsupported("draw", "case files hold test cases, not rules"),
+        ),
     }
 }
 
