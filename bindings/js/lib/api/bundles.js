@@ -56,6 +56,48 @@ function bundles(native, rules, tables, build) {
     return Array.isArray(cases) ? cases : [...cases]
   }
 
+  /**
+   * A reference to a file of test cases (`spec/bundles.md`, *Cases*): its
+   * path, relative to the bundle's directory, and the SHA-256 digest of its
+   * bytes; immutable. `bundle.cases` gives them; made by hand, both are
+   * checked by the core.
+   */
+  class CaseFile {
+    /**
+     * @param path The path: lowercase ASCII letters, digits, `.`, `_` and
+     *   `-`, in segments separated by `/`, none ending with `.`, at most 1024
+     *   characters, such as `'cases/vip.json'`.
+     * @param digest The digest of its bytes, `'sha256:'` and 64 lowercase
+     *   hexadecimal digits.
+     */
+    constructor(path, digest) {
+      native.checkCaseFile(path, digest)
+      /** The path, relative to the bundle's directory. */
+      this.path = path
+      /** The digest of the file's bytes. */
+      this.digest = digest
+      Object.freeze(this)
+    }
+
+    /**
+     * Whether `content` (a `string`, as UTF-8, or a `Uint8Array`) is the file
+     * the bundle was made with: whether its SHA-256 digest is `digest`.
+     */
+    matches(content) {
+      return native.caseFileMatches(this.path, this.digest, content)
+    }
+
+    [INSPECT]() {
+      return `CaseFile(${this.path} ${this.digest})`
+    }
+
+    [DENO_INSPECT]() {
+      return this[INSPECT]()
+    }
+  }
+
+  brand(build, CaseFile)
+
   /** A bundle document of the core made from the constructor's arguments. */
   function make(held, bundleOptions) {
     const given = options(bundleOptions, BUNDLE_OPTIONS, "{ id: 'acme/discounts', revision: '1' }")
@@ -170,9 +212,9 @@ function bundles(native, rules, tables, build) {
       return this.#contract
     }
 
-    /** The references to its case files, in order (frozen): each `{ path, digest }`. */
+    /** The references to its case files, in order (frozen): each a `CaseFile`. */
     get cases() {
-      this.#cases ??= Object.freeze(this.#data[6].map(([path, digest]) => Object.freeze({ path, digest })))
+      this.#cases ??= Object.freeze(this.#data[6].map(([path, digest]) => new CaseFile(path, digest)))
       return this.#cases
     }
 
@@ -190,7 +232,8 @@ function bundles(native, rules, tables, build) {
      * (frozen): `relation` (`'conflict'`, `'same_rules_same_engine'`,
      * `'same_rules_other_engine'`, `'other_rules_same_engine'` or
      * `'other_rules_other_engine'`), `identical` (the same digest) and
-     * `differences`, what differs, in the order of the specification.
+     * `differences`, what differs, in the order of the specification. The
+     * comparison is symmetric: `b.compare(a)` gives the same result.
      */
     compare(other) {
       if (!(other instanceof Bundle)) {
@@ -225,6 +268,7 @@ function bundles(native, rules, tables, build) {
 
   return {
     Bundle,
+    CaseFile,
     /** The `Bundle` of a bundle document of the native layer, which it keeps. */
     fromNativeBundle: (made) => new Bundle(NATIVE, made),
     /** The bundle document of the native layer of a `Bundle`. */

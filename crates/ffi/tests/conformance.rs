@@ -215,7 +215,7 @@ fn with_this_engine(json: &Json, key: &str) -> Json {
     copy
 }
 
-/// A `bundle` vector: make a bundle with `cr_bundle_new`, write it, read it
+/// A `bundle` vector: make a bundle with `cr_document_new_bundle`, write it, read it
 /// back (`spec/bundles.md`, *Making a bundle*).
 fn run_make_bundle(given: &Json, expect: &Json) -> Result<(), String> {
     let rules = common::read_document(

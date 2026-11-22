@@ -1516,6 +1516,17 @@ def bundle_vectors() -> dict[str, Any]:
         },
         {"error": {"code": "unsupported"}},
     )
+    make(
+        "make-limit-above-max",
+        "a limit of 2^53, above the largest integer every language reads exactly, is not recorded",
+        {
+            "document": load(EXAMPLE),
+            "id": "acme",
+            "revision": "1",
+            "limits": {"max_values": IntLit("9007199254740992")},
+        },
+        {"error": {"code": "unsupported"}},
+    )
 
     # Comparing bundles.
     def compare(

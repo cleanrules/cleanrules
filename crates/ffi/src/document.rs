@@ -29,7 +29,7 @@ pub const CR_DOCUMENT_RULESET: cr_document_content = 3;
 /// A document holding a decision table.
 pub const CR_DOCUMENT_DECISION_TABLE: cr_document_content = 4;
 /// A document holding a bundle (`spec/bundles.md`): read and written in JSON
-/// or YAML, made with `cr_bundle_new`.
+/// or YAML, made with `cr_document_new_bundle`.
 pub const CR_DOCUMENT_BUNDLE: cr_document_content = 5;
 
 /// A document read in any format: a condition, a rule, a rule set, a decision
@@ -251,7 +251,7 @@ pub unsafe extern "C" fn cr_document_new_rule(
 }
 
 /// A document holding a rule set (copied), to write it with
-/// `cr_document_write` or make a bundle of it with `cr_bundle_new`.
+/// `cr_document_write` or make a bundle of it with `cr_document_new_bundle`.
 ///
 /// # Safety
 ///

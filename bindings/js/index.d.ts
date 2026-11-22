@@ -1058,15 +1058,23 @@ export declare class DecisionTable {
 export interface BundleCaseInput {
   /**
    * The path, relative to the bundle's directory, such as
-   * `'cases/basic.json'`: segments of ASCII letters, digits, `.`, `_` and
-   * `-` separated by `/`, none `.` or `..`.
+   * `'cases/basic.json'`: lowercase ASCII letters, digits, `.`, `_` and `-`,
+   * in segments separated by `/`, none `.` or `..` and none ending with `.`,
+   * at most 1024 characters.
    */
   path: string
   /** The file's content: its bytes, or a string as its UTF-8 bytes. */
   content: string | Uint8Array
 }
 
-/** The limits a bundle records: those that can change a result. */
+/**
+ * The limits a bundle records: those that can change a result, by the
+ * binding's names (`maxDepth` for the format's `max_depth`). Each is a whole
+ * number from 1 to 2^53 − 1 (`Number.MAX_SAFE_INTEGER`): a limit of 0 or
+ * above is an `UnsupportedError`, which a bundle cannot record, and a
+ * negative or fractional one a `RangeError`. `maxYamlSize` and `maxTextSize`
+ * bound the reading of texts, not decisions: giving one is a `TypeError`.
+ */
 export interface BundleLimits {
   maxSize?: number | null
   maxNesting?: number | null
@@ -1088,6 +1096,9 @@ export interface BundleOptions {
   /** The limits the rules run with, which the bundle records; the defaults for those left out. */
   limits?: BundleLimits | null
 }
+
+/** The names of the limits a bundle records, as the format spells them. */
+export type BundleLimitName = 'max_size' | 'max_nesting' | 'max_depth' | 'max_path_segments' | 'max_table_size' | 'max_values'
 
 /** The engine and configuration that made a bundle. */
 export interface BundleEngine {
@@ -1111,11 +1122,25 @@ export interface BundleContract {
   }
 }
 
-/** A reference to a file of test cases. */
-export interface CaseFile {
+/**
+ * A reference to a file of test cases (`spec/bundles.md`, *Cases*); immutable.
+ * `bundle.cases` gives them. Made by hand, the path and the digest are
+ * checked: a `FormatError` for one without its form, a `TypeError` for one
+ * that is not a string.
+ */
+export declare class CaseFile {
+  /**
+   * @param path The path, as in `BundleCaseInput`.
+   * @param digest `'sha256:'` and the 64 lowercase hexadecimal digits of the
+   *   SHA-256 hash of the file's bytes.
+   */
+  constructor(path: string, digest: string)
+  /** The path, relative to the bundle's directory. */
   readonly path: string
   /** `sha256:` and the 64 lowercase hexadecimal digits of the SHA-256 hash of its bytes. */
   readonly digest: string
+  /** Whether `content` is the file the bundle was made with: whether its SHA-256 digest is `digest`. */
+  matches(content: string | Uint8Array): boolean
 }
 
 /** How two bundles relate (`spec/bundles.md`, *Comparing bundles*). */
@@ -1126,6 +1151,25 @@ export type BundleRelation =
   | 'other_rules_same_engine'
   | 'other_rules_other_engine'
 
+/**
+ * A part that differs between two bundles (`spec/bundles.md`, *Comparing
+ * bundles*). Difference names are data, like relation names: they keep the
+ * format's spelling in every language. So the difference
+ * `'engine.limits.max_depth'` is about the limit that the `limits` option and
+ * `bundle.engine.limits` call `maxDepth`.
+ */
+export type BundleDifference =
+  | 'id'
+  | 'revision'
+  | 'rules'
+  | 'source'
+  | 'engine.name'
+  | 'engine.version'
+  | `engine.limits.${BundleLimitName}`
+  | 'contract.input'
+  | 'contract.output'
+  | 'cases'
+
 /** The comparison of two bundles. */
 export interface BundleComparison {
   readonly relation: BundleRelation
@@ -1133,11 +1177,28 @@ export interface BundleComparison {
   readonly identical: boolean
   /**
    * What differs, in this order: `id`, `revision`, `rules`, `source`,
-   * `engine.name`, `engine.version`, `engine.limits.<key>` (by the JSON
-   * names, such as `engine.limits.max_depth`), `contract.input`,
-   * `contract.output`, `cases`.
+   * `engine.name`, `engine.version`, `engine.limits.<key>`,
+   * `contract.input`, `contract.output`, `cases`.
    */
-  readonly differences: readonly string[]
+  readonly differences: readonly BundleDifference[]
+}
+
+/** The bundle document of the JSON format (`spec/bundles.md`), as `Bundle.toJSON()` gives it. */
+export interface BundleDocument {
+  version: 1
+  bundle: {
+    id: string
+    revision: string
+    /** The rule set's document, for a bundle of a rule set. */
+    ruleset?: Record<string, unknown>
+    /** The table's document, for a bundle of a decision table. */
+    decision_table?: Record<string, unknown>
+    ruleset_digest: string
+    engine: { name: string; version: string; limits: Record<BundleLimitName, number> }
+    contract: { input: Record<string, unknown>; output: { keys: string[] } }
+    /** Left out when the bundle has no case files. */
+    cases?: { path: string; digest: string }[]
+  }
 }
 
 /**
@@ -1146,13 +1207,16 @@ export interface BundleComparison {
  * that made it, the contract of their input and output, and the digests of
  * their files of test cases. Made from a rule set or a decision table with
  * this engine, or read with `loads` and `load` (JSON or YAML); written with
- * `dumps` and `dump`; its digest is `digest(bundle)`.
+ * `dumps` and `dump`; its digest is `digest(bundle)`, and two bundles are the
+ * same exactly when `digest(a) === digest(b)`.
  *
  * Errors: a `FormatError` for an `id`, `revision` or case path that does not
  * have its form, or a path given twice; an `UnsupportedError` for an action
- * given as code (unless `omitActions`); a `TypeError` for arguments of the
- * wrong type, and for `maxYamlSize` or `maxTextSize`, which a bundle does
- * not record.
+ * given as code (unless `omitActions`), or a limit of 0 or above 2^53 − 1
+ * (`Number.MAX_SAFE_INTEGER`), which a bundle cannot record; a `RangeError`
+ * for a limit that is negative or not a whole number; a `TypeError` for
+ * arguments of the wrong type, and for `maxYamlSize` or `maxTextSize`, which
+ * a bundle does not record.
  *
  * @example
  * const bundle = new Bundle(rules, {
@@ -1183,13 +1247,13 @@ export declare class Bundle {
    * bundle does not refer to.
    */
   caseMatches(path: string, content: string | Uint8Array): boolean
-  /** Compare with another bundle; symmetric, but for which one is first. */
+  /** Compare with another bundle; symmetric: `b.compare(a)` gives the same result. */
   compare(other: Bundle): BundleComparison
   /**
    * The bundle document of the JSON format, as an object for
    * `JSON.stringify`; `dumps(bundle)` writes it exactly.
    */
-  toJSON(): Record<string, unknown>
+  toJSON(): BundleDocument
 }
 
 // --- Documents -----------------------------------------------------------
@@ -1217,10 +1281,16 @@ export interface DumpOptions {
   format?: Format | null
   /** Write rules without their actions given as code, instead of refusing; `null` is `false`. */
   omitActions?: boolean | null
+}
+
+/** How `dumps` and `dump` write a decision. */
+export interface DecisionDumpOptions {
+  /** `'json'` by default for `dumps`; the file's extension for `dump`. A decision has no text or CSV form. */
+  format?: 'json' | 'yaml' | null
   /**
-   * Decisions only: write the digest of the rule set that made the decision
-   * as its `ruleset_digest`, which `RuleSet.readDecision` verifies. A
-   * decision read with one keeps it either way; `null` is `false`.
+   * Write the digest of the rule set that made the decision as its
+   * `ruleset_digest`, which `RuleSet.readDecision` verifies. A decision read
+   * with one keeps it either way; `null` is `false`.
    */
   rulesetDigest?: boolean | null
 }
@@ -1252,14 +1322,17 @@ export declare function loads(text: string | Uint8Array, options?: LoadOptions |
  * `{ rulesetDigest: true }` it carries the digest of its rule set;
  * `RuleSet.readDecision` reads it back.
  *
+ * An `UnsupportedError` for an action given as code (unless `omitActions`),
+ * for CSV of anything but a table, for text of a decision, and for what the
+ * text syntax cannot hold; a `TypeError` for `rulesetDigest` with anything
+ * but a decision.
+ *
  * @example
  * const yaml = dumps(rules, { format: 'yaml' })
  * const logged = dumps(decision, { rulesetDigest: true })
- * An `UnsupportedError` for an action given as code (unless `omitActions`),
- * for CSV of anything but a table, and for what the text syntax cannot hold;
- * a `TypeError` for `rulesetDigest` with anything but a decision.
  */
-export declare function dumps(value: Loaded | Decision, options?: DumpOptions | null): string
+export declare function dumps(value: Decision, options?: DecisionDumpOptions | null): string
+export declare function dumps(value: Loaded, options?: DumpOptions | null): string
 
 /**
  * Read a document from a file (Node and Deno), its format from the extension
@@ -1281,7 +1354,8 @@ export declare function load(path: string | URLLike, options?: LoadOptions | nul
  * @example
  * await dump(rules, 'pricing.rules')
  */
-export declare function dump(value: Loaded | Decision, path: string | URLLike, options?: DumpOptions | null): Promise<void>
+export declare function dump(value: Decision, path: string | URLLike, options?: DecisionDumpOptions | null): Promise<void>
+export declare function dump(value: Loaded, path: string | URLLike, options?: DumpOptions | null): Promise<void>
 
 export interface DigestOptions {
   /** Give those of rules written without their actions given as code, instead of refusing; `null` is `false`. */

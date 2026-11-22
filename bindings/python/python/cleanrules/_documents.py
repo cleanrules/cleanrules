@@ -24,7 +24,7 @@ from typing import IO, TYPE_CHECKING, Literal, TypeAlias
 
 from cleanrules import _cleanrules as _native
 from cleanrules._expr import Expr, _wrap  # pyright: ignore[reportPrivateUsage]
-from cleanrules._rules import Action, Rule, RuleSet
+from cleanrules._rules import Action, Decision, Rule, RuleSet
 from cleanrules._tables import DecisionTable
 from cleanrules.errors import ExpressionError, FormatError, UnsupportedError
 
@@ -186,20 +186,28 @@ def _rule(native: _native.Rule) -> Rule:
 
 
 def dumps(
-    value: Expr | Rule | RuleSet | DecisionTable | Bundle,
+    value: Expr | Rule | RuleSet | DecisionTable | Bundle | Decision,
     *,
     format: Format = "json",
     omit_actions: bool = False,
+    ruleset_digest: bool = False,
 ) -> str:
-    """Write a condition, rule, rule set, decision table or bundle, in its canonical form.
+    """Write a condition, rule, rule set, decision table, bundle or decision, in its canonical form.
+
+        text = dumps(rules, format="yaml")
+        record = dumps(decision, ruleset_digest=True)
 
     Args:
-        value: A condition, a rule, a rule set, a decision table or a bundle.
+        value: A condition, a rule, a rule set, a decision table, a bundle or
+            a decision.
         format: `"json"` (compact), `"yaml"` (block style), `"text"` (the
             canonical text, `IF … THEN …`) or `"csv"` (decision tables only).
-            Bundles are JSON or YAML.
+            Bundles and decisions are JSON or YAML.
         omit_actions: Write rules without their actions instead of refusing.
             Actions are code, which a document cannot hold.
+        ruleset_digest: Decisions only: write the rule set digest of the rule
+            set that made the decision, as `Decision.to_dict` does
+            (`spec/json-format.md`, *In decisions*).
 
     Returns:
         The document's text.
@@ -209,11 +217,16 @@ def dumps(
         UnsupportedError: If a rule has an action and `omit_actions` is false;
             its `pointer` locates the rule. In text, also for a rule with
             metadata, which the text syntax cannot hold, for a decision
-            table and for a bundle.
+            table, a bundle and a decision.
         UnsupportedError: Also for CSV and anything but a decision table.
+        TypeError: For `ruleset_digest` with anything but a decision.
     """
     from cleanrules._bundles import Bundle
 
+    if isinstance(value, Decision):
+        return value._native.dump(format, ruleset_digest)  # pyright: ignore[reportPrivateUsage]
+    if ruleset_digest:
+        raise TypeError(f"ruleset_digest is an option of decisions, not of {type(value).__name__}")
     if isinstance(value, DecisionTable):
         return _native.dump_table(value._native, format)  # pyright: ignore[reportPrivateUsage]
     if isinstance(value, Bundle):
@@ -232,7 +245,7 @@ def dumps(
         _check_actions(list(value), "/ruleset/rules/{}", omit_actions)
         return _native.dump_ruleset(value._native, format)  # pyright: ignore[reportPrivateUsage]
     raise TypeError(
-        "dumps takes a condition, a rule, a rule set, a decision table or a bundle,"
+        "dumps takes a condition, a rule, a rule set, a decision table, a bundle or a decision,"
         f" not {type(value).__name__}"
     )
 
@@ -454,11 +467,12 @@ def load(
 
 
 def dump(
-    value: Expr | Rule | RuleSet | DecisionTable | Bundle,
+    value: Expr | Rule | RuleSet | DecisionTable | Bundle | Decision,
     target: str | os.PathLike[str] | IO[str],
     *,
     format: Format | None = None,
     omit_actions: bool = False,
+    ruleset_digest: bool = False,
 ) -> None:
     """Write a document to a path or an open text file, as `dumps` does.
 
@@ -467,19 +481,22 @@ def dump(
     """
     if isinstance(target, str | os.PathLike):
         file = Path(target)
-        text = _document_text(value, format or _format_of(file), omit_actions)
+        text = _document_text(value, format or _format_of(file), omit_actions, ruleset_digest)
         # Line breaks are written as the document has them, on every platform.
         file.write_text(text, encoding="utf-8", newline="")
     else:
         chosen = format or _format_of(Path(getattr(target, "name", "")))
-        target.write(_document_text(value, chosen, omit_actions))
+        target.write(_document_text(value, chosen, omit_actions, ruleset_digest))
 
 
 def _document_text(
-    value: Expr | Rule | RuleSet | DecisionTable | Bundle, format: Format, omit_actions: bool
+    value: Expr | Rule | RuleSet | DecisionTable | Bundle | Decision,
+    format: Format,
+    omit_actions: bool,
+    ruleset_digest: bool,
 ) -> str:
     """The text of a file: a rule text ends with a line break, as CSV does."""
-    text = dumps(value, format=format, omit_actions=omit_actions)
+    text = dumps(value, format=format, omit_actions=omit_actions, ruleset_digest=ruleset_digest)
     return text + "\n" if format == "text" else text
 
 

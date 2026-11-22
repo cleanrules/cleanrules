@@ -103,6 +103,7 @@ export let version
 export let native = pending('native')
 export let decimal = pending('decimal')
 export let Bundle = pending('Bundle')
+export let CaseFile = pending('CaseFile')
 export let Const = pending('Const')
 export let Decision = pending('Decision')
 export let DecisionTable = pending('DecisionTable')
@@ -141,7 +142,7 @@ function settle(layer) {
     decimal: markerDecimal,
   }
   for (const [name, value] of Object.entries(values)) reals.set(name, value)
-  ;({ Bundle, Const, Decision, DecisionTable, Expr, F, Field, Rule, RuleSet, native, decimal } = values)
+  ;({ Bundle, CaseFile, Const, Decision, DecisionTable, Expr, F, Field, Rule, RuleSet, native, decimal } = values)
   ;({ and, canonicalBytes, constant, digest, dump, dumps, evaluateTree, evaluateValueTree, field, load, loads, not, or, ruleFromText } =
     values)
   FORMAT_VERSION = layer.FORMAT_VERSION

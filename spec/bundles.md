@@ -262,7 +262,7 @@ can check that it is the one the bundle was made with, without understanding
 it. A reader of a bundle never opens files: the core has no file system, and
 checking a file against its digest is the work of the caller that has it
 (`case_matches` on a bundle in Rust and Python, `caseMatches` in JavaScript,
-and `matches` on a case in Rust and Python; the C ABI and the beta bindings
+and `matches` on a case in Rust, Python and JavaScript; the C ABI and the beta bindings
 give a bundle as a document only). Bytes as stored include line endings: a
 version control system that rewrites them on checkout (`core.autocrlf` in
 git) changes the file's digest, so case files are stored as they are (in

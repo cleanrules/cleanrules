@@ -21,6 +21,8 @@ const INTERNAL = [
   'bundleTable',
   'canonicalCondition',
   'canonicalRule',
+  'caseFileMatches',
+  'checkCaseFile',
   'decisionData',
   'digestCondition',
   'digestRule',

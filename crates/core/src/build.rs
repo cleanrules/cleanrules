@@ -22,7 +22,7 @@ use jiff::civil::{Date, DateTime};
 
 use crate::ast::{ArithOp, Closed, CompareOp, Expr, Node, StringOp};
 use crate::error::{Error, ErrorCode, Result, Segment};
-use crate::value::{Decimal, Value};
+use crate::value::{Decimal, RoundingMode, Value};
 
 /// A condition or value being built, or the first error met while building it.
 #[derive(Clone, Debug)]
@@ -216,6 +216,18 @@ impl Build {
     pub fn abs(self) -> Build {
         self.unary(Node::abs)
     }
+
+    /// An int or a decimal rounded to `scale` digits after the point, ties to
+    /// the even digit (`spec/ast.md`, *Rounding*).
+    pub fn round(self, scale: u32) -> Build {
+        self.round_with(scale, RoundingMode::HalfEven)
+    }
+
+    /// An int or a decimal rounded to `scale` digits after the point, with
+    /// `mode` (`spec/ast.md`, *Rounding*).
+    pub fn round_with(self, scale: u32, mode: RoundingMode) -> Build {
+        self.unary(|node| Node::round(node, scale, mode))
+    }
 }
 
 impl From<Node> for Build {
@@ -338,7 +350,7 @@ mod tests {
     use crate::error::{ErrorCode, Segment};
     use crate::format::read_document;
     use crate::json::Limits;
-    use crate::value::{Decimal, Value};
+    use crate::value::{Decimal, RoundingMode, Value};
 
     fn read(text: &str) -> Node {
         read_document(text, &Limits::default())
@@ -434,6 +446,7 @@ mod tests {
             bad().ends_with("x"),
             bad().contains("x"),
             bad().abs(),
+            bad().round(2),
             1.5 - bad(),
         ] {
             let error = build.build().unwrap_err();
@@ -455,5 +468,22 @@ mod tests {
         assert_eq!(tags, ["le", "ends_with", "contains", "gt", "eq"]);
         assert!(matches!(Value::from(0.5), Value::Float(x) if x.to_bits() == 0.5_f64.to_bits()));
         assert!(matches!(Value::from(7_u32), Value::Int(7)));
+    }
+
+    #[test]
+    fn rounding() {
+        let price = Decimal::parse("19.99").unwrap();
+        let tree = (field("price") * price)
+            .round_with(2, RoundingMode::HalfUp)
+            .gt(field("cap").round(0))
+            .build()
+            .unwrap();
+        assert_eq!(
+            tree.to_string(),
+            "ROUND(price * 19.99, 2, HALF_UP) > ROUND(cap, 0)"
+        );
+        let error = field("x").round(39).build().unwrap_err();
+        assert_eq!(error.code(), ErrorCode::ExpressionError);
+        assert_eq!(RoundingMode::Ceiling.to_string(), "ceiling");
     }
 }

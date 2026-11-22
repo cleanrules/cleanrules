@@ -671,7 +671,7 @@ fn bundle_arguments_are_checked() {
     unsafe {
         let mut out = ptr::null_mut();
         assert_eq!(
-            cr_bundle_new(
+            cr_document_new_bundle(
                 document.0,
                 ptr::null(),
                 1,
@@ -687,7 +687,7 @@ fn bundle_arguments_are_checked() {
         );
         let (id, id_len) = arg(b"a");
         assert_eq!(
-            cr_bundle_new(
+            cr_document_new_bundle(
                 document.0,
                 id,
                 id_len,
@@ -702,7 +702,7 @@ fn bundle_arguments_are_checked() {
             CR_INVALID_ARGUMENT
         );
         assert_eq!(
-            cr_bundle_new(
+            cr_document_new_bundle(
                 ptr::null(),
                 id,
                 id_len,
@@ -718,7 +718,7 @@ fn bundle_arguments_are_checked() {
         );
         assert!(out.is_null());
         assert_eq!(
-            cr_bundle_compare(
+            cr_document_compare_bundle(
                 ptr::null(),
                 bundle.0,
                 ptr::null_mut(),

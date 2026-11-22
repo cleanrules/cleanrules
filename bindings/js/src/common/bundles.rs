@@ -8,15 +8,18 @@
 //! native layer's `Document` writes it, and gives its canonical bytes and
 //! digest, as it does any other document.
 
-use cleanrules::bundle::{Bundle, BundleRules, CaseFile};
+use cleanrules::bundle::{
+    Bundle, BundleId, BundleRules, CaseFile, EngineLimit, EngineLimits, Revision,
+};
+use cleanrules::digest::Digest;
 use cleanrules::format::Document;
-use cleanrules::json::{Json, JsonNumber, Limits, to_string};
+use cleanrules::json::{Json, JsonNumber, to_string};
 use cleanrules::rules::RuleSet;
 use cleanrules::table::DecisionTable;
 
 use super::core::{DocumentCore, RulesCore};
 use super::tables::TableCore;
-use super::{LIMIT_NAMES, Outcome, Problem, Raw, RawLimits, limits, text};
+use super::{LIMIT_NAMES, LIMITS, Outcome, Problem, Raw, RawLimits, text};
 
 /// One item of a bundle's `cases`, as JavaScript gives it: `{ path, content }`.
 pub(crate) enum RawCase {
@@ -26,27 +29,90 @@ pub(crate) enum RawCase {
     Wrong(&'static str),
 }
 
-/// The limits a bundle is made with: those of `raw`, the others at their
-/// defaults. `maxYamlSize` and `maxTextSize` bound the reading of texts, not
-/// decisions, so a bundle does not record them (`spec/bundles.md`, *Engine*):
-/// giving one is a `TypeError` rather than a limit silently dropped.
-fn bundle_limits(raw: &RawLimits) -> Outcome<Limits> {
-    if let RawLimits::Given(values) = raw {
-        // `maxYamlSize` and `maxTextSize`, in the order of `LIMIT_NAMES`.
-        for index in [4, 5] {
-            if !matches!(values[index], Raw::Undefined | Raw::Null) {
-                return Err(Problem::Type(format!(
-                    "a bundle does not record limits.{}, which bounds the reading of texts, not decisions; \
-                     it records maxSize, maxNesting, maxDepth, maxPathSegments, maxTableSize and maxValues",
-                    LIMIT_NAMES[index]
-                )));
-            }
-        }
-    }
-    limits(raw)
+/// The limits a bundle records, by the binding's names, in the order of their
+/// table (`spec/bundles.md`, *Engine*).
+const RECORDED: [(EngineLimit, &str); 6] = [
+    (EngineLimit::MaxSize, "maxSize"),
+    (EngineLimit::MaxNesting, "maxNesting"),
+    (EngineLimit::MaxDepth, "maxDepth"),
+    (EngineLimit::MaxPathSegments, "maxPathSegments"),
+    (EngineLimit::MaxTableSize, "maxTableSize"),
+    (EngineLimit::MaxValues, "maxValues"),
+];
+
+/// The limits that bound the reading of texts, not decisions, which a bundle
+/// does not record.
+const NOT_RECORDED: [&str; 2] = ["maxYamlSize", "maxTextSize"];
+
+/// The member `name` of a limits object.
+fn member<'a>(values: &'a [Raw; LIMITS], name: &str) -> Outcome<&'a Raw> {
+    LIMIT_NAMES
+        .iter()
+        .position(|known| *known == name)
+        .map(|index| &values[index])
+        .ok_or_else(|| Problem::Internal(format!("no limit is named {name}")))
 }
 
-/// A string argument of a bundle, such as its `id`.
+/// One recorded limit as JavaScript gives it: `None` when left out; a
+/// `TypeError` for anything but a number, a `RangeError` for a number that is
+/// not a whole number from 0. A number beyond `u64` saturates: the core then
+/// refuses it, with any other above 2^53 - 1, as `unsupported`.
+fn recorded(name: &str, raw: &Raw) -> Outcome<Option<u64>> {
+    let value = match raw {
+        Raw::Undefined | Raw::Null => return Ok(None),
+        Raw::Number(value) => *value,
+        other => {
+            return Err(Problem::Type(format!(
+                "limits.{name} is a number, not {}",
+                other.describe()
+            )));
+        }
+    };
+    if !(value.is_finite() && value.fract() == 0.0 && value >= 0.0) {
+        return Err(Problem::Range(format!(
+            "limits.{name} is {value}; a limit is a whole number from 0"
+        )));
+    }
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    // A whole number from 0; saturates.
+    Ok(Some(value as u64))
+}
+
+/// The limits a bundle is made with: those of `raw`, the others at their
+/// defaults, read directly as the bundle records them (`u64`), so that every
+/// build, whatever its `usize`, records the same. `maxYamlSize` and
+/// `maxTextSize` bound the reading of texts, not decisions, so a bundle does
+/// not record them (`spec/bundles.md`, *Engine*): giving one is a `TypeError`
+/// rather than a limit silently dropped. The core checks the values
+/// (`Bundle::with_engine_limits`).
+fn bundle_limits(raw: &RawLimits) -> Outcome<EngineLimits> {
+    let values = match raw {
+        RawLimits::Absent => return Ok(EngineLimits::default()),
+        RawLimits::Wrong(kind) => {
+            return Err(Problem::Type(format!(
+                "limits must be an object, such as {{ maxDepth: 64 }}, not {kind}"
+            )));
+        }
+        RawLimits::Given(values) => values,
+    };
+    for name in NOT_RECORDED {
+        if !matches!(member(values, name)?, Raw::Undefined | Raw::Null) {
+            return Err(Problem::Type(format!(
+                "a bundle does not record limits.{name}, which bounds the reading of texts, not decisions; \
+                 it records maxSize, maxNesting, maxDepth, maxPathSegments, maxTableSize and maxValues"
+            )));
+        }
+    }
+    let mut limits = EngineLimits::default();
+    for (limit, name) in RECORDED {
+        if let Some(value) = recorded(name, member(values, name)?)? {
+            limits = limits.with(limit, value);
+        }
+    }
+    Ok(limits)
+}
+
+/// A string argument, such as a bundle's `id`.
 fn name(raw: &Raw, what: &str, example: &str) -> Outcome<String> {
     match raw {
         Raw::String(text) => Ok(text.clone()),
@@ -65,15 +131,7 @@ fn case_files(cases: Vec<RawCase>) -> Outcome<Vec<CaseFile>> {
         .enumerate()
         .map(|(i, case)| match case {
             RawCase::Given { path, content } => {
-                let path = match path {
-                    Raw::String(path) => path,
-                    other => {
-                        return Err(Problem::Type(format!(
-                            "cases[{i}].path must be a string, such as \"cases/basic.json\", not {}",
-                            other.describe()
-                        )));
-                    }
-                };
+                let path = name(&path, &format!("cases[{i}].path"), "cases/basic.json")?;
                 let bytes = text(content, &format!("cases[{i}].content"))?;
                 Ok(CaseFile::new(&path, &bytes)?)
             }
@@ -85,9 +143,10 @@ fn case_files(cases: Vec<RawCase>) -> Outcome<Vec<CaseFile>> {
 }
 
 /// Make a bundle of `rules` with this engine (`spec/bundles.md`, *Making a
-/// bundle*): the arguments are checked in order (`id`, `revision`, `cases`,
-/// `limits`), then the core checks the case paths, the identifier and the
-/// revision.
+/// bundle*): the arguments' types are checked in order (`id`, `revision`,
+/// `limits`, `cases`, each case path checked by the core as it is read), then
+/// the core checks the identifier, the revision, that no path is given twice,
+/// and the limits.
 pub(crate) fn make(
     rules: BundleRules,
     id: &Raw,
@@ -99,10 +158,34 @@ pub(crate) fn make(
     let revision = name(revision, "revision", "2026-11-16.1")?;
     let limits = bundle_limits(raw_limits)?;
     let cases = case_files(cases)?;
-    let bundle = Bundle::new(rules, &id, &revision, cases, &limits)?;
+    let bundle = Bundle::new(rules, BundleId::new(&id)?, Revision::new(&revision)?)
+        .with_cases(cases)?
+        .with_engine_limits(limits)?;
     Ok(DocumentCore {
         document: bundle.into_document(),
     })
+}
+
+/// The case file of `path` and `digest` (`spec/bundles.md`, *Cases*), both
+/// checked: a `TypeError` for one that is not a string, then a `FormatError`
+/// for a digest or a path without its form.
+fn case_file(path: &Raw, digest: &Raw) -> Outcome<CaseFile> {
+    let path = name(path, "path", "cases/basic.json")?;
+    let digest = name(digest, "digest", "sha256:e3b0c442…")?;
+    let digest: Digest = digest.parse()?;
+    Ok(CaseFile::with_digest(&path, digest)?)
+}
+
+/// Check the path and digest of a `CaseFile` of the idiomatic API.
+pub(crate) fn check_case_file(path: &Raw, digest: &Raw) -> Outcome<()> {
+    case_file(path, digest).map(drop)
+}
+
+/// Whether `content` (a string as its UTF-8 bytes, or bytes) is the case file
+/// of `path` and `digest`: whether its digest is `digest`.
+pub(crate) fn case_file_matches(path: &Raw, digest: &Raw, content: Raw) -> Outcome<bool> {
+    let case = case_file(path, digest)?;
+    Ok(case.matches(&text(content, "content")?))
 }
 
 /// The rules of a document, to make a bundle of: its rule set or its decision
@@ -173,21 +256,7 @@ impl DocumentCore {
             _ => "ruleset",
         };
         let engine = bundle.engine();
-        let recorded = engine.limits();
-        let limits = [
-            recorded.max_size,
-            recorded.max_nesting,
-            recorded.max_depth,
-            recorded.max_path_segments,
-            recorded.max_table_size,
-            recorded.max_values,
-        ];
-        let contract = bundle.contract();
-        let keys = contract
-            .output_keys()
-            .iter()
-            .map(|key| string(key))
-            .collect();
+        let limits = engine.limits().iter().map(|(_, n)| number(n)).collect();
         let cases = bundle
             .cases()
             .iter()
@@ -199,23 +268,17 @@ impl DocumentCore {
             })
             .collect();
         Ok(to_string(&Json::Array(vec![
-            string(bundle.id()),
-            string(bundle.revision()),
+            string(bundle.id().as_str()),
+            string(bundle.revision().as_str()),
             string(rules),
             string(&bundle.ruleset_digest().to_string()),
             Json::Array(vec![
                 string(engine.name()),
                 string(engine.version()),
-                Json::Array(limits.into_iter().map(number).collect()),
+                Json::Array(limits),
                 Json::Bool(engine.is_current()),
             ]),
-            Json::Object(vec![
-                ("input".into(), contract.input().clone()),
-                (
-                    "output".into(),
-                    Json::Object(vec![("keys".into(), Json::Array(keys))]),
-                ),
-            ]),
+            bundle.contract().to_json(),
             Json::Array(cases),
         ])))
     }
@@ -249,22 +312,21 @@ impl DocumentCore {
             )));
         };
         let bytes = text(bytes, "the case file's content")?;
-        let Some(case) = bundle.cases().iter().find(|case| case.path() == path) else {
+        bundle.case_matches(path, &bytes).ok_or_else(|| {
             let known: Vec<String> = bundle
                 .cases()
                 .iter()
                 .map(|case| format!("{:?}", case.path()))
                 .collect();
-            return Err(Problem::Range(if known.is_empty() {
+            Problem::Range(if known.is_empty() {
                 format!("the bundle refers to no case file {path:?}: it has none")
             } else {
                 format!(
                     "the bundle refers to no case file {path:?}; its case files are {}",
                     known.join(", ")
                 )
-            }));
-        };
-        Ok(case.matches(&bytes))
+            })
+        })
     }
 
     /// The comparison of this bundle with `other` (`spec/bundles.md`,

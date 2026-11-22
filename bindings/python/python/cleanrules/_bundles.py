@@ -24,8 +24,7 @@ import enum
 import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from types import MappingProxyType
-from typing import Any, NoReturn, cast
+from typing import Any, NoReturn, TypedDict, cast
 
 from cleanrules import _cleanrules as _native
 from cleanrules._documents import (
@@ -37,7 +36,17 @@ from cleanrules._documents import (
 from cleanrules._rules import RuleSet
 from cleanrules._tables import DecisionTable
 
-__all__ = ["Bundle", "BundleComparison", "BundleEngine", "BundleRelation", "CaseFile"]
+__all__ = [
+    "Bundle",
+    "BundleComparison",
+    "BundleContract",
+    "BundleContractOutput",
+    "BundleDifference",
+    "BundleEngine",
+    "BundleLimits",
+    "BundleRelation",
+    "CaseFile",
+]
 
 
 class BundleRelation(enum.StrEnum):
@@ -55,6 +64,82 @@ class BundleRelation(enum.StrEnum):
     """Other rules on another engine, version or limits."""
 
 
+class BundleDifference(enum.StrEnum):
+    """A part that differs between two bundles (`spec/bundles.md`, *Comparing bundles*).
+
+    The members are in the order of the specification, the order in which
+    `BundleComparison.differences` lists them. Their values are the names of
+    the JSON form, the same in every language.
+    """
+
+    ID = "id"
+    REVISION = "revision"
+    RULES = "rules"
+    """The rule set digests differ."""
+    SOURCE = "source"
+    """The rule set digests are equal, but the documents that give them differ."""
+    ENGINE_NAME = "engine.name"
+    ENGINE_VERSION = "engine.version"
+    ENGINE_LIMITS_MAX_SIZE = "engine.limits.max_size"
+    ENGINE_LIMITS_MAX_NESTING = "engine.limits.max_nesting"
+    ENGINE_LIMITS_MAX_DEPTH = "engine.limits.max_depth"
+    ENGINE_LIMITS_MAX_PATH_SEGMENTS = "engine.limits.max_path_segments"
+    ENGINE_LIMITS_MAX_TABLE_SIZE = "engine.limits.max_table_size"
+    ENGINE_LIMITS_MAX_VALUES = "engine.limits.max_values"
+    CONTRACT_INPUT = "contract.input"
+    CONTRACT_OUTPUT = "contract.output"
+    CASES = "cases"
+    """The case files differ, or their order."""
+
+
+class BundleContractOutput(TypedDict):
+    """The output part of a bundle's contract."""
+
+    keys: list[str]
+    """The payload keys any rule may output, sorted by Unicode code point."""
+
+
+class BundleContract(TypedDict):
+    """The contract of a bundle's rules in its JSON form (`spec/bundles.md`, *Contract*)."""
+
+    input: dict[str, Any]
+    """The JSON Schema of the input the rules read (`RuleSet.input_schema`)."""
+    output: BundleContractOutput
+    """The output keys."""
+
+
+@dataclass(frozen=True, slots=True)
+class BundleLimits:
+    """The limits a bundle records: those that can change a result (`spec/bundles.md`, *Engine*).
+
+    Attributes:
+        max_size: The largest JSON document, in bytes.
+        max_nesting: The deepest nesting of arrays and objects.
+        max_depth: The deepest condition or payload value.
+        max_path_segments: The longest field path.
+        max_table_size: The most cells and nodes of a decision table.
+        max_values: The most values read from one input's native data.
+    """
+
+    max_size: int
+    max_nesting: int
+    max_depth: int
+    max_path_segments: int
+    max_table_size: int
+    max_values: int
+
+    def to_dict(self) -> dict[str, int]:
+        """The limits' JSON form, the keys in the order of the specification."""
+        return {
+            "max_size": self.max_size,
+            "max_nesting": self.max_nesting,
+            "max_depth": self.max_depth,
+            "max_path_segments": self.max_path_segments,
+            "max_table_size": self.max_table_size,
+            "max_values": self.max_values,
+        }
+
+
 @dataclass(frozen=True, slots=True)
 class BundleEngine:
     """The engine and limits that made a bundle (`spec/bundles.md`, *Engine*).
@@ -62,20 +147,15 @@ class BundleEngine:
     Attributes:
         name: The engine's name, `"cleanrules"` for this one.
         version: Its exact version, a Semantic Versioning version.
-        limits: The limits it ran with, read-only, in the order of the
-            specification: `max_size`, `max_nesting`, `max_depth`,
-            `max_path_segments`, `max_table_size` and `max_values`.
+        limits: The limits it ran with.
         is_current: Whether it is this engine: the same name and version as
             `cleanrules.__version__`, whatever the limits.
     """
 
     name: str
     version: str
-    limits: Mapping[str, int]
+    limits: BundleLimits
     is_current: bool
-
-    def __hash__(self) -> int:
-        return hash((self.name, self.version, tuple(self.limits.items()), self.is_current))
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,16 +172,19 @@ class CaseFile:
     path: str
     digest: str
 
-    def matches(self, data: bytes | str) -> bool:
-        """Whether `data` are the bytes the bundle was made with.
+    def __post_init__(self) -> None:
+        for name, text in (("path", self.path), ("digest", self.digest)):
+            if not isinstance(text, str):  # pyright: ignore[reportUnnecessaryIsInstance]
+                raise TypeError(f"{name} must be a str, got {type(text).__name__}")
+        _native.check_case_file(self.path, self.digest)
+
+    def matches(self, content: bytes | str) -> bool:
+        """Whether `content` is the file the bundle was made with: the same bytes.
 
         Args:
-            data: The file's content; a `str` is encoded as UTF-8.
-
-        Raises:
-            FormatError: If `path` or `digest` does not have its form.
+            content: The file's content; a `str` is encoded as UTF-8.
         """
-        return _native.case_matches(self.path, self.digest, _bytes(data, "data"))
+        return _native.case_matches(self.path, self.digest, _bytes(content, "content"))
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,20 +196,20 @@ class BundleComparison:
         identical: Whether the two bundles are the same: the same digest.
         differences: What differs, in the order of the specification: `id`,
             `revision`, `rules`, `source`, `engine.name`, `engine.version`,
-            `engine.limits.<name>`, `contract.input`, `contract.output` and
+            `engine.limits.<key>`, `contract.input`, `contract.output` and
             `cases`. Empty exactly when the bundles are identical.
     """
 
     relation: BundleRelation
     identical: bool
-    differences: tuple[str, ...]
+    differences: tuple[BundleDifference, ...]
 
     def to_dict(self) -> dict[str, Any]:
         """The comparison's JSON form: `relation`, `identical` and `differences`."""
         return {
             "relation": self.relation.value,
             "identical": self.identical,
-            "differences": list(self.differences),
+            "differences": [difference.value for difference in self.differences],
         }
 
 
@@ -174,11 +257,11 @@ class Bundle:
         FormatError: For an identifier, revision or case path that does not
             have its form, or a case path given twice.
         UnsupportedError: For a rule with an action given as code, unless
-            `omit_actions` is true, with a `pointer` to it; or a limit above
-            2**53 - 1, which a bundle cannot record.
+            `omit_actions` is true, with a `pointer` to it; or a limit of 0 or
+            above 2**53 - 1, which a bundle cannot record.
         TypeError: For rules that are not a `RuleSet` or a `DecisionTable`,
             or an identifier, revision, path or content of another type.
-        ValueError: For a limit below 1.
+        ValueError: For a negative limit.
     """
 
     __slots__ = ("_digest", "_native", "_rules")
@@ -288,36 +371,37 @@ class Bundle:
     def engine(self) -> BundleEngine:
         """The engine and the limits that made the bundle."""
         name, version, limits, is_current = self._native.engine()
-        return BundleEngine(name, version, MappingProxyType(dict(limits)), is_current)
+        return BundleEngine(name, version, BundleLimits(**dict(limits)), is_current)
 
     @property
-    def contract(self) -> dict[str, Any]:
+    def contract(self) -> BundleContract:
         """The contract of the rules, in its JSON form (a new copy each time).
 
         `{"input": <JSON Schema of the input>, "output": {"keys": [...]}}`:
         the input schema the rules read (`RuleSet.input_schema`), and the
         payload keys any rule may output, sorted.
         """
-        return json.loads(self._native.contract_json())
+        return cast(BundleContract, json.loads(self._native.contract_json()))
 
     @property
     def cases(self) -> tuple[CaseFile, ...]:
         """The case files, in the order they run."""
         return tuple(CaseFile(path, digest) for path, digest in self._native.cases())
 
-    def case_matches(self, path: str, data: bytes | str) -> bool:
-        """Whether `data` is the case file at `path` the bundle was made with.
+    def case_matches(self, path: str, content: bytes | str) -> bool:
+        """Whether `content` is the case file at `path` the bundle was made with.
 
             bundle.case_matches("cases/vip.json", Path("cases/vip.json").read_bytes())
 
         Args:
             path: The case file's path, as the bundle holds it.
-            data: The file's content; a `str` is encoded as UTF-8.
+            content: The file's content; a `str` is encoded as UTF-8.
 
         Raises:
-            KeyError: If the bundle has no case file at `path`.
+            KeyError: If the bundle has no case file at `path`; the message
+                lists the paths it has.
         """
-        return self._native.case_matches(path, _bytes(data, "data"))
+        return self._native.case_matches(path, _bytes(content, "content"))
 
     def compare(self, other: Bundle) -> BundleComparison:
         """Compare this bundle with another (`spec/bundles.md`, *Comparing bundles*).
@@ -326,8 +410,8 @@ class Bundle:
             if comparison.relation == BundleRelation.SAME_RULES_OTHER_ENGINE:
                 ...  # any change in the results comes from the engine
 
-        Comparing uses nothing but the two bundles, and is symmetric but for
-        which bundle comes first.
+        Comparing uses nothing but the two bundles, and is symmetric:
+        `b.compare(a)` gives the same result.
 
         Raises:
             TypeError: If `other` is not a `Bundle`.
@@ -335,7 +419,11 @@ class Bundle:
         if not isinstance(other, Bundle):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError(f"a bundle compares with a Bundle, not {type(other).__name__}")
         relation, identical, differences = self._native.compare(other._native)
-        return BundleComparison(BundleRelation(relation), identical, tuple(differences))
+        return BundleComparison(
+            BundleRelation(relation),
+            identical,
+            tuple(BundleDifference(difference) for difference in differences),
+        )
 
     def _bundle_digest(self) -> str:
         if self._digest is None:
@@ -359,16 +447,34 @@ class Bundle:
         raise AttributeError(f"bundles are immutable: cannot delete {name!r}")
 
     def __reduce__(self) -> tuple[Any, tuple[Any, ...]]:
-        return (loads, (dumps(self),))
+        # Read back under the limits the bundle records (its rules may need
+        # more than the defaults), never below the defaults.
+        return (_unpickle, (dumps(self), self.engine.limits.to_dict()))
 
     def __repr__(self) -> str:
         engine = self.engine
-        kind = "decision_table" if self._native.rules()[0] == "decision_table" else "ruleset"
-        count = len(self._native.cases())
+        kind = self._native.kind
+        count = self._native.case_count
         return (
             f"<Bundle {self.id!r} revision {self.revision!r}: {kind},"
             f" {count} case file{'' if count == 1 else 's'}, {engine.name} {engine.version}>"
         )
+
+
+def _unpickle(text: str, recorded: dict[str, int]) -> Bundle:
+    """Read a pickled bundle under its recorded limits, never below the defaults."""
+    limits = {
+        name: max(recorded[name], default) for name, default in _native.default_bundle_limits()
+    }
+    bundle = loads(
+        text,
+        max_size=max(limits["max_size"], len(text.encode("utf-8"))),
+        max_nesting=limits["max_nesting"],
+        max_depth=limits["max_depth"],
+        max_table_size=limits["max_table_size"],
+        max_path_segments=limits["max_path_segments"],
+    )
+    return cast(Bundle, bundle)
 
 
 def _bytes(data: bytes | str, what: str) -> bytes:

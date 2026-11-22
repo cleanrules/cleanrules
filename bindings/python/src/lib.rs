@@ -52,6 +52,8 @@ fn native_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<bundles::PyBundle>()?;
     module.add_function(wrap_pyfunction!(bundles::make_bundle, module)?)?;
     module.add_function(wrap_pyfunction!(bundles::case_matches, module)?)?;
+    module.add_function(wrap_pyfunction!(bundles::check_case_file, module)?)?;
+    module.add_function(wrap_pyfunction!(bundles::default_bundle_limits, module)?)?;
     module.add_function(wrap_pyfunction!(documents::dump_bundle, module)?)?;
     module.add_function(wrap_pyfunction!(rules::rule, module)?)?;
     module.add_function(wrap_pyfunction!(rules::ruleset, module)?)?;

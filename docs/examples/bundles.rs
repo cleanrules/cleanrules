@@ -8,7 +8,7 @@
 
 #![allow(clippy::print_stdout)]
 
-use cleanrules::bundle::{Bundle, CaseFile, Relation};
+use cleanrules::bundle::{Bundle, BundleId, CaseFile, Difference, Relation, Revision};
 use cleanrules::format::{Document, DocumentFormat, read_document, write_document_as};
 use cleanrules::json::Limits;
 use cleanrules::text;
@@ -20,10 +20,13 @@ const CASES: &[u8] = br#"[{"input": {"customer": {"years": 7}}}]"#;
 
 fn main() -> cleanrules::Result<()> {
     let limits = Limits::default();
-    let cases = || CaseFile::new("cases/vip.json", CASES).map(|case| vec![case]);
+    let cases = [CaseFile::new("cases/vip.json", CASES)?];
     // The author names the rules and their revision; the core never does.
+    let id = BundleId::new("acme/discounts")?;
     let v1 = text::parse(V1, &limits)?.into_ruleset()?;
-    let first = Bundle::new(v1, "acme/discounts", "1", cases()?, &limits)?;
+    let first = Bundle::new(v1, id.clone(), Revision::new("1")?)
+        .with_cases(cases.clone())?
+        .with_limits(&limits)?;
     let written = write_document_as(&first.clone().into_document(), DocumentFormat::Json)?;
     println!("{written}");
     println!(
@@ -37,26 +40,26 @@ fn main() -> cleanrules::Result<()> {
     let Document::Bundle(read) = read_document(&written, &limits)? else {
         unreachable!("a bundle document gives a bundle")
     };
-    assert_eq!(read.digest(), first.digest());
+    assert_eq!(*read, first, "bundles are equal by digest");
     assert!(read.cases()[0].matches(CASES));
 
     // A new revision of the rules, on the same engine.
     let v2 = text::parse(V2, &limits)?.into_ruleset()?;
-    let second = Bundle::new(v2, "acme/discounts", "2", cases()?, &limits)?;
+    let second = Bundle::new(v2, id.clone(), Revision::new("2")?).with_cases(cases.clone())?;
     let comparison = first.compare(&second);
     println!("{}", cleanrules::json::to_string(&comparison.to_json()));
     assert_eq!(comparison.relation(), Relation::OtherRulesSameEngine);
+    assert_eq!(
+        comparison.differences(),
+        [Difference::Revision, Difference::Rules]
+    );
 
     // The same rules with other limits: another configuration of the engine.
     let mut tighter = limits;
     tighter.max_values = 1000;
-    let rerun = Bundle::new(
-        first.ruleset().clone(),
-        "acme/discounts",
-        "1",
-        cases()?,
-        &tighter,
-    )?;
+    let rerun = Bundle::new(first.ruleset().clone(), id, Revision::new("1")?)
+        .with_cases(cases)?
+        .with_limits(&tighter)?;
     assert_eq!(
         first.compare(&rerun).relation(),
         Relation::SameRulesOtherEngine

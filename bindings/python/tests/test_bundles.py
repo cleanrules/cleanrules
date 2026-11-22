@@ -12,7 +12,9 @@ import pytest
 from cleanrules import (
     Bundle,
     BundleComparison,
+    BundleDifference,
     BundleEngine,
+    BundleLimits,
     BundleRelation,
     CaseFile,
     DecisionTable,
@@ -72,17 +74,17 @@ def test_a_bundle_records_rules_engine_contract_and_cases() -> None:
     assert made.engine == BundleEngine(
         "cleanrules",
         cleanrules.__version__,
-        {
-            "max_size": 16 << 20,
-            "max_nesting": 1024,
-            "max_depth": 256,
-            "max_path_segments": 256,
-            "max_table_size": 2_097_152,
-            "max_values": 1_000_000,
-        },
+        BundleLimits(
+            max_size=16 << 20,
+            max_nesting=1024,
+            max_depth=256,
+            max_path_segments=256,
+            max_table_size=2_097_152,
+            max_values=1_000_000,
+        ),
         True,
     )
-    assert list(made.engine.limits) == [
+    assert list(made.engine.limits.to_dict()) == [
         "max_size",
         "max_nesting",
         "max_depth",
@@ -118,9 +120,9 @@ def test_a_table_bundle_gives_its_compiled_rule_set() -> None:
 
 def test_limits_are_recorded() -> None:
     made = bundle(max_depth=64, max_values=10)
-    assert made.engine.limits["max_depth"] == 64
-    assert made.engine.limits["max_values"] == 10
-    assert made.engine.limits["max_size"] == 16 << 20
+    assert made.engine.limits.max_depth == 64
+    assert made.engine.limits.max_values == 10
+    assert made.engine.limits.max_size == 16 << 20
 
 
 def test_cases_as_a_mapping_and_bytes() -> None:
@@ -137,8 +139,26 @@ def test_case_matches() -> None:
     assert not made.case_matches("cases/discounts.json", CASES + " ")
     assert made.cases[0].matches(CASES)
     assert not made.cases[0].matches(b"")
-    with pytest.raises(KeyError):
+    with pytest.raises(
+        KeyError,
+        match=r'no case file "cases/other.json"; its case files are "cases/discounts.json"',
+    ):
         made.case_matches("cases/other.json", CASES)
+    with pytest.raises(KeyError, match="it has none"):
+        bundle(cases=()).case_matches("a.json", CASES)
+    assert made.case_matches(path="cases/discounts.json", content=CASES)
+    assert made.cases[0].matches(content=CASES)
+
+
+def test_case_files_are_checked_when_made() -> None:
+    digest = "sha256:" + "0" * 64
+    assert CaseFile("cases/a.json", digest).path == "cases/a.json"
+    with pytest.raises(FormatError):
+        CaseFile("Cases/A.json", digest)
+    with pytest.raises(FormatError):
+        CaseFile("cases/a.json", "sha256:00")
+    with pytest.raises(TypeError):
+        CaseFile(b"a.json", digest)  # pyright: ignore[reportArgumentType]
 
 
 def test_actions_given_as_code_are_refused_unless_omitted() -> None:
@@ -250,9 +270,24 @@ def test_bundles_are_immutable_and_pickle() -> None:
     contract = made.contract
     contract["output"]["keys"].append("x")
     assert made.contract["output"]["keys"] == ["discount"]
-    with pytest.raises(TypeError):
-        made.engine.limits["max_depth"] = 1  # pyright: ignore[reportIndexIssue]
+    with pytest.raises(AttributeError):
+        made.engine.limits.max_depth = 1  # pyright: ignore[reportAttributeAccessIssue]
     assert pickle.loads(pickle.dumps(made)) == made
+    # A bundle pickles under the limits it records, which its rules may need.
+    path = {"op": "field", "path": ["k"] * 300}
+    condition = {
+        "version": 1,
+        "condition": {"op": "gt", "left": path, "right": {"op": "const", "value": 1}},
+    }
+    when = cleanrules.loads(json.dumps(condition), max_path_segments=300)
+    assert isinstance(when, cleanrules.Expr)
+    deep = Bundle(
+        RuleSet([Rule("deep", when)]),
+        id="acme/deep",
+        revision="1",
+        max_path_segments=300,
+    )
+    assert pickle.loads(pickle.dumps(deep)) == deep
     assert hash(made.engine) == hash(bundle().engine)
     assert made != rules()
     assert repr(made) == (
@@ -286,6 +321,8 @@ def test_same_rules_other_engine() -> None:
     by_limits = made.compare(bundle(max_depth=100))
     assert by_limits.relation is BundleRelation.SAME_RULES_OTHER_ENGINE
     assert by_limits.differences == ("engine.limits.max_depth",)
+    assert by_limits.differences == (BundleDifference.ENGINE_LIMITS_MAX_DEPTH,)
+    assert all(isinstance(d, BundleDifference) for d in by_limits.differences)
     by_version = made.compare(edited(made, {"version": "1.0.0-other.1"}))
     assert by_version.relation is BundleRelation.SAME_RULES_OTHER_ENGINE
     assert by_version.differences == ("engine.version",)
@@ -350,3 +387,35 @@ def test_loads_does_not_bind_a_bundle() -> None:
     text = cleanrules.dumps(bundle())
     with pytest.raises(TypeError, match=r"bundle\.ruleset\.bind"):
         cleanrules.loads(text, actions={})
+
+
+def test_differences_are_named_as_in_json_and_in_order() -> None:
+    names = [difference.value for difference in BundleDifference]
+    assert names == [
+        "id",
+        "revision",
+        "rules",
+        "source",
+        "engine.name",
+        "engine.version",
+        *(f"engine.limits.{name}" for name in BundleLimits.__dataclass_fields__),
+        "contract.input",
+        "contract.output",
+        "cases",
+    ]
+
+
+def test_decisions_are_dumped_with_their_rule_set_digest(tmp_path: Path) -> None:
+    decision = rules().evaluate({"years": 9})
+    record = json.loads(cleanrules.dumps(decision, ruleset_digest=True))
+    assert record == decision.to_dict(ruleset_digest=True)
+    assert record["decision"]["ruleset_digest"] == cleanrules.digest(rules())
+    assert "ruleset_digest" not in json.loads(cleanrules.dumps(decision))["decision"]
+    yaml = cleanrules.dumps(decision, format="yaml", ruleset_digest=True)
+    assert "ruleset_digest: " in yaml
+    with pytest.raises(UnsupportedError):
+        cleanrules.dumps(decision, format="text")
+    with pytest.raises(TypeError, match="ruleset_digest is an option of decisions"):
+        cleanrules.dumps(rules(), ruleset_digest=True)
+    cleanrules.dump(decision, tmp_path / "decision.json", ruleset_digest=True)
+    assert json.loads((tmp_path / "decision.json").read_text()) == record

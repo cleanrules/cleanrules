@@ -14,7 +14,7 @@ use std::fs;
 
 use cleanrules::Error;
 use cleanrules::agents::Catalog;
-use cleanrules::bundle::{self, Bundle, BundleRules, CaseFile};
+use cleanrules::bundle::{self, Bundle, BundleId, BundleRules, CaseFile, Revision};
 use cleanrules::eval::{Options, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
@@ -515,11 +515,11 @@ fn run_make_bundle(vector: &Json) -> Result<(), String> {
     let made = cases.and_then(|cases| {
         Bundle::new(
             rules,
-            text(get(given, "id")).unwrap(),
-            text(get(given, "revision")).unwrap(),
-            cases,
-            &limits,
+            BundleId::new(text(get(given, "id")).unwrap())?,
+            Revision::new(text(get(given, "revision")).unwrap())?,
         )
+        .with_cases(cases)?
+        .with_limits(&limits)
     });
     let mut expect = get(vector, "expect").unwrap().clone();
     if let Json::Object(members) = &mut expect
@@ -548,7 +548,7 @@ fn run_compare_bundles(vector: &Json) -> Result<(), String> {
         };
     let (a, b) = (read("a")?, read("b")?);
     let comparison = a.compare(&b);
-    // Symmetric, but for which bundle is first.
+    // Symmetric.
     let back = b.compare(&a);
     if back.relation() != comparison.relation() || back.differences() != comparison.differences() {
         return Err("not symmetric".into());

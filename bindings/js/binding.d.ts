@@ -75,17 +75,18 @@ export declare class Decision {
   ruleOutputJson(rule: number): string | null
   /**
    * The decision document in `format`: JSON (the default) or YAML. With
-   * `rulesetDigest`, it carries the digest of the rule set that made it as
-   * `ruleset_digest` (`spec/json-format.md`, *In decisions*), which
-   * `RuleSet.readDecision` verifies; a decision read with one keeps it
-   * either way.
+   * `{ rulesetDigest: true }`, it carries the digest of the rule set that
+   * made it as `ruleset_digest` (`spec/json-format.md`, *In decisions*),
+   * which `RuleSet.readDecision` verifies; a decision read with one keeps
+   * it either way.
    *
    * # Errors
    *
-   * `UnsupportedError` for the rule syntax and CSV; a `TypeError` for a
-   * `rulesetDigest` that is not a boolean.
+   * `UnsupportedError` for the rule syntax and CSV; a `TypeError` for
+   * options that are not an object, or a `rulesetDigest` that is not a
+   * boolean.
    */
-  write(format?: Format | null, rulesetDigest?: boolean | null): string
+  write(format?: Format | null, options?: DecisionWriteOptions | null): string
   /**
    * The explanation (`spec/explain.md`) in `format`: its text (the
    * default, as in C++), or a `"json"` or `"yaml"` document.
@@ -159,8 +160,11 @@ export declare class Document {
    * # Errors
    *
    * `FormatError` for an identifier, revision or case path that does not
-   * have its form, or a path given twice; a `TypeError` for a document of
-   * another kind or an argument of the wrong type.
+   * have its form, or a path given twice; `UnsupportedError` for a limit
+   * of 0 or above 2^53 - 1 (`Number.MAX_SAFE_INTEGER`), which a bundle
+   * cannot record; a `RangeError` for a limit that is negative or not a
+   * whole number; a `TypeError` for a document of another kind, an
+   * argument of the wrong type, or `maxYamlSize` or `maxTextSize`.
    */
   static makeBundle(rules: Document, id: string, revision: string, cases?: BundleCaseInput[] | null, limits?: Limits | null): Document
   /**
@@ -620,8 +624,9 @@ export type Aggregate = 'sum' | 'min' | 'max' | 'count'
  */
 export interface BundleCaseInput {
   /**
-   * The path, such as `"cases/basic.json"`: segments of letters, digits,
-   * `.`, `_` and `-` separated by `/`, none `.` or `..`.
+   * The path, such as `"cases/basic.json"`: lowercase ASCII letters,
+   * digits, `.`, `_` and `-`, in segments separated by `/`, none `.` or
+   * `..` and none ending with `.`, at most 1024 characters.
    */
   path: string
   /** The file's content. */
@@ -694,6 +699,28 @@ export declare function canonicalCondition(node: Node): Uint8Array
 export declare function canonicalRule(rule: NativeRule): Uint8Array
 
 /**
+ * Whether `content` is the case file of `path` and `digest`: whether the
+ * SHA-256 digest of its bytes (a string's UTF-8 bytes) is `digest`.
+ *
+ * # Errors
+ *
+ * As `checkCaseFile`, and a `TypeError` for content that is neither a string
+ * nor bytes.
+ */
+export declare function caseFileMatches(path: string, digest: string, content: string | Uint8Array): boolean
+
+/**
+ * Check the path and digest of a case file (`spec/bundles.md`, *Cases*), for
+ * the idiomatic `CaseFile`.
+ *
+ * # Errors
+ *
+ * A `TypeError` for a path or digest that is not a string; a `FormatError`
+ * for a digest or a path without its form.
+ */
+export declare function checkCaseFile(path: string, digest: string): void
+
+/**
  * Why `text` is not a decimal literal, or `null` when it is one; for the
  * `Decimal` marker of `lib/values.js`. A literal too large for 38 digits is a
  * decimal: as data it reads as null with reason `decimal_overflow`.
@@ -702,6 +729,16 @@ export declare function decimalProblem(text: string): string | null
 
 /** What a decision gives back, in the binding's encoding. */
 export declare function decisionData(decision: Decision): string
+
+/** How a decision is written (`Decision.write`). */
+export interface DecisionWriteOptions {
+  /**
+   * Write the digest of the rule set that made the decision as its
+   * `ruleset_digest`, which `RuleSet.readDecision` verifies; `false` when
+   * left out. A decision read with one keeps it either way.
+   */
+  rulesetDigest?: boolean
+}
 
 /** The digest of the condition document of a node. */
 export declare function digestCondition(node: Node): string

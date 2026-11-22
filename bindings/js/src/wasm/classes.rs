@@ -10,7 +10,7 @@ use wasm_bindgen::prelude::*;
 
 use super::{
     OrFail, call_action, call_actions, call_read, core_error, fail, nullable, object, raw,
-    raw_cases, raw_limits, raw_list, raw_options,
+    raw_cases, raw_limits, raw_list, raw_options, raw_ruleset_digest,
 };
 use crate::common::bundles;
 use crate::common::core::{
@@ -624,15 +624,14 @@ impl Decision {
     }
 
     /// The decision document in `format`, with its rule set digest when
-    /// `rulesetDigest` is true.
+    /// `options.rulesetDigest` is true.
     ///
     /// # Errors
     ///
     /// As in the napi-rs build.
-    pub fn write(&self, format: &JsValue, ruleset_digest: &JsValue) -> Result<String, JsValue> {
-        self.core
-            .write(&raw(format), &raw(ruleset_digest))
-            .or_fail()
+    pub fn write(&self, format: &JsValue, options: &JsValue) -> Result<String, JsValue> {
+        let ruleset_digest = raw_ruleset_digest(options)?;
+        self.core.write(&raw(format), &ruleset_digest).or_fail()
     }
 
     /// The explanation in `format`: its text by default.

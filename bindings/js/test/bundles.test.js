@@ -14,6 +14,7 @@ import { native, root } from './support/cr.js'
 
 const {
   Bundle,
+  CaseFile,
   DecisionTable,
   F,
   FormatError,
@@ -424,9 +425,18 @@ describe('decisions with their rule set digest', () => {
 
   test('the native layer writes it too', () => {
     const layer = native.RuleSet.read(dumps(rules)).evaluate({ customer: { years: 9 } })
-    assert.equal(JSON.parse(layer.write('json', true)).decision.ruleset_digest, digest(rules))
+    assert.equal(JSON.parse(layer.write('json', { rulesetDigest: true })).decision.ruleset_digest, digest(rules))
     assert.equal(JSON.parse(layer.write()).decision.ruleset_digest, undefined)
-    assert.throws(() => layer.write('json', 'yes'), { name: 'TypeError', message: 'rulesetDigest is a boolean, not a string' })
+    assert.equal(JSON.parse(layer.write('json', null)).decision.ruleset_digest, undefined)
+    assert.equal(JSON.parse(layer.write('json', {})).decision.ruleset_digest, undefined)
+    assert.throws(() => layer.write('json', { rulesetDigest: 'yes' }), {
+      name: 'TypeError',
+      message: 'options.rulesetDigest is a boolean, not a string',
+    })
+    assert.throws(() => layer.write('json', true), {
+      name: 'TypeError',
+      message: 'options must be an object, such as { rulesetDigest: true }, not a boolean',
+    })
   })
 
   test('rulesetDigest is an option of decisions only; decisions have no canonical bytes here', () => {
@@ -440,6 +450,51 @@ describe('decisions with their rule set digest', () => {
 describe('review fixes', () => {
   test('a limit of 0 is not recorded', () => {
     assert.throws(() => make(vip(), { limits: { maxDepth: 0 } }), UnsupportedError)
+  })
+
+  test('a limit above 2^53 - 1 is not recorded either; one that is not a whole number from 0 is a RangeError', () => {
+    const max = Number.MAX_SAFE_INTEGER
+    assert.equal(make(vip(), { limits: { maxValues: max } }).engine.limits.maxValues, max)
+    for (const value of [max + 1, 2 ** 64, 2 ** 80]) {
+      assert.throws(() => make(vip(), { limits: { maxValues: value } }), (error) => error instanceof UnsupportedError && error.code === 'unsupported')
+    }
+    for (const value of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      assert.throws(() => make(vip(), { limits: { maxDepth: value } }), { name: 'RangeError', message: /limits\.maxDepth is .*; a limit is a whole number from 0/ })
+    }
+    assert.throws(() => make(vip(), { limits: { maxDepth: '64' } }), { name: 'TypeError', message: 'limits.maxDepth is a number, not a string' })
+    assert.throws(() => make(vip(), { limits: { maxTextSize: 10 } }), { name: 'TypeError', message: /does not record limits\.maxTextSize/ })
+  })
+
+  test('the case files of a bundle are CaseFile objects, which check what they are made of', () => {
+    const bundle = make(vip(), { cases: [{ path: 'cases/a.json', content: '[]' }] })
+    const [first] = bundle.cases
+    assert.ok(first instanceof CaseFile)
+    assert.equal(first.path, 'cases/a.json')
+    assert.equal(first.matches('[]'), true)
+    assert.equal(first.matches(new TextEncoder().encode('[]')), true)
+    assert.equal(first.matches('[ ]'), false)
+    const again = new CaseFile(first.path, first.digest)
+    assert.deepEqual(again, first)
+    assert.ok(Object.isFrozen(again))
+    assert.deepEqual(JSON.parse(JSON.stringify(again)), { path: 'cases/a.json', digest: first.digest })
+    assert.equal(again[Symbol.for('nodejs.util.inspect.custom')](), `CaseFile(cases/a.json ${first.digest})`)
+    for (const [path, digest] of [
+      ['Cases/A.json', first.digest],
+      ['../a.json', first.digest],
+      ['cases/a.json', 'sha256:00'],
+      ['cases/a.json', first.digest.toUpperCase()],
+    ]) {
+      assert.throws(() => new CaseFile(path, digest), FormatError, `${path} ${digest}`)
+    }
+    assert.throws(() => new CaseFile(1, first.digest), { name: 'TypeError', message: /path must be a string/ })
+    assert.throws(() => new CaseFile('a.json'), { name: 'TypeError', message: /digest must be a string/ })
+    assert.throws(() => first.matches(5), TypeError)
+  })
+
+  test('the comparison is symmetric', () => {
+    const a = make(vip(), { limits: { maxDepth: 64 } })
+    const b = make(vip(6), { revision: '2', cases: [{ path: 'a.json', content: '' }] })
+    assert.deepEqual(a.compare(b), b.compare(a))
   })
 
   test('case paths are lowercase and do not end with a dot', () => {

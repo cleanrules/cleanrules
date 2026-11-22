@@ -611,3 +611,32 @@ pub fn bundle_case_matches(
         .case_matches(&raw(&path)?, raw(&bytes)?)
         .or_fail(env)
 }
+
+/// Check the path and digest of a case file (`spec/bundles.md`, *Cases*), for
+/// the idiomatic `CaseFile`.
+///
+/// # Errors
+///
+/// A `TypeError` for a path or digest that is not a string; a `FormatError`
+/// for a digest or a path without its form.
+#[napi(ts_args_type = "path: string, digest: string")]
+pub fn check_case_file(env: &Env, path: Unknown<'_>, digest: Unknown<'_>) -> Result<()> {
+    bundles::check_case_file(&raw(&path)?, &raw(&digest)?).or_fail(env)
+}
+
+/// Whether `content` is the case file of `path` and `digest`: whether the
+/// SHA-256 digest of its bytes (a string's UTF-8 bytes) is `digest`.
+///
+/// # Errors
+///
+/// As `checkCaseFile`, and a `TypeError` for content that is neither a string
+/// nor bytes.
+#[napi(ts_args_type = "path: string, digest: string, content: string | Uint8Array")]
+pub fn case_file_matches(
+    env: &Env,
+    path: Unknown<'_>,
+    digest: Unknown<'_>,
+    content: Unknown<'_>,
+) -> Result<bool> {
+    bundles::case_file_matches(&raw(&path)?, &raw(&digest)?, raw(&content)?).or_fail(env)
+}

@@ -1,9 +1,9 @@
 //! Bundles (`spec/bundles.md`, task R.5): the core makes, reads, writes and
 //! compares them; Python wraps the result.
 
-use cleanrules::bundle::{Bundle, BundleRules, CaseFile};
+use cleanrules::bundle::{Bundle, BundleId, BundleRules, CaseFile, Revision};
 use cleanrules::digest::Digest;
-use cleanrules::json::{Json, Limits, to_string};
+use cleanrules::json::{Limits, to_string};
 use pyo3::exceptions::{PyKeyError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
@@ -83,40 +83,54 @@ pub(crate) fn make_bundle(
         max_table_size,
         max_values,
     );
-    let bundle = Bundle::new(rules, id, revision, cases, &limits).or_raise(py)?;
+    let bundle = make(rules, id, revision, cases, &limits).or_raise(py)?;
     Ok(PyBundle { bundle })
 }
 
-/// Whether `data` is the case file whose digest is `digest`
+/// A bundle as the core makes it (`spec/bundles.md`, *Making a bundle*).
+pub(crate) fn make(
+    rules: BundleRules,
+    id: &str,
+    revision: &str,
+    cases: Vec<CaseFile>,
+    limits: &Limits,
+) -> cleanrules::Result<Bundle> {
+    Bundle::new(rules, BundleId::new(id)?, Revision::new(revision)?)
+        .with_cases(cases)?
+        .with_limits(limits)
+}
+
+/// The default limits a bundle records, `(name, value)` in the order of the
+/// specification.
+#[pyfunction]
+pub(crate) fn default_bundle_limits() -> Vec<(&'static str, u64)> {
+    cleanrules::bundle::EngineLimits::default()
+        .iter()
+        .map(|(limit, n)| (limit.as_str(), n))
+        .collect()
+}
+
+/// Check a case file's path and digest (`spec/bundles.md`, *Cases*).
+#[pyfunction]
+pub(crate) fn check_case_file(py: Python<'_>, path: &str, digest: &str) -> PyResult<()> {
+    let digest: Digest = digest.parse().or_raise(py)?;
+    CaseFile::with_digest(path, digest).or_raise(py)?;
+    Ok(())
+}
+
+/// Whether `content` is the case file whose digest is `digest`
 /// (`spec/bundles.md`, *Cases*).
 #[pyfunction]
 pub(crate) fn case_matches(
     py: Python<'_>,
     path: &str,
     digest: &str,
-    data: &[u8],
+    content: &[u8],
 ) -> PyResult<bool> {
     let digest: Digest = digest.parse().or_raise(py)?;
     Ok(CaseFile::with_digest(path, digest)
         .or_raise(py)?
-        .matches(data))
-}
-
-/// The contract's JSON form (`spec/bundles.md`, *Contract*).
-fn contract_json(bundle: &Bundle) -> Json {
-    let contract = bundle.contract();
-    let keys = contract
-        .output_keys()
-        .iter()
-        .map(|key| Json::String(key.clone()))
-        .collect();
-    Json::Object(vec![
-        ("input".into(), contract.input().clone()),
-        (
-            "output".into(),
-            Json::Object(vec![("keys".into(), Json::Array(keys))]),
-        ),
-    ])
+        .matches(content))
 }
 
 #[pymethods]
@@ -124,13 +138,28 @@ impl PyBundle {
     /// The identifier.
     #[getter]
     fn id(&self) -> &str {
-        self.bundle.id()
+        self.bundle.id().as_str()
     }
 
     /// The revision.
     #[getter]
     fn revision(&self) -> &str {
-        self.bundle.revision()
+        self.bundle.revision().as_str()
+    }
+
+    /// The kind of rules it holds: `"ruleset"` or `"decision_table"`.
+    #[getter]
+    fn kind(&self) -> &'static str {
+        match self.bundle.rules() {
+            BundleRules::DecisionTable(_) => "decision_table",
+            _ => "ruleset",
+        }
+    }
+
+    /// The number of case files.
+    #[getter]
+    fn case_count(&self) -> usize {
+        self.bundle.cases().len()
     }
 
     /// The rules as held: `("ruleset", parts)` or `("decision_table", table)`.
@@ -162,21 +191,17 @@ impl PyBundle {
     /// the order of the specification.
     fn engine<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let engine = self.bundle.engine();
-        let limits = engine.limits();
-        let pairs = [
-            ("max_size", limits.max_size),
-            ("max_nesting", limits.max_nesting),
-            ("max_depth", limits.max_depth),
-            ("max_path_segments", limits.max_path_segments),
-            ("max_table_size", limits.max_table_size),
-            ("max_values", limits.max_values),
-        ];
+        let pairs: Vec<(&'static str, u64)> = engine
+            .limits()
+            .iter()
+            .map(|(limit, n)| (limit.as_str(), n))
+            .collect();
         (engine.name(), engine.version(), pairs, engine.is_current()).into_pyobject(py)
     }
 
     /// The contract in its JSON form, as text.
     fn contract_json(&self) -> String {
-        to_string(&contract_json(&self.bundle))
+        to_string(&self.bundle.contract().to_json())
     }
 
     /// The case files as `(path, digest)`, in order.
@@ -188,15 +213,19 @@ impl PyBundle {
             .collect()
     }
 
-    /// Whether `data` is the case file at `path`; `KeyError` for a path the
-    /// bundle does not have.
-    fn case_matches(&self, path: &str, data: &[u8]) -> PyResult<bool> {
-        self.bundle
-            .cases()
-            .iter()
-            .find(|case| case.path() == path)
-            .map(|case| case.matches(data))
-            .ok_or_else(|| PyKeyError::new_err(path.to_owned()))
+    /// Whether `content` is the case file at `path`; `KeyError` for a path
+    /// the bundle does not have, with the paths it has.
+    fn case_matches(&self, path: &str, content: &[u8]) -> PyResult<bool> {
+        self.bundle.case_matches(path, content).ok_or_else(|| {
+            let cases = self.bundle.cases();
+            let known = if cases.is_empty() {
+                ": it has none".to_owned()
+            } else {
+                let paths: Vec<String> = cases.iter().map(|c| format!("{:?}", c.path())).collect();
+                format!("; its case files are {}", paths.join(", "))
+            };
+            PyKeyError::new_err(format!("the bundle refers to no case file {path:?}{known}"))
+        })
     }
 
     /// Compare with another bundle: `(relation, identical, differences)`.
@@ -205,7 +234,11 @@ impl PyBundle {
         (
             comparison.relation().as_str(),
             comparison.is_identical(),
-            comparison.differences().to_vec(),
+            comparison
+                .differences()
+                .iter()
+                .map(|difference| difference.as_str())
+                .collect(),
         )
     }
 }

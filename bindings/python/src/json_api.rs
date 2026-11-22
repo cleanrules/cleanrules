@@ -3,7 +3,7 @@
 //! task D.1 gives the binding its public reading and writing API.
 
 use cleanrules::Value;
-use cleanrules::bundle::{Bundle, BundleRules, CaseFile};
+use cleanrules::bundle::{BundleRules, CaseFile};
 use cleanrules::eval::{Options, evaluate_tree, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
@@ -119,7 +119,7 @@ pub(crate) fn py_make_bundle(
         max_table_size,
         max_values,
     );
-    let bundle = Bundle::new(rules, id, revision, cases, &limits).or_raise(py)?;
+    let bundle = crate::bundles::make(rules, id, revision, cases, &limits).or_raise(py)?;
     Ok(to_string(&write_document(&bundle.into_document())))
 }
 

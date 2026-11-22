@@ -282,6 +282,19 @@ pub(crate) fn raw_options(value: &JsValue) -> Result<Option<RawOptions>, JsValue
     }))
 }
 
+/// The `rulesetDigest` member of a decision's write options, read once:
+/// `undefined` when the options are left out.
+pub(crate) fn raw_ruleset_digest(value: &JsValue) -> Result<Raw, JsValue> {
+    let kind = raw(value);
+    if matches!(kind, Raw::Undefined | Raw::Null) {
+        return Ok(Raw::Undefined);
+    }
+    if !matches!(kind, Raw::Other(OBJECT)) {
+        return Err(fail(crate::common::not_write_options(kind.describe())));
+    }
+    member(value, "rulesetDigest")
+}
+
 /// The elements of an array argument.
 pub(crate) fn raw_list(value: &JsValue, what: &str) -> Result<Vec<Raw>, JsValue> {
     if !Array::is_array(value) {

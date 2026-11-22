@@ -394,8 +394,17 @@ void [tablePolicy, firstInput, tableSet, tableOut, outputs, contextTree, ready, 
 
 // --- Bundles (R.5) and decisions with their rule set digest ---
 
-import { Bundle, type BundleComparison, type BundleRelation } from 'cleanrules'
-import { type BundleCaseInput } from 'cleanrules/native'
+import {
+  Bundle,
+  CaseFile,
+  type BundleComparison,
+  type BundleDifference,
+  type BundleDocument,
+  type BundleLimitName,
+  type BundleRelation,
+  type DecisionDumpOptions,
+} from 'cleanrules'
+import { type BundleCaseInput, type DecisionWriteOptions } from 'cleanrules/native'
 
 const bundle = new Bundle(rules, {
   id: 'acme/discounts',
@@ -420,7 +429,30 @@ const loggedDecision: string = dumps(rules.evaluate({ x: 1 }), { rulesetDigest: 
 const nativeCase: BundleCaseInput = { path: 'cases/a.json', content: 'x' }
 const nativeBundle: Document = Document.makeBundle(document, 'acme/a', '1', [nativeCase], { maxDepth: 64 })
 const nativeComparison: string = nativeBundle.compareBundle(nativeBundle)
-const nativeDecision: string = decision.write('json', true)
+const writeOptions: DecisionWriteOptions = { rulesetDigest: true }
+const nativeDecision: string = decision.write('json', writeOptions)
+// @ts-expect-error: the native layer takes the digest as an option, not a positional boolean.
+void decision.write('json', true)
+const firstCase: CaseFile | undefined = bundle.cases[0]
+const caseFile = new CaseFile('cases/a.json', 'sha256:' + '0'.repeat(64))
+const caseMatches: boolean = caseFile.matches(new Uint8Array())
+const differences: readonly BundleDifference[] = comparison.differences
+const limitDifference: BundleDifference = 'engine.limits.max_depth'
+const limitName: BundleLimitName = 'max_path_segments'
+// @ts-expect-error: difference names keep the format's snake_case spelling.
+const camelDifference: BundleDifference = 'engine.limits.maxDepth'
+const bundleDocument: BundleDocument = bundle.toJSON()
+const recordedDepth: number = bundleDocument.bundle.engine.limits.max_depth
+const decisionOptions: DecisionDumpOptions = { format: 'yaml', rulesetDigest: true }
+const decisionYaml: string = dumps(rules.evaluate({ x: 1 }), decisionOptions)
+// @ts-expect-error: rulesetDigest is an option of decisions only.
+void dumps(rules, { rulesetDigest: true })
+// @ts-expect-error: rulesetDigest is an option of decisions only.
+void dump(rules, 'rules.json', { rulesetDigest: true })
+// @ts-expect-error: a decision has no text form.
+void dumps(rules.evaluate({ x: 1 }), { format: 'text' })
+void dump(rules.evaluate({ x: 1 }), 'decision.json', { rulesetDigest: true })
+void [firstCase, caseMatches, differences, limitDifference, limitName, camelDifference, recordedDepth, decisionYaml]
 // @ts-expect-error: a bundle needs an id and a revision.
 void new Bundle(rules, { id: 'acme/a' })
 // @ts-expect-error: a bundle holds a rule set or a table, not a rule.

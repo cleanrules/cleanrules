@@ -519,6 +519,13 @@ impl RoundingMode {
     }
 }
 
+impl fmt::Display for RoundingMode {
+    /// The name in the format, such as `half_even`.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 impl Decimal {
     /// The decimal with exactly `scale` digits after the point, digits dropped
     /// as `mode` says (`spec/ast.md`, *Rounding*). An infinity is kept.

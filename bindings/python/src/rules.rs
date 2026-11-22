@@ -547,6 +547,20 @@ impl PyDecision {
         Ok(to_string(&write_decision(&decision)))
     }
 
+    /// The decision document in `format` (`json` or `yaml`), with its rule
+    /// set's digest as in `to_json`.
+    #[pyo3(signature = (format, ruleset_digest=false))]
+    fn dump(&self, py: Python<'_>, format: &str, ruleset_digest: bool) -> PyResult<String> {
+        let format = crate::documents::document_format(format)?;
+        let decision = self.rebuild(py)?;
+        let decision = if ruleset_digest {
+            decision.with_ruleset_digest(true)
+        } else {
+            decision
+        };
+        cleanrules::format::write_decision_as(&decision, format).or_raise(py)
+    }
+
     /// The explanation as Python data: per rule, a dict with `rule`, `status`,
     /// `note`, `achievable` and `requirement` (a cause or a group, as dicts).
     fn explanation<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {

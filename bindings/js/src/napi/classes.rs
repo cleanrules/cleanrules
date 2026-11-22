@@ -11,7 +11,7 @@ use napi::{Env, Result, ValueType};
 use napi_derive::napi;
 
 use super::hooks::{hook, throw};
-use super::{OrFail, fail, raw, raw_cases, raw_limits, raw_list, raw_options};
+use super::{OrFail, fail, raw, raw_cases, raw_limits, raw_list, raw_options, raw_ruleset_digest};
 use crate::common::bundles;
 use crate::common::core::{
     ActionFailure, DecisionCore, DocumentCore, NodeCore, PathSegment, RulesCore, TreeKind,
@@ -166,12 +166,22 @@ pub enum DocumentKind {
 /// records (a string as its UTF-8 bytes).
 #[napi(object, object_from_js = false, object_to_js = false)]
 pub struct BundleCaseInput {
-    /// The path, such as `"cases/basic.json"`: segments of letters, digits,
-    /// `.`, `_` and `-` separated by `/`, none `.` or `..`.
+    /// The path, such as `"cases/basic.json"`: lowercase ASCII letters,
+    /// digits, `.`, `_` and `-`, in segments separated by `/`, none `.` or
+    /// `..` and none ending with `.`, at most 1024 characters.
     pub path: String,
     /// The file's content.
     #[napi(ts_type = "string | Uint8Array")]
     pub content: String,
+}
+
+/// How a decision is written (`Decision.write`).
+#[napi(object, object_from_js = false, object_to_js = false)]
+pub struct DecisionWriteOptions {
+    /// Write the digest of the rule set that made the decision as its
+    /// `ruleset_digest`, which `RuleSet.readDecision` verifies; `false` when
+    /// left out. A decision read with one keeps it either way.
+    pub ruleset_digest: Option<bool>,
 }
 
 /// A crisp truth value.
@@ -376,8 +386,11 @@ impl Document {
     /// # Errors
     ///
     /// `FormatError` for an identifier, revision or case path that does not
-    /// have its form, or a path given twice; a `TypeError` for a document of
-    /// another kind or an argument of the wrong type.
+    /// have its form, or a path given twice; `UnsupportedError` for a limit
+    /// of 0 or above 2^53 - 1 (`Number.MAX_SAFE_INTEGER`), which a bundle
+    /// cannot record; a `RangeError` for a limit that is negative or not a
+    /// whole number; a `TypeError` for a document of another kind, an
+    /// argument of the wrong type, or `maxYamlSize` or `maxTextSize`.
     #[napi(
         factory,
         ts_args_type = "rules: Document, id: string, revision: string, cases?: BundleCaseInput[] | null, limits?: Limits | null"
@@ -962,25 +975,26 @@ impl Decision {
     }
 
     /// The decision document in `format`: JSON (the default) or YAML. With
-    /// `rulesetDigest`, it carries the digest of the rule set that made it as
-    /// `ruleset_digest` (`spec/json-format.md`, *In decisions*), which
-    /// `RuleSet.readDecision` verifies; a decision read with one keeps it
-    /// either way.
+    /// `{ rulesetDigest: true }`, it carries the digest of the rule set that
+    /// made it as `ruleset_digest` (`spec/json-format.md`, *In decisions*),
+    /// which `RuleSet.readDecision` verifies; a decision read with one keeps
+    /// it either way.
     ///
     /// # Errors
     ///
-    /// `UnsupportedError` for the rule syntax and CSV; a `TypeError` for a
-    /// `rulesetDigest` that is not a boolean.
-    #[napi(ts_args_type = "format?: Format | null, rulesetDigest?: boolean | null")]
+    /// `UnsupportedError` for the rule syntax and CSV; a `TypeError` for
+    /// options that are not an object, or a `rulesetDigest` that is not a
+    /// boolean.
+    #[napi(ts_args_type = "format?: Format | null, options?: DecisionWriteOptions | null")]
     pub fn write(
         &self,
         env: &Env,
         format: Option<Unknown<'_>>,
-        ruleset_digest: Option<Unknown<'_>>,
+        options: Option<Unknown<'_>>,
     ) -> Result<String> {
-        self.core
-            .write(&optional(format)?, &optional(ruleset_digest)?)
-            .or_fail(env)
+        let format = optional(format)?;
+        let ruleset_digest = raw_ruleset_digest(env, options)?;
+        self.core.write(&format, &ruleset_digest).or_fail(env)
     }
 
     /// The explanation (`spec/explain.md`) in `format`: its text (the

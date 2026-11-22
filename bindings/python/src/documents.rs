@@ -123,7 +123,7 @@ pub(crate) fn load_rule(
     ))
 }
 
-fn document_format(name: &str) -> PyResult<DocumentFormat> {
+pub(crate) fn document_format(name: &str) -> PyResult<DocumentFormat> {
     DocumentFormat::from_name(name)
         .ok_or_else(|| PyValueError::new_err(format!("unknown format {name:?}")))
 }

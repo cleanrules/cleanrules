@@ -7931,6 +7931,59 @@
       }
     },
     {
+      "id": "format/bundles/make-limit-above-max",
+      "spec": [
+        "bundles.md#making-a-bundle"
+      ],
+      "description": "a limit of 2^53, above the largest integer every language reads exactly, is not recorded",
+      "given": {
+        "kind": "bundle",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "vip",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "years"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 5
+                  }
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "id": "acme",
+        "revision": "1",
+        "limits": {
+          "max_values": 9007199254740992
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
       "id": "format/bundles/compare-identical",
       "spec": [
         "bundles.md#comparing-bundles"

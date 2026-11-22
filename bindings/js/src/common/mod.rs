@@ -129,6 +129,13 @@ pub(crate) fn not_options(kind: &str) -> Problem {
     ))
 }
 
+/// The problem with a decision's write options that are not an object.
+pub(crate) fn not_write_options(kind: &str) -> Problem {
+    Problem::Type(format!(
+        "options must be an object, such as {{ rulesetDigest: true }}, not {kind}"
+    ))
+}
+
 /// A text: a string or bytes. Bytes that are not UTF-8 are a `format_error`
 /// at the line and column of the first invalid byte, as the core reports them.
 pub(crate) fn text(raw: Raw, what: &str) -> Outcome<Vec<u8>> {

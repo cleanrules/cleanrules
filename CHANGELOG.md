@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Migration guide to the 1.0 contract (task R.6,
+  [`docs/migration-1.0.md`](docs/migration-1.0.md)): every observable change
+  of phase R since the draft format and APIs, with before and after examples
+  in JSON, Python and JavaScript, how to check that a file still reads, and
+  how to pin results with a bundle.
+- API review of phase R (task R.6), applied before any release:
+  - Core: `Build::round(scale)` and `Build::round_with(scale, mode)` in the
+    fluent builder; `Display` for `RoundingMode`.
+  - Python: `dumps(decision, *, format="json", ruleset_digest=False)` and
+    `dump(...)` write decisions (a `TypeError` for `ruleset_digest` with
+    anything else), as in JavaScript; `Decision.to_dict(ruleset_digest=True)`
+    stays.
 - Reproducible bundles (task R.5; `spec/bundles.md`): a new document,
   `{"version": 1, "bundle": {...}}`, additive in format version 1 (older
   readers reject it), read and written in JSON and YAML (not in text or CSV),
@@ -33,25 +45,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `conformance/tools/canonical_vectors.py`; new vector kinds `bundle` and
   `bundle_compare`, and the flag `current_engine`), JSON Schema examples, and
   the example `docs/examples/bundles.rs`.
-  - Core: module `bundle` (`Bundle::new`, `BundleRules`, `Engine`,
-    `EngineLimits`, `Contract`, `CaseFile`, `Comparison`, `Relation`,
-    `ENGINE_NAME`, `ENGINE_VERSION`; `Bundle::case_matches`),
-    `Document::Bundle` and `format::write_bundle`.
-  - C ABI: `CR_DOCUMENT_BUNDLE`, `cr_bundle_new` (with `cr_case_file`),
-    `cr_bundle_compare` and `cr_document_new_ruleset`; C++
+  - Core: module `bundle`: `Bundle::new(rules, BundleId, Revision)`
+    (infallible: no case files, the default limits) with the consuming
+    builders `with_cases`, `with_limits(&Limits)` and
+    `with_engine_limits(EngineLimits)`; the checked newtypes `BundleId` and
+    `Revision` (`new`, `FromStr`, `TryFrom<&str>`, `Display`, `as_str`);
+    `BundleRules`, `Engine` (`is_current`), `EngineLimits` (`of`, `get`,
+    `with`, `iter`, `check`, `to_limits`, `to_json`), the enum
+    `EngineLimit`, `Contract` (`to_json`), `CaseFile`, `Comparison`
+    (`differences()` gives the enum `Difference`), `Relation`,
+    `ENGINE_NAME`, `ENGINE_VERSION` and `MAX_RECORDED_LIMIT`;
+    `Bundle::case_matches`; `Bundle` is `Eq` and `Hash` by its digest,
+    computed once. `Document::Bundle` and `format::write_bundle`.
+  - C ABI: `CR_DOCUMENT_BUNDLE`, `cr_document_new_bundle` (with
+    `struct cr_case_input { path, path_len, bytes, bytes_len }`),
+    `cr_document_compare_bundle` and `cr_document_new_ruleset`; C++
     `cr::document_content::bundle`.
   - Python: `Bundle(rules, *, id, revision, cases=(), omit_actions=False,
     max_...)` with `id`, `revision`, `rules`, `ruleset`, `ruleset_digest`,
-    `engine` (`BundleEngine`), `contract`, `cases` (`CaseFile`, with
-    `matches`), `case_matches` and `compare` (`BundleComparison`,
-    `BundleRelation`); `loads`, `dumps`, `load`, `dump`, `canonical_bytes`
-    and `digest` take bundles.
+    `engine` (`BundleEngine`, whose `limits` is a frozen `BundleLimits`),
+    `contract` (the `TypedDict` `BundleContract`), `cases` (`CaseFile`,
+    checked when made, with `matches(content)`), `case_matches(path,
+    content)` (a `KeyError` naming the bundle's paths) and `compare`
+    (`BundleComparison`, `BundleRelation`, and `differences` as
+    `BundleDifference`, a `StrEnum`); `loads`, `dumps`, `load`, `dump`,
+    `canonical_bytes` and `digest` take bundles, and a bundle pickles under
+    the limits it records.
   - JavaScript and wasm (Node, browsers, Deno): `new Bundle(rules, { id,
     revision, cases, omitActions, limits })` with `id`, `revision`, `rules`,
     `ruleset`, `rulesetDigest`, `engine` (`{ name, version, limits,
-    isCurrent }`), `contract`, `cases`, `caseMatches(path, content)`,
-    `compare(other)` and `toJSON()`; `loads`, `load`, `dumps`, `dump`,
-    `canonicalBytes` and `digest` take bundles; in `cleanrules/native`,
+    isCurrent }`), `contract`, `cases` (frozen `CaseFile` objects, also
+    exported and checked when made, with `matches(content)`),
+    `caseMatches(path, content)`, `compare(other)` and `toJSON()` (typed
+    `BundleDocument`); the types `BundleDifference` and `BundleLimitName`;
+    `loads`, `load`, `dumps`, `dump`, `canonicalBytes` and `digest` take
+    bundles; a limit of 0 or above `Number.MAX_SAFE_INTEGER` is an
+    `UnsupportedError`, as in every language; in `cleanrules/native`,
     `Document.makeBundle`, `document.compareBundle` and the document kind
     `'bundle'`.
   - Java, Scala, Go and C++ (beta) have no bundle type yet: `loads`/`Loads`
@@ -61,8 +90,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     (`DocumentKind.BUNDLE`).
 - Decisions written with their rule set digest on request in every
   supported interface (closes a deviation of R.2): Python
-  `Decision.to_dict(ruleset_digest=True)`, JavaScript `dumps(decision, { rulesetDigest: true })` (`dumps` and
-  `dump` now take decisions; `decision.write(format, rulesetDigest)` in
+  `dumps(decision, ruleset_digest=True)` or
+  `Decision.to_dict(ruleset_digest=True)`, JavaScript `dumps(decision, {
+  rulesetDigest: true })` (`dumps` and `dump` now take decisions, with their
+  own TypeScript overload; `decision.write(format, { rulesetDigest })` in
   `cleanrules/native`),
   and in the C ABI `cr_decision_write_with` with the flag
   `CR_WRITE_RULESET_DIGEST`.

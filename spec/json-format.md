@@ -1035,8 +1035,9 @@ A decision may carry the rule set digest of the rule set that made it, under
 `ruleset_digest` (*Decisions*), so that an audit log ties each decision to the
 exact rules that made it. Writers write it only when the caller asks, so
 decisions stay small and do not change with every edit of a description
-(`Decision::with_ruleset_digest` in Rust, `Decision.to_dict(ruleset_digest=True)`
-in Python, `dumps(decision, { rulesetDigest: true })` in JavaScript, the flag `CR_WRITE_RULESET_DIGEST` of
+(`Decision::with_ruleset_digest` in Rust, `dumps(decision, ruleset_digest=True)`
+or `Decision.to_dict(ruleset_digest=True)` in Python,
+`dumps(decision, { rulesetDigest: true })` in JavaScript, the flag `CR_WRITE_RULESET_DIGEST` of
 `cr_decision_write_with` in the C ABI; the Java, Scala, Go and C++ APIs do not
 ask yet, and every language keeps one that it reads). A bundle
 (`bundles.md`) states the same digest, so decisions written this way are tied

@@ -6,6 +6,7 @@ export type {
   ActionCall,
   Aggregate,
   BundleCaseInput,
+  DecisionWriteOptions,
   DocumentKind,
   Format,
   HitPolicy,

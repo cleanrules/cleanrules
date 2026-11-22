@@ -1,8 +1,8 @@
 //! Bundles in JSON (`spec/bundles.md`).
 
 use crate::bundle::{
-    Bundle, BundleRules, CaseFile, Contract, Engine, EngineLimits, LIMIT_NAMES, MAX_RECORDED_LIMIT,
-    check_case_path, check_engine, check_id, check_revision,
+    Bundle, BundleId, BundleRules, CaseFile, Contract, Engine, EngineLimit, EngineLimits,
+    MAX_RECORDED_LIMIT, Revision, check_case_path, check_engine,
 };
 use crate::digest::Digest;
 use crate::error::{Error, ErrorCode, Result};
@@ -74,13 +74,13 @@ pub(crate) fn read_bundle(
         return Err(format_error(pointer, "a bundle must be an object"));
     };
     let id = string(get(members, "id"), &at(pointer, "id"), "\"id\"")?;
-    check_id(id).map_err(|e| e.at_pointer(at(pointer, "id")))?;
+    let id = BundleId::new(id).map_err(|e| e.at_pointer(at(pointer, "id")))?;
     let revision = string(
         get(members, "revision"),
         &at(pointer, "revision"),
         "\"revision\"",
     )?;
-    check_revision(revision).map_err(|e| e.at_pointer(at(pointer, "revision")))?;
+    let revision = Revision::new(revision).map_err(|e| e.at_pointer(at(pointer, "revision")))?;
     let raw = match (get(members, "ruleset"), get(members, "decision_table")) {
         (Some(ruleset), None) => {
             RawRules::RuleSet(shape_ruleset(ruleset, &at(pointer, "ruleset"), limits)?)
@@ -137,14 +137,7 @@ pub(crate) fn read_bundle(
             .with_hint("the contract was edited or is stale: make the bundle again"));
         }
     }
-    Ok(Bundle::read(
-        id.to_owned(),
-        revision.to_owned(),
-        rules,
-        engine,
-        contract,
-        cases,
-    ))
+    Ok(Bundle::read(id, revision, rules, engine, contract, cases))
 }
 
 fn read_engine(json: Option<&Json>, pointer: &str) -> Result<Engine> {
@@ -161,7 +154,10 @@ fn read_engine(json: Option<&Json>, pointer: &str) -> Result<Engine> {
     let limits_at = at(pointer, "limits");
     let limits = object(get(members, "limits"), &limits_at, "\"limits\"")?;
     let mut values = [0u64; 6];
-    for (value, name) in values.iter_mut().zip(LIMIT_NAMES) {
+    for (value, name) in values
+        .iter_mut()
+        .zip(EngineLimit::ALL.map(EngineLimit::as_str))
+    {
         let here = at(&limits_at, name);
         *value = match get(limits, name) {
             Some(Json::Number(n)) => n
@@ -182,7 +178,11 @@ fn read_engine(json: Option<&Json>, pointer: &str) -> Result<Engine> {
             }
         };
     }
-    no_unknown_keys(limits, &LIMIT_NAMES, &limits_at)?;
+    no_unknown_keys(
+        limits,
+        &EngineLimit::ALL.map(EngineLimit::as_str),
+        &limits_at,
+    )?;
     no_unknown_keys(members, &ENGINE_KEYS, pointer)?;
     Engine::new(name, version, EngineLimits::from_values(values)).map_err(|e| e.at_pointer(pointer))
 }
@@ -314,10 +314,6 @@ fn read_cases(json: Option<&Json>, pointer: &str) -> Result<Vec<CaseFile>> {
     Ok(cases)
 }
 
-fn int(n: u64) -> Json {
-    Json::Number(JsonNumber::from_literal(n.to_string()))
-}
-
 fn text(s: &str) -> Json {
     Json::String(s.to_owned())
 }
@@ -326,8 +322,8 @@ fn text(s: &str) -> Json {
 #[must_use]
 pub fn write_bundle(bundle: &Bundle) -> Json {
     let mut members: Vec<(String, Json)> = vec![
-        ("id".into(), text(bundle.id())),
-        ("revision".into(), text(bundle.revision())),
+        ("id".into(), text(bundle.id().as_str())),
+        ("revision".into(), text(bundle.revision().as_str())),
     ];
     members.push(match bundle.rules() {
         BundleRules::RuleSet(ruleset) => ("ruleset".into(), write_ruleset(ruleset)),
@@ -338,33 +334,15 @@ pub fn write_bundle(bundle: &Bundle) -> Json {
         text(&bundle.ruleset_digest().to_string()),
     ));
     let engine = bundle.engine();
-    let limits = LIMIT_NAMES
-        .iter()
-        .zip(engine.limits().values())
-        .map(|(name, n)| ((*name).to_owned(), int(n)))
-        .collect();
     members.push((
         "engine".into(),
         Json::Object(vec![
             ("name".into(), text(engine.name())),
             ("version".into(), text(engine.version())),
-            ("limits".into(), Json::Object(limits)),
+            ("limits".into(), engine.limits().to_json()),
         ]),
     ));
-    let contract = bundle.contract();
-    members.push((
-        "contract".into(),
-        Json::Object(vec![
-            ("input".into(), contract.input().clone()),
-            (
-                "output".into(),
-                Json::Object(vec![(
-                    "keys".into(),
-                    Json::Array(contract.output_keys().iter().map(|k| text(k)).collect()),
-                )]),
-            ),
-        ]),
-    ));
+    members.push(("contract".into(), bundle.contract().to_json()));
     if !bundle.cases().is_empty() {
         members.push((
             "cases".into(),

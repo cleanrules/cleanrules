@@ -122,20 +122,6 @@ typedef int32_t cr_status;
 typedef int32_t (*cr_action)(void *data,
                              struct cr_action_call *call);
 
-// A file of test cases given to `cr_bundle_new`: its path, relative to the
-// bundle's directory, as UTF-8 bytes, and the file's content. The library
-// keeps the path and the SHA-256 digest of the content, never the pointers.
-typedef struct cr_case_file {
-  // The path: `len` bytes of UTF-8, such as `cases/basic.json`.
-  const char *path;
-  // The length of `path` in bytes.
-  size_t path_len;
-  // The file's bytes, any content.
-  const uint8_t *bytes;
-  // The number of bytes.
-  size_t len;
-} cr_case_file;
-
 // A format diagrams are written in (`CR_DIAGRAM_*`).
 typedef int32_t cr_diagram;
 
@@ -147,6 +133,21 @@ typedef int32_t cr_truth;
 
 // What a document holds, its content (`CR_DOCUMENT_*`).
 typedef int32_t cr_document_content;
+
+// A file of test cases given to `cr_document_new_bundle`: its path, relative
+// to the bundle's directory, as UTF-8 bytes, and the file's content. The
+// library keeps the path and the SHA-256 digest of the content, never the
+// pointers.
+typedef struct cr_case_input {
+  // The path: `path_len` bytes of UTF-8, such as `cases/basic.json`.
+  const char *path;
+  // The length of `path` in bytes.
+  size_t path_len;
+  // The file's content, any bytes.
+  const uint8_t *bytes;
+  // The length of `bytes`.
+  size_t bytes_len;
+} cr_case_input;
 
 // What a cell of `cr_grid_push_row_cells` is (`CR_CELL_*`).
 typedef int32_t cr_cell_kind;
@@ -205,7 +206,7 @@ typedef int32_t cr_value_type;
 #define CR_DOCUMENT_DECISION_TABLE 4
 
 // A document holding a bundle (`spec/bundles.md`): read and written in JSON
-// or YAML, made with `cr_bundle_new`.
+// or YAML, made with `cr_document_new_bundle`.
 #define CR_DOCUMENT_BUNDLE 5
 
 // `format_error`.
@@ -460,53 +461,6 @@ const struct cr_decision *cr_batch_get(const struct cr_batch *batch,
 //
 // `batch` is `NULL` or a live `cr_batch`.
 size_t cr_batch_len(const struct cr_batch *batch);
-
-// Compare two bundles (`spec/bundles.md`, *Comparing bundles*): the JSON
-// object of the comparison, with `relation`, `identical` and `differences`,
-// such as `{"relation":"same_rules_other_engine","identical":false,
-// "differences":["engine.version"]}`. Documents that are not bundles are
-// `CR_INVALID_ARGUMENT`.
-//
-// # Safety
-//
-// `a` and `b` are `NULL` or live `cr_document`s; `out` is `NULL` or points to
-// a writable `char *`; `len` is `NULL` or points to a writable `size_t`;
-// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
-cr_status cr_bundle_compare(const struct cr_document *a,
-                            const struct cr_document *b,
-                            char **out,
-                            size_t *len,
-                            struct cr_error **error);
-
-// Make a bundle of the rules `rules` holds, a `CR_DOCUMENT_RULESET` or
-// `CR_DOCUMENT_DECISION_TABLE` document, with this engine
-// (`spec/bundles.md`, *Making a bundle*): the identifier and revision its
-// author gives, its `case_count` case files in order, and `limits` (the
-// defaults for `NULL`), which it records. The bundle is a new
-// `CR_DOCUMENT_BUNDLE` document. An identifier, revision or path that does
-// not have its form, or a path given twice, is a `CR_FORMAT_ERROR`; a limit
-// of 0 or above 2^53 - 1 is `CR_UNSUPPORTED`; a document of another kind is
-// `CR_INVALID_ARGUMENT`.
-//
-// # Safety
-//
-// `rules` is `NULL` or a live `cr_document`; `id` and `revision` are `NULL`
-// or point to `id_len` and `revision_len` readable bytes; `cases` is `NULL`
-// with a `case_count` of 0, or points to `case_count` readable `cr_case_file`
-// whose `path` and `bytes` are `NULL` or point to `path_len` and `len`
-// readable bytes; `limits` is `NULL` or a live `cr_limits`; `out` is `NULL`
-// or points to a writable `cr_document *`; `error` is `NULL` or points to a
-// writable `cr_error *` set to `NULL`.
-cr_status cr_bundle_new(const struct cr_document *rules,
-                        const char *id,
-                        size_t id_len,
-                        const char *revision,
-                        size_t revision_len,
-                        const struct cr_case_file *cases,
-                        size_t case_count,
-                        const struct cr_limits *limits,
-                        struct cr_document **out,
-                        struct cr_error **error);
 
 // A copy of a decision that the caller owns, freed with `cr_decision_free`:
 // to keep a decision borrowed from a batch, an action call or an error after
@@ -773,6 +727,23 @@ cr_status cr_document_canonical_bytes(const struct cr_document *document,
                                       size_t *len,
                                       struct cr_error **error);
 
+// Compare two bundles (`spec/bundles.md`, *Comparing bundles*): the JSON
+// object of the comparison, with `relation`, `identical` and `differences`,
+// such as `{"relation":"same_rules_other_engine","identical":false,
+// "differences":["engine.version"]}`. Documents that are not bundles are
+// `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `a` and `b` are `NULL` or live `cr_document`s; `out` is `NULL` or points to
+// a writable `char *`; `len` is `NULL` or points to a writable `size_t`;
+// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
+cr_status cr_document_compare_bundle(const struct cr_document *a,
+                                     const struct cr_document *b,
+                                     char **out,
+                                     size_t *len,
+                                     struct cr_error **error);
+
 // A copy of the condition a `CR_DOCUMENT_CONDITION` document holds, freed
 // with `cr_node_free`. A document of another kind is `CR_INVALID_ARGUMENT`.
 //
@@ -837,6 +808,39 @@ void cr_document_free(struct cr_document *document);
 // `document` is `NULL` or a live `cr_document`.
 cr_document_content cr_document_kind(const struct cr_document *document);
 
+// Make a bundle of the rules `rules` holds, a `CR_DOCUMENT_RULESET` or
+// `CR_DOCUMENT_DECISION_TABLE` document, with this engine
+// (`spec/bundles.md`, *Making a bundle*): the identifier and revision its
+// author gives, its `case_count` case files in order, and `limits` (the
+// defaults for `NULL`), of which it records the six that can change a result
+// (`max_size`, `max_nesting`, `max_depth`, `max_path_segments`,
+// `max_table_size` and `max_values`; the YAML, text and diagram limits are
+// ignored). The bundle is a new
+// `CR_DOCUMENT_BUNDLE` document. An identifier, revision or path that does
+// not have its form, or a path given twice, is a `CR_FORMAT_ERROR`; a limit
+// of 0 or above 2^53 - 1 is `CR_UNSUPPORTED`; a document of another kind is
+// `CR_INVALID_ARGUMENT`.
+//
+// # Safety
+//
+// `rules` is `NULL` or a live `cr_document`; `id` and `revision` are `NULL`
+// or point to `id_len` and `revision_len` readable bytes; `cases` is `NULL`
+// with a `case_count` of 0, or points to `case_count` readable `cr_case_input`
+// whose `path` and `bytes` are `NULL` or point to `path_len` and `bytes_len`
+// readable bytes; `limits` is `NULL` or a live `cr_limits`; `out` is `NULL`
+// or points to a writable `cr_document *`; `error` is `NULL` or points to a
+// writable `cr_error *` set to `NULL`.
+cr_status cr_document_new_bundle(const struct cr_document *rules,
+                                 const char *id,
+                                 size_t id_len,
+                                 const char *revision,
+                                 size_t revision_len,
+                                 const struct cr_case_input *cases,
+                                 size_t case_count,
+                                 const struct cr_limits *limits,
+                                 struct cr_document **out,
+                                 struct cr_error **error);
+
 // A document holding a condition (copied), to write it with
 // `cr_document_write`. A value node, such as `a + 1`, or the null constant is
 // a `CR_EXPRESSION_ERROR`: only a condition can be a document.
@@ -862,7 +866,7 @@ cr_status cr_document_new_rule(const struct cr_rule *rule,
                                struct cr_error **error);
 
 // A document holding a rule set (copied), to write it with
-// `cr_document_write` or make a bundle of it with `cr_bundle_new`.
+// `cr_document_write` or make a bundle of it with `cr_document_new_bundle`.
 //
 // # Safety
 //

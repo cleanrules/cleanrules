@@ -154,7 +154,7 @@ function documents(native, expressions, rules, tables, bundles, build) {
    */
   function dumps(value, dumpOptions) {
     const { format, omitActions, rulesetDigest } = options(dumpOptions, DUMP_OPTIONS, "{ format: 'yaml' }")
-    if (value instanceof Decision) return decisionNative(value).write(format, rulesetDigest)
+    if (value instanceof Decision) return decisionNative(value).write(format, { rulesetDigest })
     if (rulesetDigest !== undefined && rulesetDigest !== null) {
       throw new TypeError(`rulesetDigest is an option of decisions, not of ${show(value)}`)
     }

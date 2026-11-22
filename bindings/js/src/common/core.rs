@@ -573,12 +573,13 @@ impl DecisionCore {
         Ok(self.rule_output_text(self.position(rule)?))
     }
 
-    /// The decision document: JSON by default. With `ruleset_digest`, it
-    /// carries the digest of the rule set that made it (`spec/json-format.md`,
-    /// *In decisions*); a decision read with one keeps it either way.
+    /// The decision document: JSON by default. With `ruleset_digest` (the
+    /// write options' `rulesetDigest`), it carries the digest of the rule set
+    /// that made it (`spec/json-format.md`, *In decisions*); a decision read
+    /// with one keeps it either way.
     pub(crate) fn write(&self, format: &Raw, ruleset_digest: &Raw) -> Outcome<String> {
         let format = super::format(format, DocumentFormat::Json)?;
-        let carry = super::flag(ruleset_digest, "rulesetDigest")?;
+        let carry = super::flag(ruleset_digest, "options.rulesetDigest")?;
         self.with(|d| {
             let carried = d
                 .clone()

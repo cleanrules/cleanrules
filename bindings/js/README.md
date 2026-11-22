@@ -78,7 +78,7 @@ CommonJS) and [`docs/examples/discounts.deno.js`](../../docs/examples/discounts.
 ## Entry points
 
 - `cleanrules`: the idiomatic API (`F`, `field`, `constant`, `and`, `or`,
-  `not`, `Expr`, `Rule`, `RuleSet`, `Decision`, `DecisionTable`, `Bundle`, `loads`,
+  `not`, `Expr`, `Rule`, `RuleSet`, `Decision`, `DecisionTable`, `Bundle`, `CaseFile`, `loads`,
   `dumps`, `load`, `dump`, `canonicalBytes`, `digest`, `ruleFromText`,
   `evaluateTree`, `evaluateValueTree`, and the classes of explanations,
   summaries, result trees and tables), the errors, the marker values
@@ -311,7 +311,7 @@ so the build does not use it.
 | `ruleset.length`, `ruleNames()`, `hitPolicy`, `aggregate`, `logic`, `strict`, `fieldPaths()` | what it is and what it reads |
 | `decision.length`, `ruleName(i)`, `firedAt(i)`, `truth(i)`, `selected()` | each rule's result |
 | `decision.outputJson()`, `outputsJson()`, `ruleOutputJson(i)` | outputs, in the JSON format; `null` for none |
-| `decision.write(format?, rulesetDigest?)`, `explain(format?)` | the decision document (JSON by default; with `rulesetDigest`, its rule set's digest), and its explanation (text by default, or JSON or YAML) |
+| `decision.write(format?, { rulesetDigest }?)`, `explain(format?)` | the decision document (JSON by default; with `{ rulesetDigest: true }`, its rule set's digest), and its explanation (text by default, or JSON or YAML) |
 | `Node.read(text, { format, limits }?)` | one condition or value node; `write`, `fieldPaths`, `evaluateTree(data, { logic, strict, limits }?)`, `evaluateValueTree(data, { strict, limits }?)`, and `evaluateTreeJson(text, { logic, strict, limits }?)` and `evaluateValueTreeJson(text, { strict, limits }?)` |
 
 Formats are `"json"`, `"yaml"`, `"text"` (the rule syntax) and `"csv"`
@@ -500,9 +500,9 @@ await dump(rules, 'pricing.rules')
 | Name | What |
 |---|---|
 | `loads(text, { format, limits, actions }?)` | an `Expr`, `Rule`, `RuleSet`, `DecisionTable` or `Bundle` from a document (a string or UTF-8 bytes); typed `DecisionTable` for `format: 'csv'` and `Expr \| Rule \| RuleSet` for `'text'` |
-| `dumps(value, { format, omitActions, rulesetDigest }?)` | the canonical document of a condition, rule, rule set, table, bundle or decision; `rulesetDigest` for decisions only |
+| `dumps(value, { format, omitActions }?)`, `dumps(decision, { format, rulesetDigest }?)` | the canonical document of a condition, rule, rule set, table, bundle or decision; `rulesetDigest` for decisions only (a `TypeError` otherwise, and a type error in TypeScript) |
 | `load(path, { format, limits, actions }?)` | `loads` of a file: a promise; the format comes from the extension |
-| `dump(value, path, { format, omitActions, rulesetDigest }?)` | `dumps` to a file: a promise; a rule text ends with a line break |
+| `dump(value, path, options?)` | `dumps` to a file: a promise; a rule text ends with a line break |
 | `ruleFromText(text, { do, actions, limits }?)` | one rule in the text syntax (fuzzytool's verb); `rule_1` without a `RULE` line |
 
 Formats are `'json'` (the default for `loads` and `dumps`), `'yaml'`, `'text'`
@@ -629,8 +629,9 @@ reads no clock.
 | `bundle.rules`, `ruleset`, `rulesetDigest` | the rules it holds (a `RuleSet` or a `DecisionTable`, actions as unbound names), the rule set it gives, and that rule set's digest |
 | `bundle.engine` | `{ name, version, limits, isCurrent }`, frozen: the engine that made it, its exact version, the six limits by the names of the `limits` option, and whether it is this engine (same name and version) |
 | `bundle.contract` | `{ input, output: { keys } }`, frozen: the JSON Schema of the input and the sorted output keys |
-| `bundle.cases` | `[{ path, digest }]`, frozen, in order |
+| `bundle.cases` | its `CaseFile`s, frozen, in order: each with `path`, `digest` and `matches(content)` |
 | `bundle.caseMatches(path, content)` | whether `content` is the case file the bundle was made with (a `RangeError` for a path it does not refer to); the engine never opens files |
+| `new CaseFile(path, digest)` | a reference to a case file, its path and digest checked by the core (`FormatError`); `caseFile.matches(content)` |
 | `bundle.compare(other)` | `{ relation, identical, differences }`, frozen (*Comparing bundles*) |
 | `loads`, `load`, `dumps`, `dump`, `canonicalBytes`, `digest`, `toJSON()` | as for any document, in JSON or YAML |
 
@@ -638,9 +639,11 @@ An `id` is one or more `/`-separated segments of lowercase letters, digits,
 `.`, `_` and `-`; a `revision` letters, digits, `.`, `_`, `+` and `-`; a case
 path stays inside the bundle's directory. Anything else is a `FormatError`, as
 is a case path given twice. Rules whose actions are code are refused
-(`UnsupportedError`) unless `omitActions`, as `dumps` refuses them; giving
-`maxYamlSize` or `maxTextSize`, which bound the reading of texts and not
-decisions, is a `TypeError`.
+(`UnsupportedError`) unless `omitActions`, as `dumps` refuses them. A limit is
+a whole number from 1 to 2^53 − 1 (`Number.MAX_SAFE_INTEGER`): 0, or one above it, is an
+`UnsupportedError`, since a bundle cannot record it, and a negative or
+fractional one a `RangeError`; giving `maxYamlSize` or `maxTextSize`, which
+bound the reading of texts and not decisions, is a `TypeError`.
 
 Reading a bundle checks its rule set digest against its rules, and, when it
 names this engine (`engine.isCurrent`), its contract against the one the
@@ -651,9 +654,14 @@ is the version of this engine.
 `compare` tells the two questions apart: `same_rules_other_engine` (the same
 rule set digest, another engine version or other limits) and
 `other_rules_same_engine`; `conflict` is one `id` and `revision` naming two
-sets of rules. `differences` names what differs, in the specification's
-order (`id`, `revision`, `rules`, `source`, `engine.name`, `engine.version`,
-`engine.limits.max_depth`..., `contract.input`, `contract.output`, `cases`).
+sets of rules; the comparison is symmetric. `differences` names what
+differs, in the specification's order (`id`, `revision`, `rules`, `source`,
+`engine.name`, `engine.version`, `engine.limits.max_depth`...,
+`contract.input`, `contract.output`, `cases`; the type `BundleDifference`).
+Difference names are data, as relation names are, so they keep the format's
+spelling in every language: the difference `engine.limits.max_depth` is about
+the limit that `limits` and `bundle.engine.limits` call `maxDepth`. Two
+bundles are the same exactly when `digest(a) === digest(b)`.
 
 ## Decision tables
 

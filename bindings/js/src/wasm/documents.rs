@@ -557,3 +557,27 @@ pub fn bundle_case_matches(
 ) -> Result<bool, JsValue> {
     document.core.case_matches(&raw(path), raw(bytes)).or_fail()
 }
+
+/// Check the path and digest of a case file, for the idiomatic `CaseFile`.
+///
+/// # Errors
+///
+/// As in the napi-rs build.
+#[wasm_bindgen(js_name = checkCaseFile)]
+pub fn check_case_file(path: &JsValue, digest: &JsValue) -> Result<(), JsValue> {
+    bundles::check_case_file(&raw(path), &raw(digest)).or_fail()
+}
+
+/// Whether `content` is the case file of `path` and `digest`.
+///
+/// # Errors
+///
+/// As in the napi-rs build.
+#[wasm_bindgen(js_name = caseFileMatches)]
+pub fn case_file_matches(
+    path: &JsValue,
+    digest: &JsValue,
+    content: &JsValue,
+) -> Result<bool, JsValue> {
+    bundles::case_file_matches(&raw(path), &raw(digest), raw(content)).or_fail()
+}

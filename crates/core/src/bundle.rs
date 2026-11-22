@@ -8,25 +8,28 @@
 //!
 //! ```
 //! use cleanrules::build::{constant, field};
-//! use cleanrules::bundle::{Bundle, CaseFile, Relation};
-//! use cleanrules::json::Limits;
+//! use cleanrules::bundle::{Bundle, BundleId, CaseFile, Difference, Relation, Revision};
 //! use cleanrules::rules::{Config, Rule, RuleSet};
 //!
 //! let rule = Rule::new("adult", field("age").ge(constant(18)).build()?)?;
 //! let rules = RuleSet::new(vec![rule], Config::default())?;
-//! let cases = vec![CaseFile::new("cases/adults.json", b"[]")?];
-//! let bundle = Bundle::new(rules, "acme/adults", "1", cases, &Limits::default())?;
+//! let (id, revision) = (BundleId::new("acme/adults")?, Revision::new("1")?);
+//! let bundle = Bundle::new(rules, id.clone(), revision.clone())
+//!     .with_cases([CaseFile::new("cases/adults.json", b"[]")?])?;
 //! assert_eq!(bundle.ruleset_digest(), bundle.ruleset().digest());
 //! assert!(bundle.engine().is_current());
 //!
-//! let same = Bundle::new(bundle.ruleset().clone(), "acme/adults", "1", vec![], &Limits::default())?;
+//! let same = Bundle::new(bundle.ruleset().clone(), id, revision);
 //! let comparison = bundle.compare(&same);
 //! assert_eq!(comparison.relation(), Relation::SameRulesSameEngine);
-//! assert_eq!(comparison.differences(), ["cases"]);
+//! assert_eq!(comparison.differences(), [Difference::Cases]);
 //! # Ok::<(), cleanrules::Error>(())
 //! ```
 
 use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::str::FromStr;
+use std::sync::OnceLock;
 
 use crate::digest::Digest;
 use crate::error::{Error, ErrorCode, Result};
@@ -117,25 +120,61 @@ pub struct EngineLimits {
     pub max_values: u64,
 }
 
-/// The names of the recorded limits, in the order of their table.
-pub(crate) const LIMIT_NAMES: [&str; 6] = [
-    "max_size",
-    "max_nesting",
-    "max_depth",
-    "max_path_segments",
-    "max_table_size",
-    "max_values",
-];
+/// One of the limits a bundle records, in the order of their table
+/// (`spec/bundles.md`, *Engine*).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
+pub enum EngineLimit {
+    /// `max_size`.
+    MaxSize,
+    /// `max_nesting`.
+    MaxNesting,
+    /// `max_depth`.
+    MaxDepth,
+    /// `max_path_segments`.
+    MaxPathSegments,
+    /// `max_table_size`.
+    MaxTableSize,
+    /// `max_values`.
+    MaxValues,
+}
 
-/// The differences of the limits, as `Comparison::differences` names them.
-const LIMIT_DIFFERENCES: [&str; 6] = [
-    "engine.limits.max_size",
-    "engine.limits.max_nesting",
-    "engine.limits.max_depth",
-    "engine.limits.max_path_segments",
-    "engine.limits.max_table_size",
-    "engine.limits.max_values",
-];
+impl EngineLimit {
+    /// Every recorded limit, in the order of their table.
+    pub const ALL: [EngineLimit; 6] = [
+        EngineLimit::MaxSize,
+        EngineLimit::MaxNesting,
+        EngineLimit::MaxDepth,
+        EngineLimit::MaxPathSegments,
+        EngineLimit::MaxTableSize,
+        EngineLimit::MaxValues,
+    ];
+
+    /// Its key in JSON, such as `max_depth`.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::MaxSize => "max_size",
+            Self::MaxNesting => "max_nesting",
+            Self::MaxDepth => "max_depth",
+            Self::MaxPathSegments => "max_path_segments",
+            Self::MaxTableSize => "max_table_size",
+            Self::MaxValues => "max_values",
+        }
+    }
+
+    /// The limit for a JSON key, exactly as the format writes it.
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|limit| limit.as_str() == name)
+    }
+}
+
+impl fmt::Display for EngineLimit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 impl EngineLimits {
     /// The limits to record from a reader's limits.
@@ -145,27 +184,51 @@ impl EngineLimits {
     /// `unsupported` for a limit of 0 or above [`MAX_RECORDED_LIMIT`], which a
     /// bundle cannot record.
     pub fn of(limits: &Limits) -> Result<Self> {
-        let recorded = |name: &str, limit: usize| {
-            u64::try_from(limit)
-                .ok()
-                .filter(|&n| (1..=MAX_RECORDED_LIMIT).contains(&n))
-                .ok_or_else(|| {
-                    Error::new(
-                        ErrorCode::Unsupported,
-                        format!("the limit {name} is {limit}, which a bundle does not record"),
-                    )
-                    .with_hint("a bundle records limits from 1 to 2^53 - 1")
-                    .unsupported("bundle", "limits of 0 or above 2^53 - 1 cannot be recorded")
-                })
+        let n = |limit: usize| u64::try_from(limit).unwrap_or(u64::MAX);
+        let recorded = Self {
+            max_size: n(limits.max_size),
+            max_nesting: n(limits.max_nesting),
+            max_depth: n(limits.max_depth),
+            max_path_segments: n(limits.max_path_segments),
+            max_table_size: n(limits.max_table_size),
+            max_values: n(limits.max_values),
         };
-        Ok(Self {
-            max_size: recorded("max_size", limits.max_size)?,
-            max_nesting: recorded("max_nesting", limits.max_nesting)?,
-            max_depth: recorded("max_depth", limits.max_depth)?,
-            max_path_segments: recorded("max_path_segments", limits.max_path_segments)?,
-            max_table_size: recorded("max_table_size", limits.max_table_size)?,
-            max_values: recorded("max_values", limits.max_values)?,
-        })
+        recorded.check()?;
+        Ok(recorded)
+    }
+
+    /// These limits with one of them set to `value`, unchecked.
+    #[must_use]
+    pub fn with(mut self, limit: EngineLimit, value: u64) -> Self {
+        *match limit {
+            EngineLimit::MaxSize => &mut self.max_size,
+            EngineLimit::MaxNesting => &mut self.max_nesting,
+            EngineLimit::MaxDepth => &mut self.max_depth,
+            EngineLimit::MaxPathSegments => &mut self.max_path_segments,
+            EngineLimit::MaxTableSize => &mut self.max_table_size,
+            EngineLimit::MaxValues => &mut self.max_values,
+        } = value;
+        self
+    }
+
+    /// Check that a bundle can record every limit.
+    ///
+    /// # Errors
+    ///
+    /// `unsupported` for the first limit of 0 or above [`MAX_RECORDED_LIMIT`].
+    pub fn check(&self) -> Result<()> {
+        match self
+            .iter()
+            .find(|&(_, n)| !(1..=MAX_RECORDED_LIMIT).contains(&n))
+        {
+            None => Ok(()),
+            Some((limit, n)) => Err(Error::new(
+                ErrorCode::Unsupported,
+                format!("the limit {limit} is {n}, which a bundle does not record"),
+            )
+            .with_hint("a bundle records limits from 1 to 2^53 - 1")
+            .unsupported("bundle", "limits of 0 or above 2^53 - 1 cannot be recorded")),
+        }
     }
 
     /// Reader limits with these values, the others at their defaults; a value
@@ -184,19 +247,38 @@ impl EngineLimits {
         }
     }
 
-    /// The values in the order of [`LIMIT_NAMES`].
-    pub(crate) fn values(&self) -> [u64; 6] {
-        [
-            self.max_size,
-            self.max_nesting,
-            self.max_depth,
-            self.max_path_segments,
-            self.max_table_size,
-            self.max_values,
-        ]
+    /// The value of one limit.
+    #[must_use]
+    pub fn get(&self, limit: EngineLimit) -> u64 {
+        match limit {
+            EngineLimit::MaxSize => self.max_size,
+            EngineLimit::MaxNesting => self.max_nesting,
+            EngineLimit::MaxDepth => self.max_depth,
+            EngineLimit::MaxPathSegments => self.max_path_segments,
+            EngineLimit::MaxTableSize => self.max_table_size,
+            EngineLimit::MaxValues => self.max_values,
+        }
     }
 
-    /// The limits from values in the order of [`LIMIT_NAMES`].
+    /// Each limit with its value, in the order of their table.
+    pub fn iter(&self) -> impl Iterator<Item = (EngineLimit, u64)> + '_ {
+        EngineLimit::ALL
+            .into_iter()
+            .map(|limit| (limit, self.get(limit)))
+    }
+
+    /// Their JSON form, an object with the six keys in the order of their
+    /// table.
+    #[must_use]
+    pub fn to_json(&self) -> Json {
+        Json::Object(
+            self.iter()
+                .map(|(limit, n)| (limit.as_str().to_owned(), int(n)))
+                .collect(),
+        )
+    }
+
+    /// The limits from values in the order of [`EngineLimit::ALL`].
     pub(crate) fn from_values(values: [u64; 6]) -> Self {
         let [
             max_size,
@@ -265,10 +347,9 @@ impl Engine {
     pub fn new(name: &str, version: &str, limits: EngineLimits) -> Result<Self> {
         check_engine_name(name)?;
         check_version(version)?;
-        if let Some(name) = LIMIT_NAMES
+        if let Some(name) = limits
             .iter()
-            .zip(limits.values())
-            .find_map(|(name, n)| (n == 0 || n > MAX_RECORDED_LIMIT).then_some(name))
+            .find_map(|(limit, n)| (n == 0 || n > MAX_RECORDED_LIMIT).then_some(limit))
         {
             return Err(Error::new(
                 ErrorCode::FormatError,
@@ -349,6 +430,23 @@ impl Contract {
     pub fn output_keys(&self) -> &[String] {
         &self.output_keys
     }
+
+    /// Its JSON form: `{"input": <schema>, "output": {"keys": [...]}}`.
+    #[must_use]
+    pub fn to_json(&self) -> Json {
+        let keys = self
+            .output_keys
+            .iter()
+            .map(|key| Json::String(key.clone()))
+            .collect();
+        Json::Object(vec![
+            ("input".into(), self.input.clone()),
+            (
+                "output".into(),
+                Json::Object(vec![("keys".into(), Json::Array(keys))]),
+            ),
+        ])
+    }
 }
 
 /// Contracts compare as JSON values: the members of the input schema in any
@@ -409,36 +507,151 @@ impl CaseFile {
     }
 }
 
+/// The stable identifier of a bundle's rules (`spec/bundles.md`, *Identifier
+/// and revision*): lowercase ASCII letters, digits, `.`, `_` and `-`, in
+/// segments separated by `/`, at most 128 characters, such as
+/// `acme/discounts`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct BundleId(String);
+
+impl BundleId {
+    /// The identifier `id`.
+    ///
+    /// # Errors
+    ///
+    /// `format_error` when it does not have its form.
+    pub fn new(id: &str) -> Result<Self> {
+        check_id(id)?;
+        Ok(Self(id.to_owned()))
+    }
+
+    /// The identifier as text.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// The revision of a bundle's rules (`spec/bundles.md`, *Identifier and
+/// revision*): ASCII letters, digits, `.`, `_`, `+` and `-`, starting with a
+/// letter or a digit, at most 128 characters, such as `3` or `2026-11-16.1`.
+/// Revisions are labels, without order.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct Revision(String);
+
+impl Revision {
+    /// The revision `revision`.
+    ///
+    /// # Errors
+    ///
+    /// `format_error` when it does not have its form.
+    pub fn new(revision: &str) -> Result<Self> {
+        check_revision(revision)?;
+        Ok(Self(revision.to_owned()))
+    }
+
+    /// The revision as text.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+macro_rules! text_newtype {
+    ($name:ident) => {
+        impl FromStr for $name {
+            type Err = Error;
+            fn from_str(text: &str) -> Result<Self> {
+                Self::new(text)
+            }
+        }
+
+        impl TryFrom<&str> for $name {
+            type Error = Error;
+            fn try_from(text: &str) -> Result<Self> {
+                Self::new(text)
+            }
+        }
+
+        impl fmt::Display for $name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(&self.0)
+            }
+        }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                &self.0
+            }
+        }
+
+        impl PartialEq<str> for $name {
+            fn eq(&self, other: &str) -> bool {
+                self.0 == other
+            }
+        }
+
+        impl PartialEq<&str> for $name {
+            fn eq(&self, other: &&str) -> bool {
+                self.0 == *other
+            }
+        }
+    };
+}
+
+text_newtype!(BundleId);
+text_newtype!(Revision);
+
 /// A bundle (`spec/bundles.md`).
+///
+/// Two bundles are equal exactly when their digests are (`spec/bundles.md`,
+/// *Digest of a bundle*): a bundle holds no code, so its digest is its
+/// identity. The digest is computed once, when first asked for, and never
+/// changes afterwards, so a bundle is a sound key of a `HashSet` or `HashMap`
+/// even though it holds caches (`clippy::mutable_key_type` warns about any
+/// type with interior mutability, such as the regexes of a rule set).
 #[derive(Clone, Debug)]
 pub struct Bundle {
-    id: String,
-    revision: String,
+    id: BundleId,
+    revision: Revision,
     rules: BundleRules,
     engine: Engine,
     contract: Contract,
     cases: Vec<CaseFile>,
+    digest: OnceLock<Digest>,
 }
 
 impl Bundle {
     /// Make a bundle of `rules` with this engine (`spec/bundles.md`, *Making a
-    /// bundle*): the identifier and revision its author gives, references to
-    /// its case files, and the limits it runs with, which the bundle records.
-    /// The rule set digest and the contract are derived from the rules.
+    /// bundle*), the identifier and revision its author gives, no case files
+    /// and the default limits. The rule set digest and the contract are
+    /// derived from the rules; [`with_cases`](Self::with_cases) and
+    /// [`with_limits`](Self::with_limits) give the rest.
+    pub fn new(rules: impl Into<BundleRules>, id: BundleId, revision: Revision) -> Self {
+        let rules = rules.into();
+        let contract = Contract::derive(rules.ruleset());
+        Self {
+            id,
+            revision,
+            rules,
+            engine: Engine {
+                name: ENGINE_NAME.to_owned(),
+                version: ENGINE_VERSION.to_owned(),
+                limits: EngineLimits::default(),
+            },
+            contract,
+            cases: Vec::new(),
+            digest: OnceLock::new(),
+        }
+    }
+
+    /// The bundle with these case files, in order, instead of its own.
     ///
     /// # Errors
     ///
-    /// `format_error` for an identifier, a revision or a repeated case path;
-    /// `unsupported` for a limit of 0 or above [`MAX_RECORDED_LIMIT`].
-    pub fn new(
-        rules: impl Into<BundleRules>,
-        id: &str,
-        revision: &str,
-        cases: Vec<CaseFile>,
-        limits: &Limits,
-    ) -> Result<Self> {
-        check_id(id)?;
-        check_revision(revision)?;
+    /// `format_error` for a path given twice.
+    pub fn with_cases(mut self, cases: impl IntoIterator<Item = CaseFile>) -> Result<Self> {
+        let cases: Vec<CaseFile> = cases.into_iter().collect();
         if let Some(repeated) = repeated_path(&cases) {
             return Err(Error::new(
                 ErrorCode::FormatError,
@@ -446,22 +659,38 @@ impl Bundle {
             )
             .with_hint("give each case file once"));
         }
-        let rules = rules.into();
-        let contract = Contract::derive(rules.ruleset());
-        Ok(Self {
-            id: id.to_owned(),
-            revision: revision.to_owned(),
-            rules,
-            engine: Engine::current(limits)?,
-            contract,
-            cases,
-        })
+        self.cases = cases;
+        self.digest = OnceLock::new();
+        Ok(self)
+    }
+
+    /// The bundle recording that it runs with `limits` (the six of
+    /// [`EngineLimits`]; the others change no result and are not recorded).
+    ///
+    /// # Errors
+    ///
+    /// `unsupported` for a limit of 0 or above [`MAX_RECORDED_LIMIT`].
+    pub fn with_limits(self, limits: &Limits) -> Result<Self> {
+        self.with_engine_limits(EngineLimits::of(limits)?)
+    }
+
+    /// The bundle recording that it runs with `limits`, given as the bundle
+    /// records them: the same on every platform, whatever its `usize`.
+    ///
+    /// # Errors
+    ///
+    /// `unsupported` for a limit of 0 or above [`MAX_RECORDED_LIMIT`].
+    pub fn with_engine_limits(mut self, limits: EngineLimits) -> Result<Self> {
+        limits.check()?;
+        self.engine.limits = limits;
+        self.digest = OnceLock::new();
+        Ok(self)
     }
 
     /// A bundle as read, checked by the reader.
     pub(crate) fn read(
-        id: String,
-        revision: String,
+        id: BundleId,
+        revision: Revision,
         rules: BundleRules,
         engine: Engine,
         contract: Contract,
@@ -474,18 +703,19 @@ impl Bundle {
             engine,
             contract,
             cases,
+            digest: OnceLock::new(),
         }
     }
 
     /// The stable identifier of the rules.
     #[must_use]
-    pub fn id(&self) -> &str {
+    pub fn id(&self) -> &BundleId {
         &self.id
     }
 
     /// The revision of the rules.
     #[must_use]
-    pub fn revision(&self) -> &str {
+    pub fn revision(&self) -> &Revision {
         &self.revision
     }
 
@@ -540,7 +770,9 @@ impl Bundle {
     /// a bundle*).
     #[must_use]
     pub fn digest(&self) -> Digest {
-        Digest::of(&self.canonical_bytes())
+        *self
+            .digest
+            .get_or_init(|| Digest::of(&self.canonical_bytes()))
     }
 
     /// The canonical bytes of its document.
@@ -559,6 +791,20 @@ impl Bundle {
     #[must_use]
     pub fn into_document(self) -> Document {
         Document::Bundle(Box::new(self))
+    }
+}
+
+impl PartialEq for Bundle {
+    fn eq(&self, other: &Self) -> bool {
+        self.digest() == other.digest()
+    }
+}
+
+impl Eq for Bundle {}
+
+impl Hash for Bundle {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.digest().hash(state);
     }
 }
 
@@ -599,11 +845,100 @@ impl fmt::Display for Relation {
     }
 }
 
+/// A part that differs between two bundles (`spec/bundles.md`, *Comparing
+/// bundles*), in the order of the specification, which `Ord` follows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
+pub enum Difference {
+    /// `id`.
+    Id,
+    /// `revision`.
+    Revision,
+    /// `rules`: the rule set digests differ.
+    Rules,
+    /// `source`: the rule set digests are equal, but the documents that give
+    /// them differ.
+    Source,
+    /// `engine.name`.
+    EngineName,
+    /// `engine.version`.
+    EngineVersion,
+    /// `engine.limits.<key>`.
+    EngineLimit(EngineLimit),
+    /// `contract.input`.
+    ContractInput,
+    /// `contract.output`.
+    ContractOutput,
+    /// `cases`: the items differ, or their order.
+    Cases,
+}
+
+impl Difference {
+    /// Its name in JSON, such as `engine.limits.max_depth`.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Id => "id",
+            Self::Revision => "revision",
+            Self::Rules => "rules",
+            Self::Source => "source",
+            Self::EngineName => "engine.name",
+            Self::EngineVersion => "engine.version",
+            Self::EngineLimit(limit) => match limit {
+                EngineLimit::MaxSize => "engine.limits.max_size",
+                EngineLimit::MaxNesting => "engine.limits.max_nesting",
+                EngineLimit::MaxDepth => "engine.limits.max_depth",
+                EngineLimit::MaxPathSegments => "engine.limits.max_path_segments",
+                EngineLimit::MaxTableSize => "engine.limits.max_table_size",
+                EngineLimit::MaxValues => "engine.limits.max_values",
+            },
+            Self::ContractInput => "contract.input",
+            Self::ContractOutput => "contract.output",
+            Self::Cases => "cases",
+        }
+    }
+
+    /// The difference for a name, exactly as the format writes it.
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        [
+            Self::Id,
+            Self::Revision,
+            Self::Rules,
+            Self::Source,
+            Self::EngineName,
+            Self::EngineVersion,
+        ]
+        .into_iter()
+        .chain(EngineLimit::ALL.map(Self::EngineLimit))
+        .chain([Self::ContractInput, Self::ContractOutput, Self::Cases])
+        .find(|difference| difference.as_str() == name)
+    }
+}
+
+impl fmt::Display for Difference {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl PartialEq<str> for Difference {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<&str> for Difference {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
 /// The comparison of two bundles (`spec/bundles.md`, *Comparing bundles*).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Comparison {
     relation: Relation,
-    differences: Vec<&'static str>,
+    differences: Vec<Difference>,
 }
 
 impl Comparison {
@@ -621,9 +956,9 @@ impl Comparison {
 
     /// What differs, in the order of the specification: `id`, `revision`,
     /// `rules`, `source`, `engine.name`, `engine.version`,
-    /// `engine.limits.<name>`, `contract.input`, `contract.output`, `cases`.
+    /// `engine.limits.<key>`, `contract.input`, `contract.output`, `cases`.
     #[must_use]
-    pub fn differences(&self) -> &[&'static str] {
+    pub fn differences(&self) -> &[Difference] {
         &self.differences
     }
 
@@ -641,7 +976,7 @@ impl Comparison {
                 Json::Array(
                     self.differences
                         .iter()
-                        .map(|d| Json::String((*d).into()))
+                        .map(|d| Json::String(d.as_str().into()))
                         .collect(),
                 ),
             ),
@@ -652,39 +987,38 @@ impl Comparison {
 fn compare(a: &Bundle, b: &Bundle) -> Comparison {
     let same_rules = a.ruleset_digest() == b.ruleset_digest();
     let mut differences = Vec::new();
-    let mut differ = |different: bool, name: &'static str| {
+    let mut differ = |different: bool, difference: Difference| {
         if different {
-            differences.push(name);
+            differences.push(difference);
         }
     };
-    differ(a.id != b.id, "id");
-    differ(a.revision != b.revision, "revision");
-    differ(!same_rules, "rules");
+    differ(a.id != b.id, Difference::Id);
+    differ(a.revision != b.revision, Difference::Revision);
+    differ(!same_rules, Difference::Rules);
     differ(
         same_rules && a.rules.source_digest() != b.rules.source_digest(),
-        "source",
+        Difference::Source,
     );
-    differ(a.engine.name != b.engine.name, "engine.name");
-    differ(a.engine.version != b.engine.version, "engine.version");
-    for ((x, y), name) in a
-        .engine
-        .limits
-        .values()
-        .into_iter()
-        .zip(b.engine.limits.values())
-        .zip(LIMIT_DIFFERENCES)
-    {
-        differ(x != y, name);
+    differ(a.engine.name != b.engine.name, Difference::EngineName);
+    differ(
+        a.engine.version != b.engine.version,
+        Difference::EngineVersion,
+    );
+    for limit in EngineLimit::ALL {
+        differ(
+            a.engine.limits.get(limit) != b.engine.limits.get(limit),
+            Difference::EngineLimit(limit),
+        );
     }
     differ(
         !same(&a.contract.input, &b.contract.input),
-        "contract.input",
+        Difference::ContractInput,
     );
     differ(
         a.contract.output_keys != b.contract.output_keys,
-        "contract.output",
+        Difference::ContractOutput,
     );
-    differ(a.cases != b.cases, "cases");
+    differ(a.cases != b.cases, Difference::Cases);
     let same_engine = a.engine == b.engine;
     let relation = if a.id == b.id && a.revision == b.revision && !same_rules {
         Relation::Conflict
@@ -726,11 +1060,7 @@ fn is_name_segment(segment: &str) -> bool {
 }
 
 /// Check a bundle's identifier (`spec/bundles.md`, *Identifier and revision*).
-///
-/// # Errors
-///
-/// `format_error` when it does not have its form.
-pub fn check_id(id: &str) -> Result<()> {
+fn check_id(id: &str) -> Result<()> {
     if id.len() <= MAX_NAME && id.split('/').all(is_name_segment) {
         Ok(())
     } else {
@@ -743,11 +1073,7 @@ pub fn check_id(id: &str) -> Result<()> {
 }
 
 /// Check a bundle's revision (`spec/bundles.md`, *Identifier and revision*).
-///
-/// # Errors
-///
-/// `format_error` when it does not have its form.
-pub fn check_revision(revision: &str) -> Result<()> {
+fn check_revision(revision: &str) -> Result<()> {
     let mut chars = revision.chars();
     if revision.len() <= MAX_NAME
         && chars.next().is_some_and(|c| c.is_ascii_alphanumeric())
@@ -843,6 +1169,10 @@ pub(crate) fn check_case_path(path: &str) -> Result<()> {
     check_path(path)
 }
 
+fn int(n: u64) -> Json {
+    Json::Number(crate::json::JsonNumber::from_literal(n.to_string()))
+}
+
 /// The first path given twice.
 fn repeated_path(cases: &[CaseFile]) -> Option<&str> {
     let mut seen = std::collections::BTreeSet::new();
@@ -857,6 +1187,19 @@ mod tests {
     use super::*;
     use crate::build::{constant, field};
     use crate::rules::{Config, Rule};
+
+    /// A bundle, as `Bundle::new` and its builders make it.
+    pub(super) fn make(
+        rules: impl Into<BundleRules>,
+        id: &str,
+        revision: &str,
+        cases: Vec<CaseFile>,
+        limits: &Limits,
+    ) -> Result<Bundle> {
+        Bundle::new(rules, BundleId::new(id)?, Revision::new(revision)?)
+            .with_cases(cases)?
+            .with_limits(limits)
+    }
 
     fn rules(threshold: i64) -> RuleSet {
         let rule = Rule::new(
@@ -958,9 +1301,14 @@ mod tests {
 
     #[test]
     fn a_bundle_records_its_engine_and_contract() {
-        let bundle = Bundle::new(rules(5), "acme/vip", "1", vec![], &Limits::default()).unwrap();
+        let bundle = make(rules(5), "acme/vip", "1", vec![], &Limits::default()).unwrap();
         assert_eq!(bundle.id(), "acme/vip");
-        assert_eq!(bundle.revision(), "1");
+        assert_eq!(bundle.revision().as_str(), "1");
+        assert_eq!(bundle.id().to_string(), "acme/vip");
+        assert_eq!("acme/vip".parse::<BundleId>().unwrap(), *bundle.id());
+        assert_eq!(Revision::try_from("1").unwrap().as_ref(), "1");
+        assert!(BundleId::new("Acme").is_err());
+        assert!("-1".parse::<Revision>().is_err());
         assert!(bundle.engine().is_current());
         assert_eq!(bundle.engine().name(), ENGINE_NAME);
         assert_eq!(bundle.engine().limits(), &EngineLimits::default());
@@ -976,36 +1324,45 @@ mod tests {
 
     #[test]
     fn making_checks_what_the_author_gives() {
-        let make = |id: &str, revision: &str, cases: Vec<CaseFile>| {
-            Bundle::new(rules(5), id, revision, cases, &Limits::default())
+        let made = |id: &str, revision: &str, cases: Vec<CaseFile>| {
+            make(rules(5), id, revision, cases, &Limits::default())
         };
-        assert!(make("Bad", "1", vec![]).is_err());
-        assert!(make("ok", " ", vec![]).is_err());
+        assert!(made("Bad", "1", vec![]).is_err());
+        assert!(made("ok", " ", vec![]).is_err());
         let case = CaseFile::new("a.json", b"x").unwrap();
-        let error = make("ok", "1", vec![case.clone(), case]).unwrap_err();
+        let error = made("ok", "1", vec![case.clone(), case]).unwrap_err();
         assert_eq!(error.code(), ErrorCode::FormatError);
         assert!(CaseFile::new("../a", b"x").is_err());
         let mut limits = Limits {
             max_values: usize::MAX,
             ..Limits::default()
         };
-        let error = Bundle::new(rules(5), "ok", "1", vec![], &limits).unwrap_err();
+        let error = make(rules(5), "ok", "1", vec![], &limits).unwrap_err();
         assert_eq!(error.code(), ErrorCode::Unsupported);
         limits.max_values = 0;
-        let error = Bundle::new(rules(5), "ok", "1", vec![], &limits).unwrap_err();
+        let error = make(rules(5), "ok", "1", vec![], &limits).unwrap_err();
         assert_eq!(error.code(), ErrorCode::Unsupported);
         limits.max_values = 7;
-        let bundle = Bundle::new(rules(5), "ok", "1", vec![], &limits).unwrap();
+        let bundle = make(rules(5), "ok", "1", vec![], &limits).unwrap();
         assert_eq!(bundle.engine().limits().max_values, 7);
         assert_eq!(bundle.engine().limits().to_limits().max_values, 7);
+        let wide = EngineLimits::default().with(EngineLimit::MaxValues, MAX_RECORDED_LIMIT);
+        let bundle = bundle.with_engine_limits(wide).unwrap();
+        assert_eq!(bundle.engine().limits().max_values, MAX_RECORDED_LIMIT);
+        let beyond = wide.with(EngineLimit::MaxDepth, MAX_RECORDED_LIMIT + 1);
+        let error = bundle.clone().with_engine_limits(beyond).unwrap_err();
+        assert_eq!(error.code(), ErrorCode::Unsupported);
+        assert!(
+            error.to_string().contains("max_depth is 9007199254740992"),
+            "{error}"
+        );
     }
 
     #[test]
     fn case_files_match_their_bytes() {
         let case = CaseFile::new("cases/a.json", b"[1]").unwrap();
         assert!(case.matches(b"[1]"));
-        let bundle =
-            Bundle::new(rules(5), "r", "1", vec![case.clone()], &Limits::default()).unwrap();
+        let bundle = make(rules(5), "r", "1", vec![case.clone()], &Limits::default()).unwrap();
         assert_eq!(bundle.case_matches("cases/a.json", b"[1]"), Some(true));
         assert_eq!(bundle.case_matches("cases/a.json", b"[2]"), Some(false));
         assert_eq!(bundle.case_matches("cases/b.json", b"[1]"), None);
@@ -1041,17 +1398,19 @@ mod tests {
     #[test]
     fn comparisons_tell_the_two_questions_apart() {
         let limits = Limits::default();
-        let a = Bundle::new(rules(5), "r", "1", vec![], &limits).unwrap();
+        let a = make(rules(5), "r", "1", vec![], &limits).unwrap();
         let other_engine = Bundle {
             engine: Engine::new(ENGINE_NAME, "99.0.0", EngineLimits::default()).unwrap(),
+            digest: OnceLock::new(),
             ..a.clone()
         };
-        let other_rules = Bundle::new(rules(6), "r", "2", vec![], &limits).unwrap();
+        let other_rules = make(rules(6), "r", "2", vec![], &limits).unwrap();
         let both = Bundle {
             engine: other_engine.engine.clone(),
+            digest: OnceLock::new(),
             ..other_rules.clone()
         };
-        let conflict = Bundle::new(rules(6), "r", "1", vec![], &limits).unwrap();
+        let conflict = make(rules(6), "r", "1", vec![], &limits).unwrap();
 
         let same = a.compare(&a);
         assert_eq!(same.relation(), Relation::SameRulesSameEngine);
@@ -1072,7 +1431,7 @@ mod tests {
 
         let mut tighter = limits;
         tighter.max_values = 10;
-        let configured = Bundle::new(rules(5), "r", "1", vec![], &tighter).unwrap();
+        let configured = make(rules(5), "r", "1", vec![], &tighter).unwrap();
         let comparison = a.compare(&configured);
         assert_eq!(comparison.relation(), Relation::SameRulesOtherEngine);
         assert_eq!(comparison.differences(), ["engine.limits.max_values"]);
@@ -1081,6 +1440,82 @@ mod tests {
             r#"{"relation":"same_rules_other_engine","identical":false,"differences":["engine.limits.max_values"]}"#
         );
         assert_eq!(Relation::Conflict.to_string(), "conflict");
+        assert_eq!(
+            comparison.differences(),
+            [Difference::EngineLimit(EngineLimit::MaxValues)]
+        );
+    }
+
+    #[test]
+    fn differences_and_limits_have_names() {
+        let mut all = vec![
+            Difference::Id,
+            Difference::Revision,
+            Difference::Rules,
+            Difference::Source,
+            Difference::EngineName,
+            Difference::EngineVersion,
+        ];
+        all.extend(EngineLimit::ALL.map(Difference::EngineLimit));
+        all.extend([
+            Difference::ContractInput,
+            Difference::ContractOutput,
+            Difference::Cases,
+        ]);
+        let mut sorted = all.clone();
+        sorted.sort();
+        assert_eq!(sorted, all, "Ord is the order of the specification");
+        for difference in all {
+            assert_eq!(Difference::from_name(difference.as_str()), Some(difference));
+            assert_eq!(difference.to_string(), difference.as_str());
+        }
+        assert_eq!(Difference::from_name("engine.limits"), None);
+        for limit in EngineLimit::ALL {
+            assert_eq!(EngineLimit::from_name(&limit.to_string()), Some(limit));
+        }
+        assert_eq!(EngineLimit::from_name("max_text_size"), None);
+        let limits = EngineLimits::default();
+        assert_eq!(limits.get(EngineLimit::MaxDepth), limits.max_depth);
+        assert_eq!(
+            crate::json::to_string(&limits.to_json()),
+            format!(
+                r#"{{"max_size":{},"max_nesting":{},"max_depth":{},"max_path_segments":{},"max_table_size":{},"max_values":{}}}"#,
+                limits.max_size,
+                limits.max_nesting,
+                limits.max_depth,
+                limits.max_path_segments,
+                limits.max_table_size,
+                limits.max_values
+            )
+        );
+    }
+
+    #[test]
+    // A bundle hashes by its digest, which never changes once computed; the
+    // lint sees the caches inside (`OnceLock`, the regexes of a rule set).
+    #[allow(clippy::mutable_key_type)]
+    fn bundles_are_equal_by_digest() {
+        use std::collections::HashSet;
+        let limits = Limits::default();
+        let a = make(rules(5), "r", "1", vec![], &limits).unwrap();
+        let again = make(rules(5), "r", "1", vec![], &limits).unwrap();
+        let other = make(rules(5), "r", "2", vec![], &limits).unwrap();
+        assert_eq!(a, again);
+        assert_ne!(a, other);
+        let set: HashSet<Bundle> = [a.clone(), again, other].into_iter().collect();
+        assert_eq!(set.len(), 2);
+        // The cached digest follows the builders.
+        let digest = a.digest();
+        let with_case = a
+            .with_cases([CaseFile::new("a.json", b"x").unwrap()])
+            .unwrap();
+        assert_ne!(with_case.digest(), digest);
+        let tighter = Limits {
+            max_values: 9,
+            ..limits
+        };
+        let digest = with_case.digest();
+        assert_ne!(with_case.with_limits(&tighter).unwrap().digest(), digest);
     }
 }
 
@@ -1098,7 +1533,7 @@ mod document_tests {
         else {
             panic!("a table")
         };
-        Bundle::new(table, "t", "1", vec![], &Limits::default()).unwrap()
+        super::tests::make(table, "t", "1", vec![], &Limits::default()).unwrap()
     }
 
     #[test]
@@ -1138,7 +1573,7 @@ mod document_tests {
             )
             .is_ok()
         );
-        let of_rules = Bundle::new(ruleset.clone(), "r", "1", vec![], &limits).unwrap();
+        let of_rules = super::tests::make(ruleset.clone(), "r", "1", vec![], &limits).unwrap();
         assert_eq!(
             draw_document(
                 &of_rules.into_document(),
@@ -1155,7 +1590,7 @@ mod document_tests {
             )
             .unwrap()
         );
-        let of_rules = Bundle::new(ruleset.clone(), "r", "1", vec![], &limits).unwrap();
+        let of_rules = super::tests::make(ruleset.clone(), "r", "1", vec![], &limits).unwrap();
         let error = draw_document(
             &of_rules.into_document(),
             Some(&decision),

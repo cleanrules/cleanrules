@@ -141,7 +141,8 @@ cleanrules.digest(table.ruleset)  # a decision table's rule set digest
 A digest does not say that two rule sets decide alike: `x > 5` and `5 < x`, or
 the decimals `1.0` and `1.00`, give different digests. A decision document
 that carries `ruleset_digest` is checked against it by `read_decision` and
-keeps it; `decision.to_dict(ruleset_digest=True)` writes one, so that a log of
+keeps it; `cleanrules.dumps(decision, ruleset_digest=True)` (or
+`decision.to_dict(ruleset_digest=True)`) writes one, so that a log of
 decisions names the exact rules that made them (it is read back with
 `rules.read_decision`, not `loads`, since a decision is read with its rule
 set). Actions given as code are not
@@ -175,7 +176,8 @@ bundle.contract["output"]  # {'keys': ['discount']}
 old = cleanrules.load("discounts-1.bundle.json")
 comparison = old.compare(bundle)
 comparison.relation  # e.g. 'other_rules_same_engine': the rules changed
-comparison.differences  # e.g. ('revision', 'rules')
+comparison.differences  # e.g. (BundleDifference.REVISION, BundleDifference.RULES)
+bundle.engine.limits.max_depth  # 256
 bundle.case_matches("cases/discounts.json", Path("cases/discounts.json").read_bytes())
 ```
 

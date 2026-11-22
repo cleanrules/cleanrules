@@ -15,6 +15,7 @@ import { trees } from './trees.js'
 /** The names of the API of a build, as each entry point exports them. */
 export const NAMES = Object.freeze([
   'Bundle',
+  'CaseFile',
   'Const',
   'Decision',
   'DecisionTable',
@@ -57,11 +58,12 @@ export function api(native, build) {
     const { Const, Expr, F, Field, and, constant, field, not, or } = built
     const { Decision, Rule, RuleSet } = ruleApi
     const { DecisionTable } = tableApi
-    const { Bundle } = bundleApi
+    const { Bundle, CaseFile } = bundleApi
     const { evaluateTree, evaluateValueTree } = treeApi
     const { canonicalBytes, digest, dump, dumps, load, loads, ruleFromText } = documentApi
     found = Object.freeze({
       Bundle,
+      CaseFile,
       Const,
       Decision,
       DecisionTable,

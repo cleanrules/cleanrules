@@ -24,6 +24,7 @@ Website: <https://cleanrules.github.io>
 | [`conformance/`](conformance/) | 2,000+ language-neutral test vectors that every implementation must pass, and their checker |
 | [`crates/core/`](crates/core/) | The Rust core (crate `cleanrules`) |
 | [`benchmarks/`](benchmarks/) | Benchmark suites, results, and the comparison with zen-engine |
+| [`docs/migration-1.0.md`](docs/migration-1.0.md) | Migrating rule files and code from the draft to the 1.0 contract |
 | [`docs/PLAN.md`](docs/PLAN.md) | The roadmap and its decisions (in Spanish) |
 
 A rule as the engine reads it, in the JSON format:

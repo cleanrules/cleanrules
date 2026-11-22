@@ -5,7 +5,7 @@
 
 use std::ffi::c_char;
 
-use cleanrules::bundle::{Bundle, BundleRules, CaseFile};
+use cleanrules::bundle::{Bundle, BundleId, BundleRules, CaseFile, Revision};
 use cleanrules::format::Document;
 
 use crate::boundary::{
@@ -16,26 +16,30 @@ use crate::document::{cr_document, not_holding};
 use crate::error::cr_error;
 use crate::limits::cr_limits;
 
-/// A file of test cases given to `cr_bundle_new`: its path, relative to the
-/// bundle's directory, as UTF-8 bytes, and the file's content. The library
-/// keeps the path and the SHA-256 digest of the content, never the pointers.
+/// A file of test cases given to `cr_document_new_bundle`: its path, relative
+/// to the bundle's directory, as UTF-8 bytes, and the file's content. The
+/// library keeps the path and the SHA-256 digest of the content, never the
+/// pointers.
 #[repr(C)]
-pub struct cr_case_file {
-    /// The path: `len` bytes of UTF-8, such as `cases/basic.json`.
+pub struct cr_case_input {
+    /// The path: `path_len` bytes of UTF-8, such as `cases/basic.json`.
     pub path: *const c_char,
     /// The length of `path` in bytes.
     pub path_len: usize,
-    /// The file's bytes, any content.
+    /// The file's content, any bytes.
     pub bytes: *const u8,
-    /// The number of bytes.
-    pub len: usize,
+    /// The length of `bytes`.
+    pub bytes_len: usize,
 }
 
 /// Make a bundle of the rules `rules` holds, a `CR_DOCUMENT_RULESET` or
 /// `CR_DOCUMENT_DECISION_TABLE` document, with this engine
 /// (`spec/bundles.md`, *Making a bundle*): the identifier and revision its
 /// author gives, its `case_count` case files in order, and `limits` (the
-/// defaults for `NULL`), which it records. The bundle is a new
+/// defaults for `NULL`), of which it records the six that can change a result
+/// (`max_size`, `max_nesting`, `max_depth`, `max_path_segments`,
+/// `max_table_size` and `max_values`; the YAML, text and diagram limits are
+/// ignored). The bundle is a new
 /// `CR_DOCUMENT_BUNDLE` document. An identifier, revision or path that does
 /// not have its form, or a path given twice, is a `CR_FORMAT_ERROR`; a limit
 /// of 0 or above 2^53 - 1 is `CR_UNSUPPORTED`; a document of another kind is
@@ -45,20 +49,20 @@ pub struct cr_case_file {
 ///
 /// `rules` is `NULL` or a live `cr_document`; `id` and `revision` are `NULL`
 /// or point to `id_len` and `revision_len` readable bytes; `cases` is `NULL`
-/// with a `case_count` of 0, or points to `case_count` readable `cr_case_file`
-/// whose `path` and `bytes` are `NULL` or point to `path_len` and `len`
+/// with a `case_count` of 0, or points to `case_count` readable `cr_case_input`
+/// whose `path` and `bytes` are `NULL` or point to `path_len` and `bytes_len`
 /// readable bytes; `limits` is `NULL` or a live `cr_limits`; `out` is `NULL`
 /// or points to a writable `cr_document *`; `error` is `NULL` or points to a
 /// writable `cr_error *` set to `NULL`.
 #[unsafe(no_mangle)]
 #[allow(clippy::too_many_arguments)] // C has no structs of arguments here.
-pub unsafe extern "C" fn cr_bundle_new(
+pub unsafe extern "C" fn cr_document_new_bundle(
     rules: *const cr_document,
     id: *const c_char,
     id_len: usize,
     revision: *const c_char,
     revision_len: usize,
-    cases: *const cr_case_file,
+    cases: *const cr_case_input,
     case_count: usize,
     limits: *const cr_limits,
     out: *mut *mut cr_document,
@@ -84,7 +88,9 @@ pub unsafe extern "C" fn cr_bundle_new(
         let cases = unsafe { case_files(cases, case_count) }?;
         // SAFETY: `limits` is NULL or live (# Safety).
         let limits = unsafe { limits_of(limits) };
-        let bundle = Bundle::new(rules, id, revision, cases, &limits)?;
+        let bundle = Bundle::new(rules, BundleId::new(id)?, Revision::new(revision)?)
+            .with_cases(cases)?
+            .with_limits(&limits)?;
         // SAFETY: `out` passed `clear`.
         unsafe {
             give(
@@ -100,12 +106,12 @@ pub unsafe extern "C" fn cr_bundle_new(
     unsafe { call(error, body) }
 }
 
-/// The case files of `cr_bundle_new`, in order.
+/// The case files of `cr_document_new_bundle`, in order.
 ///
 /// # Safety
 ///
-/// As `cr_bundle_new`'s `cases` and `case_count`.
-unsafe fn case_files(cases: *const cr_case_file, count: usize) -> Outcome<Vec<CaseFile>> {
+/// As `cr_document_new_bundle`'s `cases` and `case_count`.
+unsafe fn case_files(cases: *const cr_case_input, count: usize) -> Outcome<Vec<CaseFile>> {
     if count == 0 {
         return Ok(Vec::new());
     }
@@ -125,8 +131,9 @@ unsafe fn case_files(cases: *const cr_case_file, count: usize) -> Outcome<Vec<Ca
                 unsafe { bytes(item.path, item.path_len, "a case path") }?,
                 "a case path",
             )?;
-            // SAFETY: each item's `bytes` and `len` (# Safety).
-            let content = unsafe { bytes(item.bytes.cast(), item.len, "a case file's bytes") }?;
+            // SAFETY: each item's `bytes` and `bytes_len` (# Safety).
+            let content =
+                unsafe { bytes(item.bytes.cast(), item.bytes_len, "a case file's bytes") }?;
             Ok(CaseFile::new(path, content)?)
         })
         .collect()
@@ -144,7 +151,7 @@ unsafe fn case_files(cases: *const cr_case_file, count: usize) -> Outcome<Vec<Ca
 /// a writable `char *`; `len` is `NULL` or points to a writable `size_t`;
 /// `error` is `NULL` or points to a writable `cr_error *` set to `NULL`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cr_bundle_compare(
+pub unsafe extern "C" fn cr_document_compare_bundle(
     a: *const cr_document,
     b: *const cr_document,
     out: *mut *mut c_char,

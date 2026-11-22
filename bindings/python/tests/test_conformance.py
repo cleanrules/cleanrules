@@ -505,7 +505,7 @@ def check_bundle(bundle: cleanrules.Bundle, document: dict[str, Any]) -> None:
     engine = bundle.engine
     assert engine.name == content["engine"]["name"]
     assert engine.version == content["engine"]["version"]
-    assert dict(engine.limits) == content["engine"]["limits"]
+    assert engine.limits.to_dict() == content["engine"]["limits"]
     assert engine.is_current == (
         engine.name == "cleanrules" and engine.version == cleanrules.__version__
     )

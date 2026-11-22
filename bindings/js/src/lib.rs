@@ -45,16 +45,16 @@ pub use napi::build::{
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use napi::classes::{
-    ActionCall, Aggregate, BundleCaseInput, Decision, Document, DocumentKind, Format, HitPolicy,
-    Limits, Node, ReadOptions, RuleSet, TreeOptions, Truth, ValueTreeOptions,
+    ActionCall, Aggregate, BundleCaseInput, Decision, DecisionWriteOptions, Document, DocumentKind,
+    Format, HitPolicy, Limits, Node, ReadOptions, RuleSet, TreeOptions, Truth, ValueTreeOptions,
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use napi::documents::{
     NativeGrid, NativeTable, NativeTree, bundle_case_matches, bundle_data, bundle_of_ruleset,
     bundle_of_table, bundle_ruleset, bundle_table, canonical_condition, canonical_rule,
-    digest_condition, digest_rule, document_condition, document_rule, document_table,
-    file_size_check, grid_new, node_tree, rule_nodes, rule_parts, rule_set_rules, rule_text,
-    rule_tree, stringifiable, write_condition, write_rule,
+    case_file_matches, check_case_file, digest_condition, digest_rule, document_condition,
+    document_rule, document_table, file_size_check, grid_new, node_tree, rule_nodes, rule_parts,
+    rule_set_rules, rule_text, rule_tree, stringifiable, write_condition, write_rule,
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use napi::hooks::set_hooks;
@@ -74,9 +74,9 @@ pub use wasm::classes::{Decision, Document, Node, RuleSet};
 pub use wasm::documents::{
     NativeGrid, NativeTable, NativeTree, bundle_case_matches, bundle_data, bundle_of_ruleset,
     bundle_of_table, bundle_ruleset, bundle_table, canonical_condition, canonical_rule,
-    digest_condition, digest_rule, document_condition, document_rule, document_table,
-    file_size_check, grid_new, node_tree, rule_nodes, rule_parts, rule_set_rules, rule_text,
-    rule_tree, stringifiable, write_condition, write_rule,
+    case_file_matches, check_case_file, digest_condition, digest_rule, document_condition,
+    document_rule, document_table, file_size_check, grid_new, node_tree, rule_nodes, rule_parts,
+    rule_set_rules, rule_text, rule_tree, stringifiable, write_condition, write_rule,
 };
 #[cfg(target_arch = "wasm32")]
 pub use wasm::{decimal_problem, format_version, not_a_document, set_hooks, version};
