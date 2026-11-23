@@ -55,6 +55,7 @@ export const SKIPS = {
   cases:
     'case files (spec/tests.md) have no type in the idiomatic API yet: loads refuses them, so their vectors run through cleanrules/native (the JSON route), and those whose file does not read run in both',
   audit: 'the static audit (spec/audit.md) is made by the core and checked by its runner; the JavaScript API audits from task T.9',
+  test_run: 'test runs (spec/tests.md, Running cases) are made by the core and checked by its runner; the JavaScript API runs cases from task T.9b',
 }
 
 /**
@@ -1441,6 +1442,7 @@ not
     current = `${route}:${vector.get('id')}`
     if (vector.get('given').get('kind') === 'tool') return { skip: 'agents' }
     if (vector.get('given').get('kind') === 'audit') return { skip: 'audit' }
+    if (vector.get('given').get('kind') === 'test_run') return { skip: 'test_run' }
     const logic = vector.get('given').get('logic')
     if (logic !== undefined && logic !== 'boolean') return { skip: 'graded' }
     try {

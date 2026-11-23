@@ -1233,6 +1233,9 @@ int main(int argc, char **argv) {
     // The static audit (spec/audit.md) is the core's: cleanrules.hpp, a beta
     // binding, does not audit yet (docs/PLAN.md, T.7).
     std::size_t audits = 0;
+    // Nor does it run test cases (spec/tests.md, Running cases; docs/PLAN.md,
+    // T.3).
+    std::size_t test_runs = 0;
     std::size_t skipped_draw = 0;
     std::size_t graded = 0;
     // cleanrules.hpp has no bundles yet (a beta binding, docs/PLAN.md, R.5):
@@ -1275,6 +1278,10 @@ int main(int argc, char **argv) {
                     ++audits;
                     continue;
                 }
+                if (need(given, "kind").text == "test_run") {
+                    ++test_runs;
+                    continue;
+                }
                 if (need(given, "kind").text == "bundle" ||
                     need(given, "kind").text == "bundle_compare") {
                     ++bundles;
@@ -1315,13 +1322,13 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "%s\n", failed.c_str());
     }
     std::printf("conformance: %zu vectors; json %zu of %zu passed, native %zu of %zu passed; %zu "
-                "native-only, %zu tool vectors (agents, not in C++ yet), %zu audits (not in C++ "
-                "yet), %zu diagrams "
+                "native-only, %zu tool vectors (agents, not in C++ yet), %zu audits and %zu test "
+                "runs (not in C++ yet), %zu diagrams "
                 "(spec/visual.md: checked through the C ABI until cleanrules.hpp draws them),"
                 " %zu under a graded logic (task J.1b) and %zu that make or compare bundles (not in "
                 "C++ yet) skipped\n",
-                ran, passed_json, ran, passed_native, ran_native, skipped, tools, audits, skipped_draw,
-                graded, bundles);
+                ran, passed_json, ran, passed_native, ran_native, skipped, tools, audits, test_runs,
+                skipped_draw, graded, bundles);
     if (!failures.empty()) {
         std::fprintf(stderr, "conformance: %zu failures\n", failures.size());
         return EXIT_FAILURE;

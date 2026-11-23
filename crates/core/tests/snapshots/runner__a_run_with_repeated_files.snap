@@ -1,0 +1,12 @@
+---
+source: crates/core/tests/runner.rs
+expression: run.to_string()
+---
+Test run of a rule set: 1 rule, hit policy first, logic boolean
+ERROR   a.json
+          format_error: the case file a.json is given twice in the run
+          hint: give each case file once, each with its own path: a case is its path and its id
+ERROR   (a case file without a path)
+          format_error: two case files without a path are given in the run
+          hint: give each case file once, each with its own path: a case is its path and its id
+5 results: 3 passed, 0 failed, 2 errors

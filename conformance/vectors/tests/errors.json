@@ -1,0 +1,563 @@
+{
+  "version": 1,
+  "area": "tests",
+  "vectors": [
+    {
+      "id": "tests/errors/unexpected",
+      "spec": [
+        "tests.md#matching",
+        "tests.md#running-cases",
+        "tests.md#test-runs"
+      ],
+      "description": "evaluation raised an error the case does not expect: the result is error, with the error, and the run goes on",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "strict": true
+          }
+        },
+        "cases": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "missing",
+                "input": {},
+                "expect": {
+                  "selected": []
+                }
+              },
+              {
+                "id": "next",
+                "input": {
+                  "x": 2
+                },
+                "expect": {
+                  "selected": [
+                    "a"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "strict": true,
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {}
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 2,
+            "passed": 1,
+            "failed": 0,
+            "error": 1,
+            "partial": false
+          },
+          "results": [
+            {
+              "id": "missing",
+              "status": "error",
+              "error": {
+                "code": "missing_field",
+                "rule": "a",
+                "path": [
+                  "x"
+                ]
+              }
+            },
+            {
+              "id": "next",
+              "status": "passed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/errors/expected",
+      "spec": [
+        "tests.md#matching",
+        "tests.md#errors"
+      ],
+      "description": "an error with the expected code passes; another code fails the error key, with the error given",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "strict": true
+          }
+        },
+        "cases": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "missing-field",
+                "input": {},
+                "expect": {
+                  "error": {
+                    "code": "missing_field"
+                  }
+                }
+              },
+              {
+                "id": "both-fire",
+                "input": {
+                  "x": 3
+                },
+                "expect": {
+                  "error": {
+                    "code": "hit_policy_error"
+                  }
+                }
+              },
+              {
+                "id": "other-code",
+                "input": {},
+                "expect": {
+                  "error": {
+                    "code": "type_mismatch"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "strict": true,
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {}
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 3,
+            "passed": 2,
+            "failed": 1,
+            "error": 0,
+            "partial": false
+          },
+          "results": [
+            {
+              "id": "missing-field",
+              "status": "passed"
+            },
+            {
+              "id": "both-fire",
+              "status": "passed"
+            },
+            {
+              "id": "other-code",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "error",
+                  "expected": {
+                    "code": "type_mismatch"
+                  },
+                  "actual": {
+                    "code": "missing_field",
+                    "rule": "a",
+                    "path": [
+                      "x"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/errors/expected-but-none",
+      "spec": [
+        "tests.md#matching",
+        "tests.md#explaining-failures"
+      ],
+      "description": "an expected error that evaluation does not raise fails the error key with null, and the decision is explained",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "strict": true
+          }
+        },
+        "cases": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "no-error",
+                "input": {
+                  "x": 2
+                },
+                "expect": {
+                  "error": {
+                    "code": "hit_policy_error"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_explained": 5
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "strict": true,
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {}
+          ],
+          "limits": {
+            "max_explained": 5
+          },
+          "summary": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "partial": false
+          },
+          "results": [
+            {
+              "id": "no-error",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "error",
+                  "expected": {
+                    "code": "hit_policy_error"
+                  },
+                  "actual": null
+                }
+              ],
+              "explanation_text": "HIT POLICY unique: selected a\n[x] a (selected): x > 1\n    - x > 1 is true (x = 2)\n[ ] b (not fired): x > 2\n    - x > 2 is false (x = 2); at the limit (needs x > 2)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/errors/policy-error-is-a-result",
+      "spec": [
+        "tests.md#matching"
+      ],
+      "description": "hit_policy_error under unique is a case's error, naming the rules that fired",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "cases": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "both",
+                "input": {
+                  "x": 2
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {}
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 1,
+            "passed": 0,
+            "failed": 0,
+            "error": 1,
+            "partial": false
+          },
+          "results": [
+            {
+              "id": "both",
+              "status": "error",
+              "error": {
+                "code": "hit_policy_error",
+                "rules": [
+                  "a",
+                  "b"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -9,6 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Case runner with incremental batches (tasks T.2 and T.3;
+  [`spec/tests.md`](spec/tests.md), *Running cases*, *Test runs*): in the
+  Rust core, `cases::Runner` (for a rule set, `Runner::for_table` and
+  `Runner::for_bundle`) evaluates rules on the cases of `cases::CaseFile`s
+  with `evaluate`, never calling an action, and gives one `CaseResult` per
+  case, in run order: `passed`, `failed` with every `Mismatch` in the order
+  of the expectation's keys (what was expected and what was given; an output
+  asked of a decision without a single output fails with the reason "the
+  decision has no single output (`<policy>`)"), or `error` with the error
+  the case did not expect. An error never stops the run. Three names, the
+  same in every language: `CaseFileRef` (a bundle's reference), `Cases` (a
+  case file's content) and `CaseFile` (one file given to a run: its path, the
+  digest of its bytes, and its cases or the error of reading it;
+  `CaseFile::read`, `read_as`, `unreadable`, `bundle_files`, `bundle_file`,
+  `case`). The core opens no files: a file the caller cannot open is the
+  caller's error, or, with `CaseFile::unreadable`, that file's result. A case
+  file that cannot be read is one error result with its path; a file whose
+  path repeats an earlier one (or a second file without a path) is a
+  `format_error` result, since a case is its path and its id; a bundle's case
+  files are checked against their recorded digests (`decision_mismatch` at
+  `/bundle/cases/<i>/digest`) and read under the bundle's recorded engine
+  limits. The run keeps no result trees: each decision is reduced to what
+  the expectation checks, and only the first `max_explained` failures with a
+  decision (5 by default) carry `explanation_text`; `Runner::evaluate` and
+  `Runner::explain` evaluate a case again. `Runner::iter` gives the results
+  one at a time (`CaseRun`), and `Runner::next_result` drives the same run
+  with an owned cursor, `TestRunState` (`Clone + Send`), for bindings that
+  own their rules; a run is interrupted before an item by `TestRunLimits`
+  (`max_results`, `max_steps`: one step per rule for each case) or by the
+  caller (`CaseRun::cancel_when`, `CaseRun::cancel`, `Runner::stop`), and a
+  run whose test run is asked for before its last result is partial
+  (cancelled), never reported complete. A new output-only document,
+  `{"version": 1, "test_run": {...}}`, additive in format version 1 (readers
+  reject it with `unsupported`), with `engine` (name, version and the limits
+  its case files were read with), `files` (each path and digest), `bundle`
+  (id and revision, for a bundle's cases), an optional `ruleset_digest`
+  (`TestRun::with_ruleset_digest`), its JSON Schema
+  `spec/schemas/v1/test_run.schema.json`, `format::write_test_run`,
+  `format::write_case_result` and `format::write_test_run_as` (JSON, YAML or
+  the text the command line will print, fixed by snapshot tests). Mismatch
+  keys may grow within the version (`ExpectationKey` is non-exhaustive);
+  statuses are closed. 28 conformance vectors of a new kind, `test_run`,
+  written by `conformance/tools/test_run_vectors.py` (checked in CI) and
+  run by the core's runner; the C ABI, Python, C++, JavaScript, Java, Scala
+  and Go runners skip and count them until the bindings run cases (T.9b).
+  Example: `docs/examples/test_run.rs`.
 - Static audit of rule sets and decision tables (task T.7;
   [`spec/audit.md`](spec/audit.md)): in the Rust core, `audit::audit` and
   `audit::audit_table` (both return `Result<Audit>`: `unsupported` for a
@@ -1534,6 +1580,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Shared names for the test runner and the audit (API review of T.2 and
+  T.3; branches built on T.7 follow them): `audit::AuditSource` is now
+  `rules::RulesSource`, re-exported as `audit::RulesSource` and
+  `cases::RulesSource`, and is the `source` of both an `Audit` and a
+  `TestRun`. Within the unreleased runner: `RunLimits` is `TestRunLimits`,
+  `max_cases` is `max_results` (the limit, its JSON key and the interruption
+  reason), the result key `explanation` is `explanation_text`,
+  `Runner::with_ruleset_digest` is `TestRun::with_ruleset_digest`, and
+  `CaseFile::of_bundle` is `CaseFile::bundle_file` (by path).
 - Java: `DocumentKind` has a new constant, `BUNDLE` (task R.5), so a
   `switch` that lists every kind needs a case for it. Go's `Loads` and Java's
   `Documents.loads` refuse a bundle document with `unsupported` instead of

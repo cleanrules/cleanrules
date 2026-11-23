@@ -129,38 +129,56 @@ class Conformance {
     static final int MINIMUM_VECTORS = 2951;
 
     /** Why a vector does not run one way: each is counted and listed. */
-    static final Map<String, String> SKIPS = Map.of(
-            "grid",
-            "grids are Java data: the native layer reads documents only, so table_grid vectors run in the native"
-                    + " route (DecisionTable)",
-            "decimal_infinity",
-            "a decimal infinity in the vector's data or constants, which no Java value holds (spec/data-model.md,"
-                    + " Java and Scala: BigDecimal cannot hold it, and a Double infinity is a float)",
-            "zone_unknown_to_java",
-            "a datetime in a zone that Java's zone database does not know, which no Java value holds",
-            "agents",
-            "the tools for agents (spec/agents.md) are not in the JVM binding yet (docs/PLAN.md, O.1), so tool"
-                    + " vectors run in the core and Python runners",
-            "native",
-            "max_values bounds what is read from native data only, so evaluate vectors with limits run in the native"
-                    + " route",
-            "diagram",
-            "diagrams (spec/visual.md) are drawn by the core and checked through the C ABI's runner; the Java and"
-                    + " Scala APIs draw them from phase V.2",
-            "graded",
-            "conditions under a graded logic: the binding evaluates one node under boolean only until task J.1b",
-            "audit",
-            "the static audit (spec/audit.md) is made by the core and checked by its runner; the Java and Scala"
-                    + " APIs are beta and do not audit yet (docs/PLAN.md, T.7)",
-            "bundle",
-            "bundles (spec/bundles.md) have no Java or Scala type yet (a beta binding, docs/PLAN.md, R.5): loads"
-                    + " refuses a bundle once the core has read it, so vectors that make or compare bundles, hold one"
-                    + " of the running engine, or read one without an error outside the native layer run in the core,"
-                    + " C ABI, Python and JavaScript runners",
-            "cases",
-            "case files (spec/tests.md) have no Java or Scala type yet (a beta binding): loads refuses a case file"
-                    + " once the core has read it, so outside the native layer the vectors that read one without an"
-                    + " error or write it in another format run in the native layer only");
+    static final Map<String, String> SKIPS = Map.ofEntries(
+            Map.entry(
+                    "grid",
+                    "grids are Java data: the native layer reads documents only, so table_grid vectors run "
+                            + "in the native route (DecisionTable)"),
+            Map.entry(
+                    "decimal_infinity",
+                    "a decimal infinity in the vector's data or constants, which no Java value holds "
+                            + "(spec/data-model.md, Java and Scala: BigDecimal cannot hold it, and a Double infinity "
+                            + "is a float)"),
+            Map.entry(
+                    "zone_unknown_to_java",
+                    "a datetime in a zone that Java's zone database does not know, which no Java value "
+                            + "holds"),
+            Map.entry(
+                    "agents",
+                    "the tools for agents (spec/agents.md) are not in the JVM binding yet (docs/PLAN.md, "
+                            + "O.1), so tool vectors run in the core and Python runners"),
+            Map.entry(
+                    "native",
+                    "max_values bounds what is read from native data only, so evaluate vectors with limits "
+                            + "run in the native route"),
+            Map.entry(
+                    "diagram",
+                    "diagrams (spec/visual.md) are drawn by the core and checked through the C ABI's "
+                            + "runner; the Java and Scala APIs draw them from phase V.2"),
+            Map.entry(
+                    "graded",
+                    "conditions under a graded logic: the binding evaluates one node under boolean only "
+                            + "until task J.1b"),
+            Map.entry(
+                    "audit",
+                    "the static audit (spec/audit.md) is made by the core and checked by its runner; the "
+                            + "Java and Scala APIs are beta and do not audit yet (docs/PLAN.md, T.7)"),
+            Map.entry(
+                    "bundle",
+                    "bundles (spec/bundles.md) have no Java or Scala type yet (a beta binding, "
+                            + "docs/PLAN.md, R.5): loads refuses a bundle once the core has read it, so vectors that "
+                            + "make or compare bundles, hold one of the running engine, or read one without an error "
+                            + "outside the native layer run in the core, C ABI, Python and JavaScript runners"),
+            Map.entry(
+                    "cases",
+                    "case files (spec/tests.md) have no Java or Scala type yet (a beta binding): loads "
+                            + "refuses a case file once the core has read it, so outside the native layer the "
+                            + "vectors that read one without an error or write it in another format run in the "
+                            + "native layer only"),
+            Map.entry(
+                    "test_run",
+                    "test runs (spec/tests.md, Running cases) are made by the core and checked by its "
+                            + "runner; the Java and Scala APIs are beta and do not run cases yet (docs/PLAN.md, T.3)"));
 
     /** The exception class of each error code (spec/errors.md, Codes). */
     private static final Map<String, Class<? extends CleanRulesException>> CLASSES = Map.ofEntries(
@@ -282,6 +300,9 @@ class Conformance {
         }
         if ("audit".equals(kind)) {
             return new Outcome(null, "audit");
+        }
+        if ("test_run".equals(kind)) {
+            return new Outcome(null, "test_run");
         }
         if ("draw".equals(kind)) {
             return new Outcome(null, "diagram");

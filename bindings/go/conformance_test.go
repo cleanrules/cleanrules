@@ -79,14 +79,16 @@ var conformanceSkips = map[string]string{
 	"cases": "case files (spec/tests.md) have no Go type yet (a beta binding): Loads refuses a case file once" +
 		" the core has read it, so vectors that read one without an error, write it in another format or" +
 		" check its canonical bytes run in the core, C ABI, Python and JavaScript runners",
+	"test_run": "test runs (spec/tests.md, Running cases) are made by the core and checked by its runner; the Go" +
+		" binding is beta and does not run cases yet (docs/PLAN.md, T.3)",
 	"audit": "the static audit (spec/audit.md) is made by the core and checked by its runner; the Go binding" +
 		" is beta and does not audit yet (docs/PLAN.md, T.7)",
 }
 
 // allowedSkips are the skips each route may have; any other fails.
 var allowedSkips = map[string][]string{
-	"json":   {"agents", "audit", "bundle", "cases", "diagram", "graded", "grid", "native"},
-	"native": {"agents", "audit", "bundle", "cases", "diagram", "graded", "zero_limit", "zone_unknown_to_go"},
+	"json":   {"agents", "audit", "bundle", "cases", "diagram", "graded", "grid", "native", "test_run"},
+	"native": {"agents", "audit", "bundle", "cases", "diagram", "graded", "test_run", "zero_limit", "zone_unknown_to_go"},
 }
 
 // conformance runs vectors; it counts the Go forms of the native route.
@@ -161,6 +163,9 @@ func (c *conformance) run(vector *jsonObject, route string) (failure, skip strin
 	}
 	if given.str("kind") == "audit" {
 		panic(vectorSkip{"audit"})
+	}
+	if given.str("kind") == "test_run" {
+		panic(vectorSkip{"test_run"})
 	}
 	if isGraded(given) {
 		return "", "graded"

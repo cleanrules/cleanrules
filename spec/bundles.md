@@ -260,7 +260,8 @@ or YAML. The bundle does not read it: the digest covers the file's bytes as
 stored, whatever their format and whether or not they read as a case file,
 so a reader that has the file can check that it is the one the bundle was
 made with, without reading it; reading and running the cases is the work of
-the case runner (task T.3). A reader of a bundle never opens files: the core
+the case runner, which checks each file against its digest first
+(`tests.md`, *Case files of a bundle*). A reader of a bundle never opens files: the core
 has no file system, and checking a file against its digest is the work of the
 caller that has it
 (`case_digest_matches` on a bundle in Rust and Python, `caseDigestMatches` in

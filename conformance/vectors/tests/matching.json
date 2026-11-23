@@ -1,0 +1,1956 @@
+{
+  "version": 1,
+  "area": "tests",
+  "vectors": [
+    {
+      "id": "tests/matching/example",
+      "spec": [
+        "tests.md#matching",
+        "tests.md#running-cases",
+        "tests.md#identity"
+      ],
+      "description": "the example case file passes against the example rules: every key of each case matches",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "priority",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "blocked",
+                "when": {
+                  "op": "field",
+                  "path": [
+                    "customer",
+                    "blocked"
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "priority": 99,
+                "description": "blocked customers never get a discount"
+              },
+              {
+                "name": "vip",
+                "when": {
+                  "op": "and",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "order",
+                          "total"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1000
+                      }
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.15"
+                    }
+                  }
+                },
+                "priority": 10,
+                "tags": [
+                  "loyalty"
+                ],
+                "do": "notify_sales"
+              },
+              {
+                "name": "loyal",
+                "when": {
+                  "op": "or",
+                  "operands": [
+                    {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "customer",
+                          "years"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 2
+                      }
+                    },
+                    {
+                      "op": "field",
+                      "path": [
+                        "customer",
+                        "newsletter"
+                      ]
+                    }
+                  ]
+                },
+                "then": {
+                  "discount": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.05"
+                    }
+                  }
+                },
+                "priority": 5,
+                "tags": [
+                  "loyalty"
+                ]
+              }
+            ]
+          }
+        },
+        "files": [
+          {
+            "path": "cases/discounts.json",
+            "text": "{\n  \"version\": 1,\n  \"cases\": {\n    \"description\": \"the cases of the discount rules (docs/examples/discounts.json)\",\n    \"items\": [\n      {\n        \"id\": \"vip-gets-15\",\n        \"description\": \"a customer of seven years with a large order gets 15%; whether they are blocked is not known\",\n        \"input\": { \"customer\": { \"years\": 7 }, \"order\": { \"total\": 1500 } },\n        \"expect\": {\n          \"selected\": [\"vip\"],\n          \"output\": { \"discount\": { \"$decimal\": \"0.15\" } },\n          \"unknown\": [\"blocked\"]\n        }\n      },\n      {\n        \"id\": \"blocked-gets-nothing\",\n        \"input\": { \"customer\": { \"years\": 7, \"blocked\": true }, \"order\": { \"total\": 1500 } },\n        \"expect\": { \"selected\": [\"blocked\"], \"output\": { \"discount\": 0 } }\n      },\n      {\n        \"id\": \"newsletter-is-loyal\",\n        \"input\": { \"customer\": { \"years\": 1, \"newsletter\": true, \"blocked\": false }, \"order\": { \"total\": 10 } },\n        \"expect\": { \"selected\": [\"loyal\"], \"output\": { \"discount\": { \"$decimal\": \"0.05\" } }, \"unknown\": [] }\n      },\n      {\n        \"id\": \"new-customer-gets-nothing\",\n        \"input\": { \"customer\": { \"years\": 1, \"newsletter\": false, \"blocked\": false }, \"order\": { \"total\": 50 } },\n        \"expect\": { \"selected\": [], \"output\": null, \"unknown\": [] }\n      }\n    ]\n  }\n}\n"
+          }
+        ],
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "priority",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {
+              "path": "cases/discounts.json",
+              "digest": "sha256:9076dcc125c059ce1ed94a7bef2bfc41436d0437f1a2bc5786cc9df5b5160dde"
+            }
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 4,
+            "passed": 4,
+            "failed": 0,
+            "error": 0,
+            "partial": false
+          },
+          "results": [
+            {
+              "path": "cases/discounts.json",
+              "id": "vip-gets-15",
+              "status": "passed"
+            },
+            {
+              "path": "cases/discounts.json",
+              "id": "blocked-gets-nothing",
+              "status": "passed"
+            },
+            {
+              "path": "cases/discounts.json",
+              "id": "newsletter-is-loyal",
+              "status": "passed"
+            },
+            {
+              "path": "cases/discounts.json",
+              "id": "new-customer-gets-nothing",
+              "status": "passed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/matching/selected-in-selection-order",
+      "spec": [
+        "tests.md#matching",
+        "tests.md#test-runs"
+      ],
+      "description": "selected matches the effective ids in selection order: another order fails, and what was given is listed",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "rule_order",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  },
+                  "w": {
+                    "op": "const",
+                    "value": "a"
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "id": "B-2"
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "y"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 3
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "cases": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "in-order",
+                "input": {
+                  "x": 2
+                },
+                "expect": {
+                  "selected": [
+                    "a",
+                    "B-2"
+                  ]
+                }
+              },
+              {
+                "id": "reversed",
+                "input": {
+                  "x": 2
+                },
+                "expect": {
+                  "selected": [
+                    "B-2",
+                    "a"
+                  ]
+                }
+              },
+              {
+                "id": "by-name",
+                "input": {
+                  "x": 2
+                },
+                "expect": {
+                  "selected": [
+                    "a",
+                    "b"
+                  ]
+                }
+              },
+              {
+                "id": "none",
+                "input": {
+                  "x": 0,
+                  "y": 0
+                },
+                "expect": {
+                  "selected": []
+                }
+              },
+              {
+                "id": "not-a-rule",
+                "input": {
+                  "x": 0
+                },
+                "expect": {
+                  "selected": [
+                    "z"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "rule_order",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {}
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 5,
+            "passed": 2,
+            "failed": 3,
+            "error": 0,
+            "partial": false
+          },
+          "results": [
+            {
+              "id": "in-order",
+              "status": "passed"
+            },
+            {
+              "id": "reversed",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "selected",
+                  "expected": [
+                    "B-2",
+                    "a"
+                  ],
+                  "actual": [
+                    "a",
+                    "B-2"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "by-name",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "selected",
+                  "expected": [
+                    "a",
+                    "b"
+                  ],
+                  "actual": [
+                    "a",
+                    "B-2"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "none",
+              "status": "passed"
+            },
+            {
+              "id": "not-a-rule",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "selected",
+                  "expected": [
+                    "z"
+                  ],
+                  "actual": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/matching/output-keys-and-null",
+      "spec": [
+        "tests.md#matching",
+        "tests.md#test-runs"
+      ],
+      "description": "output matches when the output has the expected keys with equal values, the others unchecked; null expects no rule selected; {} expects one",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  },
+                  "w": {
+                    "op": "const",
+                    "value": "a"
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "id": "B-2"
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "y"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 3
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "cases": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "subset",
+                "input": {
+                  "x": 1
+                },
+                "expect": {
+                  "output": {
+                    "v": 1
+                  }
+                }
+              },
+              {
+                "id": "all-keys",
+                "input": {
+                  "x": 1
+                },
+                "expect": {
+                  "output": {
+                    "v": 1,
+                    "w": "a"
+                  }
+                }
+              },
+              {
+                "id": "wrong-value",
+                "input": {
+                  "x": 1
+                },
+                "expect": {
+                  "output": {
+                    "v": 2
+                  }
+                }
+              },
+              {
+                "id": "missing-key",
+                "input": {
+                  "x": 1
+                },
+                "expect": {
+                  "output": {
+                    "z": null
+                  }
+                }
+              },
+              {
+                "id": "null",
+                "input": {},
+                "expect": {
+                  "output": null
+                }
+              },
+              {
+                "id": "null-but-selected",
+                "input": {
+                  "x": 1
+                },
+                "expect": {
+                  "output": null
+                }
+              },
+              {
+                "id": "empty",
+                "input": {
+                  "x": 1
+                },
+                "expect": {
+                  "output": {}
+                }
+              },
+              {
+                "id": "empty-but-nothing",
+                "input": {},
+                "expect": {
+                  "output": {}
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {}
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 8,
+            "passed": 4,
+            "failed": 4,
+            "error": 0,
+            "partial": false
+          },
+          "results": [
+            {
+              "id": "subset",
+              "status": "passed"
+            },
+            {
+              "id": "all-keys",
+              "status": "passed"
+            },
+            {
+              "id": "wrong-value",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "output",
+                  "expected": {
+                    "v": 2
+                  },
+                  "actual": {
+                    "v": 1,
+                    "w": "a"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "missing-key",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "output",
+                  "expected": {
+                    "z": null
+                  },
+                  "actual": {
+                    "v": 1,
+                    "w": "a"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "null",
+              "status": "passed"
+            },
+            {
+              "id": "null-but-selected",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "output",
+                  "expected": null,
+                  "actual": {
+                    "v": 1,
+                    "w": "a"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "empty",
+              "status": "passed"
+            },
+            {
+              "id": "empty-but-nothing",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "output",
+                  "expected": {},
+                  "actual": null
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/matching/output-of-a-multi-hit-decision",
+      "spec": [
+        "tests.md#matching",
+        "tests.md#test-runs"
+      ],
+      "description": "a decision with no single output matches no output, null included: the key fails with its reason and no actual",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "rule_order",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  },
+                  "w": {
+                    "op": "const",
+                    "value": "a"
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "id": "B-2"
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "y"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 3
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "cases": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "object",
+                "input": {
+                  "x": 1
+                },
+                "expect": {
+                  "output": {
+                    "v": 1
+                  }
+                }
+              },
+              {
+                "id": "null",
+                "input": {},
+                "expect": {
+                  "output": null
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "rule_order",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {}
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 2,
+            "passed": 0,
+            "failed": 2,
+            "error": 0,
+            "partial": false
+          },
+          "results": [
+            {
+              "id": "object",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "output",
+                  "expected": {
+                    "v": 1
+                  },
+                  "reason": "the decision has no single output (rule_order)"
+                }
+              ]
+            },
+            {
+              "id": "null",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "output",
+                  "expected": null,
+                  "reason": "the decision has no single output (rule_order)"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/matching/output-of-an-aggregate",
+      "spec": [
+        "tests.md#matching"
+      ],
+      "description": "under collect with an aggregate, output is the aggregate, null when nothing is selected; outputs are the selected rules' own",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "collect",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 2
+                  }
+                }
+              }
+            ],
+            "aggregate": "sum"
+          }
+        },
+        "cases": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "sum",
+                "input": {
+                  "x": 2
+                },
+                "expect": {
+                  "output": {
+                    "v": 3
+                  },
+                  "outputs": [
+                    {
+                      "v": 1
+                    },
+                    {
+                      "v": 2
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "nothing",
+                "input": {
+                  "x": 0
+                },
+                "expect": {
+                  "output": null,
+                  "outputs": []
+                }
+              },
+              {
+                "id": "not-the-sum",
+                "input": {
+                  "x": 2
+                },
+                "expect": {
+                  "output": {
+                    "v": 2
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "collect",
+          "aggregate": "sum",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {}
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 3,
+            "passed": 2,
+            "failed": 1,
+            "error": 0,
+            "partial": false
+          },
+          "results": [
+            {
+              "id": "sum",
+              "status": "passed"
+            },
+            {
+              "id": "nothing",
+              "status": "passed"
+            },
+            {
+              "id": "not-the-sum",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "output",
+                  "expected": {
+                    "v": 2
+                  },
+                  "actual": {
+                    "v": 3
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/matching/outputs",
+      "spec": [
+        "tests.md#matching",
+        "tests.md#test-runs"
+      ],
+      "description": "outputs matches item by item, each as an output; a different count fails, and what was given has every key",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "rule_order",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  },
+                  "w": {
+                    "op": "const",
+                    "value": "a"
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "id": "B-2"
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "y"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 3
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "cases": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "both",
+                "input": {
+                  "x": 2
+                },
+                "expect": {
+                  "outputs": [
+                    {
+                      "w": "a"
+                    },
+                    {
+                      "v": 2
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "one-missing",
+                "input": {
+                  "x": 2
+                },
+                "expect": {
+                  "outputs": [
+                    {
+                      "v": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "other-order",
+                "input": {
+                  "x": 2
+                },
+                "expect": {
+                  "outputs": [
+                    {
+                      "v": 2
+                    },
+                    {
+                      "v": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "none",
+                "input": {},
+                "expect": {
+                  "outputs": []
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "rule_order",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {}
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 4,
+            "passed": 2,
+            "failed": 2,
+            "error": 0,
+            "partial": false
+          },
+          "results": [
+            {
+              "id": "both",
+              "status": "passed"
+            },
+            {
+              "id": "one-missing",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "outputs",
+                  "expected": [
+                    {
+                      "v": 1
+                    }
+                  ],
+                  "actual": [
+                    {
+                      "v": 1,
+                      "w": "a"
+                    },
+                    {
+                      "v": 2
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "other-order",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "outputs",
+                  "expected": [
+                    {
+                      "v": 2
+                    },
+                    {
+                      "v": 1
+                    }
+                  ],
+                  "actual": [
+                    {
+                      "v": 1,
+                      "w": "a"
+                    },
+                    {
+                      "v": 2
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "none",
+              "status": "passed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/matching/unknown",
+      "spec": [
+        "tests.md#matching",
+        "tests.md#rules-in-expectations",
+        "tests.md#test-runs"
+      ],
+      "description": "unknown matches the effective ids of the rules whose condition is unknown, as a set; given sorted by code point",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  },
+                  "w": {
+                    "op": "const",
+                    "value": "a"
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "id": "B-2"
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "y"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 3
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "cases": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "all-unknown",
+                "input": {},
+                "expect": {
+                  "unknown": [
+                    "c",
+                    "B-2",
+                    "a"
+                  ]
+                }
+              },
+              {
+                "id": "none-unknown",
+                "input": {
+                  "x": 0,
+                  "y": 0
+                },
+                "expect": {
+                  "unknown": []
+                }
+              },
+              {
+                "id": "not-all",
+                "input": {},
+                "expect": {
+                  "unknown": [
+                    "a"
+                  ]
+                }
+              },
+              {
+                "id": "y-unknown",
+                "input": {
+                  "x": 0
+                },
+                "expect": {
+                  "unknown": []
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {}
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 4,
+            "passed": 2,
+            "failed": 2,
+            "error": 0,
+            "partial": false
+          },
+          "results": [
+            {
+              "id": "all-unknown",
+              "status": "passed"
+            },
+            {
+              "id": "none-unknown",
+              "status": "passed"
+            },
+            {
+              "id": "not-all",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "unknown",
+                  "expected": [
+                    "a"
+                  ],
+                  "actual": [
+                    "B-2",
+                    "a",
+                    "c"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "y-unknown",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "unknown",
+                  "expected": [],
+                  "actual": [
+                    "c"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/matching/every-key-in-order",
+      "spec": [
+        "tests.md#matching",
+        "tests.md#test-runs"
+      ],
+      "description": "a failure lists every key that does not match, in the order of the expectations table, whatever their order in the file",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  },
+                  "w": {
+                    "op": "const",
+                    "value": "a"
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 2
+                  }
+                },
+                "id": "B-2"
+              },
+              {
+                "name": "c",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "y"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 3
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "cases": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "all-wrong",
+                "input": {
+                  "x": 1
+                },
+                "expect": {
+                  "unknown": [],
+                  "outputs": [
+                    {
+                      "v": 3
+                    }
+                  ],
+                  "output": {
+                    "v": 3
+                  },
+                  "selected": [
+                    "c"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {}
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "partial": false
+          },
+          "results": [
+            {
+              "id": "all-wrong",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "selected",
+                  "expected": [
+                    "c"
+                  ],
+                  "actual": [
+                    "a"
+                  ]
+                },
+                {
+                  "key": "output",
+                  "expected": {
+                    "v": 3
+                  },
+                  "actual": {
+                    "v": 1,
+                    "w": "a"
+                  }
+                },
+                {
+                  "key": "outputs",
+                  "expected": [
+                    {
+                      "v": 3
+                    }
+                  ],
+                  "actual": [
+                    {
+                      "v": 1,
+                      "w": "a"
+                    }
+                  ]
+                },
+                {
+                  "key": "unknown",
+                  "expected": [],
+                  "actual": [
+                    "c"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/matching/values",
+      "spec": [
+        "tests.md#values"
+      ],
+      "description": "expected values match by canonical bytes: an int is not a float, decimals keep their scale, floats their sign of zero, and nulls match whatever their reason",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "r",
+                "when": {
+                  "op": "const",
+                  "value": true
+                },
+                "then": {
+                  "i": {
+                    "op": "const",
+                    "value": 1
+                  },
+                  "d": {
+                    "op": "const",
+                    "value": {
+                      "$decimal": "0.150"
+                    }
+                  },
+                  "f": {
+                    "op": "field",
+                    "path": [
+                      "f"
+                    ]
+                  },
+                  "n": {
+                    "op": "div",
+                    "left": {
+                      "op": "const",
+                      "value": 1
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "cases": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "exact",
+                "input": {
+                  "f": -0.0
+                },
+                "expect": {
+                  "output": {
+                    "i": 1,
+                    "d": {
+                      "$decimal": "0.150"
+                    },
+                    "f": -0.0,
+                    "n": null
+                  }
+                }
+              },
+              {
+                "id": "int-is-not-float",
+                "input": {
+                  "f": -0.0
+                },
+                "expect": {
+                  "output": {
+                    "i": 1.0
+                  }
+                }
+              },
+              {
+                "id": "scale",
+                "input": {
+                  "f": -0.0
+                },
+                "expect": {
+                  "output": {
+                    "d": {
+                      "$decimal": "0.15"
+                    }
+                  }
+                }
+              },
+              {
+                "id": "zero-sign",
+                "input": {
+                  "f": -0.0
+                },
+                "expect": {
+                  "output": {
+                    "f": 0.0
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {}
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 4,
+            "passed": 1,
+            "failed": 3,
+            "error": 0,
+            "partial": false
+          },
+          "results": [
+            {
+              "id": "exact",
+              "status": "passed"
+            },
+            {
+              "id": "int-is-not-float",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "output",
+                  "expected": {
+                    "i": 1.0
+                  },
+                  "actual": {
+                    "d": {
+                      "$decimal": "0.150"
+                    },
+                    "f": -0.0,
+                    "i": 1,
+                    "n": null
+                  }
+                }
+              ]
+            },
+            {
+              "id": "scale",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "output",
+                  "expected": {
+                    "d": {
+                      "$decimal": "0.15"
+                    }
+                  },
+                  "actual": {
+                    "d": {
+                      "$decimal": "0.150"
+                    },
+                    "f": -0.0,
+                    "i": 1,
+                    "n": null
+                  }
+                }
+              ]
+            },
+            {
+              "id": "zero-sign",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "output",
+                  "expected": {
+                    "f": 0.0
+                  },
+                  "actual": {
+                    "d": {
+                      "$decimal": "0.150"
+                    },
+                    "f": -0.0,
+                    "i": 1,
+                    "n": null
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

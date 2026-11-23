@@ -1,0 +1,553 @@
+{
+  "version": 1,
+  "area": "tests",
+  "vectors": [
+    {
+      "id": "tests/files/in-order-with-paths",
+      "spec": [
+        "tests.md#running-cases",
+        "tests.md#identity",
+        "tests.md#test-runs"
+      ],
+      "description": "case files run in the order given, each case with its file's path; two files may hold the same id, and an empty file gives no result",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "files": [
+          {
+            "path": "cases/a.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"one\", \"input\": {\"x\": 1}, \"expect\": {\"selected\": [\"a\"]}}, {\"id\": \"two\", \"input\": {\"x\": 0}}]}}"
+          },
+          {
+            "path": "cases/empty.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": []}}"
+          },
+          {
+            "path": "cases/b.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"one\", \"input\": {\"x\": 0}, \"expect\": {\"selected\": []}}]}}"
+          }
+        ],
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {
+              "path": "cases/a.json",
+              "digest": "sha256:c974ceb7874b505dd07bd9454bed5ebce90cc0d3cd59c89ead567dbc0ce9c149"
+            },
+            {
+              "path": "cases/empty.json",
+              "digest": "sha256:bc16a440106aa30627fa91e6d226ed0143eef8c2496e2d1954b0055dcae22ebc"
+            },
+            {
+              "path": "cases/b.json",
+              "digest": "sha256:f7f0081638701369c7b9974e72b766da83110ca37e9b873556ed3d6897bce4aa"
+            }
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 3,
+            "passed": 3,
+            "failed": 0,
+            "error": 0,
+            "partial": false
+          },
+          "results": [
+            {
+              "path": "cases/a.json",
+              "id": "one",
+              "status": "passed"
+            },
+            {
+              "path": "cases/a.json",
+              "id": "two",
+              "status": "passed"
+            },
+            {
+              "path": "cases/b.json",
+              "id": "one",
+              "status": "passed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/files/unreadable",
+      "spec": [
+        "tests.md#running-cases",
+        "tests.md#test-runs"
+      ],
+      "description": "a file that cannot be read as a case file is one error with its path and no id, and the run goes on: invalid JSON, another document, a repeated id, another version",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "files": [
+          {
+            "path": "cases/syntax.json",
+            "text": "{"
+          },
+          {
+            "path": "cases/rules.json",
+            "text": "{\"version\": 1, \"ruleset\": {\"hit_policy\": \"first\", \"logic\": \"boolean\", \"rules\": [{\"name\": \"a\", \"when\": {\"op\": \"gt\", \"left\": {\"op\": \"field\", \"path\": [\"x\"]}, \"right\": {\"op\": \"const\", \"value\": 0}}, \"then\": {\"v\": {\"op\": \"const\", \"value\": 1}}}]}}"
+          },
+          {
+            "path": "cases/twice.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"a\", \"input\": {}}, {\"id\": \"a\", \"input\": {}}]}}"
+          },
+          {
+            "path": "cases/good.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"one\", \"input\": {\"x\": 1}, \"expect\": {\"selected\": [\"a\"]}}, {\"id\": \"two\", \"input\": {\"x\": 0}}]}}"
+          },
+          {
+            "path": "cases/version.json",
+            "text": "{\"version\": 2, \"cases\": {\"items\": []}}"
+          }
+        ],
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {
+              "path": "cases/syntax.json",
+              "digest": "sha256:021fb596db81e6d02bf3d2586ee3981fe519f275c0ac9ca76bbcf2ebb4097d96"
+            },
+            {
+              "path": "cases/rules.json",
+              "digest": "sha256:55885dd76b7b1c30152223e1de473156941e8e15e90efc695fe010bccc28d368"
+            },
+            {
+              "path": "cases/twice.json",
+              "digest": "sha256:fd51cced0775101d4c773715e1361b0d1ce4618ae643c758388c919294747624"
+            },
+            {
+              "path": "cases/good.json",
+              "digest": "sha256:c974ceb7874b505dd07bd9454bed5ebce90cc0d3cd59c89ead567dbc0ce9c149"
+            },
+            {
+              "path": "cases/version.json",
+              "digest": "sha256:a45a6791b59e710ed9c6616310f858ff3caf049feda0e3dafb4b55a97967d70e"
+            }
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 6,
+            "passed": 2,
+            "failed": 0,
+            "error": 4,
+            "partial": false
+          },
+          "results": [
+            {
+              "path": "cases/syntax.json",
+              "status": "error",
+              "error": {
+                "code": "format_error",
+                "line": 1,
+                "column": 2
+              }
+            },
+            {
+              "path": "cases/rules.json",
+              "status": "error",
+              "error": {
+                "code": "format_error",
+                "pointer": ""
+              }
+            },
+            {
+              "path": "cases/twice.json",
+              "status": "error",
+              "error": {
+                "code": "format_error",
+                "pointer": "/cases/items/1/id"
+              }
+            },
+            {
+              "path": "cases/good.json",
+              "id": "one",
+              "status": "passed"
+            },
+            {
+              "path": "cases/good.json",
+              "id": "two",
+              "status": "passed"
+            },
+            {
+              "path": "cases/version.json",
+              "status": "error",
+              "error": {
+                "code": "unsupported_version",
+                "pointer": "/version"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/files/repeated-path",
+      "spec": [
+        "tests.md#running-cases",
+        "tests.md#identity"
+      ],
+      "description": "a case is its path and its id in a run: a file whose path repeats an earlier file's is one format_error, without an id, and none of its cases runs",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "files": [
+          {
+            "path": "cases/a.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"one\", \"input\": {\"x\": 1}, \"expect\": {\"selected\": [\"a\"]}}, {\"id\": \"two\", \"input\": {\"x\": 0}}]}}"
+          },
+          {
+            "path": "cases/a.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"one\", \"input\": {\"x\": 0}, \"expect\": {\"selected\": []}}]}}"
+          },
+          {
+            "path": "cases/b.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"one\", \"input\": {\"x\": 0}, \"expect\": {\"selected\": []}}]}}"
+          }
+        ],
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {
+              "path": "cases/a.json",
+              "digest": "sha256:c974ceb7874b505dd07bd9454bed5ebce90cc0d3cd59c89ead567dbc0ce9c149"
+            },
+            {
+              "path": "cases/a.json",
+              "digest": "sha256:f7f0081638701369c7b9974e72b766da83110ca37e9b873556ed3d6897bce4aa"
+            },
+            {
+              "path": "cases/b.json",
+              "digest": "sha256:f7f0081638701369c7b9974e72b766da83110ca37e9b873556ed3d6897bce4aa"
+            }
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 4,
+            "passed": 3,
+            "failed": 0,
+            "error": 1,
+            "partial": false
+          },
+          "results": [
+            {
+              "path": "cases/a.json",
+              "id": "one",
+              "status": "passed"
+            },
+            {
+              "path": "cases/a.json",
+              "id": "two",
+              "status": "passed"
+            },
+            {
+              "path": "cases/a.json",
+              "status": "error",
+              "error": {
+                "code": "format_error"
+              }
+            },
+            {
+              "path": "cases/b.json",
+              "id": "one",
+              "status": "passed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/files/decision-table",
+      "spec": [
+        "tests.md#running-cases",
+        "tests.md#matching",
+        "tests.md#test-runs"
+      ],
+      "description": "a decision table is tested through the rule set it compiles to; the run names the table's own policy, here in the reason of a missing single output",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "decision_table": {
+            "hit_policy": "collect",
+            "logic": "boolean",
+            "inputs": [
+              "x"
+            ],
+            "outputs": [
+              {
+                "name": "v"
+              }
+            ],
+            "rows": [
+              {
+                "name": "low",
+                "inputs": [
+                  "> 0"
+                ],
+                "outputs": [
+                  "1"
+                ]
+              },
+              {
+                "inputs": [
+                  "> 1"
+                ],
+                "outputs": [
+                  "2"
+                ]
+              }
+            ]
+          }
+        },
+        "cases": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "both",
+                "input": {
+                  "x": 2
+                },
+                "expect": {
+                  "selected": [
+                    "low",
+                    "row_2"
+                  ],
+                  "outputs": [
+                    {
+                      "v": 1
+                    },
+                    {
+                      "v": 2
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "single",
+                "input": {
+                  "x": 1
+                },
+                "expect": {
+                  "output": {
+                    "v": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_explained": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "decision_table",
+          "hit_policy": "collect",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {}
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 2,
+            "passed": 1,
+            "failed": 1,
+            "error": 0,
+            "partial": false
+          },
+          "results": [
+            {
+              "id": "both",
+              "status": "passed"
+            },
+            {
+              "id": "single",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "output",
+                  "expected": {
+                    "v": 1
+                  },
+                  "reason": "the decision has no single output (collect)"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -18,11 +18,11 @@ import scala.jdk.CollectionConverters.*
 class ScalaConformanceSuite extends munit.FunSuite:
   /**
    * The skips the Scala route may have, as the Java route's: values no JVM value holds, the tools for agents (O.1),
-   * the static audit (T.7), diagrams (V.2) and conditions under a graded logic until task J.1b. Any other is a
-   * failure.
+   * the static audit (T.7), the case runner (T.3), diagrams (V.2) and conditions under a graded logic until task
+   * J.1b. Any other is a failure.
    */
   private val allowedSkips =
-    Set("decimal_infinity", "zone_unknown_to_java", "agents", "audit", "diagram", "graded", "bundle", "cases")
+    Set("decimal_infinity", "zone_unknown_to_java", "agents", "audit", "test_run", "diagram", "graded", "bundle", "cases")
 
   private val files = Conformance.files().asScala.toVector
   private val runner = ScalaConformance()
@@ -95,6 +95,7 @@ class ScalaConformanceSuite extends munit.FunSuite:
       vectors.collect { case (id, vector) if vector.get("given").asInstanceOf[java.util.Map[?, ?]].get("kind") == kind => id }.toVector
     assertEquals(skipped.getOrElse("agents", Vector()), ofKind("tool"))
     assertEquals(skipped.getOrElse("audit", Vector()), ofKind("audit"))
+    assertEquals(skipped.getOrElse("test_run", Vector()), ofKind("test_run"))
     assertEquals(skipped.getOrElse("diagram", Vector()), ofKind("draw"))
     assertEquals(skipped.getOrElse("graded", Vector()), vectors.collect { case (id, vector) if Conformance.isGraded(vector) => id }.toVector)
     // Canonical bytes and digests run the Scala way, never skipped.

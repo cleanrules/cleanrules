@@ -1,0 +1,10 @@
+---
+source: crates/core/tests/runner.rs
+expression: run.to_string()
+---
+Test run of a rule set: 2 rules, hit policy unique, logic boolean, strict
+ERROR   "missing"
+          missing_field: missing field x
+FAILED  "other-code"
+          error: expected type_mismatch, actual missing_field: missing field x
+5 results: 3 passed, 1 failed, 1 error

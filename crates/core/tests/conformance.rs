@@ -16,6 +16,7 @@ use cleanrules::Error;
 use cleanrules::agents::Catalog;
 use cleanrules::audit::{AuditLimits, audit, audit_table};
 use cleanrules::bundle::{self, Bundle, BundleId, BundleRules, CaseFileRef, Revision};
+use cleanrules::cases::{CaseFile, Runner, TestRunLimits};
 use cleanrules::eval::{Options, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
@@ -643,6 +644,141 @@ fn run_audit(vector: &Json) -> Result<(), String> {
     compare(Ok(written), get(vector, "expect").unwrap(), "audit")
 }
 
+/// The compared fields of an error written in its JSON form
+/// (`spec/errors.md`, *Comparing errors*): the others are dropped.
+fn compared_error(json: &mut Json) {
+    const COMPARED: [&str; 11] = [
+        "code", "pointer", "line", "column", "rule", "rules", "path", "types", "row", "name",
+        "executed",
+    ];
+    if let Json::Object(members) = json {
+        members.retain(|(k, _)| COMPARED.contains(&k.as_str()));
+    }
+}
+
+/// Reduce every error of a written test run to its compared fields: a
+/// result's `error`, and the `actual` of a mismatch of the key `error`.
+fn compared_errors(written: &mut Json) {
+    if let Json::Object(members) = written
+        && let Some((_, Json::Array(results))) = members.iter_mut().find(|(k, _)| k == "results")
+    {
+        for result in results {
+            let Json::Object(fields) = result else {
+                continue;
+            };
+            for (key, value) in fields.iter_mut() {
+                if key == "error" {
+                    compared_error(value);
+                }
+                if key == "mismatches"
+                    && let Json::Array(mismatches) = value
+                {
+                    for mismatch in mismatches {
+                        let Json::Object(parts) = mismatch else {
+                            continue;
+                        };
+                        let is_error = parts.iter().any(|(k, v)| {
+                            k == "key" && matches!(v, Json::String(s) if s == "error")
+                        });
+                        for (k, v) in parts.iter_mut() {
+                            if is_error && k == "actual" {
+                                compared_error(v);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A `test_run` vector (`spec/tests.md`, *Running cases*): run the cases of
+/// `cases` or `files` against the rules of `document`, then compare the test
+/// run with its errors reduced to their compared fields.
+fn run_test_run(vector: &Json) -> Result<(), String> {
+    let given = get(vector, "given").unwrap();
+    let limits = Limits::default();
+    let document = read_document(&to_string(get(given, "document").unwrap()), &limits)
+        .map_err(|e| format!("reading the rules: {e}"))?;
+    let texts: Vec<(String, String)> = match get(given, "files") {
+        Some(Json::Array(items)) => items
+            .iter()
+            .map(|item| {
+                (
+                    text(get(item, "path")).unwrap().to_owned(),
+                    text(get(item, "text")).unwrap().to_owned(),
+                )
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
+    let files: Vec<CaseFile> = match (&document, get(given, "cases")) {
+        (_, Some(cases)) => match read_document(&to_string(cases), &limits) {
+            Ok(Document::Cases(cases)) => vec![CaseFile::new(cases)],
+            other => return Err(format!("not a case file: {other:?}")),
+        },
+        (Document::Bundle(bundle), None) => CaseFile::bundle_files(bundle, |r| {
+            texts
+                .iter()
+                .find(|(path, _)| path == r.path())
+                .map(|(_, text)| text.as_bytes().to_vec())
+                .ok_or_else(|| format!("no file {}", r.path()))
+        })?,
+        (_, None) => texts
+            .iter()
+            .map(|(path, text)| CaseFile::read(path, text.as_bytes(), &limits))
+            .collect(),
+    };
+    let mut run_limits = TestRunLimits::default();
+    if let Some(Json::Object(members)) = get(given, "limits") {
+        for (key, value) in members {
+            let Json::Number(n) = value else {
+                return Err(format!("limit {key} is not a number"));
+            };
+            let n = usize::try_from(n.as_i128().unwrap()).unwrap();
+            run_limits = match key.as_str() {
+                "max_results" => run_limits.with_max_results(n),
+                "max_steps" => run_limits.with_max_steps(n),
+                "max_explained" => run_limits.with_max_explained(n),
+                other => return Err(format!("unknown limit {other}")),
+            };
+        }
+    }
+    let runner = match &document {
+        Document::RuleSet(ruleset) => Runner::new(ruleset),
+        Document::DecisionTable(table) => Runner::for_table(table),
+        Document::Bundle(bundle) => Runner::for_bundle(bundle),
+        _ => return Err("not rules".into()),
+    }
+    .with_limits(run_limits);
+    let digest = matches!(get(given, "ruleset_digest"), Some(Json::Bool(true)));
+    let report = match get(given, "cancel_after") {
+        Some(Json::Number(n)) => {
+            let after = usize::try_from(n.as_i128().unwrap()).unwrap();
+            let mut asked = 0;
+            runner.run_until(&files, || {
+                asked += 1;
+                asked > after
+            })
+        }
+        _ => runner.run(&files),
+    }
+    .with_ruleset_digest(digest);
+    let mut written = cleanrules::format::write_test_run(&report);
+    compared_errors(&mut written);
+    // The expected `engine.version` is this engine's, whichever it is
+    // (`conformance/README.md`, `test_run`).
+    let mut expect = get(vector, "expect").unwrap().clone();
+    if let Json::Object(members) = &mut expect
+        && let Some((_, Json::Object(run))) = members.iter_mut().find(|(k, _)| k == "test_run")
+        && let Some((_, Json::Object(engine))) = run.iter_mut().find(|(k, _)| k == "engine")
+        && let Some((_, version)) = engine.iter_mut().find(|(k, _)| k == "version")
+    {
+        *version = Json::String(cleanrules::bundle::ENGINE_VERSION.to_owned());
+    }
+    compare(Ok(written), &expect, "test_run")
+}
+
 fn run(vector: &Json) -> Result<(), String> {
     let given = get(vector, "given").unwrap();
     let kind = text(get(given, "kind")).unwrap();
@@ -672,6 +808,9 @@ fn run(vector: &Json) -> Result<(), String> {
     }
     if kind == "audit" {
         return run_audit(vector);
+    }
+    if kind == "test_run" {
+        return run_test_run(vector);
     }
     let limits = Limits::default();
     let node_key = if kind == "condition" {
@@ -759,6 +898,7 @@ fn conformance_vectors() {
                         | "draw"
                         | "canonical"
                         | "audit"
+                        | "test_run"
                 ) {
                     *pending.entry(kind.to_owned()).or_default() += 1;
                     continue;

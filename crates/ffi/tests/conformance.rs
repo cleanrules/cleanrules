@@ -635,6 +635,9 @@ fn the_vectors_pass_through_the_c_abi() {
         // Nor is the static audit (`spec/audit.md`; `docs/PLAN.md`, T.7 and
         // T.9): its vectors are counted and skipped too.
         let mut audits = 0;
+        // Nor is the case runner (`spec/tests.md`, *Running cases*;
+        // `docs/PLAN.md`, T.3 and T.9b).
+        let mut test_runs = 0;
         for file in files() {
             let document = json(&fs::read_to_string(&file).unwrap());
             let Some(Json::Array(vectors)) = get(&document, "vectors") else {
@@ -655,6 +658,10 @@ fn the_vectors_pass_through_the_c_abi() {
                 }
                 if string(get(given, "kind")) == Some("audit") {
                     audits += 1;
+                    continue;
+                }
+                if string(get(given, "kind")) == Some("test_run") {
+                    test_runs += 1;
                     continue;
                 }
                 // Conditions under a graded logic: the C ABI evaluates one
@@ -678,8 +685,9 @@ fn the_vectors_pass_through_the_c_abi() {
         assert!(ran >= 2508, "only {ran} vectors ran");
         assert!(skipped >= 14, "{skipped} native-only vectors skipped");
         assert!(graded >= 96, "{graded} graded-logic vectors skipped");
+        assert!(test_runs >= 26, "{test_runs} test run vectors skipped");
         println!(
-            "{ran} ran, {skipped} native-only, {tools} tool vectors (agents), {audits} audit vectors and {graded} graded-logic vectors skipped"
+            "{ran} ran, {skipped} native-only, {tools} tool vectors (agents), {audits} audit vectors, {test_runs} test run vectors and {graded} graded-logic vectors skipped"
         );
     });
 }

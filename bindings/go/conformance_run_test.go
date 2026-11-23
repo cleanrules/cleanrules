@@ -118,7 +118,7 @@ func TestConformance(t *testing.T) {
 	// The only skips of the JSON route: grids, evaluate vectors with limits
 	// (max_values bounds native data only), tools for agents, audits, diagrams
 	// and conditions under a graded logic.
-	var grids, limited, zero, tools, audits, drawn, graded []string
+	var grids, limited, zero, tools, audits, runs, drawn, graded []string
 	for _, file := range files {
 		for _, vector := range file.vectors {
 			given, id := vector.obj("given"), vector.str("id")
@@ -127,6 +127,9 @@ func TestConformance(t *testing.T) {
 			}
 			if given.str("kind") == "audit" {
 				audits = append(audits, id)
+			}
+			if given.str("kind") == "test_run" {
+				runs = append(runs, id)
 			}
 			if given.str("kind") == "draw" {
 				drawn = append(drawn, id)
@@ -143,7 +146,7 @@ func TestConformance(t *testing.T) {
 			// A bundle vector's limits are skipped as bundles, which Go cannot
 			// make, and an audit's are the audit's, which Go does not run.
 			kind := given.str("kind")
-			if limits := given.obj("limits"); limits != nil && kind != "bundle" && kind != "audit" {
+			if limits := given.obj("limits"); limits != nil && kind != "bundle" && kind != "audit" && kind != "test_run" {
 				for _, value := range limits.values {
 					if fmt.Sprint(value) == "0" {
 						zero = append(zero, id)
@@ -168,6 +171,9 @@ func TestConformance(t *testing.T) {
 	for _, route := range conformanceRoutes {
 		if !slices.Equal(counts[route].skipped["audit"], audits) {
 			t.Errorf("%s skipped %v as audits, the audit vectors are %v", route, counts[route].skipped["audit"], audits)
+		}
+		if !slices.Equal(counts[route].skipped["test_run"], runs) {
+			t.Errorf("%s skipped %v as test runs, the test run vectors are %v", route, counts[route].skipped["test_run"], runs)
 		}
 	}
 	// Both routes skip the diagrams, which this binding draws from phase V.2.

@@ -1,0 +1,938 @@
+{
+  "version": 1,
+  "area": "tests",
+  "vectors": [
+    {
+      "id": "tests/interruption/max-results",
+      "spec": [
+        "tests.md#batches-and-interruption",
+        "tests.md#test-runs"
+      ],
+      "description": "max_results stops the run after that many results: a prefix of the full run, partial, with the results not given",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "files": [
+          {
+            "path": "one.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"a\", \"input\": {\"x\": 1}}, {\"id\": \"b\", \"input\": {\"x\": 0}}]}}"
+          },
+          {
+            "path": "bad.json",
+            "text": "[]"
+          },
+          {
+            "path": "two.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"c\", \"input\": {\"x\": 1}}, {\"id\": \"d\", \"input\": {\"x\": 1}, \"expect\": {\"selected\": []}}]}}"
+          }
+        ],
+        "limits": {
+          "max_explained": 0,
+          "max_results": 2
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {
+              "path": "one.json",
+              "digest": "sha256:6adc5dbab2900a2521ed8ccba88c652a05e2ccd1495912afe5f20e39c5ea9d6e"
+            },
+            {
+              "path": "bad.json",
+              "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "path": "two.json",
+              "digest": "sha256:2235bf1d3433e68ca4ad14a004cc223deb43d1ac500f6690cd80fdffa27c6bd1"
+            }
+          ],
+          "limits": {
+            "max_explained": 0,
+            "max_results": 2
+          },
+          "summary": {
+            "total": 2,
+            "passed": 2,
+            "failed": 0,
+            "error": 0,
+            "partial": true,
+            "interrupted": {
+              "reason": "max_results",
+              "remaining": 3
+            }
+          },
+          "results": [
+            {
+              "path": "one.json",
+              "id": "a",
+              "status": "passed"
+            },
+            {
+              "path": "one.json",
+              "id": "b",
+              "status": "passed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/interruption/max-steps",
+      "spec": [
+        "tests.md#batches-and-interruption"
+      ],
+      "description": "each case costs one step per rule and an unreadable file none: with 4 steps, two cases and the file run, and the next case would go past the limit",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "files": [
+          {
+            "path": "one.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"a\", \"input\": {\"x\": 1}}, {\"id\": \"b\", \"input\": {\"x\": 0}}]}}"
+          },
+          {
+            "path": "bad.json",
+            "text": "[]"
+          },
+          {
+            "path": "two.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"c\", \"input\": {\"x\": 1}}, {\"id\": \"d\", \"input\": {\"x\": 1}, \"expect\": {\"selected\": []}}]}}"
+          }
+        ],
+        "limits": {
+          "max_explained": 0,
+          "max_steps": 4
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {
+              "path": "one.json",
+              "digest": "sha256:6adc5dbab2900a2521ed8ccba88c652a05e2ccd1495912afe5f20e39c5ea9d6e"
+            },
+            {
+              "path": "bad.json",
+              "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "path": "two.json",
+              "digest": "sha256:2235bf1d3433e68ca4ad14a004cc223deb43d1ac500f6690cd80fdffa27c6bd1"
+            }
+          ],
+          "limits": {
+            "max_explained": 0,
+            "max_steps": 4
+          },
+          "summary": {
+            "total": 3,
+            "passed": 2,
+            "failed": 0,
+            "error": 1,
+            "partial": true,
+            "interrupted": {
+              "reason": "max_steps",
+              "remaining": 2
+            }
+          },
+          "results": [
+            {
+              "path": "one.json",
+              "id": "a",
+              "status": "passed"
+            },
+            {
+              "path": "one.json",
+              "id": "b",
+              "status": "passed"
+            },
+            {
+              "path": "bad.json",
+              "status": "error",
+              "error": {
+                "code": "format_error",
+                "pointer": ""
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/interruption/max-steps-zero",
+      "spec": [
+        "tests.md#batches-and-interruption"
+      ],
+      "description": "with no step, no case runs, and the run is partial with every result remaining",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "files": [
+          {
+            "path": "one.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"a\", \"input\": {\"x\": 1}}, {\"id\": \"b\", \"input\": {\"x\": 0}}]}}"
+          },
+          {
+            "path": "bad.json",
+            "text": "[]"
+          },
+          {
+            "path": "two.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"c\", \"input\": {\"x\": 1}}, {\"id\": \"d\", \"input\": {\"x\": 1}, \"expect\": {\"selected\": []}}]}}"
+          }
+        ],
+        "limits": {
+          "max_explained": 0,
+          "max_steps": 0
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {
+              "path": "one.json",
+              "digest": "sha256:6adc5dbab2900a2521ed8ccba88c652a05e2ccd1495912afe5f20e39c5ea9d6e"
+            },
+            {
+              "path": "bad.json",
+              "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "path": "two.json",
+              "digest": "sha256:2235bf1d3433e68ca4ad14a004cc223deb43d1ac500f6690cd80fdffa27c6bd1"
+            }
+          ],
+          "limits": {
+            "max_explained": 0,
+            "max_steps": 0
+          },
+          "summary": {
+            "total": 0,
+            "passed": 0,
+            "failed": 0,
+            "error": 0,
+            "partial": true,
+            "interrupted": {
+              "reason": "max_steps",
+              "remaining": 5
+            }
+          },
+          "results": []
+        }
+      }
+    },
+    {
+      "id": "tests/interruption/limits-in-order",
+      "spec": [
+        "tests.md#batches-and-interruption"
+      ],
+      "description": "max_results is checked before max_steps",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "files": [
+          {
+            "path": "one.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"a\", \"input\": {\"x\": 1}}, {\"id\": \"b\", \"input\": {\"x\": 0}}]}}"
+          },
+          {
+            "path": "bad.json",
+            "text": "[]"
+          },
+          {
+            "path": "two.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"c\", \"input\": {\"x\": 1}}, {\"id\": \"d\", \"input\": {\"x\": 1}, \"expect\": {\"selected\": []}}]}}"
+          }
+        ],
+        "limits": {
+          "max_explained": 0,
+          "max_results": 1,
+          "max_steps": 2
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {
+              "path": "one.json",
+              "digest": "sha256:6adc5dbab2900a2521ed8ccba88c652a05e2ccd1495912afe5f20e39c5ea9d6e"
+            },
+            {
+              "path": "bad.json",
+              "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "path": "two.json",
+              "digest": "sha256:2235bf1d3433e68ca4ad14a004cc223deb43d1ac500f6690cd80fdffa27c6bd1"
+            }
+          ],
+          "limits": {
+            "max_explained": 0,
+            "max_results": 1,
+            "max_steps": 2
+          },
+          "summary": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "error": 0,
+            "partial": true,
+            "interrupted": {
+              "reason": "max_results",
+              "remaining": 4
+            }
+          },
+          "results": [
+            {
+              "path": "one.json",
+              "id": "a",
+              "status": "passed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/interruption/cancelled",
+      "spec": [
+        "tests.md#batches-and-interruption"
+      ],
+      "description": "the caller's callback, asked before each result, cancels the run after three",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "files": [
+          {
+            "path": "one.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"a\", \"input\": {\"x\": 1}}, {\"id\": \"b\", \"input\": {\"x\": 0}}]}}"
+          },
+          {
+            "path": "bad.json",
+            "text": "[]"
+          },
+          {
+            "path": "two.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"c\", \"input\": {\"x\": 1}}, {\"id\": \"d\", \"input\": {\"x\": 1}, \"expect\": {\"selected\": []}}]}}"
+          }
+        ],
+        "limits": {
+          "max_explained": 0
+        },
+        "cancel_after": 3
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {
+              "path": "one.json",
+              "digest": "sha256:6adc5dbab2900a2521ed8ccba88c652a05e2ccd1495912afe5f20e39c5ea9d6e"
+            },
+            {
+              "path": "bad.json",
+              "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "path": "two.json",
+              "digest": "sha256:2235bf1d3433e68ca4ad14a004cc223deb43d1ac500f6690cd80fdffa27c6bd1"
+            }
+          ],
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 3,
+            "passed": 2,
+            "failed": 0,
+            "error": 1,
+            "partial": true,
+            "interrupted": {
+              "reason": "cancelled",
+              "remaining": 2
+            }
+          },
+          "results": [
+            {
+              "path": "one.json",
+              "id": "a",
+              "status": "passed"
+            },
+            {
+              "path": "one.json",
+              "id": "b",
+              "status": "passed"
+            },
+            {
+              "path": "bad.json",
+              "status": "error",
+              "error": {
+                "code": "format_error",
+                "pointer": ""
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/interruption/complete-at-the-limit",
+      "spec": [
+        "tests.md#batches-and-interruption"
+      ],
+      "description": "a run that has given its last result is complete, never partial, even at its limits and with a callback that would cancel",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                }
+              },
+              {
+                "name": "b",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "files": [
+          {
+            "path": "one.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"a\", \"input\": {\"x\": 1}}, {\"id\": \"b\", \"input\": {\"x\": 0}}]}}"
+          },
+          {
+            "path": "bad.json",
+            "text": "[]"
+          },
+          {
+            "path": "two.json",
+            "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"c\", \"input\": {\"x\": 1}}, {\"id\": \"d\", \"input\": {\"x\": 1}, \"expect\": {\"selected\": []}}]}}"
+          }
+        ],
+        "limits": {
+          "max_explained": 0,
+          "max_results": 5,
+          "max_steps": 8
+        },
+        "cancel_after": 5
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {
+              "path": "one.json",
+              "digest": "sha256:6adc5dbab2900a2521ed8ccba88c652a05e2ccd1495912afe5f20e39c5ea9d6e"
+            },
+            {
+              "path": "bad.json",
+              "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "path": "two.json",
+              "digest": "sha256:2235bf1d3433e68ca4ad14a004cc223deb43d1ac500f6690cd80fdffa27c6bd1"
+            }
+          ],
+          "limits": {
+            "max_explained": 0,
+            "max_results": 5,
+            "max_steps": 8
+          },
+          "summary": {
+            "total": 5,
+            "passed": 3,
+            "failed": 1,
+            "error": 1,
+            "partial": false
+          },
+          "results": [
+            {
+              "path": "one.json",
+              "id": "a",
+              "status": "passed"
+            },
+            {
+              "path": "one.json",
+              "id": "b",
+              "status": "passed"
+            },
+            {
+              "path": "bad.json",
+              "status": "error",
+              "error": {
+                "code": "format_error",
+                "pointer": ""
+              }
+            },
+            {
+              "path": "two.json",
+              "id": "c",
+              "status": "passed"
+            },
+            {
+              "path": "two.json",
+              "id": "d",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "selected",
+                  "expected": [],
+                  "actual": [
+                    "a"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tests/interruption/explained-up-to-the-limit",
+      "spec": [
+        "tests.md#explaining-failures"
+      ],
+      "description": "only the first max_explained failures are explained, in run order",
+      "given": {
+        "kind": "test_run",
+        "document": {
+          "version": 1,
+          "ruleset": {
+            "hit_policy": "first",
+            "logic": "boolean",
+            "rules": [
+              {
+                "name": "a",
+                "when": {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": 0
+                  }
+                },
+                "then": {
+                  "v": {
+                    "op": "const",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "cases": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "first",
+                "input": {
+                  "x": 1
+                },
+                "expect": {
+                  "selected": []
+                }
+              },
+              {
+                "id": "second",
+                "input": {
+                  "x": 2
+                },
+                "expect": {
+                  "selected": []
+                }
+              }
+            ]
+          }
+        },
+        "limits": {
+          "max_explained": 1
+        }
+      },
+      "expect": {
+        "test_run": {
+          "source": "ruleset",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "engine": {
+            "name": "cleanrules",
+            "version": "0.0.0-this-engine",
+            "limits": {
+              "max_size": 16777216,
+              "max_nesting": 1024,
+              "max_depth": 256,
+              "max_path_segments": 256,
+              "max_table_size": 2097152,
+              "max_values": 1000000
+            }
+          },
+          "files": [
+            {}
+          ],
+          "limits": {
+            "max_explained": 1
+          },
+          "summary": {
+            "total": 2,
+            "passed": 0,
+            "failed": 2,
+            "error": 0,
+            "partial": false
+          },
+          "results": [
+            {
+              "id": "first",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "selected",
+                  "expected": [],
+                  "actual": [
+                    "a"
+                  ]
+                }
+              ],
+              "explanation_text": "HIT POLICY first: selected a\n[x] a (selected): x > 0\n    - x > 0 is true (x = 1)"
+            },
+            {
+              "id": "second",
+              "status": "failed",
+              "mismatches": [
+                {
+                  "key": "selected",
+                  "expected": [],
+                  "actual": [
+                    "a"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

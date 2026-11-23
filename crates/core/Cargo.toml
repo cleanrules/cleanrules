@@ -82,3 +82,8 @@ required-features = ["yaml"]
 [[example]]
 name = "audit"
 path = "../../docs/examples/audit.rs"
+
+# The example of running test cases in the documentation (tasks T.2 and T.3).
+[[example]]
+name = "test_run"
+path = "../../docs/examples/test_run.rs"

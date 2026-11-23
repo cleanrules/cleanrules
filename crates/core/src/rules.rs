@@ -578,6 +578,28 @@ pub(crate) fn repeated_id_error(rule: &Rule, earlier: &Rule) -> Error {
     })
 }
 
+/// Where a rule set comes from, as an audit and a test run name it: a rule
+/// set document, or a decision table compiled into one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RulesSource {
+    /// A rule set.
+    RuleSet,
+    /// A decision table, through the rule set it compiles to.
+    DecisionTable,
+}
+
+impl RulesSource {
+    /// The source's name, which is also its document's content key.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RulesSource::RuleSet => "ruleset",
+            RulesSource::DecisionTable => "decision_table",
+        }
+    }
+}
+
 /// Rules evaluated together under a hit policy.
 #[derive(Clone, Debug)]
 pub struct RuleSet {

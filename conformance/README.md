@@ -11,6 +11,7 @@ conformance/
   tools/check.py                the vector checker
   tools/decimal_vectors.py      the decimal oracle: writes and checks vectors
   tools/canonical_vectors.py    the canonical-bytes oracle: writes and checks vectors
+  tools/test_run_vectors.py     writes and checks the case runner's vectors (tests/)
 ```
 
 ## Vector files
@@ -61,6 +62,7 @@ A vector file is a JSON document:
 | `bundle` | `document` (a rule set or decision table document: the rules), `id`, `revision`; optional `cases` (an array of `{"path", "text"}`: each case file's path and content as UTF-8 text) and `limits` (any of the six that a bundle records, `spec/bundles.md`, *Engine*) | make a bundle of the rules with this engine (`spec/bundles.md`, *Making a bundle*), write it, and read it back | `document`: the bundle, whose `engine.version` the runner first sets to its own engine's; or `error` (its `code` only) |
 | `bundle_compare` | `a`, `b`: two bundle documents | read both, then compare `a` with `b` (`spec/bundles.md`, *Comparing bundles*) | `comparison`: `relation`, `identical` and `differences` |
 | `audit` | `document` (a rule set or decision table document); optional `limits` (`max_terms`, `max_steps`, `spec/audit.md`, *Limits*) and `ruleset_digest` (`true`: ask for the digest in the report) | `audit` or `audit_table` (`spec/audit.md`) | `audit`: the report without the `message` and `witness` of each diagnostic (below) |
+| `test_run` | `document` (a rule set, decision table or bundle document: the rules); `cases` (a case file document, run without a path) or `files` (an array of `{"path", "text"}`: case files with their paths and contents as UTF-8 text, in order; for a bundle, the files it names, looked up by path); optional `limits` (`max_results`, `max_steps`, `max_explained`), `cancel_after` (an int: the run is given a cancel callback that says so when it is asked after that many results) and `ruleset_digest` (`true`) | run the cases against the rules (`spec/tests.md`, *Running cases*): from a bundle, its case files checked against their digests | `test_run`: the test run, with each error (a result's `error`, and the `actual` of an `error` mismatch) written with its code and compared fields only, and `engine.version`, which the runner first sets to its own engine's |
 | `draw` | `format` (`dot`, `mermaid`, `html` or `html_fragment`), `document` (a condition, rule, rule set or decision table document); optional `input`, with a rule set or a table; optional `limits` (`max_diagram_size`) | `draw_document` (`spec/visual.md`); with an `input`, the rule set (or the table's rule set) evaluates it, and the runner draws the decision's explanation for a rule set (`draw_explanation`), and the table with the decision for a table (`draw_document` with the decision) | `diagram`: the exact text, compared as a string, or `error` (`code` and `name`) |
 
 Optional flags such as `strict` are omitted when false. A bundle's `engine.version`
@@ -106,6 +108,14 @@ because the spec says that they are informative:
   `hit_policy_error` naming both its rules; any other `overlap` gives a
   decision in which both fire; a `gap` gives a decision in which no rule
   fires; and those two codes, and only those, have one;
+- in `test_run` vectors, the runner sets `engine.version` of the expected
+  test run to its engine's version (`cr_version()`,
+  `cleanrules.__version__`, ...), as for bundles of the current engine; each
+  error of the actual test run (a result's
+  `error`, and the `actual` of a mismatch of the key `error`) keeps only its
+  code and the compared fields of `spec/errors.md` (*Comparing errors*);
+  explanations are compared exactly, as `explain` vectors compare their
+  `text`;
 - in `tool` vectors, an agent error (a tool error, or the `error` of a
   `validate` result) must have a non-empty `hint`, and is compared on every
   member of its JSON form except `message`, `hint`, `cause`, `node`,
@@ -162,6 +172,15 @@ output, never stopping at the first one.
   and C++ are beta): until then the C ABI, Python, C++, JavaScript, Java,
   Scala and Go runners skip them in every route, count them and say why
   (`audit` in the JavaScript, Go and JVM reports).
+- **Test runs** (`spec/tests.md`, *Running cases*): the core's runner runs
+  the `test_run` vectors. Python and JavaScript run cases from task T.9b
+  (Java, Scala, Go and C++ are beta): until then the C ABI, Python, C++,
+  JavaScript, Java, Scala and Go runners skip them in every route, count them
+  and say why (`test_run` in the JavaScript, Go and JVM reports). The
+  vectors are written by `tools/test_run_vectors.py` (`--write`; `--check` in
+  CI), whose expected results are written by hand from the spec; it computes
+  only the digests of case files and bundles, with the canonical-bytes
+  oracle.
 - **Diagrams in the bindings**: until each binding draws diagrams (phase V.2),
   the Python, C++, JavaScript, Java, Scala and Go runners skip the `draw`
   vectors, count them and state the reason (`diagram` in the JavaScript, Go

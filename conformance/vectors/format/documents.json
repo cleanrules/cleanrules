@@ -385,6 +385,42 @@
       }
     },
     {
+      "id": "format/documents/test-run-is-output-only",
+      "spec": [
+        "json-format.md#documents",
+        "json-format.md#test-runs",
+        "tests.md#test-runs"
+      ],
+      "description": "test runs are output only",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "test_run": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "limits": {
+              "max_explained": 5
+            },
+            "summary": {
+              "total": 0,
+              "passed": 0,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "results": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
       "id": "format/documents/lone-surrogate",
       "spec": [
         "json-format.md#documents",

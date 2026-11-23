@@ -1,0 +1,16 @@
+---
+source: crates/core/tests/runner.rs
+expression: run.to_string()
+---
+Test run of a rule set: 3 rules, hit policy priority, logic boolean
+ERROR   cases/syntax.json
+          format_error at line 1, column 2: expected a string key, found the end of the document
+ERROR   cases/rules.json
+          format_error at the root: this document holds a rule set, not test cases
+          hint: give a case file: {"version": 1, "cases": {"items": [...]}}
+ERROR   cases/twice.json
+          format_error at /cases/items/1/id: two cases have the id "a"
+          hint: give each case of a file its own id
+ERROR   cases/version.json
+          unsupported_version at /version: this reader knows format version 1
+8 results: 4 passed, 0 failed, 4 errors

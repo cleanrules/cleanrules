@@ -565,6 +565,88 @@
             "document"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Run test cases against rules (spec/tests.md, Running cases).",
+          "properties": {
+            "kind": {
+              "const": "test_run"
+            },
+            "document": {
+              "type": "object",
+              "description": "The rules: a rule set, decision table or bundle document (spec/json-format.md)."
+            },
+            "cases": {
+              "type": "object",
+              "description": "A case file document, run without a path."
+            },
+            "files": {
+              "type": "array",
+              "description": "Case files with their paths and contents as UTF-8 text, in order; for a bundle, the files it names, by path.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "max_results": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "max_steps": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "max_explained": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            },
+            "cancel_after": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Cancel the run by a callback that says so when it is asked after this many results (spec/tests.md, Batches and interruption)."
+            },
+            "ruleset_digest": {
+              "const": true,
+              "description": "Ask for the rule set digest in the test run (spec/tests.md, Test runs)."
+            }
+          },
+          "required": [
+            "kind",
+            "document"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "cases"
+              ]
+            },
+            {
+              "required": [
+                "files"
+              ]
+            }
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -724,6 +806,10 @@
         "audit": {
           "type": "object",
           "description": "The audit (spec/audit.md, JSON) without the message and witness of each diagnostic, which the runner checks instead (conformance/README.md)."
+        },
+        "test_run": {
+          "type": "object",
+          "description": "The test run (spec/tests.md, Test runs), with each error written with its code and compared fields only, which the runner compares as errors are (conformance/README.md, Comparing)."
         }
       },
       "additionalProperties": false

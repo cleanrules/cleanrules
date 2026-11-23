@@ -267,7 +267,38 @@ impl Error {
     pub fn context_mut(&mut self) -> &mut Context {
         &mut self.inner.context
     }
+
+    /// A copy of this error: its code, message, hint and context, and the
+    /// message of its cause as the copy's cause. Errors are not `Clone`, since
+    /// a cause may not be; the copy reads the same in every form.
+    pub(crate) fn duplicate(&self) -> Self {
+        let inner = &self.inner;
+        Self {
+            inner: Box::new(Inner {
+                code: inner.code,
+                message: inner.message.clone(),
+                hint: inner.hint.clone(),
+                context: inner.context.clone(),
+                source: inner.source.as_ref().map(|source| {
+                    Box::new(CauseMessage(source.to_string()))
+                        as Box<dyn std::error::Error + Send + Sync>
+                }),
+            }),
+        }
+    }
 }
+
+/// The message of a cause, kept by [`Error::duplicate`].
+#[derive(Debug)]
+struct CauseMessage(String);
+
+impl fmt::Display for CauseMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for CauseMessage {}
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -343,5 +374,14 @@ mod tests {
         assert_eq!(error.hint(), Some("check the data"));
         assert_eq!(error.context().pointer.as_deref(), Some("/condition"));
         assert!(std::error::Error::source(&error).is_some());
+        let copy = error.duplicate();
+        assert_eq!(copy.code(), ErrorCode::EvaluationError);
+        assert_eq!(copy.to_string(), error.to_string());
+        assert_eq!(copy.hint(), error.hint());
+        assert_eq!(copy.context(), error.context());
+        let cause = std::error::Error::source(&copy).map(ToString::to_string);
+        assert_eq!(cause.as_deref(), Some("disk on fire"));
+        let plain = Error::new(ErrorCode::FormatError, "bad").duplicate();
+        assert!(std::error::Error::source(&plain).is_none());
     }
 }

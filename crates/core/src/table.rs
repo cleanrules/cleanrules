@@ -55,6 +55,18 @@ pub enum TablePolicy {
 }
 
 impl TablePolicy {
+    /// The table policy of the same name as a rule set's policy.
+    pub(crate) fn of_ruleset(policy: HitPolicy) -> Self {
+        match policy {
+            HitPolicy::First => TablePolicy::First,
+            HitPolicy::Priority => TablePolicy::Priority,
+            HitPolicy::Unique => TablePolicy::Unique,
+            HitPolicy::Any => TablePolicy::Any,
+            HitPolicy::RuleOrder => TablePolicy::RuleOrder,
+            HitPolicy::Collect => TablePolicy::Collect,
+        }
+    }
+
     /// The name in the format.
     #[must_use]
     pub fn as_str(self) -> &'static str {

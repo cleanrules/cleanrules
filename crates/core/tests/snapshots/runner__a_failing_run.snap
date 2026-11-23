@@ -1,0 +1,51 @@
+---
+source: crates/core/tests/runner.rs
+expression: run.to_string()
+---
+Test run of a rule set: 3 rules, hit policy priority, logic boolean
+FAILED  "every-key"
+          selected: expected ["loyal"], actual ["vip"]
+          output: expected {"discount":{"$decimal":"0.05"}}, actual {"discount":{"$decimal":"0.15"}}
+          outputs: expected [{"discount":{"$decimal":"0.05"}}], actual [{"discount":{"$decimal":"0.15"}}]
+          unknown: expected [], actual ["blocked"]
+          explanation:
+            HIT POLICY priority: selected vip
+            [?] blocked (unknown): customer.blocked
+                blocked customers never get a discount
+                - customer.blocked is unknown: missing field customer.blocked
+            [x] vip (selected): customer.years > 5 AND order.total > 1000
+                because all of these hold:
+                - customer.years > 5 is true (customer.years = 7)
+                - order.total > 1000 is true (order.total = 1500)
+            [x] loyal (fired, not selected): customer.years > 2 OR customer.newsletter
+                fired, but vip has a higher priority (10 > 5)
+                - customer.years > 2 is true (customer.years = 7)
+FAILED  "no-error"
+          error: expected hit_policy_error, actual no error
+          explanation:
+            HIT POLICY priority: selected no rule
+            [?] blocked (unknown): customer.blocked
+                blocked customers never get a discount
+                - customer.blocked is unknown: missing field customer.blocked
+            [ ] vip (not fired): customer.years > 5 AND order.total > 1000
+                would fire if all of these changed:
+                - customer.years > 5 is false (customer.years = 1); short by 4
+                - order.total > 1000 is unknown: missing field order
+            [?] loyal (unknown): customer.years > 2 OR customer.newsletter
+                - customer.newsletter is unknown: missing field customer.newsletter
+FAILED  "nothing-expected"
+          output: expected {}, actual null
+          explanation:
+            HIT POLICY priority: selected no rule
+            [?] blocked (unknown): customer.blocked
+                blocked customers never get a discount
+                - customer.blocked is unknown: missing field customer
+            [?] vip (unknown): customer.years > 5 AND order.total > 1000
+                would fire if all of these changed:
+                - customer.years > 5 is unknown: missing field customer
+                - order.total > 1000 is unknown: missing field order
+            [?] loyal (unknown): customer.years > 2 OR customer.newsletter
+                would fire if any of these changed:
+                - customer.years > 2 is unknown: missing field customer
+                - customer.newsletter is unknown: missing field customer
+4 results: 1 passed, 3 failed, 0 errors

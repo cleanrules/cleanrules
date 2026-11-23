@@ -3,15 +3,15 @@
 
 use std::fmt;
 
-use super::{Audit, AuditSource, CheckStatus, UndecidedReason};
+use super::{Audit, CheckStatus, RulesSource, UndecidedReason};
 use crate::format::write_value;
 use crate::json::to_string;
 
 impl fmt::Display for Audit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let what = match self.source {
-            AuditSource::RuleSet => "a rule set",
-            AuditSource::DecisionTable => "a decision table",
+            RulesSource::RuleSet => "a rule set",
+            RulesSource::DecisionTable => "a decision table",
         };
         let count = self.rules.len();
         write!(

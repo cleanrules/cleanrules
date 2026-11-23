@@ -1,0 +1,12 @@
+---
+source: crates/core/tests/runner.rs
+expression: run.to_string()
+---
+Test run of a rule set: 1 rule, hit policy rule_order, logic boolean
+FAILED  "one"
+          output: expected {"v":1}; the decision has no single output (rule_order)
+          explanation:
+            HIT POLICY rule_order: selected a
+            [x] a (selected): x > 1
+                - x > 1 is true (x = 2)
+1 result: 0 passed, 1 failed, 0 errors

@@ -34,6 +34,9 @@ mod domain;
 mod read;
 mod text;
 
+/// What was audited: a rule set, or a decision table. Shared with test runs.
+pub use crate::rules::RulesSource;
+
 use std::collections::BTreeMap;
 
 use check::Auditor;
@@ -393,27 +396,6 @@ pub struct Undecided {
     pub remaining: Option<usize>,
 }
 
-/// What was audited.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum AuditSource {
-    /// A rule set.
-    RuleSet,
-    /// A decision table.
-    DecisionTable,
-}
-
-impl AuditSource {
-    /// The source's name, which is also its document's content key.
-    #[must_use]
-    pub fn as_str(self) -> &'static str {
-        match self {
-            AuditSource::RuleSet => "ruleset",
-            AuditSource::DecisionTable => "decision_table",
-        }
-    }
-}
-
 /// A rule of what was audited.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -431,7 +413,7 @@ pub struct AuditedRule {
 #[non_exhaustive]
 pub struct Audit {
     /// What was audited.
-    pub source: AuditSource,
+    pub source: RulesSource,
     /// The hit policy: a rule set's, as the table policy of the same name, or
     /// a decision table's.
     pub hit_policy: TablePolicy,
@@ -488,14 +470,7 @@ impl Audit {
 
 /// The table policy of the same name as a rule set's policy.
 fn table_policy(policy: HitPolicy) -> TablePolicy {
-    match policy {
-        HitPolicy::First => TablePolicy::First,
-        HitPolicy::Priority => TablePolicy::Priority,
-        HitPolicy::Unique => TablePolicy::Unique,
-        HitPolicy::Any => TablePolicy::Any,
-        HitPolicy::RuleOrder => TablePolicy::RuleOrder,
-        HitPolicy::Collect => TablePolicy::Collect,
-    }
+    TablePolicy::of_ruleset(policy)
 }
 
 /// The logic the audit reasons with: Kleene's, the only one a rule set takes
@@ -613,7 +588,7 @@ pub fn audit_table(table: &DecisionTable, limits: &AuditLimits) -> Result<Audit>
     let unlisted = unlisted_fields(table, ruleset, &rows);
     let mut auditor = Auditor::new(ruleset, &logic, limits);
     let mut report = auditor.run(&parts, &row_pointers, unlisted, CheckStatus::Complete);
-    report.source = AuditSource::DecisionTable;
+    report.source = RulesSource::DecisionTable;
     report.hit_policy = table.config().hit_policy;
     report.rules = ruleset
         .rules()

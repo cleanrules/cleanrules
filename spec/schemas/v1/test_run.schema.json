@@ -1,0 +1,523 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanrules.github.io/schemas/v1/test_run.schema.json",
+  "title": "cleanrules test run document, format version 1",
+  "description": "The results of running test cases against rules, and their summary, output only. See spec/tests.md (Running cases, Test runs), which is normative. Within format version 1 new optional keys, new reasons of interruption and new mismatch keys may be added: consumers ignore the keys and reasons they do not know, and show a mismatch of an unknown key from its expected, actual and reason. The statuses are a closed set.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "test_run": {
+      "$ref": "#/$defs/testRun"
+    }
+  },
+  "required": [
+    "version",
+    "test_run"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "testRun": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "enum": [
+            "ruleset",
+            "decision_table"
+          ]
+        },
+        "hit_policy": {
+          "enum": [
+            "first",
+            "priority",
+            "unique",
+            "any",
+            "rule_order",
+            "output_order",
+            "collect"
+          ]
+        },
+        "aggregate": {
+          "$ref": "ruleset.schema.json#/$defs/ruleset/properties/aggregate"
+        },
+        "logic": {
+          "$ref": "ruleset.schema.json#/$defs/ruleset/properties/logic"
+        },
+        "strict": {
+          "const": true
+        },
+        "ruleset_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "The rule set digest of the rules tested, when asked for (spec/json-format.md, Rule set digests)."
+        },
+        "engine": {
+          "description": "The engine that ran the cases, as a bundle records one (spec/bundles.md, Engine).",
+          "$ref": "bundle.schema.json#/$defs/bundle/properties/engine"
+        },
+        "bundle": {
+          "description": "The bundle whose cases were run.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "bundle.schema.json#/$defs/bundle/properties/id"
+            },
+            "revision": {
+              "$ref": "bundle.schema.json#/$defs/bundle/properties/revision"
+            }
+          },
+          "required": [
+            "id",
+            "revision"
+          ],
+          "additionalProperties": false
+        },
+        "files": {
+          "description": "The case files given to the run, in run order: each with its path when it has one, and the digest of its bytes when it was read from bytes.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "digest": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "max_explained": {
+              "description": "The most failed cases explained.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_results": {
+              "description": "The most results given, unreadable files included, when set.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_steps": {
+              "description": "The most steps (one per rule per case), when set.",
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "max_explained"
+          ],
+          "additionalProperties": false
+        },
+        "summary": {
+          "$ref": "#/$defs/summary"
+        },
+        "results": {
+          "description": "One result per case, and one per case file that cannot be read, in run order.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/result"
+          }
+        }
+      },
+      "required": [
+        "source",
+        "hit_policy",
+        "logic",
+        "engine",
+        "files",
+        "limits",
+        "summary",
+        "results"
+      ],
+      "additionalProperties": false
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "$ref": "#/$defs/count"
+        },
+        "passed": {
+          "$ref": "#/$defs/count"
+        },
+        "failed": {
+          "$ref": "#/$defs/count"
+        },
+        "error": {
+          "$ref": "#/$defs/count"
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "interrupted": {
+          "description": "Why a partial run stopped, and how many results it did not give.",
+          "type": "object",
+          "properties": {
+            "reason": {
+              "enum": [
+                "max_results",
+                "max_steps",
+                "cancelled"
+              ]
+            },
+            "remaining": {
+              "$ref": "#/$defs/count"
+            }
+          },
+          "required": [
+            "reason",
+            "remaining"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "total",
+        "passed",
+        "failed",
+        "error",
+        "partial"
+      ],
+      "additionalProperties": false,
+      "if": {
+        "properties": {
+          "partial": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "interrupted"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "interrupted"
+          ]
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "The path of the case's file, when it has one.",
+          "type": "string",
+          "minLength": 1
+        },
+        "id": {
+          "description": "The case's id; absent for a case file that cannot be read.",
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "error"
+          ]
+        },
+        "mismatches": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/mismatch"
+          }
+        },
+        "error": {
+          "$ref": "error.schema.json"
+        },
+        "explanation_text": {
+          "description": "The text of the decision's explanation (spec/explain.md, Text).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "status": {
+              "const": "passed"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "mismatches"
+                ]
+              },
+              {
+                "required": [
+                  "error"
+                ]
+              },
+              {
+                "required": [
+                  "explanation_text"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "failed"
+            }
+          },
+          "required": [
+            "id",
+            "mismatches"
+          ],
+          "not": {
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "error"
+            }
+          },
+          "required": [
+            "error"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "mismatches"
+                ]
+              },
+              {
+                "required": [
+                  "explanation_text"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "rules": {
+      "description": "Rules by effective id.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "output": {
+      "$ref": "cases.schema.json#/$defs/output"
+    },
+    "mismatch": {
+      "type": "object",
+      "oneOf": [
+        {
+          "properties": {
+            "key": {
+              "const": "selected"
+            },
+            "expected": {
+              "$ref": "#/$defs/rules"
+            },
+            "actual": {
+              "$ref": "#/$defs/rules"
+            }
+          },
+          "required": [
+            "key",
+            "expected",
+            "actual"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "key": {
+              "const": "output"
+            },
+            "expected": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/output"
+                }
+              ]
+            },
+            "actual": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/output"
+                }
+              ]
+            }
+          },
+          "required": [
+            "key",
+            "expected",
+            "actual"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "An output expected of a decision that has no single output.",
+          "properties": {
+            "key": {
+              "const": "output"
+            },
+            "expected": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/output"
+                }
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "pattern": "^the decision has no single output \\([a-z_]+\\)$"
+            }
+          },
+          "required": [
+            "key",
+            "expected",
+            "reason"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "key": {
+              "const": "outputs"
+            },
+            "expected": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/output"
+              }
+            },
+            "actual": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/output"
+              }
+            }
+          },
+          "required": [
+            "key",
+            "expected",
+            "actual"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "key": {
+              "const": "unknown"
+            },
+            "expected": {
+              "$ref": "#/$defs/rules"
+            },
+            "actual": {
+              "$ref": "#/$defs/rules"
+            }
+          },
+          "required": [
+            "key",
+            "expected",
+            "actual"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "key": {
+              "const": "error"
+            },
+            "expected": {
+              "$ref": "cases.schema.json#/$defs/error"
+            },
+            "actual": {
+              "description": "The error evaluation raised, in its JSON form, or null when it raised none.",
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "error.schema.json"
+                }
+              ]
+            }
+          },
+          "required": [
+            "key",
+            "expected",
+            "actual"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "A mismatch of a key a later version adds: shown from its expected, actual and reason as they are.",
+          "properties": {
+            "key": {
+              "type": "string",
+              "not": {
+                "enum": [
+                  "selected",
+                  "output",
+                  "outputs",
+                  "unknown",
+                  "error"
+                ]
+              }
+            },
+            "expected": {},
+            "actual": {},
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "expected"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,6 @@
+---
+source: crates/core/tests/runner.rs
+expression: run.to_string()
+---
+Test run of a rule set: 3 rules, hit policy priority, logic boolean
+4 results: 4 passed, 0 failed, 0 errors

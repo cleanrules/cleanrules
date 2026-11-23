@@ -1,0 +1,15 @@
+---
+source: crates/core/tests/runner.rs
+expression: run.to_string()
+---
+Test run of a decision table: 2 rules, hit policy collect, aggregate sum, logic boolean, strict
+FAILED  "sum"
+          output: expected {"discount":2}, actual {"discount":3}
+          outputs: expected [{"discount":1}], actual [{"discount":1},{"discount":2}]
+          explanation:
+            HIT POLICY collect AGGREGATE sum: selected row_1, row_2
+            [x] row_1 (selected): years > 5
+                - years > 5 is true (years = 7)
+            [x] row_2 (selected): years > 6
+                - years > 6 is true (years = 7)
+1 result: 0 passed, 1 failed, 0 errors

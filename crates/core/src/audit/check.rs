@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 use super::domain::{ORDERED, Pick, ValueSet};
 use super::read::{Part, Read, Reader, Region};
 use super::{
-    Audit, AuditLimit, AuditLimits, AuditSource, Check, CheckResult, CheckStatus, Diagnostic,
-    DiagnosticCode, NotModelled, Severity, Undecided, UndecidedReason, table_policy,
+    Audit, AuditLimit, AuditLimits, Check, CheckResult, CheckStatus, Diagnostic, DiagnosticCode,
+    NotModelled, RulesSource, Severity, Undecided, UndecidedReason, table_policy,
 };
 use crate::ast::Node;
 use crate::error::{ErrorCode, Segment};
@@ -247,7 +247,7 @@ impl<'r, L: Logic<Truth = Truth>> Auditor<'r, L> {
         unmodelled.sort_by_key(|u| (u.rule, u.seq));
         let check = |check, status| CheckResult { check, status };
         Audit {
-            source: AuditSource::RuleSet,
+            source: RulesSource::RuleSet,
             hit_policy: table_policy(policy),
             aggregate: self.ruleset.aggregate(),
             logic: self.ruleset.logic(),

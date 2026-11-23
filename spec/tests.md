@@ -1,7 +1,9 @@
 # Test cases
 
-**Status:** draft, format version `1` (task T.1). JSON Schema:
-[`schemas/v1/cases.schema.json`](schemas/v1/cases.schema.json).
+**Status:** draft, format version `1` (tasks T.1, T.2 and T.3). JSON Schemas:
+[`schemas/v1/cases.schema.json`](schemas/v1/cases.schema.json) for case files
+and [`schemas/v1/test_run.schema.json`](schemas/v1/test_run.schema.json) for
+the results of running them.
 
 A **test case** gives rules one input and says what evaluating it must give:
 the rules selected, their outputs, the rules whose condition is unknown, or
@@ -12,9 +14,10 @@ each gives, is how a user tests and compares those versions; a bundle
 
 Cases are run with `evaluate`, never with `run`: a test never calls an action
 (`rules.md`, *Actions*), so it gives the same result whether the rules' actions
-are bound or not, and it can be run any number of times. Running cases, their
-results and summaries (task T.3), running them in batches (T.2) and comparing
-two versions on the same cases (T.4) build on this format.
+are bound or not, and it can be run any number of times. Running cases gives a
+result per case and a summary (*Running cases*, *Test runs*), one result at a
+time and with limits (*Batches and interruption*); comparing two versions on
+the same cases (task T.4) builds on it.
 
 ```json
 {
@@ -188,9 +191,6 @@ case expects a strict error from rules that are strict.
 
 ## Matching
 
-*Not checked by vectors yet: the case runner (task T.3) runs cases, and its
-vectors check matching.*
-
 A case is run by evaluating the rules being tested on its `input`, as
 `evaluate` does (`rules.md`, *Evaluation*). Its result is one of:
 
@@ -289,6 +289,278 @@ a digest as every document has (`json-format.md`, *Canonical bytes*,
 file's bytes as stored (`bundles.md`, *Cases*), so that it names one exact
 file.
 
+## Running cases
+
+A **run** evaluates rules on the cases of one or more case files and gives
+one **result** per case. The rules are a rule set, a decision table (as the
+rule set it compiles to, `tables.md`, *Compiling*) or the rules of a bundle.
+Each case is matched as *Matching* says: it is evaluated with `evaluate`
+(`rules.md`, *Evaluation*) on its own `input`, without actions and without
+anything carried over from another case, and its result is `passed`,
+`failed` or `error`.
+
+Results come in **run order**: the case files in the order they are given
+(a bundle's in the order of its `cases`), and the cases of each file in the
+order of its `items`. A case is identified by its `id` and, when its file has
+one, the file's `path` (*Identity*); the same rules and case files give the
+same results, in the same order, on every platform.
+
+Within a run, the path and the id of a case are unique together: a file
+whose path repeats an earlier file's path, and a second file without a path,
+give one result each, a `format_error` without a pointer and without an
+`id`, and none of their cases runs.
+
+An error is the result of the case that raised it, and the run goes on with
+the next case: a case never stops the run. A **file that cannot be read** as
+a case file is one result with the status `error`, its `path` and its error,
+and no `id`; the run goes on with the next file. The core never opens files:
+the caller gives the bytes of each case file, and a file the caller cannot
+open is the caller's error: a command line reports it as it reports any
+file it cannot open, or, to go on, gives the run the file with its own
+error, which is then that file's result. Reading the bytes is reading a document
+(*Reading and writing*), in YAML when the file's path ends in `.yaml` or
+`.yml` (in any ASCII case) and in JSON otherwise, and a document with another
+content key, such as a rule set, is a `format_error` at the root (`""`).
+
+The core gives these three things the same names in every language: a
+**case file reference** (`CaseFileRef`) is a bundle's reference to a case
+file, its path and digest (`bundles.md`, *Cases*); the **cases**
+(`Cases`) are the content of a case file document; and a **case file**
+(`CaseFile`) is one file given to a run: its path when it has one, the
+digest of the bytes it was read from when it was, and its cases or the error
+that keeps it from being read.
+
+### Case files of a bundle
+
+Running a bundle runs its rules on the case files it lists (`bundles.md`,
+*Cases*), in its order, each with its `path`. Before a file is read, its
+bytes are checked against the digest the bundle records for it: when they
+differ, the file's result is a `decision_mismatch` at
+`/bundle/cases/<i>/digest`, `<i>` its position in the bundle's `cases`, and
+none of its cases runs, since they are not the ones the bundle was made with.
+Then the file is read as above, under the limits the bundle records
+(`bundles.md`, *Engine*: they are the ones that can change a result), and
+the test run records those limits (*Test runs*, `engine`).
+
+*Rationale.* `decision_mismatch` is the code that says that a record does not
+match what it is checked against, as for a bundle's `ruleset_digest`
+(`bundles.md`, *Rules and their digest*); the pointer says which file of the
+bundle it is.
+
+### Explaining failures
+
+A failed case whose evaluation gave a decision is **explained**: its result
+holds the text of the decision's explanation (`explain.md`, *Text*), which
+says why each rule was or was not selected. A run explains the first
+`max_explained` failed cases that have a decision, in run order (5 unless
+the caller sets it; 0 explains none), so that a run over many cases keeps few
+explanations. A case whose result is `error`, and a failed `error` key whose
+evaluation raised another error, have no decision to explain: their error
+says what happened.
+
+A run keeps no result trees: each case's decision is reduced to what its
+expectation checks (the selected rules, the outputs, the single output and
+the unknown rules, which are each rule's status, `explain.md`, *Rule
+status*), and explained only when it is one of the failures explained, before
+the next case is evaluated. A failure that is not explained can be explained
+later by evaluating its case again: evaluation is deterministic, so this
+gives the same decision and the same explanation.
+
+### Batches and interruption
+
+A run is **incremental**: it gives its results one at a time, in run order,
+each before the next case is evaluated, so a caller can show, store or drop
+each result as it comes, and the run itself keeps only the counts of its
+summary (*Test runs*) between results.
+
+A run ends when every case has a result, or when it is **interrupted**: then
+it gives no more results, and it is **partial**. Before each item (a case, or
+a file that cannot be read, which gives one result), and only when one
+remains, the run is interrupted when:
+
+| Reason | When |
+|---|---|
+| `max_results` | `max_results` results have been given, those of files that cannot be read included |
+| `max_steps` | evaluating the next case would take the steps past `max_steps`: running a case costs one step per rule of the rules being tested (each rule's condition is evaluated once), and a file that cannot be read costs none |
+| `cancelled` | the caller cancels the run: by a callback, which the run asks before each item, or by stopping it between two results, which includes asking for its test run before it is finished |
+
+The checks are made in this order. Both limits are unbounded unless the
+caller sets them, and each is a count of at least 0. A run that has given its
+last result is complete, never partial, whatever the limits or the callback
+would say.
+
+An interruption is not an error, and it is not a case's result: a case
+either has its full result, or it is not run. So the results of a partial
+run are the first results of the full run with the same rules and case files,
+the same in every way, and its summary says why it stopped and how many
+results it did not give (`remaining`), among the case files given to the run:
+one per case not run, and one per file not reached that gives one result
+(it cannot be read, or it repeats a path). A caller that stops taking
+results and asks for the test run gets a partial run: a run is never
+reported complete before its last result.
+
+A run needs no threads: it is never interrupted while it evaluates a case,
+and a callback that a caller gives (one that reads a flag, or checks a
+deadline) is asked between cases only.
+
+*Rationale.* Limits count results and steps rather than time, so a partial
+run is deterministic: the same limits give the same results on every
+platform. A deadline is the caller's, as a cancellation.
+
+## Test runs
+
+A **test run** document is the JSON form of a run's results and summary, with
+the content key `"test_run"` (`json-format.md`, *Documents*). Like an audit,
+it is output only: readers reject it with `unsupported`.
+
+```json
+{
+  "version": 1,
+  "test_run": {
+    "source": "ruleset",
+    "hit_policy": "priority",
+    "logic": "boolean",
+    "engine": {
+      "name": "cleanrules",
+      "version": "1.0.0",
+      "limits": { "max_size": 16777216, "max_nesting": 1024, "max_depth": 256, "max_path_segments": 256, "max_table_size": 2097152, "max_values": 1000000 }
+    },
+    "files": [
+      { "path": "cases/discounts.json", "digest": "sha256:37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570" },
+      { "path": "cases/strict.json", "digest": "sha256:0f2b6c5d8e8c1b7a3f6e4d2c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a" }
+    ],
+    "limits": { "max_explained": 5 },
+    "summary": { "total": 3, "passed": 1, "failed": 1, "error": 1, "partial": false },
+    "results": [
+      { "path": "cases/discounts.json", "id": "vip-gets-15", "status": "passed" },
+      {
+        "path": "cases/discounts.json",
+        "id": "loyal-gets-5",
+        "status": "failed",
+        "mismatches": [
+          { "key": "selected", "expected": ["loyal"], "actual": ["vip"] },
+          { "key": "output", "expected": { "discount": { "$decimal": "0.05" } }, "actual": { "discount": { "$decimal": "0.15" } } }
+        ],
+        "explanation_text": "HIT POLICY priority: selected vip\n..."
+      },
+      {
+        "path": "cases/strict.json",
+        "status": "error",
+        "error": { "code": "format_error", "message": "two cases have the id \"a\"", "hint": "give each case of a file its own id", "pointer": "/cases/items/1/id" }
+      }
+    ]
+  }
+}
+```
+
+| Key | Required | JSON type |
+|---|---|---|
+| `source` | yes | `"ruleset"` or `"decision_table"`: what was tested (a bundle's rules are one or the other) |
+| `hit_policy` | yes | the policy: a rule set's, or a decision table's (with `output_order`) |
+| `aggregate` | with an aggregate | the aggregate |
+| `logic` | yes | the logic |
+| `strict` | when `true` | `true` |
+| `ruleset_digest` | when asked for | string: the rule set digest of the rules tested, or of the rule set the table compiles to (`json-format.md`, *Rule set digests*), as decisions and audits carry it |
+| `engine` | yes | object: the engine that ran the cases, as a bundle records one (`bundles.md`, *Engine*): its `name`, its `version` and the `limits` its case files were read with (a bundle's own, for a bundle's cases) |
+| `bundle` | for a bundle's cases | object: the bundle's `id` and `revision` (`bundles.md`, *Identifier and revision*) |
+| `files` | yes | array, in run order, of the case files given to the run, each an object with its `path` when it has one and the `digest` of its bytes (`json-format.md`, *Digests*) when it was read from bytes |
+| `limits` | yes | object: `max_explained`, and `max_results` and `max_steps` when they are set, ints |
+| `summary` | yes | object: the summary (below) |
+| `results` | yes | array of results, in run order (below) |
+
+The **summary**:
+
+| Key | Required | JSON type |
+|---|---|---|
+| `total` | yes | int: the number of results |
+| `passed` | yes | int: the results `passed` |
+| `failed` | yes | int: the results `failed` |
+| `error` | yes | int: the results `error`, files that cannot be read included |
+| `partial` | yes | boolean: whether the run was interrupted |
+| `interrupted` | when `partial` | object: `reason` (`max_results`, `max_steps` or `cancelled`) and `remaining`, an int |
+
+`results` holds the results the run gave, so its length is `total`; a
+consumer does not rely on it, since a later version may let a test run keep
+only some of its results (*Not yet*), and counts with the summary.
+
+A **result**:
+
+| Key | Required | JSON type |
+|---|---|---|
+| `path` | when its file has one | string: the case file's path |
+| `id` | for a case | string: the case's id; absent for a file that cannot be run |
+| `status` | yes | `"passed"`, `"failed"` or `"error"` |
+| `mismatches` | for `failed` | array of mismatches, in the order of the *Expectations* table |
+| `error` | for `error` | the error, in its JSON form (`errors.md`, *JSON form*). Its `pointer` points into the case file at `path` (a case file's `format_error`), but for a `decision_mismatch`, which points into the bundle (`/bundle/cases/<i>/digest`) |
+| `explanation_text` | for a failure explained | string: the text of the decision's explanation (*Explaining failures*). The key `explanation` is kept for the explanation's JSON form, as other documents hold it |
+
+A **mismatch** is a key of the expectation that does not match:
+
+| Key | Required | JSON type |
+|---|---|---|
+| `key` | yes | `"selected"`, `"output"`, `"outputs"`, `"unknown"` or `"error"` |
+| `expected` | yes | what the case expects under that key, as a case file writes it (`unknown` sorted, `error` as `{"code"}`) |
+| `actual` | but for a decision without a single output | what was given, in the same form (below) |
+| `reason` | for a decision without a single output | string: "the decision has no single output (`<policy>`)", with the run's `hit_policy` (*Matching*) |
+
+What was given is: for `selected`, the effective ids of the selected rules, in
+selection order; for `output`, the decision's output with all its keys, or
+`null`; for `outputs`, the outputs of the selected rules, in selection order,
+each with all its keys; for `unknown`, the effective ids of the rules whose
+condition is unknown, sorted by Unicode code point; for `error`, the error
+evaluation raised, in its JSON form, or `null` when it raised none. Outputs
+are objects whose keys are payload keys, taken literally, and whose values
+are in the JSON encoding of values (`json-format.md`, *Values*), as expected
+outputs are written (*Expectations*).
+
+Writers write the keys in the order of their tables, and every array even
+when it is empty. Errors are written in their JSON form, whose `message` and
+`hint`, like an explanation's text, are the core's and the same in every
+language; conformance vectors compare errors by code and compared fields
+(`errors.md`, *Comparing errors*). Within format version 1, new optional keys,
+new reasons of interruption and new mismatch keys (as new expectation keys
+are added) may be added: consumers ignore the keys and reasons they do not
+know, and show a mismatch of a key they do not know from its `expected`,
+`actual` and `reason` as they are. The statuses are a closed set, as an
+audit's severities, so that a command line can map them to its exit codes.
+
+### Text
+
+*Not checked by vectors: the core's snapshot tests fix it.*
+
+The text of a test run, as the command line prints it, is generated by the
+core:
+
+```text
+Test run of a rule set: 3 rules, hit policy priority, logic boolean
+FAILED  cases/discounts.json  "loyal-gets-5"
+          selected: expected ["loyal"], actual ["vip"]
+          output: expected {"discount":{"$decimal":"0.05"}}, actual {"discount":{"$decimal":"0.15"}}
+          explanation:
+            HIT POLICY priority: selected vip
+            ...
+ERROR   cases/strict.json
+          format_error at /cases/items/1/id: two cases have the id "a"
+          hint: give each case of a file its own id
+3 results: 1 passed, 1 failed, 1 error
+```
+
+- A header with what was tested, its number of rules and its configuration,
+  as in an audit (`audit.md`, *Text*).
+- One block per result that is not `passed`, in run order: its status in
+  capitals (`FAILED`, `ERROR`), its path and its id, quoted as a JSON
+  string, when it has them (`(a case file without a path)` when it has
+  neither); then,
+  indented, each mismatch: its key, what was expected and what was given in
+  compact JSON (or the reason, when nothing was given), and for `error` the
+  code expected and the error given, as its code and message, or
+  `no error`; the explanation, indented further, when there is one; and the
+  error, as its code, its location (`at` a pointer, `the root` for `""`, or
+  `at line <l>, column <c>`) and its message, with its hint on the next line
+  when it has one.
+- The summary: the number of results and how many of each status; and, for a
+  partial run, `Partial run: interrupted by <reason>, <n> not run`.
+
 ## Not yet
 
 *Informative: what this version leaves out, so that a later version can add
@@ -311,3 +583,10 @@ existing case files mean.*
   (task T.4) defines.
 - Settings of a case that change how the rules evaluate (strict mode, limits):
   they are settings of the rules, under their digest.
+- Running only some of the cases (by id, tag or file), and keeping only some
+  results in a test run document (the failures, say).
+- Reading case files lazily, one at a time as the run reaches them: today a
+  run is given every case file, read, and `remaining` counts within them.
+- A limit of time: runs are bounded by results and steps, which are
+  deterministic, and a deadline is a cancellation (*Batches and
+  interruption*).

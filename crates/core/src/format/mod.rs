@@ -12,6 +12,7 @@ mod logic;
 pub mod result;
 mod rules;
 pub(crate) mod table;
+pub(crate) mod test_run;
 pub mod value;
 
 pub use audit::write_audit;
@@ -22,7 +23,7 @@ pub use document::{
     Document, DocumentFormat, parse_as, read_decision_document, read_decision_document_as,
     read_document, read_document_as, read_parsed_decision_document, read_parsed_document,
     write_audit_as, write_decision_as, write_document, write_document_as, write_explanation_as,
-    write_summary_as,
+    write_summary_as, write_test_run_as,
 };
 #[cfg(feature = "yaml")]
 pub use document::{read_yaml_decision_document, read_yaml_document};
@@ -35,6 +36,7 @@ pub use result::{
 };
 pub use rules::{write_decision, write_rule, write_ruleset};
 pub use table::write_table;
+pub use test_run::{write_case_result, write_test_run};
 pub use value::{ValueContext, read_value, write_value};
 
 use crate::ast::Node;

@@ -1,0 +1,9 @@
+---
+source: crates/core/tests/runner.rs
+expression: cases.to_string()
+---
+Test run of a rule set: 2 rules, hit policy first, logic boolean
+ERROR   bad.json
+          format_error at the root: a document is a JSON object
+3 results: 2 passed, 0 failed, 1 error
+Partial run: interrupted by max_results, 2 not run
