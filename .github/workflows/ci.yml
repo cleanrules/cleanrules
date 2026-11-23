@@ -54,6 +54,53 @@ jobs:
           tool: cargo-llvm-cov
       # The definition of done asks for 95 % of the core's lines.
       - run: cargo llvm-cov -p cleanrules --features yaml --fail-under-lines 95
+      # And 90 % of the command line's, through its tests running the binary.
+      - run: cargo llvm-cov -p cleanrules-cli --fail-under-lines 90
+
+  cli:
+    name: Command line (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: astral-sh/setup-uv@v7
+      # The binary and its tests (also run by the rust job on every system):
+      # exit codes, text and JSON output, errors, and the audit and draw
+      # conformance vectors through the command line.
+      - run: cargo build -p cleanrules-cli --locked
+      - run: cargo test -p cleanrules-cli --locked
+      # The example workflow for users (docs/examples/ci/cleanrules-audit.yml):
+      # its audit script, as written there, on the rule files of
+      # docs/examples, with this build of cleanrules; then on a rule set with
+      # an error, and on a folder that is missing or empty, where it must fail.
+      - name: Example audit workflow
+        run: |
+          uv run --no-project --with pyyaml python - > "$RUNNER_TEMP/audit.sh" <<'EOF'
+          import yaml
+          workflow = yaml.safe_load(open("docs/examples/ci/cleanrules-audit.yml"))
+          step = next(s for s in workflow["jobs"]["audit"]["steps"] if s.get("name") == "Audit")
+          print(step["run"])
+          EOF
+          export PATH="$PWD/target/debug:$PATH" FAIL_ON=error
+          # The rule files of docs/examples, with its case file under cases/.
+          mkdir -p "$RUNNER_TEMP/rules"
+          cp -r docs/examples/discounts.json docs/examples/discounts.yaml docs/examples/discounts.rules \
+            docs/examples/risk.csv docs/examples/cases "$RUNNER_TEMP/rules/"
+          RULES_DIR="$RUNNER_TEMP/rules" bash -eo pipefail "$RUNNER_TEMP/audit.sh"
+          test "$(ls cleanrules-audit | wc -l)" -eq 4
+          mkdir -p "$RUNNER_TEMP/failing"
+          cp crates/cli/tests/data/unique.rules "$RUNNER_TEMP/failing/"
+          if RULES_DIR="$RUNNER_TEMP/failing" bash -eo pipefail "$RUNNER_TEMP/audit.sh"; then
+            echo "::error::the example audit passed on a rule set with an error"; exit 1
+          fi
+          # A folder that is missing, or holds no rule files, fails too.
+          mkdir -p "$RUNNER_TEMP/empty"
+          for dir in "$RUNNER_TEMP/missing" "$RUNNER_TEMP/empty"; do
+            if RULES_DIR="$dir" bash -eo pipefail "$RUNNER_TEMP/audit.sh"; then
+              echo "::error::the example audit passed on $dir"; exit 1
+            fi
+          done
 
   c-abi:
     name: C ABI (${{ matrix.os }})

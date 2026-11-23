@@ -1,0 +1,5 @@
+HIT POLICY,collect
+RULE,country,age,THEN label
+es,ES,>= 18,'adult'
+pt,'PT',> TRUE,VIP
+young,-,< '18',

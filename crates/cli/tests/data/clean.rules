@@ -1,0 +1,4 @@
+HIT POLICY unique
+
+RULE minor IF age < 18 THEN band = 'minor'
+RULE adult IF age >= 18 THEN band = 'adult'

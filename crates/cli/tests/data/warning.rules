@@ -1,0 +1,4 @@
+HIT POLICY first
+
+RULE odd IF x > 5 AND x < 3
+RULE rest IF TRUE

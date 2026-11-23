@@ -43,8 +43,10 @@ use check::Auditor;
 use read::Part;
 
 use crate::ast::Node;
+use crate::bundle::BundleRules;
 use crate::digest::Digest;
 use crate::error::{Error, ErrorCode, Result, Segment};
+use crate::format::Document;
 use crate::logic::{Kleene, LogicName};
 use crate::rules::{Aggregate, HitPolicy, RuleSet};
 use crate::table::{DecisionTable, TablePolicy, label};
@@ -396,6 +398,29 @@ pub struct Undecided {
     pub remaining: Option<usize>,
 }
 
+/// The document that held the rules audited, when it is not the rule set
+/// or decision table itself (`spec/audit.md`, *Documents*).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum AuditDocument {
+    /// A bundle: pointers are prefixed with `/bundle`.
+    Bundle,
+    /// A rule document, audited as the rule set of that one rule: pointers
+    /// are under `/rule`, and the checks between rules do not apply.
+    Rule,
+}
+
+impl AuditDocument {
+    /// The document's content key: `bundle` or `rule`.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AuditDocument::Bundle => "bundle",
+            AuditDocument::Rule => "rule",
+        }
+    }
+}
+
 /// A rule of what was audited.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -412,8 +437,12 @@ pub struct AuditedRule {
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct Audit {
-    /// What was audited.
+    /// The kind of rules audited: a rule set or a decision table, which may
+    /// sit in a bundle or come from a rule document ([`Audit::document`]).
     pub source: RulesSource,
+    /// The document that held them, when it is not the rule set or decision
+    /// table itself ([`audit_document`]).
+    pub document: Option<AuditDocument>,
     /// The hit policy: a rule set's, as the table policy of the same name, or
     /// a decision table's.
     pub hit_policy: TablePolicy,
@@ -440,6 +469,18 @@ pub struct Audit {
     pub diagnostics: Vec<Diagnostic>,
     /// The rule set digest, kept for [`Audit::with_ruleset_digest`].
     digest: Digest,
+    /// A decision table's column headers, which the text names cells by
+    /// (`spec/audit.md`, *Text*); `None` for a rule set.
+    headers: Option<Headers>,
+}
+
+/// The headers of a decision table's columns, in the canonical text.
+#[derive(Clone, Debug, PartialEq)]
+struct Headers {
+    /// Each input's expression.
+    inputs: Vec<String>,
+    /// Each output's name.
+    outputs: Vec<String>,
 }
 
 impl Audit {
@@ -465,6 +506,25 @@ impl Audit {
     pub fn with_ruleset_digest(mut self, carry: bool) -> Self {
         self.ruleset_digest = carry.then_some(self.digest);
         self
+    }
+
+    /// Every pointer that starts with `from` (`""` for all of them), with
+    /// `to` in its place, for an audit of rules held in another document
+    /// ([`audit_document`]).
+    fn relocate(&mut self, from: &str, to: &str) {
+        let moved = |pointer: &mut String| {
+            if let Some(rest) = pointer.strip_prefix(from) {
+                *pointer = format!("{to}{rest}");
+            }
+        };
+        for diagnostic in &mut self.diagnostics {
+            if let Some(pointer) = &mut diagnostic.pointer {
+                moved(pointer);
+            }
+        }
+        for item in &mut self.not_modelled {
+            moved(&mut item.pointer);
+        }
     }
 }
 
@@ -600,7 +660,86 @@ pub fn audit_table(table: &DecisionTable, limits: &AuditLimits) -> Result<Audit>
             row: Some(row),
         })
         .collect();
+    report.headers = Some(Headers {
+        inputs: table.inputs().iter().map(ToString::to_string).collect(),
+        outputs: table.outputs().iter().map(|o| o.name.clone()).collect(),
+    });
     Ok(report)
+}
+
+/// Audit the rules a document holds (`spec/audit.md`, *Documents*), with
+/// pointers into that document: a rule set's or a decision table's own; a
+/// bundle's, prefixed with `/bundle`; and a rule's, audited as the rule set
+/// of that one rule with the default settings (`spec/json-format.md`, *A
+/// rule set from a document*), under `/rule`, where the checks between rules
+/// (`shadowed`, `overlap`, `gap`) are `not_applicable`. [`Audit::document`]
+/// says which.
+///
+/// ```
+/// use cleanrules::audit::{AuditLimits, audit_document};
+/// use cleanrules::json::Limits;
+///
+/// let rule = cleanrules::text::parse("RULE odd IF x > TRUE", &Limits::default())?;
+/// let report = audit_document(&rule, &AuditLimits::default())?;
+/// assert_eq!(report.diagnostics[0].code.as_str(), "incompatible_types");
+/// assert_eq!(report.diagnostics[0].pointer.as_deref(), Some("/rule/when"));
+/// # Ok::<(), cleanrules::Error>(())
+/// ```
+///
+/// # Errors
+///
+/// `unsupported` for a condition and for a case file, which hold no rules,
+/// and as [`audit`] and [`audit_table`].
+pub fn audit_document(document: &Document, limits: &AuditLimits) -> Result<Audit> {
+    match document {
+        Document::RuleSet(ruleset) => audit(ruleset, limits),
+        Document::DecisionTable(table) => audit_table(table, limits),
+        Document::Bundle(bundle) => {
+            let mut report = match bundle.rules() {
+                BundleRules::RuleSet(ruleset) => audit(ruleset, limits)?,
+                BundleRules::DecisionTable(table) => audit_table(table, limits)?,
+            };
+            report.relocate("", "/bundle");
+            report.document = Some(AuditDocument::Bundle);
+            Ok(report)
+        }
+        Document::Rule(rule) => {
+            let ruleset = Document::Rule(rule.clone()).into_ruleset()?;
+            let mut report = audit(&ruleset, limits)?;
+            report.relocate("/ruleset/rules/0", "/rule");
+            report.document = Some(AuditDocument::Rule);
+            // The checks between rules are about a rule set, which a rule
+            // document is not: its default policy would report a gap the
+            // rule did not cause.
+            let between =
+                |check: Check| matches!(check, Check::Shadowed | Check::Overlap | Check::Gap);
+            for result in &mut report.checks {
+                if between(result.check) {
+                    result.status = CheckStatus::NotApplicable;
+                }
+            }
+            report.diagnostics.retain(|d| {
+                !matches!(
+                    d.code,
+                    DiagnosticCode::Shadowed | DiagnosticCode::Overlap | DiagnosticCode::Gap
+                )
+            });
+            report.undecided.retain(|u| !between(u.check));
+            Ok(report)
+        }
+        Document::Condition(_) => Err(Error::new(
+            ErrorCode::Unsupported,
+            "a condition has no audit: the audit reads rules and their hit policy",
+        )
+        .with_hint("make it the condition of a rule (RULE name IF ...), and audit that")
+        .unsupported("audit", "a condition holds no rules")),
+        Document::Cases(_) => Err(Error::new(
+            ErrorCode::Unsupported,
+            "a case file has no audit: it holds test cases, not rules",
+        )
+        .with_hint("audit the rules that the cases test")
+        .unsupported("audit", "case files hold test cases, not rules")),
+    }
 }
 
 /// The `unlisted_field` diagnostics of a table, in rule order and then cell

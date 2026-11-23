@@ -1,0 +1,7 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stdout
+---
+Audit of a rule set: 2 rules, hit policy unique, logic boolean
+No findings.
+Checks: types complete, fields not applicable, unsatisfiable complete, shadowed not applicable, overlap complete, gap complete

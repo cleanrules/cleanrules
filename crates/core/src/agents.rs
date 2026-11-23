@@ -633,14 +633,7 @@ fn validate(args: &Arguments<'_>) -> Result<Json> {
             ]));
         }
     };
-    let content = match &document {
-        Document::Condition(_) => "condition",
-        Document::Rule(_) => "rule",
-        Document::RuleSet(_) => "ruleset",
-        Document::DecisionTable(_) => "decision_table",
-        Document::Bundle(_) => "bundle",
-        Document::Cases(_) => "cases",
-    };
+    let content = document.content_key();
     let mut members = vec![("valid", Json::Bool(true)), ("content", string(content))];
     if !matches!(document, Document::Condition(_) | Document::Cases(_)) {
         let ruleset = document.into_ruleset()?;

@@ -28,7 +28,15 @@
           "enum": [
             "ruleset",
             "decision_table"
-          ]
+          ],
+          "description": "The kind of rules audited, which may sit in a bundle or come from a rule document."
+        },
+        "document": {
+          "enum": [
+            "bundle",
+            "rule"
+          ],
+          "description": "The document that held the rules audited, when it is not the rule set or decision table itself (spec/audit.md, Documents)."
         },
         "hit_policy": {
           "enum": [

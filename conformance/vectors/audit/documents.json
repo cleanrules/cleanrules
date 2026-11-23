@@ -1,0 +1,519 @@
+{
+  "version": 1,
+  "area": "audit",
+  "vectors": [
+    {
+      "id": "audit/documents/rule",
+      "spec": [
+        "audit.md#documents"
+      ],
+      "description": "a rule document is audited as the rule set of that one rule with the default settings: its pointers are under /rule, document is rule, and the checks between rules (shadowed, overlap, gap) do not apply, so the default policy gives no gap",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "rule": {
+            "name": "odd",
+            "when": {
+              "op": "or",
+              "operands": [
+                {
+                  "op": "gt",
+                  "left": {
+                    "op": "field",
+                    "path": [
+                      "x"
+                    ]
+                  },
+                  "right": {
+                    "op": "const",
+                    "value": true
+                  }
+                },
+                {
+                  "op": "matches",
+                  "operand": {
+                    "op": "field",
+                    "path": [
+                      "name"
+                    ]
+                  },
+                  "pattern": "^a"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "document": "rule",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "odd"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "partial"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "not_applicable"
+            },
+            {
+              "check": "gap",
+              "status": "not_applicable"
+            }
+          ],
+          "not_modelled": [
+            {
+              "rule": "odd",
+              "op": "matches",
+              "pointer": "/rule/when/operands/1"
+            }
+          ],
+          "undecided": [
+            {
+              "check": "unsatisfiable",
+              "rules": [
+                "odd"
+              ],
+              "reason": "not_modelled"
+            }
+          ],
+          "diagnostics": [
+            {
+              "code": "incompatible_types",
+              "severity": "warning",
+              "rules": [
+                "odd"
+              ],
+              "pointer": "/rule/when/operands/0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/documents/bundle-ruleset",
+      "spec": [
+        "audit.md#documents",
+        "bundles.md#rules-and-their-digest"
+      ],
+      "description": "a bundle's rule set is audited with every pointer prefixed with /bundle",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "bundle": {
+            "id": "acme/audit",
+            "revision": "1",
+            "ruleset": {
+              "hit_policy": "first",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "odd",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": true
+                    }
+                  }
+                },
+                {
+                  "name": "rest",
+                  "when": {
+                    "op": "const",
+                    "value": true
+                  }
+                }
+              ]
+            },
+            "ruleset_digest": "sha256:5c2ad349e3a5d08348a82aaba36f1f2eec44003c1b8cc56f5f1319e53753fda1",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "contract": {
+              "input": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "description": "conditions of odd",
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              },
+              "output": {
+                "keys": []
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "ruleset",
+          "document": "bundle",
+          "hit_policy": "first",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "odd"
+            },
+            {
+              "name": "rest"
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "not_applicable"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "complete"
+            },
+            {
+              "check": "shadowed",
+              "status": "complete"
+            },
+            {
+              "check": "overlap",
+              "status": "complete"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [],
+          "undecided": [],
+          "diagnostics": [
+            {
+              "code": "incompatible_types",
+              "severity": "warning",
+              "rules": [
+                "odd"
+              ],
+              "pointer": "/bundle/ruleset/rules/0/when"
+            },
+            {
+              "code": "unsatisfiable",
+              "severity": "warning",
+              "rules": [
+                "odd"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/documents/bundle-decision-table",
+      "spec": [
+        "audit.md#documents",
+        "audit.md#fields-of-decision-tables"
+      ],
+      "description": "a bundle's decision table is audited as a table, its cell pointers prefixed with /bundle",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "bundle": {
+            "id": "acme/audit",
+            "revision": "2",
+            "decision_table": {
+              "hit_policy": "unique",
+              "logic": "boolean",
+              "inputs": [
+                "country",
+                "age"
+              ],
+              "outputs": [
+                {
+                  "name": "label"
+                }
+              ],
+              "rows": [
+                {
+                  "name": "es",
+                  "inputs": [
+                    "ES",
+                    ">= 18"
+                  ],
+                  "outputs": [
+                    "'adult'"
+                  ]
+                },
+                {
+                  "name": "old",
+                  "inputs": [
+                    "'ES'",
+                    ">= 65"
+                  ],
+                  "outputs": [
+                    "'senior'"
+                  ]
+                }
+              ]
+            },
+            "ruleset_digest": "sha256:2837466ccc95012f6f6c7dbb5d9b80dc1cf1900015fe4970938825da90dbd731",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "contract": {
+              "input": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "ES": {
+                    "description": "conditions of es"
+                  },
+                  "age": {
+                    "description": "conditions of es, old",
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "country": {
+                    "description": "conditions of es, old",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              },
+              "output": {
+                "keys": [
+                  "label"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "audit": {
+          "source": "decision_table",
+          "document": "bundle",
+          "hit_policy": "unique",
+          "logic": "boolean",
+          "limits": {
+            "max_terms": 256,
+            "max_steps": 1000000
+          },
+          "rules": [
+            {
+              "name": "es",
+              "row": 0
+            },
+            {
+              "name": "old",
+              "row": 1
+            }
+          ],
+          "checks": [
+            {
+              "check": "types",
+              "status": "complete"
+            },
+            {
+              "check": "fields",
+              "status": "complete"
+            },
+            {
+              "check": "unsatisfiable",
+              "status": "partial"
+            },
+            {
+              "check": "shadowed",
+              "status": "not_applicable"
+            },
+            {
+              "check": "overlap",
+              "status": "partial"
+            },
+            {
+              "check": "gap",
+              "status": "complete"
+            }
+          ],
+          "not_modelled": [
+            {
+              "rule": "es",
+              "op": "eq",
+              "pointer": "/bundle/decision_table/rows/0/inputs/0"
+            }
+          ],
+          "undecided": [
+            {
+              "check": "unsatisfiable",
+              "rules": [
+                "es"
+              ],
+              "reason": "not_modelled"
+            },
+            {
+              "check": "overlap",
+              "rules": [
+                "es",
+                "old"
+              ],
+              "reason": "not_modelled"
+            }
+          ],
+          "diagnostics": [
+            {
+              "code": "unlisted_field",
+              "severity": "warning",
+              "rules": [
+                "es"
+              ],
+              "pointer": "/bundle/decision_table/rows/0/inputs/0",
+              "path": [
+                "ES"
+              ]
+            },
+            {
+              "code": "gap",
+              "severity": "warning",
+              "rules": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "audit/documents/condition-unsupported",
+      "spec": [
+        "audit.md#documents"
+      ],
+      "description": "a condition holds no rules to audit",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "condition": {
+            "op": "gt",
+            "left": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            },
+            "right": {
+              "op": "const",
+              "value": 1
+            }
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
+      "id": "audit/documents/cases-unsupported",
+      "spec": [
+        "audit.md#documents"
+      ],
+      "description": "a case file holds test cases, not rules",
+      "given": {
+        "kind": "audit",
+        "document": {
+          "version": 1,
+          "cases": {
+            "items": [
+              {
+                "id": "one",
+                "input": {
+                  "x": 2
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    }
+  ]
+}

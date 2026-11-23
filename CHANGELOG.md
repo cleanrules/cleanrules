@@ -55,6 +55,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   run by the core's runner; the C ABI, Python, C++, JavaScript, Java, Scala
   and Go runners skip and count them until the bindings run cases (T.9b).
   Example: `docs/examples/test_run.rs`.
+- The command line `cleanrules` (task T.8a; new crate `crates/cli`,
+  package `cleanrules-cli`; [`spec/cli.md`](spec/cli.md)): `cleanrules
+  validate <file>` (what a document holds, with its rule set's summary, or
+  why it does not read, with the exit code 1; with `--format json`, the
+  result of the agents' `validate` tool, valid or not), `cleanrules
+  audit <file>` (the static audit of a rule set, decision table, bundle or
+  rule, in text or as the JSON audit document; `--fail-on
+  error|warning|info|never`, `--max-terms`, `--max-steps`,
+  `--ruleset-digest`) and `cleanrules draw <file>` (diagrams in `mermaid`,
+  `dot`, `html` or `html_fragment`, to standard output or `--output`;
+  `--max-diagram-size`). Documents are read from JSON, YAML, the rule syntax
+  or CSV by their suffix or `--syntax`, or from standard input (`-`), as the
+  core reads them. Exit codes for CI: `0` clean, `1` findings at or above
+  `--fail-on`, `2` usage errors, `3` a file that cannot be read or written,
+  a document that does not read, or an operation the core refuses. Errors go
+  to standard error with their stable code, place (file, line and column or
+  pointer) and hint, or as JSON with `--format json`, argument errors
+  included; the command line adds the codes `usage_error` and `io_error`
+  (in `spec/schemas/v1/error.schema.json`), and its error lines have the
+  JSON Schema `spec/schemas/v1/cli-error.schema.json`. Prebuilt binaries for Linux (static
+  musl, x64 and arm64), macOS (arm64 and x64) and Windows (x64 and arm64) are
+  built and smoke-tested by `.github/workflows/cli-binaries.yml` as
+  artifacts, not yet published; an example workflow for users that audits a
+  repository's rules and fails on errors is
+  `docs/examples/ci/cleanrules-audit.yml`.
+- `audit::audit_document` in the Rust core (`spec/audit.md`, *Documents*):
+  audits the rules a document holds, with pointers into that document: a
+  bundle's prefixed with `/bundle`, and a rule document's under `/rule`,
+  where the checks between rules (`shadowed`, `overlap`, `gap`) are
+  `not_applicable`; a condition or a case file is `unsupported`. The audit
+  document has a new optional key, `document` (`"bundle"` or `"rule"`,
+  additive in format version 1; `Audit::document`, `AuditDocument`), and
+  `source` is now the kind of rules audited. `Document::content_key` and
+  `visual::DiagramFormat::for_document` (HTML for decision tables, Mermaid
+  otherwise). Five new `audit` conformance
+  vectors (`conformance/vectors/audit/documents.json`), which the core's
+  runner and the command line's tests run.
 - Static audit of rule sets and decision tables (task T.7;
   [`spec/audit.md`](spec/audit.md)): in the Rust core, `audit::audit` and
   `audit::audit_table` (both return `Result<Audit>`: `unsupported` for a
@@ -1579,6 +1616,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`CLAUDE.md`, `.claude/`).
 
 ### Changed
+
+- The text of an audit of a decision table names each cell by its row and
+  column before its pointer, as `row es, input country
+  (/decision_table/rows/0/inputs/0)` (`spec/audit.md`, *Text*).
 
 - Shared names for the test runner and the audit (API review of T.2 and
   T.3; branches built on T.7 follow them): `audit::AuditSource` is now

@@ -1,0 +1,8 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stdout
+---
+Audit of a rule set: 2 rules, hit policy first, logic boolean
+info     overlap  big, rest: rules big and rest both fire for the witness; big takes precedence over rest (first hit policy)
+           witness: {"x":6}
+Checks: types complete, fields not applicable, unsatisfiable complete, shadowed complete, overlap complete, gap complete

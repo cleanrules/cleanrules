@@ -1,0 +1,110 @@
+# Audit the rules of a repository with the cleanrules command line, and fail
+# the job when a rule set or decision table has a finding at or above a
+# severity (spec/cli.md, *audit*). Copy this file to .github/workflows/ in
+# your repository and set RULES_DIR to the folder of your rule files.
+#
+# Every file with a suffix cleanrules reads (.json, .yaml, .yml, .rules,
+# .csv) under RULES_DIR is audited, except case files under a cases/ folder,
+# which hold test cases rather than rules, and the reports this workflow
+# writes. Each audit is printed in the log, in its own group, and its JSON
+# report is kept as the artifact cleanrules-audit. Exit codes: 0 clean, 1
+# findings at or above FAIL_ON, 2 usage error, 3 a file that does not read
+# or cannot be audited; any code but 0 fails the job, after every file has
+# been audited. A missing RULES_DIR, or one without rule files, fails too.
+#
+# Installing cleanrules: until prebuilt binaries are released, this builds the
+# command from source with cargo, at the commit CLEANRULES_REF points to when
+# the job runs (a few minutes the first time; then the cache, keyed by that
+# commit, holds it). For reproducible audits, set CLEANRULES_REF to a tag or
+# pin the commit itself. The workflow .github/workflows/cli-binaries.yml of
+# the cleanrules repository also uploads a binary per platform as an
+# artifact, which you can download instead (actions/download-artifact with
+# its run-id and a token).
+#
+# Third-party actions are referenced here by version tag for readability;
+# pin them by commit SHA, as GitHub recommends (`uses: owner/action@<sha> #
+# v1.2.3`). dtolnay/rust-toolchain@stable is a moving reference in
+# particular.
+name: Audit rules
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      # The folder of the rule files.
+      RULES_DIR: rules
+      # error, warning, info or never.
+      FAIL_ON: error
+      # The branch or tag of cleanrules to build.
+      CLEANRULES_REF: main
+    steps:
+      - uses: actions/checkout@v7
+      # The commit the reference points to now, so the build and its cache
+      # follow it.
+      - name: Resolve cleanrules
+        run: |
+          sha=$(git ls-remote https://github.com/cleanrules/cleanrules \
+            "refs/heads/$CLEANRULES_REF" "refs/tags/$CLEANRULES_REF" | head -n 1 | cut -f 1)
+          if [ -z "$sha" ]; then
+            echo "::error::no branch or tag $CLEANRULES_REF in the cleanrules repository"; exit 1
+          fi
+          echo "CLEANRULES_SHA=$sha" >> "$GITHUB_ENV"
+      - uses: actions/cache@v6
+        id: cache
+        with:
+          path: ~/.cargo/bin/cleanrules
+          key: cleanrules-${{ runner.os }}-${{ env.CLEANRULES_SHA }}
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install cleanrules
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: >
+          cargo install --locked --git https://github.com/cleanrules/cleanrules
+          --rev "$CLEANRULES_SHA" cleanrules-cli
+      - name: Audit
+        shell: bash
+        run: |
+          cleanrules --version
+          if [ ! -d "$RULES_DIR" ]; then
+            echo "::error::RULES_DIR $RULES_DIR is not a folder of this repository"; exit 1
+          fi
+          mkdir -p cleanrules-audit
+          status=0
+          count=0
+          while IFS= read -r -d '' file; do
+            count=$((count + 1))
+            echo "::group::$file"
+            set +e
+            cleanrules audit "$file" --fail-on "$FAIL_ON"
+            code=$?
+            cleanrules audit "$file" --format json --fail-on never \
+              > "cleanrules-audit/$(echo "$file" | tr '/' '_').json"
+            set -e
+            echo "::endgroup::"
+            case $code in
+              0) ;;
+              1) echo "::error file=$file::cleanrules audit found findings at or above $FAIL_ON"; status=1 ;;
+              *) echo "::error file=$file::cleanrules could not audit this file (exit code $code)"; status=1 ;;
+            esac
+          done < <(find "$RULES_DIR" -type f -not -path '*/cases/*' -not -path '*/cleanrules-audit/*' \
+            \( -name '*.json' -o -name '*.yaml' -o -name '*.yml' -o -name '*.rules' -o -name '*.csv' \) \
+            -print0 | sort -z)
+          if [ "$count" -eq 0 ]; then
+            echo "::error::no rule files (.json, .yaml, .yml, .rules, .csv) under $RULES_DIR"; exit 1
+          fi
+          echo "$count files audited"
+          exit "$status"
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cleanrules-audit
+          path: cleanrules-audit/
+          if-no-files-found: ignore

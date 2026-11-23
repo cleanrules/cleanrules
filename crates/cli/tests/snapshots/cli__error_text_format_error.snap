@@ -1,0 +1,7 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stderr
+---
+error[format_error]: unknown key "whn"
+  --> broken.json at /ruleset/rules/0/whn
+  hint: it may come from a newer version of cleanrules

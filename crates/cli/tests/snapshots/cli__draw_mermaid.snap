@@ -1,0 +1,23 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stdout
+---
+---
+title: "HIT POLICY unique"
+---
+flowchart LR
+  accTitle: HIT POLICY unique
+  n0(["age"])
+  n1("1. adult<br>age #gt;= 18")
+  n2("2. senior<br>age #gt;= 65")
+  n3[["band"]]
+  n0 --> n1
+  n1 --> n3
+  n0 --> n2
+  n2 --> n3
+  classDef rule fill:#ffffff,stroke:#202124
+  classDef field fill:#ffffff,stroke:#5f6368
+  classDef output fill:#f3e8fd,stroke:#9334e6
+  class n1,n2 rule
+  class n0 field
+  class n3 output

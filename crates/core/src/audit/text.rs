@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use super::{Audit, CheckStatus, RulesSource, UndecidedReason};
+use super::{Audit, AuditDocument, CheckStatus, RulesSource, UndecidedReason};
 use crate::format::write_value;
 use crate::json::to_string;
 
@@ -14,12 +14,22 @@ impl fmt::Display for Audit {
             RulesSource::DecisionTable => "a decision table",
         };
         let count = self.rules.len();
-        write!(
-            f,
-            "Audit of {what}: {count} {}, hit policy {}",
-            if count == 1 { "rule" } else { "rules" },
-            self.hit_policy.as_str()
-        )?;
+        match self.document {
+            // A rule has no hit policy of its own.
+            Some(AuditDocument::Rule) => write!(f, "Audit of a rule")?,
+            Some(AuditDocument::Bundle) => write!(
+                f,
+                "Audit of {what} in a bundle: {count} {}, hit policy {}",
+                if count == 1 { "rule" } else { "rules" },
+                self.hit_policy.as_str()
+            )?,
+            None => write!(
+                f,
+                "Audit of {what}: {count} {}, hit policy {}",
+                if count == 1 { "rule" } else { "rules" },
+                self.hit_policy.as_str()
+            )?,
+        }
         if let Some(aggregate) = self.aggregate {
             write!(f, ", aggregate {}", aggregate.as_str())?;
         }
@@ -38,7 +48,7 @@ impl fmt::Display for Audit {
             }
             writeln!(f, "{}", d.message)?;
             if let Some(pointer) = &d.pointer {
-                writeln!(f, "           at {pointer}")?;
+                writeln!(f, "           at {}", self.place(pointer))?;
             }
             if let Some(path) = &d.path {
                 writeln!(f, "           field {}", crate::text::path(path))?;
@@ -70,7 +80,7 @@ impl fmt::Display for Audit {
         if !self.not_modelled.is_empty() {
             writeln!(f, "Not modelled ({}):", self.not_modelled.len())?;
             for n in &self.not_modelled {
-                write!(f, "  {}  {} at {}", n.rule, n.op, n.pointer)?;
+                write!(f, "  {}  {} at {}", n.rule, n.op, self.place(&n.pointer))?;
                 if let Some(limit) = n.limit {
                     write!(f, " ({})", limit.as_str())?;
                 }
@@ -95,5 +105,43 @@ impl fmt::Display for Audit {
             }
         }
         Ok(())
+    }
+}
+
+impl Audit {
+    /// Where a pointer is: in a decision table, its row and cell by their
+    /// label and header, followed by the pointer (`row adult, input age
+    /// (/decision_table/rows/0/inputs/1)`); otherwise the pointer.
+    pub(super) fn place(&self, pointer: &str) -> String {
+        let Some(headers) = &self.headers else {
+            return pointer.to_owned();
+        };
+        let Some(at) = pointer.rfind("/decision_table/rows/") else {
+            return pointer.to_owned();
+        };
+        let rest = &pointer[at + "/decision_table/rows/".len()..];
+        let mut parts = rest.split('/');
+        let row = parts.next().and_then(|r| r.parse::<usize>().ok());
+        let Some(label) = row.and_then(|r| self.rules.iter().find(|rule| rule.row == Some(r)))
+        else {
+            return pointer.to_owned();
+        };
+        let column = match (
+            parts.next(),
+            parts.next().map(str::parse::<usize>),
+            parts.next(),
+        ) {
+            (None, None, None) => String::new(),
+            (Some("inputs"), Some(Ok(c)), None) => match headers.inputs.get(c) {
+                Some(header) => format!(", input {header}"),
+                None => return pointer.to_owned(),
+            },
+            (Some("outputs"), Some(Ok(c)), None) => match headers.outputs.get(c) {
+                Some(header) => format!(", output {header}"),
+                None => return pointer.to_owned(),
+            },
+            _ => return pointer.to_owned(),
+        };
+        format!("row {}{column} ({pointer})", label.name)
     }
 }

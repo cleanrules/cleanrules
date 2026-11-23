@@ -1,0 +1,10 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stdout
+---
+Audit of a rule set: 2 rules, hit policy unique, logic boolean
+error    overlap  adult, senior: rules adult and senior both fire for the witness, so the unique hit policy raises hit_policy_error: make their conditions exclusive, or use first or priority
+           witness: {"age":65}
+warning  gap  no rule fires for the witness, so the decision has no output: add a rule whose condition covers it; a rule with the condition TRUE would fire with every other rule
+           witness: {"age":0}
+Checks: types complete, fields not applicable, unsatisfiable complete, shadowed not applicable, overlap complete, gap complete

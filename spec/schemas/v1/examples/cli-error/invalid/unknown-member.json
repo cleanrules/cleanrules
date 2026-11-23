@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "io_error",
+    "message": "cannot read rules.json"
+  },
+  "file": "rules.json",
+  "exit": 3
+}

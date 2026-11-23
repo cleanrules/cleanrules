@@ -1,0 +1,5 @@
+---
+source: crates/cli/tests/cli.rs
+expression: "run(&[\"audit\", \"x.rules\", \"--fail-on=fatal\", \"--format=json\"]).stderr"
+---
+{"error":{"code":"usage_error","message":"invalid value 'fatal' for '--fail-on <SEVERITY>' [possible values: error, warning, info, never]","hint":"see cleanrules audit --help"}}

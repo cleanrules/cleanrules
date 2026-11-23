@@ -1,0 +1,62 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stdout
+---
+Audit the rules of a rule set, decision table, bundle or rule
+
+Usage: cleanrules audit [OPTIONS] <FILE>
+
+Arguments:
+  <FILE>
+          The document's file, or - for standard input
+
+Options:
+      --syntax <SYNTAX>
+          Its syntax; by default, from the file's suffix (.json, .yaml, .yml, .rules, .csv), and json for standard input
+
+          Possible values:
+          - json: JSON
+          - yaml: YAML
+          - text: The rule syntax
+          - csv:  CSV, for decision tables
+
+      --format <FORMAT>
+          What to write
+
+          Possible values:
+          - text: Text for people
+          - json: The JSON document, on one line
+          
+          [default: text]
+
+      --fail-on <SEVERITY>
+          Exit with 1 when a diagnostic has this severity or a more serious one
+
+          Possible values:
+          - error:   Errors only
+          - warning: Warnings and errors
+          - info:    Any diagnostic
+          - never:   Never: exit with 0 whatever the audit finds
+          
+          [default: error]
+
+      --max-terms <N>
+          The most boxes of one node's description (audit limit max_terms) [default: 256]
+
+      --max-steps <N>
+          The most steps of the whole audit (audit limit max_steps) [default: 1000000]
+
+      --ruleset-digest
+          Carry the rule set digest of the rules audited in the JSON
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Exit codes:
+  0  done, nothing found at or above --fail-on
+  1  findings at or above --fail-on (audit)
+  2  usage error
+  3  a file could not be read or written, a document did not read, or the
+     operation is not supported for it
+
+Specification: https://github.com/cleanrules/cleanrules/blob/main/spec/cli.md

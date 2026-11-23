@@ -98,6 +98,22 @@ impl Document {
         }
     }
 
+    /// The document's content key (`spec/json-format.md`, *Documents*):
+    /// `condition`, `rule`, `ruleset`, `decision_table`, `bundle` or `cases`.
+    /// The output-only keys (`decision`, `explanation`, `summary`, `audit`,
+    /// `test_run`) are never read into a document.
+    #[must_use]
+    pub fn content_key(&self) -> &'static str {
+        match self {
+            Document::Condition(_) => "condition",
+            Document::Rule(_) => "rule",
+            Document::RuleSet(_) => "ruleset",
+            Document::DecisionTable(_) => "decision_table",
+            Document::Bundle(_) => "bundle",
+            Document::Cases(_) => "cases",
+        }
+    }
+
     /// The condition, if the document holds one.
     #[must_use]
     pub fn into_condition(self) -> Option<Node> {

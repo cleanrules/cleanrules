@@ -69,6 +69,32 @@ impl DiagramFormat {
             _ => return None,
         })
     }
+
+    /// The format a document is drawn in when none is asked for: HTML for a
+    /// decision table and a bundle of one, which are drawn in HTML only
+    /// (`spec/visual.md`, *Decision tables*), and Mermaid for the others.
+    ///
+    /// ```
+    /// use cleanrules::json::Limits;
+    /// use cleanrules::visual::DiagramFormat;
+    ///
+    /// let rule = cleanrules::text::parse("RULE adult IF age >= 18", &Limits::default())?;
+    /// assert_eq!(DiagramFormat::for_document(&rule), DiagramFormat::Mermaid);
+    /// # Ok::<(), cleanrules::Error>(())
+    /// ```
+    #[must_use]
+    pub fn for_document(document: &Document) -> Self {
+        let table = match document {
+            Document::DecisionTable(_) => true,
+            Document::Bundle(bundle) => matches!(bundle.rules(), BundleRules::DecisionTable(_)),
+            _ => false,
+        };
+        if table {
+            DiagramFormat::Html
+        } else {
+            DiagramFormat::Mermaid
+        }
+    }
 }
 
 /// The class a truth value gives the node of a cause (`spec/visual.md`,
@@ -353,6 +379,38 @@ pub fn draw_document(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tables_are_drawn_in_html_by_default() {
+        use crate::bundle::{Bundle, BundleId, Revision};
+        let limits = Limits::default();
+        let table = DecisionTable::from_csv(
+            "HIT POLICY,first\nRULE,age,THEN ok\na,>= 18,TRUE\n",
+            &limits,
+        )
+        .unwrap();
+        let rules = crate::text::parse("RULE a IF x > 1\nRULE b IF x < 1", &limits).unwrap();
+        let bundle = |rules: crate::bundle::BundleRules| {
+            Document::Bundle(Box::new(Bundle::new(
+                rules,
+                BundleId::new("acme/draw").unwrap(),
+                Revision::new("1").unwrap(),
+            )))
+        };
+        let defaults = [
+            (Document::DecisionTable(table.clone()), DiagramFormat::Html),
+            (bundle(table.into()), DiagramFormat::Html),
+            (
+                bundle(rules.clone().into_ruleset().unwrap().into()),
+                DiagramFormat::Mermaid,
+            ),
+            (rules, DiagramFormat::Mermaid),
+        ];
+        for (document, format) in defaults {
+            assert_eq!(DiagramFormat::for_document(&document), format);
+            assert!(draw_document(&document, None, format, &limits).is_ok());
+        }
+    }
 
     #[test]
     fn formats_have_names() {

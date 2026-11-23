@@ -1,0 +1,1 @@
+RULE odd IF x > TRUE OR name MATCHES '^a'

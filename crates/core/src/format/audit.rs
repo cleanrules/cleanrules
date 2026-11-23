@@ -19,10 +19,11 @@ fn strings<S: AsRef<str>>(items: &[S]) -> Json {
 /// The content of an audit document: the object under `"audit"`.
 #[must_use]
 pub fn write_audit(audit: &Audit) -> Json {
-    let mut members = vec![
-        ("source".to_owned(), string(audit.source.as_str())),
-        ("hit_policy".to_owned(), string(audit.hit_policy.as_str())),
-    ];
+    let mut members = vec![("source".to_owned(), string(audit.source.as_str()))];
+    if let Some(document) = audit.document {
+        members.push(("document".into(), string(document.as_str())));
+    }
+    members.push(("hit_policy".into(), string(audit.hit_policy.as_str())));
     if let Some(aggregate) = audit.aggregate {
         members.push(("aggregate".into(), string(aggregate.as_str())));
     }

@@ -1,0 +1,4 @@
+HIT POLICY first
+
+RULE big IF x > 5
+RULE rest IF TRUE

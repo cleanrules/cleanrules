@@ -340,7 +340,8 @@ only: readers reject it with `unsupported`.
 
 | Key | Required | JSON type |
 |---|---|---|
-| `source` | yes | `"ruleset"` or `"decision_table"`: what was audited |
+| `source` | yes | `"ruleset"` or `"decision_table"`: the kind of rules audited, which may sit in a bundle or come from a rule document |
+| `document` | when the rules came from another document | `"bundle"` or `"rule"`: the document that held them (*Documents*); absent when the audited document is the rule set or decision table itself |
 | `hit_policy` | yes | the policy: a rule set's, or a decision table's (with `output_order`) |
 | `aggregate` | with an aggregate | the aggregate |
 | `logic` | yes | the logic |
@@ -380,9 +381,8 @@ A `pointer` is a JSON Pointer into the rule set or decision table document
 of what was audited, as the core writes it: a node of a rule set, such as
 `/ruleset/rules/0/when/operands/1`, or a cell of a decision table, such as
 `/decision_table/rows/1/inputs/0`; within a cell, which is text, every test
-points to the cell. A tool that audits the rules of a bundle prefixes
-`/bundle` (`bundles.md`, *Rules and their digest*). `message`, like an
-error's, is free text that conformance vectors do not compare.
+points to the cell. `message`, like an error's, is free text that
+conformance vectors do not compare.
 
 **Extensions.** Within format version 1, new diagnostic codes, checks,
 reasons, limits and optional keys may be added. Consumers ignore those they
@@ -430,6 +430,34 @@ codes.
 }
 ```
 
+## Documents
+
+Auditing a document audits the rules it holds, with every pointer into that
+document as written:
+
+- a rule set or a decision table: as above;
+- a bundle (`bundles.md`): the rule set or decision table it holds, with
+  every pointer prefixed with `/bundle` (`/bundle/ruleset/rules/0/when`), as
+  its rules are located there (`bundles.md`, *Rules and their digest*);
+- a rule: the rule set of that one rule with the default settings
+  (`json-format.md`, *A rule set from a document*), with `/rule` in place of
+  `/ruleset/rules/0` (`/rule/when/operands/1`). The checks between rules,
+  `shadowed`, `overlap` and `gap`, are `not_applicable`, and report nothing:
+  a rule has no hit policy of its own, and a gap of the default one is not
+  something the rule did. `types`, `fields` and `unsatisfiable` run as for a
+  rule set;
+- a condition or a case file (`tests.md`), which hold no rules:
+  `unsupported`.
+
+The report's `source` is the kind of rules audited, `ruleset` or
+`decision_table`, and its `document` says when they came from a `bundle` or
+a `rule` document (*JSON*).
+
+A document read from the rule syntax (`text.md`) or from CSV (`tables.md`) is
+located in the JSON form of the same document: `/ruleset/rules/2/when` is the
+condition of its third rule. The text form (*Text*) also names a table's
+cells by their row and column.
+
 ## Text
 
 *Not checked by vectors: the core's snapshot tests fix it.*
@@ -446,12 +474,19 @@ warning  gap  no rule fires for the witness, ...
 Checks: types complete, fields not applicable, unsatisfiable complete, shadowed not applicable, overlap complete, gap complete
 ```
 
-- A header with what was audited, the number of rules and the
-  configuration, as in a summary (`explain.md`, *Summaries*).
+- A header with what was audited (`a rule set`, `a decision table`,
+  followed by `in a bundle` for a bundle's), the number of rules and the
+  configuration, as in a summary (`explain.md`, *Summaries*); for a rule
+  document, `Audit of a rule` and its logic, since a rule has no hit policy.
 - One line per diagnostic: its severity, its code, its rules and its message,
   followed by its pointer (`at`), path (`field`) and groups when it has them
   and its witness in compact JSON, each on an indented line; `No findings.`
   when there are none.
+- In a decision table, a pointer to a row or a cell is written with the
+  row's label and the column's header before it, as
+  `row <label>, input <header> (<pointer>)`, `row <label>, output <name>
+  (<pointer>)` or `row <label> (<pointer>)`, here and in `Not modelled`;
+  the header of an input is its expression in the text syntax.
 - `Checks:` with each check's status; then `Not modelled (<n>):` with each
   test (its rule, its `op` and its pointer, and the limit), and
   `Undecided (<n>):` with each item (its check, its rules, its reason, the

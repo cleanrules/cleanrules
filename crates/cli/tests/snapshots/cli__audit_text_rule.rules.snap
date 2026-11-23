@@ -1,0 +1,12 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stdout
+---
+Audit of a rule, logic boolean
+warning  incompatible_types  odd: in rule odd, x > TRUE is UNKNOWN for every input: the values it tests can never be compared with its constant (booleans are not ordered, arithmetic gives numbers): compare with a value of the type the field holds
+           at /rule/when/operands/0
+Checks: types complete, fields not applicable, unsatisfiable partial, shadowed not applicable, overlap not applicable, gap not applicable
+Not modelled (1):
+  odd  matches at /rule/when/operands/1
+Undecided (1):
+  unsatisfiable  odd  not_modelled

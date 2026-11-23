@@ -1,0 +1,39 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stdout
+---
+Draw the diagram of a document
+
+Usage: cleanrules draw [OPTIONS] <FILE>
+
+Arguments:
+  <FILE>
+          The document's file, or - for standard input
+
+Options:
+      --syntax <SYNTAX>
+          Its syntax; by default, from the file's suffix (.json, .yaml, .yml, .rules, .csv), and json for standard input
+
+          Possible values:
+          - json: JSON
+          - yaml: YAML
+          - text: The rule syntax
+          - csv:  CSV, for decision tables
+
+      --format <FORMAT>
+          The diagram format [default: mermaid, or html for a decision table]
+
+          Possible values:
+          - mermaid:       A Mermaid flowchart
+          - dot:           A Graphviz graph
+          - html:          A standalone HTML document
+          - html_fragment: An HTML fragment, to embed in a page
+
+      --output <PATH>
+          Write the diagram to this file instead of standard output
+
+      --max-diagram-size <N>
+          The most elements of the diagram [default: 20000]
+
+  -h, --help
+          Print help (see a summary with '-h')

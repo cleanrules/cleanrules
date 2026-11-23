@@ -1,0 +1,7 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stderr
+---
+error[unsupported]: a decision table cannot be drawn as mermaid
+  --> table.csv
+  hint: draw it as HTML, or draw its rule set or the explanation of a decision

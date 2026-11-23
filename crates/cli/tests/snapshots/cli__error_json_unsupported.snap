@@ -1,0 +1,5 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stderr
+---
+{"error":{"code":"unsupported","message":"a condition has no audit: the audit reads rules and their hit policy","hint":"make it the condition of a rule (RULE name IF ...), and audit that","operation":"audit","reason":"a condition holds no rules"},"file":"condition.rules"}

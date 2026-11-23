@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "usage_error",
+    "message": "unexpected argument '--frob' found",
+    "hint": "see cleanrules audit --help"
+  }
+}

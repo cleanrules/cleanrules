@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/core", "crates/ffi", "bindings/python", "bindings/js", "bindings/erlang/native/cleanrules_nif"]
+members = ["crates/core", "crates/ffi", "crates/cli", "bindings/python", "bindings/js", "bindings/erlang/native/cleanrules_nif"]
 
 [workspace.package]
 version = "0.0.0"

@@ -1,0 +1,6 @@
+---
+source: crates/cli/tests/cli.rs
+expression: "run(&[\"audit\", \"x.rules\", \"--frob\"]).stderr"
+---
+error[usage_error]: unexpected argument '--frob' found
+  hint: see cleanrules audit --help

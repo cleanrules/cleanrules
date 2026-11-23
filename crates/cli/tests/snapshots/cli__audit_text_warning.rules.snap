@@ -1,0 +1,7 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stdout
+---
+Audit of a rule set: 2 rules, hit policy first, logic boolean
+warning  unsatisfiable  odd: rule odd never fires: no input makes its condition TRUE; fix the condition, or remove the rule
+Checks: types complete, fields not applicable, unsatisfiable complete, shadowed complete, overlap complete, gap complete

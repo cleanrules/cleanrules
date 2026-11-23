@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "file_error",
+    "message": "cannot read rules.json"
+  }
+}

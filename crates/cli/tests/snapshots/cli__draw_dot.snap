@@ -1,0 +1,16 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stdout
+---
+digraph cleanrules {
+  graph [rankdir=TB, fontname="Helvetica"];
+  node [fontname="Helvetica", fontsize=11];
+  edge [color="#5f6368"];
+  n0 [label="all", class="connective", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n1 [label="x > 1", class="leaf", shape=box, style="filled", fillcolor="#f8f9fa", color="#5f6368"];
+  n2 [label="not", class="connective", shape=ellipse, style="filled", fillcolor="#ffffff", color="#5f6368"];
+  n3 [label="blocked", class="leaf", shape=box, style="filled", fillcolor="#f8f9fa", color="#5f6368"];
+  n0 -> n1;
+  n0 -> n2;
+  n2 -> n3;
+}

@@ -775,3 +775,185 @@ fn the_text_of_an_audit_with_witnesses() {
     );
     insta::assert_snapshot!(format!("{report}{limited}"));
 }
+
+#[test]
+fn documents_are_audited_with_pointers_into_them() {
+    use crate::bundle::{Bundle, BundleId, Revision};
+    let limits = Limits::default();
+    let first = |document: &Document| {
+        let report = super::audit_document(document, &AuditLimits::default()).unwrap();
+        let pointer = report.diagnostics[0].pointer.clone();
+        let unmodelled = report.not_modelled.first().map(|n| n.pointer.clone());
+        (report, pointer, unmodelled)
+    };
+    // A rule: the rule set of that one rule, under `/rule`.
+    let rule = crate::text::parse("RULE odd IF x > TRUE OR name MATCHES 'a'", &limits).unwrap();
+    let (report, pointer, unmodelled) = first(&rule);
+    assert_eq!(report.source.as_str(), "ruleset");
+    assert_eq!(pointer.as_deref(), Some("/rule/when/operands/0"));
+    assert_eq!(unmodelled.as_deref(), Some("/rule/when/operands/1"));
+    // A rule set, as `audit`.
+    let rules = crate::text::parse(
+        "HIT POLICY first\nRULE a IF x > TRUE\nRULE b IF y > 1",
+        &limits,
+    )
+    .unwrap();
+    let (report, pointer, _) = first(&rules);
+    assert_eq!(pointer.as_deref(), Some("/ruleset/rules/0/when"));
+    assert_eq!(report.document, None);
+    // A bundle of a rule set, and of a table: prefixed with `/bundle`.
+    let bundle = |rules: crate::bundle::BundleRules| {
+        Document::Bundle(Box::new(Bundle::new(
+            rules,
+            BundleId::new("acme/audit").unwrap(),
+            Revision::new("1").unwrap(),
+        )))
+    };
+    let (report, pointer, _) = first(&bundle(rules.into_ruleset().unwrap().into()));
+    assert_eq!(pointer.as_deref(), Some("/bundle/ruleset/rules/0/when"));
+    assert_eq!(
+        report.document.map(super::AuditDocument::as_str),
+        Some("bundle")
+    );
+    assert!(
+        report
+            .to_string()
+            .starts_with("Audit of a rule set in a bundle: 2 rules, hit policy first")
+    );
+    let csv = "HIT POLICY,first\nRULE,country,age,THEN label\nes,ES,> TRUE,'adult'\n";
+    let table = DecisionTable::from_csv(csv, &limits).unwrap();
+    let (report, pointer, unmodelled) = first(&Document::DecisionTable(table.clone()));
+    assert_eq!(pointer.as_deref(), Some("/decision_table/rows/0/inputs/1"));
+    assert_eq!(
+        unmodelled.as_deref(),
+        Some("/decision_table/rows/0/inputs/0")
+    );
+    let (bundled, pointer, unmodelled) = first(&bundle(table.into()));
+    assert_eq!(
+        pointer.as_deref(),
+        Some("/bundle/decision_table/rows/0/inputs/1")
+    );
+    assert_eq!(
+        unmodelled.as_deref(),
+        Some("/bundle/decision_table/rows/0/inputs/0")
+    );
+    // The text names a bundled table's cells as it names the table's own.
+    assert!(
+        report
+            .to_string()
+            .contains("at row es, input age (/decision_table/rows/0/inputs/1)")
+    );
+    assert!(
+        bundled
+            .to_string()
+            .contains("at row es, input age (/bundle/decision_table/rows/0/inputs/1)")
+    );
+    // A condition and a case file hold no rules.
+    for document in [
+        crate::text::parse("x > 1", &limits).unwrap(),
+        crate::format::read_document(r#"{"version": 1, "cases": {"items": []}}"#, &limits).unwrap(),
+    ] {
+        let error = super::audit_document(&document, &AuditLimits::default()).unwrap_err();
+        assert_eq!(error.code().as_str(), "unsupported");
+        assert!(error.hint().is_some());
+    }
+}
+
+#[test]
+fn a_rule_document_has_no_checks_between_rules() {
+    let limits = Limits::default();
+    let rule = crate::text::parse("RULE odd IF x > TRUE OR name MATCHES 'a'", &limits).unwrap();
+    let report = super::audit_document(&rule, &AuditLimits::default()).unwrap();
+    assert_eq!(
+        report.document.map(super::AuditDocument::as_str),
+        Some("rule")
+    );
+    // The checks between rules do not apply to a rule: no gap of a default
+    // policy, which the rule did not choose.
+    let statuses: Vec<(&str, &str)> = report
+        .checks
+        .iter()
+        .map(|c| (c.check.as_str(), c.status.as_str()))
+        .collect();
+    assert_eq!(
+        statuses,
+        [
+            ("types", "complete"),
+            ("fields", "not_applicable"),
+            ("unsatisfiable", "partial"),
+            ("shadowed", "not_applicable"),
+            ("overlap", "not_applicable"),
+            ("gap", "not_applicable"),
+        ]
+    );
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .all(|d| d.code == DiagnosticCode::IncompatibleTypes)
+    );
+    assert!(
+        report
+            .undecided
+            .iter()
+            .all(|u| u.check == Check::Unsatisfiable)
+    );
+    assert!(
+        report
+            .to_string()
+            .starts_with("Audit of a rule, logic boolean\n")
+    );
+    let plain = crate::text::parse("RULE a IF x > 1", &limits).unwrap();
+    let report = super::audit_document(&plain, &AuditLimits::default()).unwrap();
+    assert!(report.diagnostics.is_empty() && report.undecided.is_empty());
+}
+
+#[test]
+fn places_that_are_not_cells_are_written_as_pointers() {
+    let csv = "HIT POLICY,first\nRULE,age,THEN label\nadult,>= 18,'adult'\n";
+    let table = DecisionTable::from_csv(csv, &Limits::default()).unwrap();
+    let report = audit_table(&table, &AuditLimits::default()).unwrap();
+    for (pointer, place) in [
+        (
+            "/decision_table/rows/0",
+            "row adult (/decision_table/rows/0)",
+        ),
+        (
+            "/decision_table/rows/0/inputs/0",
+            "row adult, input age (/decision_table/rows/0/inputs/0)",
+        ),
+        (
+            "/decision_table/rows/0/outputs/0",
+            "row adult, output label (/decision_table/rows/0/outputs/0)",
+        ),
+        (
+            "/decision_table/rows/1/inputs/0",
+            "/decision_table/rows/1/inputs/0",
+        ),
+        ("/decision_table/rows/x", "/decision_table/rows/x"),
+        (
+            "/decision_table/rows/0/inputs/1",
+            "/decision_table/rows/0/inputs/1",
+        ),
+        (
+            "/decision_table/rows/0/outputs/1",
+            "/decision_table/rows/0/outputs/1",
+        ),
+        (
+            "/decision_table/rows/0/inputs/x",
+            "/decision_table/rows/0/inputs/x",
+        ),
+        (
+            "/decision_table/rows/0/inputs/0/1",
+            "/decision_table/rows/0/inputs/0/1",
+        ),
+        ("/decision_table/inputs/0", "/decision_table/inputs/0"),
+    ] {
+        assert_eq!(report.place(pointer), place, "{pointer}");
+    }
+    let rules = audit(&ruleset("RULE a IF x > 1"), &AuditLimits::default()).unwrap();
+    assert_eq!(
+        rules.place("/decision_table/rows/0/inputs/0"),
+        "/decision_table/rows/0/inputs/0"
+    );
+}

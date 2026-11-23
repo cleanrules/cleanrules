@@ -248,6 +248,7 @@ impl<'r, L: Logic<Truth = Truth>> Auditor<'r, L> {
         let check = |check, status| CheckResult { check, status };
         Audit {
             source: RulesSource::RuleSet,
+            document: None,
             hit_policy: table_policy(policy),
             aggregate: self.ruleset.aggregate(),
             logic: self.ruleset.logic(),
@@ -275,6 +276,7 @@ impl<'r, L: Logic<Truth = Truth>> Auditor<'r, L> {
             undecided: std::mem::take(&mut self.undecided),
             diagnostics: std::mem::take(&mut self.diagnostics),
             digest: self.ruleset.digest(),
+            headers: None,
         }
     }
 

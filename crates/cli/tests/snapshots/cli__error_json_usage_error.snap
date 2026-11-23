@@ -1,0 +1,5 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stderr
+---
+{"error":{"code":"usage_error","message":"cannot tell the syntax of notes.txt from its suffix","hint":"name it .json, .yaml, .yml, .rules or .csv, or give --syntax json, yaml, text or csv"}}

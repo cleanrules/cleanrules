@@ -1,0 +1,33 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stdout
+---
+Read a document and say what it holds
+
+Usage: cleanrules validate [OPTIONS] <FILE>
+
+Arguments:
+  <FILE>
+          The document's file, or - for standard input
+
+Options:
+      --syntax <SYNTAX>
+          Its syntax; by default, from the file's suffix (.json, .yaml, .yml, .rules, .csv), and json for standard input
+
+          Possible values:
+          - json: JSON
+          - yaml: YAML
+          - text: The rule syntax
+          - csv:  CSV, for decision tables
+
+      --format <FORMAT>
+          What to write
+
+          Possible values:
+          - text: Text for people
+          - json: The JSON document, on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')

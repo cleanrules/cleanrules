@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "io_error",
+    "message": "cannot read missing.json: No such file or directory (os error 2)",
+    "hint": "check the path, relative to the current directory"
+  },
+  "file": "missing.json"
+}

@@ -1,0 +1,4 @@
+HIT POLICY unique
+
+RULE adult IF age >= 18 THEN band = 'adult'
+RULE senior ID "AGE-2" IF age >= 65 THEN band = 'senior'

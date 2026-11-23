@@ -23,7 +23,9 @@
         "action_error",
         "unsupported",
         "invalid_argument",
-        "internal_error"
+        "internal_error",
+        "usage_error",
+        "io_error"
       ]
     },
     "message": { "type": "string" },

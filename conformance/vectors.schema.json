@@ -539,7 +539,7 @@
             },
             "document": {
               "type": "object",
-              "description": "A rule set or decision table document (spec/json-format.md)."
+              "description": "A document (spec/json-format.md), audited as spec/audit.md (Documents) says: a rule set, a decision table, a bundle or a rule; a condition or a case file is unsupported."
             },
             "limits": {
               "type": "object",

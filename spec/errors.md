@@ -128,7 +128,11 @@ these members, in this order, each only when it applies: `code`, `message`,
 `executed`, `node` (a node in JSON form, as in `json-format.md`, even a null constant), `operation` and `reason`,
 leaving out empty arrays; and `cause`, the message of the error that caused it.
 The C ABI's own statuses are written with the codes `invalid_argument` and
-`internal_error`. JSON Schema: `schemas/v1/error.schema.json`.
+`internal_error`, and the command line's own errors with `usage_error` (its
+arguments are wrong) and `io_error` (a file could not be read or written),
+all outside the hierarchy (`cli.md`, *Errors*). JSON Schema:
+`schemas/v1/error.schema.json`; the command line's error lines,
+`schemas/v1/cli-error.schema.json`.
 
 The member names and what they hold are stable, like the format's
 (`json-format.md`, *Versioning*): a new version may add members, never change

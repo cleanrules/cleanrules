@@ -1,0 +1,7 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stdout
+---
+broken.rules: invalid
+error[rule_syntax_error]: expected a field, a constant or a parenthesis, found the end of the text
+  --> broken.rules:3:1

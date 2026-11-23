@@ -1,0 +1,26 @@
+---
+source: crates/cli/tests/cli.rs
+expression: help.stdout
+---
+Audit, validate and draw rule sets and decision tables
+
+Usage: cleanrules <COMMAND>
+
+Commands:
+  validate  Read a document and say what it holds
+  audit     Audit the rules of a rule set, decision table, bundle or rule
+  draw      Draw the diagram of a document
+  help      Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+
+Exit codes:
+  0  done, nothing found at or above --fail-on
+  1  findings at or above --fail-on (audit)
+  2  usage error
+  3  a file could not be read or written, a document did not read, or the
+     operation is not supported for it
+
+Specification: https://github.com/cleanrules/cleanrules/blob/main/spec/cli.md

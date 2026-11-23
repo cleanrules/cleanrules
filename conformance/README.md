@@ -61,7 +61,7 @@ A vector file is a JSON document:
 | `canonical` | `document` (a condition, rule, rule set or decision table document), or `text` (its JSON text, for lexical cases) | the reader, then the document's canonical bytes and digest, and the digest of the rule set it gives (`spec/json-format.md`, *Canonical bytes*, *Digests*) | `canonical`: the exact canonical bytes as UTF-8 text, compared as a string; `digest`; `ruleset_digest`, absent for a condition |
 | `bundle` | `document` (a rule set or decision table document: the rules), `id`, `revision`; optional `cases` (an array of `{"path", "text"}`: each case file's path and content as UTF-8 text) and `limits` (any of the six that a bundle records, `spec/bundles.md`, *Engine*) | make a bundle of the rules with this engine (`spec/bundles.md`, *Making a bundle*), write it, and read it back | `document`: the bundle, whose `engine.version` the runner first sets to its own engine's; or `error` (its `code` only) |
 | `bundle_compare` | `a`, `b`: two bundle documents | read both, then compare `a` with `b` (`spec/bundles.md`, *Comparing bundles*) | `comparison`: `relation`, `identical` and `differences` |
-| `audit` | `document` (a rule set or decision table document); optional `limits` (`max_terms`, `max_steps`, `spec/audit.md`, *Limits*) and `ruleset_digest` (`true`: ask for the digest in the report) | `audit` or `audit_table` (`spec/audit.md`) | `audit`: the report without the `message` and `witness` of each diagnostic (below) |
+| `audit` | `document` (a rule set, decision table, bundle or rule document, or one without rules); optional `limits` (`max_terms`, `max_steps`, `spec/audit.md`, *Limits*) and `ruleset_digest` (`true`: ask for the digest in the report) | `audit_document` (`spec/audit.md`, *Documents*) | `audit`: the report without the `message` and `witness` of each diagnostic (below); or `error` |
 | `test_run` | `document` (a rule set, decision table or bundle document: the rules); `cases` (a case file document, run without a path) or `files` (an array of `{"path", "text"}`: case files with their paths and contents as UTF-8 text, in order; for a bundle, the files it names, looked up by path); optional `limits` (`max_results`, `max_steps`, `max_explained`), `cancel_after` (an int: the run is given a cancel callback that says so when it is asked after that many results) and `ruleset_digest` (`true`) | run the cases against the rules (`spec/tests.md`, *Running cases*): from a bundle, its case files checked against their digests | `test_run`: the test run, with each error (a result's `error`, and the `actual` of an `error` mismatch) written with its code and compared fields only, and `engine.version`, which the runner first sets to its own engine's |
 | `draw` | `format` (`dot`, `mermaid`, `html` or `html_fragment`), `document` (a condition, rule, rule set or decision table document); optional `input`, with a rule set or a table; optional `limits` (`max_diagram_size`) | `draw_document` (`spec/visual.md`); with an `input`, the rule set (or the table's rule set) evaluates it, and the runner draws the decision's explanation for a rule set (`draw_explanation`), and the table with the decision for a table (`draw_document` with the decision) | `diagram`: the exact text, compared as a string, or `error` (`code` and `name`) |
 
@@ -167,7 +167,10 @@ output, never stopping at the first one.
   bundles; the vectors with `current_engine` in Go, Java and Scala; reading a
   bundle without an error in Go and in the idiomatic Java and Scala routes) is
   counted and skipped with the reason `bundle`.
-- **Audits** (`spec/audit.md`): the core's runner runs the `audit` vectors.
+- **Audits** (`spec/audit.md`): the core's runner runs the `audit` vectors,
+  and so do the command line's tests (`crates/cli/tests/conformance.rs`),
+  through `cleanrules audit --format json`, with the `draw` vectors that draw
+  a document.
   The bindings audit from task T.9 (Python and JavaScript; Java, Scala, Go
   and C++ are beta): until then the C ABI, Python, C++, JavaScript, Java,
   Scala and Go runners skip them in every route, count them and say why

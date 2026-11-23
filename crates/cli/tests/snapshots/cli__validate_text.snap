@@ -1,0 +1,12 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stdout
+---
+unique.rules: valid ruleset
+Rule set: 2 rules, hit policy unique, logic boolean
+  priority  name    condition  outputs
+         0  adult   age >= 18  band
+         0  senior  age >= 65  band
+Fields read (1):
+  age  conditions of adult, senior
+Outputs: band

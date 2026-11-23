@@ -590,7 +590,9 @@ pub enum RulesSource {
 }
 
 impl RulesSource {
-    /// The source's name, which is also its document's content key.
+    /// The source's name: `ruleset` or `decision_table`. The rules may sit
+    /// in a bundle, or come from a rule document (an audit's `document` says
+    /// which: `spec/audit.md`, *Documents*).
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {

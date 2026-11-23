@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "format_error",
+    "message": "unknown key \"whn\"",
+    "hint": "it may come from a newer version of cleanrules",
+    "pointer": "/ruleset/rules/0/whn"
+  },
+  "file": "broken.json"
+}

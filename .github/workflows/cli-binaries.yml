@@ -1,0 +1,145 @@
+name: CLI binaries
+
+# Builds the `cleanrules` command line (crates/cli, spec/cli.md) for every
+# platform, checks each binary where it runs, and uploads it as an artifact,
+# without publishing anything (task M.2 attaches them to a release; nothing
+# here creates a release, pushes or tags):
+#
+# - Linux: static musl binaries (x64 and arm64), which run on any
+#   distribution, glibc or musl, with no system library;
+# - macOS: arm64 and x64, for macOS 11.0 and later;
+# - Windows: x64 and arm64 (MSVC), with the C runtime linked in (crt-static),
+#   so no Visual C++ redistributable is needed.
+#
+# Release builds with fat LTO and one codegen unit, symbols stripped (the
+# workspace's release profile keeps them for Xcode 27's strip, which can
+# corrupt Mach-O libraries: each stripped binary runs its smoke test after).
+#
+# Each archive holds the binary, README.md, LICENSE and NOTICE, and comes with
+# its SHA-256 (cleanrules-<target>.tar.gz or .zip, plus .sha256). Each binary
+# is smoke-tested on its own runner: --version, and the exit codes of
+# `audit`, `validate` and `draw` on the documents of docs/examples and the
+# CLI's test data.
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "crates/cli/**"
+      - "crates/core/**"
+      - "docs/examples/**"
+      - ".gitattributes"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/cli-binaries.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-binaries-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # The oldest macOS the binaries run on, as for the other native libraries.
+  MACOSX_DEPLOYMENT_TARGET: "11.0"
+
+jobs:
+  build:
+    name: cleanrules (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, target: x86_64-unknown-linux-musl }
+          - { runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl }
+          - { runner: macos-latest, target: aarch64-apple-darwin }
+          - { runner: macos-15-intel, target: x86_64-apple-darwin }
+          - { runner: windows-latest, target: x86_64-pc-windows-msvc }
+          - { runner: windows-11-arm, target: aarch64-pc-windows-msvc }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          # llvm-readobj, to list the imports of the Windows binaries.
+          components: llvm-tools
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      # musl's C runtime objects for the linker (the crate has no C code).
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Build
+        env:
+          CARGO_PROFILE_RELEASE_LTO: "true"
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
+          CARGO_PROFILE_RELEASE_STRIP: symbols
+          # The MSVC C runtime linked in; musl is static by default.
+          CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS: -C target-feature=+crt-static
+          CARGO_TARGET_AARCH64_PC_WINDOWS_MSVC_RUSTFLAGS: -C target-feature=+crt-static
+        run: cargo build --release --locked -p cleanrules-cli --target ${{ matrix.target }}
+      - name: Smoke test
+        run: |
+          exe=target/${{ matrix.target }}/release/cleanrules
+          if [ "$RUNNER_OS" = Windows ]; then exe="$exe.exe"; fi
+          "$exe" --version
+          expect() { want=$1; shift; set +e; "$exe" "$@" > /dev/null; got=$?; set -e
+            [ "$got" = "$want" ] || { echo "::error::cleanrules $* exited with $got, not $want"; exit 1; }; }
+          expect 0 validate docs/examples/discounts.yaml
+          expect 0 audit docs/examples/discounts.rules
+          expect 0 audit docs/examples/risk.csv --format json
+          expect 1 audit crates/cli/tests/data/unique.rules
+          expect 1 audit crates/cli/tests/data/warning.rules --fail-on warning
+          expect 2 audit crates/cli/tests/data/notes.txt
+          expect 3 audit crates/cli/tests/data/broken.json
+          expect 1 validate crates/cli/tests/data/broken.json --format json
+          expect 0 draw docs/examples/discounts.json --format dot
+          # No dynamic library beyond the system's, and no C runtime DLL on
+          # Windows.
+          case "$RUNNER_OS" in
+            Linux)
+              file "$exe"
+              file "$exe" | grep -q -E "statically linked|static-pie linked" ;;
+            macOS)
+              otool -L "$exe"
+              if otool -L "$exe" | tail -n +2 | grep -v -E "^[[:space:]]+/(usr/lib|System/Library)/"; then
+                echo "::error::the binary links a library outside the system's"; exit 1
+              fi ;;
+            Windows)
+              readobj=$(find "$(rustc --print sysroot)" -name 'llvm-readobj*' -type f -print -quit)
+              test -n "$readobj"
+              "$readobj" --coff-imports "$exe" | grep -i "Name:" | sort -u
+              if "$readobj" --coff-imports "$exe" | grep -i -E "vcruntime|msvcp|api-ms-win-crt"; then
+                echo "::error::the binary imports the C runtime: it must be linked in (crt-static)"; exit 1
+              fi ;;
+          esac
+      - name: Package
+        run: |
+          name=cleanrules-${{ matrix.target }}
+          mkdir -p "dist/$name"
+          cp crates/cli/README.md LICENSE NOTICE "dist/$name/"
+          cd dist
+          if [ "$RUNNER_OS" = Windows ]; then
+            cp "../target/${{ matrix.target }}/release/cleanrules.exe" "$name/"
+            pwsh -NoProfile -Command "Compress-Archive -Path '$name' -DestinationPath '$name.zip'"
+            sha256sum "$name.zip" > "$name.zip.sha256"
+          else
+            cp "../target/${{ matrix.target }}/release/cleanrules" "$name/"
+            tar -czf "$name.tar.gz" "$name"
+            shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"
+          fi
+          rm -r "$name"
+          ls -l
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cleanrules-${{ matrix.target }}
+          path: dist/
+          if-no-files-found: error

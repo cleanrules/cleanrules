@@ -14,7 +14,7 @@ use std::fs;
 
 use cleanrules::Error;
 use cleanrules::agents::Catalog;
-use cleanrules::audit::{AuditLimits, audit, audit_table};
+use cleanrules::audit::{AuditLimits, audit_document};
 use cleanrules::bundle::{self, Bundle, BundleId, BundleRules, CaseFileRef, Revision};
 use cleanrules::cases::{CaseFile, Runner, TestRunLimits};
 use cleanrules::eval::{Options, evaluate_value_tree};
@@ -595,12 +595,15 @@ fn run_audit(vector: &Json) -> Result<(), String> {
         &Limits::default(),
     )
     .map_err(|e| format!("reading the document: {e}"))?;
-    let (report, ruleset) = match &document {
-        Document::RuleSet(ruleset) => (audit(ruleset, &limits), ruleset),
-        Document::DecisionTable(table) => (audit_table(table, &limits), table.ruleset()),
-        _ => return Err("not a rule set or a decision table".into()),
+    // Any document, through `audit_document` (`spec/audit.md`, *Documents*);
+    // a document without rules is an expected error.
+    let report = match audit_document(&document, &limits) {
+        Ok(report) => report,
+        Err(error) => return compare(Err(error), get(vector, "expect").unwrap(), "audit"),
     };
-    let report = report.map_err(|e| format!("auditing: {e}"))?;
+    let ruleset = &document
+        .into_ruleset()
+        .map_err(|e| format!("the rule set: {e}"))?;
     let report = report.with_ruleset_digest(matches!(
         get(given, "ruleset_digest"),
         Some(Json::Bool(true))
