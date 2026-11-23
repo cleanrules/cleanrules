@@ -16,6 +16,7 @@ use napi::bindgen_prelude::{
 use napi::{Env, Result, ValueType};
 use napi_derive::napi;
 
+use crate::common::audit::{RawAuditLimits, RawAuditOptions};
 use crate::common::bundles::RawCase;
 use crate::common::{LIMIT_NAMES, LIMITS, OBJECT, Outcome, Problem, Raw, RawLimits, RawOptions};
 use hooks::{range_error, throw, type_error};
@@ -134,6 +135,38 @@ pub(crate) fn raw_options(env: &Env, value: &Unknown<'_>) -> Result<Option<RawOp
         strict: member(&object, "strict")?,
         limits: raw_limits(&object.get_named_property::<Unknown<'_>>("limits")?)?,
     }))
+}
+
+/// The options of an audit, read once: the defaults when they are left out.
+pub(crate) fn raw_audit_options(value: Option<Unknown<'_>>) -> Result<RawAuditOptions> {
+    let Some(value) = value else {
+        return Ok(RawAuditOptions::Absent);
+    };
+    let kind = raw(&value)?;
+    if matches!(kind, Raw::Undefined | Raw::Null) {
+        return Ok(RawAuditOptions::Absent);
+    }
+    if !matches!(kind, Raw::Other(OBJECT)) {
+        return Ok(RawAuditOptions::Wrong(kind.describe()));
+    }
+    let object = Object::from_unknown(value)?;
+    let limits = object.get_named_property::<Unknown<'_>>("limits")?;
+    let limits = match raw(&limits)? {
+        Raw::Undefined | Raw::Null => RawAuditLimits::Absent,
+        Raw::Other(OBJECT) => {
+            let limits = Object::from_unknown(limits)?;
+            RawAuditLimits::Given {
+                max_terms: member(&limits, "maxTerms")?,
+                max_steps: member(&limits, "maxSteps")?,
+            }
+        }
+        other => RawAuditLimits::Wrong(other.describe()),
+    };
+    Ok(RawAuditOptions::Given {
+        format: member(&object, "format")?,
+        limits,
+        ruleset_digest: member(&object, "rulesetDigest")?,
+    })
 }
 
 /// The `rulesetDigest` member of a decision's write options, read once:

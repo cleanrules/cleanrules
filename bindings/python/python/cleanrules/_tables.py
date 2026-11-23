@@ -18,12 +18,15 @@ from __future__ import annotations
 import enum
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, NoReturn, TypeAlias
+from typing import TYPE_CHECKING, Any, NoReturn, TypeAlias
 
 from cleanrules import _cleanrules as _native
 from cleanrules._expr import Expr, _wrap  # pyright: ignore[reportPrivateUsage]
 from cleanrules._rules import Aggregate, Decision, RuleSet, Summary
 from cleanrules.errors import RuleDefinitionError
+
+if TYPE_CHECKING:
+    from cleanrules._audit import Audit
 
 __all__ = ["DecisionTable", "HeaderItem", "TableOutput", "TablePolicy", "TableRow"]
 
@@ -347,6 +350,32 @@ class DecisionTable:
     def summary(self) -> Summary:
         """The summary of the compiled rule set (`RuleSet.summary`)."""
         return self.ruleset.summary()
+
+    def audit(
+        self,
+        *,
+        max_terms: int | None = None,
+        max_steps: int | None = None,
+        ruleset_digest: bool = False,
+    ) -> Audit:
+        """Audit the table without any input (`spec/audit.md`), as `RuleSet.audit` does.
+
+        The rows are read cell by cell, so pointers name cells
+        (`/decision_table/rows/1/inputs/0`) and each rule its `row`; the table
+        is also checked for cells that read a field no input reads
+        (`unlisted_field`, such as `ES` written for `'ES'`). Witnesses are
+        evaluated by the compiled rule set (`DecisionTable.ruleset`).
+
+        Raises:
+            TypeError: For a limit that is not an int, or a `ruleset_digest`
+                that is not a bool.
+            ValueError: For a negative limit.
+        """
+        from cleanrules._audit import Audit, _check_options  # pyright: ignore[reportPrivateUsage]
+
+        max_terms, max_steps = _check_options(max_terms, max_steps, ruleset_digest)
+        native = _native.audit_decision_table(self._native, max_terms, max_steps, ruleset_digest)
+        return Audit(native)
 
     def __setattr__(self, name: str, value: object) -> NoReturn:
         raise AttributeError(f"decision tables are immutable: cannot set {name!r}")

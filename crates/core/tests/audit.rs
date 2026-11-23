@@ -7,7 +7,7 @@
 #![allow(clippy::unwrap_used, clippy::panic)]
 
 use cleanrules::audit::{
-    Audit, AuditLimits, Check, CheckStatus, DiagnosticCode, UndecidedReason, audit,
+    Audit, AuditCheck, AuditLimits, CheckStatus, DiagnosticCode, UndecidedReason, audit,
 };
 use cleanrules::eval::{Options, evaluate_tree};
 use cleanrules::format::Document;
@@ -178,21 +178,20 @@ fn check(ruleset: &RuleSet, report: &Audit, exact: bool) {
         let any = ruleset.hit_policy() == HitPolicy::Any;
         for u in &report.undecided {
             assert!(
-                any && u.check == Check::Overlap && u.reason == UndecidedReason::NoWitness,
+                any && u.check == AuditCheck::Overlap && u.reason == UndecidedReason::NoWitness,
                 "{report}"
             );
         }
         assert!(
-            report
-                .checks
-                .iter()
-                .all(|c| c.status != CheckStatus::Partial || (any && c.check == Check::Overlap))
+            report.checks.iter().all(
+                |c| c.status != CheckStatus::Partial || (any && c.check == AuditCheck::Overlap)
+            )
         );
     }
     let undecided_pairs: Vec<Vec<usize>> = report
         .undecided
         .iter()
-        .filter(|u| u.check == Check::Overlap)
+        .filter(|u| u.check == AuditCheck::Overlap)
         .map(|u| rules(&u.rules))
         .collect();
     let mut never = vec![false; n];
@@ -217,8 +216,8 @@ fn check(ruleset: &RuleSet, report: &Audit, exact: bool) {
             _ => {}
         }
     }
-    let overlap_checked = report.status(Check::Overlap) != CheckStatus::NotApplicable;
-    let gap_checked = report.status(Check::Gap) == CheckStatus::Complete;
+    let overlap_checked = report.status(AuditCheck::Overlap) != CheckStatus::NotApplicable;
+    let gap_checked = report.status(AuditCheck::Gap) == CheckStatus::Complete;
     for (input, supported) in grid() {
         let fired: Vec<bool> = (0..n).map(|r| fires(ruleset, r, &input)).collect();
         for r in 0..n {

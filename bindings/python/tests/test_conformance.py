@@ -25,6 +25,9 @@ with `_compare_bundles` or `Bundle.compare`. A `current_engine` vector, and
 the expected document of a `bundle` vector, name this engine's version
 (`cleanrules.__version__`).
 
+Audits (`spec/audit.md`) run on both routes but for documents other than
+rule sets and tables, which only the `json` route audits (`run_audit`).
+
 Case files (`spec/tests.md`, `format/cases/*`) have no Python type yet:
 `loads` refuses them with `UnsupportedError`. Their `read` vectors run through
 `_read_document` (`json`); those that write a case file in another format, and
@@ -476,6 +479,183 @@ def run_canonical(given: dict[str, Any], expect: dict[str, Any], *, built: bool)
     assert (None if ruleset is None else cleanrules.digest(ruleset)) == wanted
 
 
+# --- Audits -----------------------------------------------------------------------------
+
+
+def shown(
+    code: str, severity: str, rules: list[str], witness: Any, evaluate: Callable[[], Any]
+) -> bool:
+    """Whether a diagnostic's witness shows it (`spec/audit.md`, *Witnesses*).
+
+    `evaluate` evaluates the witness with the audited rule set and gives the
+    names of the rules that fired. An `overlap` of severity `error` raises
+    `hit_policy_error` naming both its rules; any other `overlap` is a
+    decision in which both fire; a `gap` a decision in which none fires. Only
+    those two codes have a witness.
+    """
+    if code not in ("overlap", "gap"):
+        return witness is None
+    if witness is None:
+        return False
+    try:
+        fired = evaluate()
+    except CleanRulesError as error:
+        return (
+            code == "overlap"
+            and severity == "error"
+            and error.code == "hit_policy_error"
+            and all(rule in (error.rules or ()) for rule in rules)
+        )
+    if code == "gap":
+        return not fired
+    return severity != "error" and all(rule in fired for rule in rules)
+
+
+def without_free_text(content: dict[str, Any]) -> dict[str, Any]:
+    """An audit's content without the `message` and `witness` of its diagnostics."""
+    out = dict(content)
+    out["diagnostics"] = [
+        {k: v for k, v in d.items() if k not in ("message", "witness")}
+        for d in content["diagnostics"]
+    ]
+    return out
+
+
+def audits_document(vector: dict[str, Any]) -> bool:
+    """An `audit` vector whose document holds neither a rule set nor a decision table."""
+    document = vector["given"]["document"]
+    return "ruleset" not in document and "decision_table" not in document
+
+
+AUDIT_DOCUMENT_SKIP = (
+    "the Python API audits rule sets and decision tables (RuleSet.audit, DecisionTable.audit):"
+    " audits of other documents (a bundle, a rule, a condition, a case file) run in the json"
+    " route, through the core's audit_document"
+)
+
+
+def run_audit(vector: dict[str, Any], route: str) -> None:
+    """An `audit` vector: the report, with each witness checked by the rule set's evaluation.
+
+    `json` audits the document through `_audit` (the core's `audit_document`:
+    a rule set, a table, a bundle or a rule) and evaluates each witness, in
+    the JSON encoding, with `_evaluate` and the rule set the document gives;
+    `native` builds the rule set with the
+    Python API (a decision table is read), audits it with `RuleSet.audit` or
+    `DecisionTable.audit`, and evaluates each witness, as Python data, with
+    `RuleSet.evaluate`.
+    """
+    given, expect = vector["given"], vector["expect"]
+    limits = {name: int(value) for name, value in given.get("limits", {}).items()}
+    carry = bool(given.get("ruleset_digest", False))
+    document = given["document"]
+    failures: list[str] = []
+    if route == "json":
+        # The core's `audit_document`: any document; an error is the vector's.
+        try:
+            content_text, ruleset_text = _cleanrules._audit(  # pyright: ignore[reportPrivateUsage]
+                dumps(document), **limits, ruleset_digest=carry
+            )
+        except CleanRulesError as raised:
+            assert "error" in expect, f"unexpected {raised.code}: {raised}"
+            check_error(raised, typed(expect["error"]), read=True)
+            return
+        assert "error" not in expect, f"expected the error {expect['error']}"
+        content = json.loads(content_text)
+        kind = next(key for key in document if key != "version")
+        if kind in ("bundle", "rule"):
+            assert content.get("document") == kind, content.get("document")
+
+        def evaluate_json(witness: Any) -> set[str]:
+            decision = json.loads(
+                _cleanrules._evaluate(ruleset_text, json.dumps(witness))  # pyright: ignore[reportPrivateUsage]
+            )
+            return {r["rule"] for r in decision["results"] if r["fired"]}
+
+        for d in content["diagnostics"]:
+            witness = d.get("witness")
+            evaluate = functools.partial(evaluate_json, witness)
+            if not shown(d["code"], d["severity"], d["rules"], witness, evaluate):
+                failures.append(f"the witness does not show {d}")
+    else:
+        rules: cleanrules.RuleSet | cleanrules.DecisionTable = (
+            build_ruleset(document["ruleset"])
+            if "ruleset" in document
+            else cast(cleanrules.DecisionTable, cleanrules.loads(dumps(document)))
+        )
+        report = rules.audit(**limits, ruleset_digest=carry)
+        ruleset = rules if isinstance(rules, cleanrules.RuleSet) else rules.ruleset
+
+        def evaluate_native(witness: Any) -> set[str]:
+            return {r.rule.name for r in ruleset.evaluate(witness).results if r.fired}
+
+        for d in report.diagnostics:
+            evaluate = functools.partial(evaluate_native, d.witness)
+            if not shown(d.code, d.severity, list(d.rules), d.witness, evaluate):
+                failures.append(f"the witness does not show {d!r}")
+        content = report.to_dict()["audit"]
+        check_audit(report, content)
+    assert not failures, "\n".join(failures)
+    wanted = typed(expect["audit"])
+    got = without_free_text(content)
+    assert same(got, wanted), f"\ngot  {json.dumps(got)}\nwant {json.dumps(wanted)}"
+
+
+def check_audit(report: cleanrules.Audit, content: dict[str, Any]) -> None:
+    """The attributes of an audit agree with its JSON form."""
+    assert report.source == content["source"]
+    assert report.document == content.get("document")
+    assert report.hit_policy == content["hit_policy"]
+    assert report.logic == content["logic"]
+    assert report.strict == content.get("strict", False)
+    assert report.ruleset_digest == content.get("ruleset_digest")
+    assert report.limits == cleanrules.AuditLimits(**content["limits"])
+    rules = [
+        {k: v for k, v in (("name", r.name), ("id", r.id), ("row", r.row)) if v is not None}
+        for r in report.rules
+    ]
+    assert rules == content["rules"]
+    assert [{"check": c.check, "status": c.status} for c in report.checks] == content["checks"]
+    for check in content["checks"]:
+        assert report.status(check["check"]) == check["status"]
+    for n, item in zip(report.not_modelled, content["not_modelled"], strict=True):
+        assert (n.rule, n.op, n.pointer, n.limit) == (
+            item["rule"],
+            item["op"],
+            item["pointer"],
+            item.get("limit"),
+        )
+    for u, item in zip(report.undecided, content["undecided"], strict=True):
+        assert (u.check, list(u.rules), u.reason, u.limit, u.remaining) == (
+            item["check"],
+            item["rules"],
+            item["reason"],
+            item.get("limit"),
+            item.get("remaining"),
+        )
+    severities = {d.severity for d in report.diagnostics}
+    for d, item in zip(report.diagnostics, content["diagnostics"], strict=True):
+        assert (d.code, d.severity, list(d.rules), d.message) == (
+            item["code"],
+            item["severity"],
+            item["rules"],
+            item["message"],
+        )
+        assert d.pointer == item.get("pointer")
+        assert d.path == (None if "path" not in item else tuple(item["path"]))
+        assert list(d.groups) == item.get("groups", [])
+        assert (d.witness is None) == ("witness" not in item)
+    # Severities by seriousness (`spec/audit.md`, *JSON*, *Extensions*).
+    rank = {"info": 0, "warning": 1, "error": 2}
+    worst = max(severities, key=rank.__getitem__, default=None)
+    assert report.max_severity == worst
+    for severity in cleanrules.Severity:
+        assert report.at_least(severity) == (worst is not None and rank[worst] >= rank[severity])
+    text = str(report)
+    assert text.startswith("Audit of a "), text
+    assert ("No findings." in text) == (not report.diagnostics)
+
+
 # --- Bundles ----------------------------------------------------------------------------
 
 
@@ -840,11 +1020,6 @@ DRAW_SKIP = (
     " the binding draws them from phase V.2"
 )
 
-AUDIT_SKIP = (
-    "audits (spec/audit.md) are made by the core and checked by its runner;"
-    " the binding audits from task T.9"
-)
-
 TEST_RUN_SKIP = (
     "test runs (spec/tests.md, Running cases) are made by the core and checked by its runner;"
     " the binding runs cases from task T.9b"
@@ -879,17 +1054,16 @@ def collect() -> list[Any]:
                         )
                     )
                 continue
-            if given["kind"] == "audit":
-                # The static audit is the core's; the Python API to it comes with T.9.
-                for run in ("json", "native"):
-                    params.append(
-                        pytest.param(
-                            vector,
-                            run,
-                            id=f"{run}:{vector['id']}",
-                            marks=pytest.mark.skip(reason=AUDIT_SKIP),
-                        )
+            if given["kind"] == "audit" and audits_document(vector):
+                params.append(pytest.param(vector, "json", id=f"json:{vector['id']}"))
+                params.append(
+                    pytest.param(
+                        vector,
+                        "native",
+                        id=f"native:{vector['id']}",
+                        marks=pytest.mark.skip(reason=AUDIT_DOCUMENT_SKIP),
                     )
+                )
                 continue
             if given["kind"] == "test_run":
                 # The case runner is the core's; the Python API to it comes with T.9b.
@@ -930,6 +1104,9 @@ def collect() -> list[Any]:
 def test_vector(vector: dict[str, Any], run: str) -> None:
     if vector["given"]["kind"] == "tool":
         run_tool(vector, run)
+        return
+    if vector["given"]["kind"] == "audit":
+        run_audit(vector, run)
         return
     (run_json if run == "json" else run_native)(vector)
 

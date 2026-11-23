@@ -178,6 +178,21 @@ export declare class Document {
    * A `TypeError` when either document is not a bundle.
    */
   compareBundle(other: Document): string
+  /**
+   * The static audit (`spec/audit.md`) of the rule set or decision table
+   * the document holds, without any input, in `options.format`: its text
+   * (the default, as `RuleSet.summary`), or a `"json"` or `"yaml"` audit
+   * document, whose pointers point into this document. `maxTerms` and
+   * `maxSteps` bound it; `rulesetDigest` carries the rule set digest.
+   *
+   * # Errors
+   *
+   * `UnsupportedError` for CSV or the rule syntax; a `TypeError` for a
+   * document that holds no rule set or decision table, or an option of the
+   * wrong type; a `RangeError` for a limit that is negative or not a whole
+   * number.
+   */
+  audit(options?: AuditWriteOptions | null): string
 }
 
 /**
@@ -468,6 +483,16 @@ export declare class RuleSet {
    */
   summary(format?: Format | null): string
   /**
+   * The static audit (`spec/audit.md`) of the rule set, without any input,
+   * in `options.format`: its text (the default), or a `"json"` or `"yaml"`
+   * audit document, as `Document.audit` gives them.
+   *
+   * # Errors
+   *
+   * As `Document.audit`.
+   */
+  audit(options?: AuditWriteOptions | null): string
+  /**
    * The canonical bytes of the rule set's document (`spec/json-format.md`,
    * *Canonical bytes*), as `Document.canonicalBytes` gives them.
    */
@@ -616,6 +641,41 @@ export declare function actionErrorData(rule: string, action: string | undefined
 
 /** The name of an aggregate of `collect`. */
 export type Aggregate = 'sum' | 'min' | 'max' | 'count'
+
+/**
+ * A rule set's audit for the idiomatic API (`common::audit`).
+ *
+ * # Errors
+ *
+ * As `RuleSet.audit`.
+ */
+export declare function auditRuleset(ruleset: RuleSet, options?: AuditWriteOptions | null): string
+
+/**
+ * A decision table's audit for the idiomatic API (`common::audit`).
+ *
+ * # Errors
+ *
+ * As `Document.audit`.
+ */
+export declare function auditTable(table: NativeTable, options?: AuditWriteOptions | null): string
+
+/**
+ * The options of an audit (`spec/audit.md`) in the native layer: how its
+ * report is written, its limits, and whether it carries the rule set digest.
+ */
+export interface AuditWriteOptions {
+  /** The format: `"text"` (the default), `"json"` or `"yaml"`. */
+  format?: Format
+  /**
+   * The limits: `maxTerms`, the most boxes in the true or false
+   * description of one node (256), and `maxSteps`, the work of the whole
+   * audit in steps (1,000,000); each one left out keeps its default.
+   */
+  limits?: { maxTerms?: number | null; maxSteps?: number | null } | null
+  /** Carry the rule set digest of what was audited in the report. */
+  rulesetDigest?: boolean
+}
 
 /**
  * Whether `bytes` are the case file at `path` the bundle was made with.

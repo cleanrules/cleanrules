@@ -1,15 +1,16 @@
 //! What the napi-rs and wasm-bindgen front ends share: checking arguments as
 //! JavaScript gives them, the reader's encoding (`wire`), the documents, rule
 //! sets, decisions and nodes over the core (`core`), conditions and rules
-//! built in code (`build`), documents, decision tables and bundles for the
-//! idiomatic API (`documents`, `tables`, `bundles`), and the encoding of what
-//! comes back (`out`).
+//! built in code (`build`), the static audit (`audit`), documents, decision
+//! tables and bundles for the idiomatic API (`documents`, `tables`,
+//! `bundles`), and the encoding of what comes back (`out`).
 //!
 //! Nothing here touches a JavaScript engine. Each front end turns its
 //! arguments into [`Raw`] values and [`RawOptions`], calls this code, and turns
 //! a [`Problem`] into a JavaScript error, so that both builds accept the same
 //! arguments and throw the same errors.
 
+pub(crate) mod audit;
 pub(crate) mod build;
 pub(crate) mod bundles;
 pub(crate) mod core;
@@ -170,19 +171,25 @@ pub(crate) fn format(raw: &Raw, default: DocumentFormat) -> Outcome<DocumentForm
 const MAX_SAFE: f64 = 9_007_199_254_740_991.0;
 
 fn size(name: &str, raw: &Raw) -> Outcome<Option<usize>> {
+    whole(&format!("limits.{name}"), raw)
+}
+
+/// A limit named `what` in messages (`limits.maxSize`, `options.maxSteps`):
+/// a whole number from 0, or `None` when it is left out.
+pub(crate) fn whole(what: &str, raw: &Raw) -> Outcome<Option<usize>> {
     let value = match raw {
         Raw::Undefined | Raw::Null => return Ok(None),
         Raw::Number(value) => *value,
         other => {
             return Err(Problem::Type(format!(
-                "limits.{name} is a number, not {}",
+                "{what} is a number, not {}",
                 other.describe()
             )));
         }
     };
     if !(value.is_finite() && value.fract() == 0.0 && (0.0..=MAX_SAFE).contains(&value)) {
         return Err(Problem::Range(format!(
-            "limits.{name} is {value}; a limit is a whole number from 0"
+            "{what} is {value}; a limit is a whole number from 0"
         )));
     }
     // A limit beyond the address space is no limit at all.

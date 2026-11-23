@@ -92,6 +92,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   otherwise). Five new `audit` conformance
   vectors (`conformance/vectors/audit/documents.json`), which the core's
   runner and the command line's tests run.
+- The static audit in Python and JavaScript (task T.9a;
+  [`spec/audit.md`](spec/audit.md)). Python: `RuleSet.audit()` and
+  `DecisionTable.audit()` (keyword options `max_terms`, `max_steps`, a limit
+  beyond the core's being no limit, and `ruleset_digest`; the GIL is
+  released while the core audits) return an immutable `Audit` with `source`,
+  `document`, `hit_policy`, `aggregate`, `logic`, `strict`, `ruleset_digest`, `limits`
+  (`AuditLimits`), `rules` (`AuditedRule`), `checks` (`CheckResult`),
+  `not_modelled` (`NotModelled`), `undecided` (`Undecided`), `diagnostics`
+  (`Diagnostic`: `code`, `severity`, `rules`, `message`, `pointer`, `path`,
+  `groups`, and `witness` as Python data that `evaluate` takes; `str()` is
+  the core's text of the diagnostic), `max_severity`, `at_least(severity)`,
+  `status(check)`, `to_dict()` (the audit document) and `str()` (the text);
+  `StrEnum`s `Severity` and `CheckStatus` (closed) and `DiagnosticCode`,
+  `AuditCheck`, `UndecidedReason` and `AuditLimit`, whose unknown values
+  (codes a later version adds) arrive as plain strings. `Summary` is now
+  immutable too, and `dumps` of an audit says it is output only. JavaScript
+  (Node addon, WebAssembly and Deno): `RuleSet.audit(options)` and
+  `DecisionTable.audit(options)` (`{ limits: { maxTerms, maxSteps },
+  rulesetDigest }`) return a frozen `Audit` with the same members in
+  camelCase, `atLeast(severity)`, `toJSON()` and `toString()`, and the
+  classes `Diagnostic` (whose `toString()` is the core's text),
+  `AuditedRule`, `CheckResult`, `NotModelled` and `Undecided`; the types
+  `Severity`, `CheckStatus`, `DiagnosticCode`, `AuditCheck`,
+  `UndecidedReason`, `AuditLimit`, `AuditOptions` and `AuditLimits` (the open
+  ones admit any string); in `cleanrules/native`, `RuleSet.audit(options)`
+  and `Document.audit(options)` (`AuditWriteOptions`: the same options and
+  `format`; `Document.audit` audits whatever `audit::audit_document`
+  accepts: a rule set, a decision table, a bundle or a rule) write the text,
+  or an audit document in JSON or YAML. In the core, for the bindings:
+  `impl Display for Diagnostic` (a diagnostic on its own, with its bare
+  pointer) and `Audit::diagnostic_text` (as the audit's text writes it,
+  naming a table's cells), which the audit's text uses, `Audit::at_least`, `Severity` ordered by
+  seriousness (`Info < Warning < Error`, so `max_severity` is a maximum),
+  `Check` renamed `AuditCheck` so that every audit type has the same name in
+  Rust, Python and JavaScript, and `CheckStatus` closed, as
+  [`spec/audit.md`](spec/audit.md) now says (sources may grow). The command
+  line's `--fail-on` uses `Audit::at_least`. The Python and JavaScript
+  conformance runners now run the 35 `audit` vectors, checking each witness
+  with the rule set's own evaluation: the 30 of rule sets and tables on both
+  routes, and the 5 of other documents on the JSON route, through
+  `audit_document` (the idiomatic APIs audit rule sets and tables only).
 - Static audit of rule sets and decision tables (task T.7;
   [`spec/audit.md`](spec/audit.md)): in the Rust core, `audit::audit` and
   `audit::audit_table` (both return `Result<Audit>`: `unsupported` for a
@@ -112,7 +153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the steps run out, each check gives one entry with the number of items it
   did not reach). `Audit::max_severity`, `Audit::with_ruleset_digest` (the
   report's optional `ruleset_digest`, as in decisions), `CheckResult`, and
-  `from_name` on `Severity`, `DiagnosticCode` and `Check`. A new output-only
+  `from_name` on `Severity`, `DiagnosticCode` and `AuditCheck`. A new output-only
   document, `{"version": 1, "audit": {...}}`, additive in format version 1
   (readers reject it with `unsupported`; new codes, checks, reasons and
   limits may be added within the version, and consumers ignore those they

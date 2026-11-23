@@ -3,6 +3,12 @@
 import {
   ActionContext,
   ActionError,
+  Audit,
+  type AuditCheck,
+  type AuditOptions,
+  type CheckStatus,
+  type DiagnosticCode,
+  type Severity,
   type Aggregate as RootAggregate,
   Cause,
   CauseGroup,
@@ -239,6 +245,29 @@ const summary: Summary = rules.summary()
 const ruleSummaries: readonly RuleSummary[] = summary.rules
 const usage: readonly FieldUsage[] = summary.fields
 const tags: Readonly<Record<string, readonly string[]>> = summary.tags
+const auditOptions: AuditOptions = { limits: { maxSteps: 10_000 }, rulesetDigest: true }
+const report: Audit = rules.audit(auditOptions)
+const worst: Severity | null = report.maxSeverity
+const overlapStatus: CheckStatus = report.status('overlap')
+const failing: boolean = report.atLeast('warning')
+const roundTrip: Audit = rules.audit({ limits: report.limits })
+void [failing, roundTrip]
+for (const d of report.diagnostics) {
+  const code: DiagnosticCode = d.code
+  // A code of a later version is a string too.
+  const later: DiagnosticCode = 'redundant_condition'
+  const witness: Readonly<Record<string, Value>> | null = d.witness
+  const where: string | null = d.pointer
+  void [code, later, witness, where, d.path, d.groups, d.severity === 'error']
+}
+const checked: AuditCheck[] = report.checks.map((c) => c.check)
+const reportJson: Record<string, unknown> = report.toJSON()
+void [worst, overlapStatus, checked, reportJson, String(report), report.notModelled[0]?.limit, report.undecided[0]?.remaining]
+// @ts-expect-error severities are a closed set
+void report.atLeast('fatal')
+// @ts-expect-error severities are a closed set
+const notASeverity: Severity = 'fatal'
+void notASeverity
 const when: unknown = out?.when
 if (when instanceof ZonedDateTime) {
   const instant: bigint = when.epochMicroseconds
@@ -404,7 +433,7 @@ import {
   type BundleRelation,
   type DecisionDumpOptions,
 } from 'cleanrules'
-import { type BundleCaseInput, type DecisionWriteOptions } from 'cleanrules/native'
+import { type AuditWriteOptions, type BundleCaseInput, type DecisionWriteOptions } from 'cleanrules/native'
 
 const bundle = new Bundle(rules, {
   id: 'acme/discounts',
@@ -430,6 +459,9 @@ const nativeCase: BundleCaseInput = { path: 'cases/a.json', content: 'x' }
 const nativeBundle: Document = Document.makeBundle(document, 'acme/a', '1', [nativeCase], { maxDepth: 64 })
 const nativeComparison: string = nativeBundle.compareBundle(nativeBundle)
 const writeOptions: DecisionWriteOptions = { rulesetDigest: true }
+const nativeAuditOptions: AuditWriteOptions = { format: 'json', limits: { maxTerms: 64 } }
+const nativeAudit: string = document.audit(nativeAuditOptions) + nativeSet.audit()
+void nativeAudit
 const nativeDecision: string = decision.write('json', writeOptions)
 // @ts-expect-error: the native layer takes the digest as an option, not a positional boolean.
 void decision.write('json', true)

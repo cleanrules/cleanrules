@@ -5,6 +5,7 @@ export { Decision, Document, FORMAT_VERSION, Node, RuleSet } from './binding.js'
 export type {
   ActionCall,
   Aggregate,
+  AuditWriteOptions,
   BundleCaseInput,
   DecisionWriteOptions,
   DocumentKind,

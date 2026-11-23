@@ -13,7 +13,7 @@ import path from 'node:path'
 import test from 'node:test'
 
 import { build, deno, native, root } from './support/cr.js'
-import { MINIMUM_VECTORS, SKIPS, checkComparison, conformance, needsCaseFiles } from './support/conformance.js'
+import { MINIMUM_VECTORS, SKIPS, auditsDocument, checkComparison, conformance, needsCaseFiles } from './support/conformance.js'
 import { Obj, parse, write } from './support/json.js'
 
 const VECTORS = path.join(import.meta.dirname, '..', '..', '..', 'conformance', 'vectors')
@@ -103,10 +103,10 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
   const graded = [...vectors.values()]
     .filter((v) => v.get('given').has('logic') && v.get('given').get('logic') !== 'boolean')
     .map((v) => v.get('id'))
-  // And the static audit, until task T.9.
-  const audited = [...vectors.values()].filter((v) => v.get('given').get('kind') === 'audit').map((v) => v.get('id'))
   const agents = tools.length > 0 ? ['agents'] : []
-  const audits = audited.length > 0 ? ['audit'] : []
+  // The audit's native route: rule sets and tables only.
+  const auditedDocuments = [...vectors.values()].filter(auditsDocument).map((v) => v.get('id'))
+  const documents = auditedDocuments.length > 0 ? ['audit_document'] : []
   // And the case runner, until task T.9b.
   const testRuns = [...vectors.values()].filter((v) => v.get('given').get('kind') === 'test_run').map((v) => v.get('id'))
   const runs = testRuns.length > 0 ? ['test_run'] : []
@@ -122,7 +122,6 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
       ...(limited.length > 0 ? ['native'] : []),
       ...diagrams,
       ...agents,
-      ...audits,
       ...runs,
       ...grades,
     ].sort(),
@@ -132,14 +131,13 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
   assert.deepEqual(counts.json.skipped.get('diagram') ?? [], drawn)
   assert.deepEqual(counts.json.skipped.get('agents') ?? [], tools)
   assert.deepEqual(counts.json.skipped.get('graded') ?? [], graded)
-  assert.deepEqual(counts.json.skipped.get('audit') ?? [], audited)
   assert.deepEqual(counts.json.skipped.get('test_run') ?? [], testRuns)
-  assert.deepEqual([...counts.native.skipped.keys()].sort(), [...diagrams, ...agents, ...audits, ...runs, ...grades, ...cases].sort())
+  assert.deepEqual([...counts.native.skipped.keys()].sort(), [...diagrams, ...agents, ...documents, ...runs, ...grades, ...cases].sort())
   assert.deepEqual(counts.native.skipped.get('cases') ?? [], caseFiles)
   assert.deepEqual(counts.native.skipped.get('diagram') ?? [], drawn)
   assert.deepEqual(counts.native.skipped.get('agents') ?? [], tools)
   assert.deepEqual(counts.native.skipped.get('graded') ?? [], graded)
-  assert.deepEqual(counts.native.skipped.get('audit') ?? [], audited)
+  assert.deepEqual(counts.native.skipped.get('audit_document') ?? [], auditedDocuments)
   assert.deepEqual(counts.native.skipped.get('test_run') ?? [], testRuns)
 })
 
@@ -179,6 +177,11 @@ test('a wrong expected output fails both ways', () => {
     ['format/bundles/compare-other-limits', '"same_rules_other_engine"', '"same_rules_same_engine"'],
     ['format/bundles/make-bad-id', '"format_error"', '"unsupported"'],
     ['format/bundles/current-engine-verified', '"acme/orders"', '"acme/order"'],
+    // Audits: a severity, a check's status, a pointer and a rule's row.
+    ['audit/overlaps/unique', '"severity":"error"', '"severity":"warning"'],
+    ['audit/gaps/boundary', '"status":"complete"', '"status":"partial"'],
+    ['audit/tables/unlisted-fields', '"pointer":"/decision_table/rows/', '"pointer":"/decision_table/rows/9'],
+    ['audit/tables/unlisted-fields', '"row":0', '"row":1'],
   ]
   for (const [id, from, to] of wrong) {
     const vector = mutated(id, from, to)

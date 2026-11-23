@@ -9,6 +9,7 @@
 //! global mutable state.
 
 mod agents;
+mod audit;
 mod bundles;
 mod convert;
 mod documents;
@@ -50,6 +51,9 @@ fn native_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<rules::PyDecision>()?;
     module.add_class::<tables::PyDecisionTable>()?;
     module.add_class::<bundles::PyBundle>()?;
+    module.add_class::<audit::PyAudit>()?;
+    module.add_function(wrap_pyfunction!(audit::audit_ruleset, module)?)?;
+    module.add_function(wrap_pyfunction!(audit::audit_decision_table, module)?)?;
     module.add_function(wrap_pyfunction!(bundles::make_bundle, module)?)?;
     module.add_function(wrap_pyfunction!(bundles::case_digest_matches, module)?)?;
     module.add_function(wrap_pyfunction!(bundles::check_case_file, module)?)?;
@@ -86,5 +90,6 @@ fn native_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(json_api::py_evaluate_node, module)?)?;
     module.add_function(wrap_pyfunction!(json_api::py_make_bundle, module)?)?;
     module.add_function(wrap_pyfunction!(json_api::py_compare_bundles, module)?)?;
+    module.add_function(wrap_pyfunction!(audit::py_audit, module)?)?;
     Ok(())
 }

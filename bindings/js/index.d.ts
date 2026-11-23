@@ -660,6 +660,18 @@ export declare class RuleSet implements Iterable<Rule> {
   run(data: unknown, options?: EvaluateOptions | null): Decision
   summary(): Summary
   /**
+   * Audit the rule set without any input (`spec/audit.md`): tests whose types
+   * never match, conditions never true, rules never selected, rules that fire
+   * together and inputs for which no rule fires, the last two with a witness
+   * this rule set has evaluated. A `RangeError` for a limit that is negative
+   * or not a whole number; a `TypeError` for an unknown option.
+   *
+   * @example
+   * const report = rules.audit({ limits: { maxSteps: 100_000 } })
+   * if (report.atLeast('warning')) console.log(String(report))
+   */
+  audit(options?: AuditOptions | null): Audit
+  /**
    * The rule set document of the JSON format (`{ version, ruleset }`), as an
    * object for `JSON.stringify`: a float that holds an integer is `{"$float":
    * n}`, so the text reads back as the same rule set, except that a float zero
@@ -887,6 +899,183 @@ export declare class Summary {
   toString(): string
 }
 
+// --- Audits --------------------------------------------------------------
+
+/**
+ * How serious a finding is; a closed set (`spec/audit.md`). The core orders
+ * them `info` < `warning` < `error`; as strings they compare otherwise, so
+ * ask a report with `Audit.atLeast(severity)`.
+ */
+export type Severity = 'info' | 'warning' | 'error'
+
+/**
+ * What a diagnostic found (`spec/audit.md`, *Checks*). Within format version
+ * 1 new codes may appear, so any other string is possible too: handle the
+ * ones you know and keep the others.
+ */
+export type DiagnosticCode =
+  | 'incompatible_types'
+  | 'mixed_types'
+  | 'unlisted_field'
+  | 'unsatisfiable'
+  | 'shadowed'
+  | 'overlap'
+  | 'gap'
+  | (string & {})
+
+/** A check of the audit, in the order it runs; new checks may appear. */
+export type AuditCheck = 'types' | 'fields' | 'unsatisfiable' | 'shadowed' | 'overlap' | 'gap' | (string & {})
+
+/** Whether a check decided everything it looked at. */
+export type CheckStatus = 'complete' | 'partial' | 'not_applicable'
+
+/** Why an item was left undecided; new reasons may appear. */
+export type UndecidedReason = 'not_modelled' | 'no_witness' | 'limit' | (string & {})
+
+/** A limit of the audit (`spec/audit.md`, *Limits*); new limits may appear. */
+export type AuditLimit = 'max_terms' | 'max_steps' | (string & {})
+
+/**
+ * The options of `RuleSet.audit` and `DecisionTable.audit`. A limit is a
+ * whole number from 0 (a `RangeError` otherwise); each one left out keeps
+ * its default.
+ */
+export interface AuditOptions {
+  /** The limits, as `Audit.limits` gives them back. */
+  limits?: Partial<AuditLimits> | null
+  /** Carry the rule set digest of what was audited in the report (`Audit.rulesetDigest`). */
+  rulesetDigest?: boolean | null
+}
+
+/**
+ * The limits of an audit (`spec/audit.md`, *Limits*). A limit a later
+ * version adds appears in `Audit.toJSON()` until this type gains it.
+ */
+export interface AuditLimits {
+  /** The most boxes in the true or false description of one node (256); a node that needs more is read as not modelled. */
+  readonly maxTerms: number
+  /** The work of the whole audit, in steps (1,000,000); when it runs out, each check stops and says how much it left. */
+  readonly maxSteps: number
+}
+
+/** A rule of what was audited: diagnostics name rules by `name`. */
+export declare class AuditedRule {
+  private constructor()
+  readonly name: string
+  /** Its own id (`Rule.id`), or `null`. */
+  readonly id: string | null
+  /** Its row's position in a decision table, from 0; `null` for a rule set. */
+  readonly row: number | null
+}
+
+/** A check of an audit and its status. */
+export declare class CheckResult {
+  private constructor()
+  readonly check: AuditCheck
+  readonly status: CheckStatus
+}
+
+/** A test the audit does not model, or a node read as one because of a limit. */
+export declare class NotModelled {
+  private constructor()
+  /** The rule, by name. */
+  readonly rule: string
+  /** The node's tag, such as `"matches"`. */
+  readonly op: string
+  /** Where it is, as a JSON Pointer into the audited document. */
+  readonly pointer: string
+  /** The limit that made it one, or `null`. */
+  readonly limit: AuditLimit | null
+}
+
+/** An item a check left undecided, or the items it did not reach. */
+export declare class Undecided {
+  private constructor()
+  readonly check: AuditCheck
+  /** The rules involved, by name; none for the gap check and for the items `maxSteps` did not reach. */
+  readonly rules: readonly string[]
+  readonly reason: UndecidedReason
+  /** The limit, when `reason` is `"limit"`; otherwise `null`. */
+  readonly limit: AuditLimit | null
+  /** How many items `maxSteps` left unreached, for that entry; otherwise `null`. */
+  readonly remaining: number | null
+}
+
+/** One finding of an audit (`spec/audit.md`, *Checks*). */
+export declare class Diagnostic {
+  private constructor()
+  readonly code: DiagnosticCode
+  readonly severity: Severity
+  /** The rules involved, by name: names in `Audit.rules`. */
+  readonly rules: readonly string[]
+  /** What was found and how to fix it, in words. */
+  readonly message: string
+  /** The test or cell, as a JSON Pointer into the audited document, for `incompatible_types` and `unlisted_field`; otherwise `null`. */
+  readonly pointer: string | null
+  /** The field, for `mixed_types` and `unlisted_field`; otherwise `null`. */
+  readonly path: FieldPath | null
+  /** The type groups a field is used with, for `mixed_types`. */
+  readonly groups: readonly string[]
+  /**
+   * The input that shows it, for `overlap` and `gap`: native data (frozen)
+   * that the audited rules evaluate to show the finding, and that can be kept
+   * as a test case's input; otherwise `null`.
+   */
+  readonly witness: Readonly<Record<string, Value>> | null
+  /** The diagnostic as the audit's text writes it (the core's): its line, then its indented lines. */
+  toString(): string
+}
+
+/**
+ * The report of an audit (`spec/audit.md`), from `RuleSet.audit()` or
+ * `DecisionTable.audit()`. It is sound but incomplete: every diagnostic is
+ * true, and what it could not decide is in `undecided` and `notModelled`.
+ */
+export declare class Audit {
+  private constructor()
+  /** The kind of rules audited; a later version may add sources. */
+  readonly source: 'ruleset' | 'decision_table' | (string & {})
+  /**
+   * `'bundle'` or `'rule'` when the core audited the rules as that document
+   * holds them (the native layer's `Document.audit`, the command line);
+   * `null` for a rule set or a table audited directly, as here.
+   */
+  readonly document: 'bundle' | 'rule' | (string & {}) | null
+  /** The hit policy: a rule set's, as the table policy of the same name. */
+  readonly hitPolicy: TablePolicy
+  readonly aggregate: Aggregate | null
+  readonly logic: string
+  /** Whether evaluation is strict; witnesses are evaluated so. */
+  readonly strict: boolean
+  /** The rule set digest of what was audited, with `rulesetDigest: true`; otherwise `null`. */
+  readonly rulesetDigest: string | null
+  readonly limits: AuditLimits
+  /** The rules, in rule order. */
+  readonly rules: readonly AuditedRule[]
+  /** Each check's status, in check order. */
+  readonly checks: readonly CheckResult[]
+  /** The tests not modelled, in rule order and depth-first pre-order. */
+  readonly notModelled: readonly NotModelled[]
+  /** The items left undecided, in check order. */
+  readonly undecided: readonly Undecided[]
+  /** The findings, by code and then in their check's order. */
+  readonly diagnostics: readonly Diagnostic[]
+  /** The most serious severity among the diagnostics, or `null` without findings. */
+  readonly maxSeverity: Severity | null
+  /** Whether some diagnostic is at least as serious as `severity`, as the core orders them; a `RangeError` for another name. */
+  atLeast(severity: Severity): boolean
+  /** The status of a check; `"not_applicable"` for one the report does not list. */
+  status(check: AuditCheck): CheckStatus
+  /**
+   * The audit document of the JSON format (`{ version, audit }`), as an
+   * object for `JSON.stringify`: witnesses are in the JSON encoding of
+   * values, and a float that holds an integer is `{"$float": n}`; a copy.
+   */
+  toJSON(): Record<string, unknown>
+  /** The audit as text, the same in every language (`spec/audit.md`, *Text*). */
+  toString(): string
+}
+
 // --- Result trees --------------------------------------------------------
 
 /**
@@ -1040,6 +1229,12 @@ export declare class DecisionTable {
   evaluate(data: unknown, options?: EvaluateOptions | null): Decision
   evaluateMany(rows: Iterable<unknown>, options?: EvaluateOptions | null): Decision[]
   summary(): Summary
+  /**
+   * Audit the table without any input, as `RuleSet.audit` does: pointers name
+   * cells (`/decision_table/rows/1/inputs/0`), each rule has its `row`, and
+   * cells that read a field no input reads are reported (`unlisted_field`).
+   */
+  audit(options?: AuditOptions | null): Audit
   /**
    * The decision table document of the JSON format, as an object for
    * `JSON.stringify`: a float that holds an integer is `{"$float": n}`, so the

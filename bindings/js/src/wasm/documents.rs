@@ -9,11 +9,11 @@ use super::build::NativeRule;
 use super::classes::{
     Decision, Document, Node, RuleSet, chained, make_bundle, read, undefined_input,
 };
-use super::{OrFail, fail, raw, raw_limits, raw_options};
-use crate::common::bundles;
+use super::{OrFail, fail, raw, raw_audit_options, raw_limits, raw_options};
 use crate::common::core::{NodeCore, TreeData, TreeKind};
 use crate::common::documents;
 use crate::common::tables::{GridCore, TableCore};
+use crate::common::{audit, bundles};
 use crate::common::{no_constructor, tree_options};
 
 fn node(core: cleanrules::ast::Node) -> Node {
@@ -149,6 +149,28 @@ impl NativeTable {
     pub fn digest(&self) -> String {
         self.core.digest()
     }
+}
+
+/// A rule set's audit for the idiomatic API, as in the napi-rs build.
+///
+/// # Errors
+///
+/// As in the napi-rs build.
+#[wasm_bindgen(js_name = auditRuleset)]
+pub fn audit_ruleset(ruleset: &RuleSet, options: &JsValue) -> Result<String, JsValue> {
+    let options = raw_audit_options(options)?;
+    audit::ruleset_data(&ruleset.core.ruleset, &options).or_fail()
+}
+
+/// A decision table's audit for the idiomatic API, as in the napi-rs build.
+///
+/// # Errors
+///
+/// As in the napi-rs build.
+#[wasm_bindgen(js_name = auditTable)]
+pub fn audit_table(table: &NativeTable, options: &JsValue) -> Result<String, JsValue> {
+    let options = raw_audit_options(options)?;
+    audit::table_data(&table.core.table, &options).or_fail()
 }
 
 /// A decision table being built from a grid.

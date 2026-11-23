@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 use super::domain::{ORDERED, Pick, ValueSet};
 use super::read::{Part, Read, Reader, Region};
 use super::{
-    Audit, AuditLimit, AuditLimits, Check, CheckResult, CheckStatus, Diagnostic, DiagnosticCode,
-    NotModelled, RulesSource, Severity, Undecided, UndecidedReason, table_policy,
+    Audit, AuditCheck, AuditLimit, AuditLimits, CheckResult, CheckStatus, Diagnostic,
+    DiagnosticCode, NotModelled, RulesSource, Severity, Undecided, UndecidedReason, table_policy,
 };
 use crate::ast::Node;
 use crate::error::{ErrorCode, Segment};
@@ -241,7 +241,7 @@ impl<'r, L: Logic<Truth = Truth>> Auditor<'r, L> {
         } else {
             CheckStatus::NotApplicable
         };
-        let unsatisfiable_status = self.status(Check::Unsatisfiable);
+        let unsatisfiable_status = self.status(AuditCheck::Unsatisfiable);
         let gap = self.gap(&truths);
         let mut unmodelled = std::mem::take(&mut self.reader.unmodelled);
         unmodelled.sort_by_key(|u| (u.rule, u.seq));
@@ -257,12 +257,12 @@ impl<'r, L: Logic<Truth = Truth>> Auditor<'r, L> {
             limits: self.limits,
             rules: Vec::new(),
             checks: vec![
-                check(Check::Types, CheckStatus::Complete),
-                check(Check::Fields, fields),
-                check(Check::Unsatisfiable, unsatisfiable_status),
-                check(Check::Shadowed, shadowed),
-                check(Check::Overlap, overlap),
-                check(Check::Gap, gap),
+                check(AuditCheck::Types, CheckStatus::Complete),
+                check(AuditCheck::Fields, fields),
+                check(AuditCheck::Unsatisfiable, unsatisfiable_status),
+                check(AuditCheck::Shadowed, shadowed),
+                check(AuditCheck::Overlap, overlap),
+                check(AuditCheck::Gap, gap),
             ],
             not_modelled: unmodelled
                 .into_iter()
@@ -281,7 +281,7 @@ impl<'r, L: Logic<Truth = Truth>> Auditor<'r, L> {
     }
 
     /// Complete, or partial when an item of `check` was left undecided.
-    fn status(&self, check: Check) -> CheckStatus {
+    fn status(&self, check: AuditCheck) -> CheckStatus {
         if self.undecided.iter().any(|u| u.check == check) {
             CheckStatus::Partial
         } else {
@@ -391,11 +391,11 @@ impl<'r, L: Logic<Truth = Truth>> Auditor<'r, L> {
         }
     }
 
-    fn undecided(&mut self, check: Check, rules: &[usize]) {
+    fn undecided(&mut self, check: AuditCheck, rules: &[usize]) {
         let reason = self.reason(rules);
         self.undecided.push(Undecided {
             check,
-            rules: if check == Check::Gap {
+            rules: if check == AuditCheck::Gap {
                 Vec::new()
             } else {
                 names(self.ruleset, rules)
@@ -407,7 +407,7 @@ impl<'r, L: Logic<Truth = Truth>> Auditor<'r, L> {
 
     /// The one entry for the items of `check` that `max_steps` did not
     /// reach, if there were any (`spec/audit.md`, *What was checked*).
-    fn unreached(&mut self, check: Check, remaining: usize) {
+    fn unreached(&mut self, check: AuditCheck, remaining: usize) {
         if remaining > 0 {
             self.undecided.push(Undecided {
                 check,
@@ -581,11 +581,11 @@ impl<'r, L: Logic<Truth = Truth>> Auditor<'r, L> {
             }
             match self.show(&candidates, false, |me, w| me.fires(rule, w)) {
                 Shown::Yes(_) => {}
-                Shown::No => self.undecided(Check::Unsatisfiable, &[rule]),
+                Shown::No => self.undecided(AuditCheck::Unsatisfiable, &[rule]),
                 Shown::Stopped => unreached += 1,
             }
         }
-        self.unreached(Check::Unsatisfiable, unreached);
+        self.unreached(AuditCheck::Unsatisfiable, unreached);
         never
     }
 
@@ -671,12 +671,12 @@ impl<'r, L: Logic<Truth = Truth>> Auditor<'r, L> {
             });
             match shown {
                 Shown::Yes(_) => {}
-                Shown::No => self.undecided(Check::Shadowed, &involved),
+                Shown::No => self.undecided(AuditCheck::Shadowed, &involved),
                 Shown::Stopped => unreached += 1,
             }
         }
-        self.unreached(Check::Shadowed, unreached);
-        self.status(Check::Shadowed)
+        self.unreached(AuditCheck::Shadowed, unreached);
+        self.status(AuditCheck::Shadowed)
     }
 
     fn shadow(&mut self, rule: usize, by: &[usize]) {
@@ -728,13 +728,13 @@ impl<'r, L: Logic<Truth = Truth>> Auditor<'r, L> {
                 }
                 match self.show(&both, false, |me, w| me.shows_overlap(a, b, w)) {
                     Shown::Yes(witness) => self.overlap(a, b, witness),
-                    Shown::No => self.undecided(Check::Overlap, &[a, b]),
+                    Shown::No => self.undecided(AuditCheck::Overlap, &[a, b]),
                     Shown::Stopped => unreached += 1,
                 }
             }
         }
-        self.unreached(Check::Overlap, unreached);
-        self.status(Check::Overlap)
+        self.unreached(AuditCheck::Overlap, unreached);
+        self.status(AuditCheck::Overlap)
     }
 
     /// Whether the rule set's own evaluation of `input` shows that rules
@@ -860,18 +860,18 @@ impl<'r, L: Logic<Truth = Truth>> Auditor<'r, L> {
         }
         let all: Vec<usize> = (0..truths.len()).collect();
         if self.reader.work.exhausted {
-            self.unreached(Check::Gap, 1);
-            return self.status(Check::Gap);
+            self.unreached(AuditCheck::Gap, 1);
+            return self.status(AuditCheck::Gap);
         }
         let mut remainder = vec![supported];
         for truth in truths {
             let Ok(rest) = self.subtract(remainder, truth.narrow()) else {
-                self.unreached(Check::Gap, 1);
-                return self.status(Check::Gap);
+                self.unreached(AuditCheck::Gap, 1);
+                return self.status(AuditCheck::Gap);
             };
             remainder = rest;
             if remainder.is_empty() {
-                return self.status(Check::Gap);
+                return self.status(AuditCheck::Gap);
             }
         }
         // The rule set's own evaluation: no error and no rule fired.
@@ -883,10 +883,10 @@ impl<'r, L: Logic<Truth = Truth>> Auditor<'r, L> {
         });
         match shown {
             Shown::Yes(witness) => self.report_gap(witness),
-            Shown::No => self.undecided(Check::Gap, &all),
-            Shown::Stopped => self.unreached(Check::Gap, 1),
+            Shown::No => self.undecided(AuditCheck::Gap, &all),
+            Shown::Stopped => self.unreached(AuditCheck::Gap, 1),
         }
-        self.status(Check::Gap)
+        self.status(AuditCheck::Gap)
     }
 
     fn report_gap(&mut self, witness: Value) {

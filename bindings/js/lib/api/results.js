@@ -462,6 +462,204 @@ class Summary {
   }
 }
 
+// --- Audits --------------------------------------------------------------
+
+/** `value` with the arrays and plain objects it holds frozen, deeply (the engine's values are frozen already). */
+function frozenData(value) {
+  if (Array.isArray(value) || (value !== null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype)) {
+    for (const item of Object.values(value)) frozenData(item)
+    Object.freeze(value)
+  }
+  return value
+}
+
+/** A rule of what was audited: diagnostics name rules by `name`. */
+class AuditedRule {
+  constructor(token, rule) {
+    check(token, 'AuditedRule')
+    /** The rule's name. */
+    this.name = rule.name
+    /** Its own id, or `null` (`Rule.id`). */
+    this.id = rule.id ?? null
+    /** Its row's position in a decision table, from 0; `null` for a rule set. */
+    this.row = rule.row ?? null
+    Object.freeze(this)
+  }
+}
+
+/** A check of an audit and its status. */
+class CheckResult {
+  constructor(token, result) {
+    check(token, 'CheckResult')
+    /** The check: `"types"`, `"fields"`, `"unsatisfiable"`, `"shadowed"`, `"overlap"`, `"gap"`, or one a later version adds. */
+    this.check = result.check
+    /** `"complete"`, `"partial"` or `"not_applicable"`. */
+    this.status = result.status
+    Object.freeze(this)
+  }
+}
+
+/** A test the audit does not model, or a node read as one because of a limit. */
+class NotModelled {
+  constructor(token, item) {
+    check(token, 'NotModelled')
+    /** The rule, by name. */
+    this.rule = item.rule
+    /** The node's tag, such as `"matches"`. */
+    this.op = item.op
+    /** Where it is, as a JSON Pointer into the audited document. */
+    this.pointer = item.pointer
+    /** The limit that made it one (`"max_terms"`), or `null`. */
+    this.limit = item.limit ?? null
+    Object.freeze(this)
+  }
+}
+
+/** An item a check left undecided, or the items it did not reach. */
+class Undecided {
+  constructor(token, item) {
+    check(token, 'Undecided')
+    /** The check. */
+    this.check = item.check
+    /** The rules involved, by name; none for the gap check and for the items `maxSteps` did not reach. */
+    this.rules = frozen(item.rules)
+    /** Why: `"not_modelled"`, `"no_witness"`, `"limit"`, or one a later version adds. */
+    this.reason = item.reason
+    /** The limit, when `reason` is `"limit"`; otherwise `null`. */
+    this.limit = item.limit ?? null
+    /** How many items `maxSteps` left unreached, for that entry; otherwise `null`. */
+    this.remaining = item.remaining ?? null
+    Object.freeze(this)
+  }
+}
+
+/** One finding of an audit (`spec/audit.md`, *Checks*). */
+class Diagnostic {
+  #text
+
+  constructor(token, item, witness, text) {
+    check(token, 'Diagnostic')
+    /** What was found: a `DiagnosticCode`, or a code a later version adds. */
+    this.code = item.code
+    /** `"error"`, `"warning"` or `"info"`. */
+    this.severity = item.severity
+    /** The rules involved, by name: names in `Audit.rules`. */
+    this.rules = frozen(item.rules)
+    /** What was found and how to fix it, in words. */
+    this.message = item.message
+    /** The test or cell, as a JSON Pointer into the audited document, or `null`. */
+    this.pointer = item.pointer ?? null
+    /** The field, for `mixed_types` and `unlisted_field`; otherwise `null`. */
+    this.path = item.path === undefined ? null : path(item.path)
+    /** The type groups a field is used with, for `mixed_types`. */
+    this.groups = frozen(item.groups ?? [])
+    /**
+     * The input that shows it, for `overlap` and `gap`, as native data
+     * (frozen) that the audited rules evaluate; otherwise `null`.
+     */
+    this.witness = witness === null ? null : frozenData(decode(witness, []))
+    this.#text = text
+    Object.freeze(this)
+  }
+
+  /** The diagnostic as the audit's text writes it (the core's): its line, then its indented lines. */
+  toString() {
+    return this.#text
+  }
+}
+
+/** The report of an audit (`spec/audit.md`): `RuleSet.audit()` and `DecisionTable.audit()` make it. */
+class Audit {
+  #document
+  #text
+  #atLeast
+
+  constructor(token, data) {
+    check(token, 'Audit')
+    const [document, witnesses, maxSeverity, text, texts, atLeast] = JSON.parse(data)
+    this.#document = JSON.stringify(document)
+    this.#text = text
+    this.#atLeast = atLeast
+    const audit = document.audit
+    /** The kind of rules audited: `"ruleset"` or `"decision_table"` (a later version may add sources). */
+    this.source = audit.source
+    /**
+     * `"bundle"` or `"rule"` when the core audited the rules as that document
+     * holds them (`Document.audit` of the native layer, the command line),
+     * with pointers into it; `null` for a rule set or a table audited
+     * directly, as `RuleSet.audit` and `DecisionTable.audit` do.
+     */
+    this.document = audit.document ?? null
+    /** The hit policy: a rule set's, as the table policy of the same name. */
+    this.hitPolicy = audit.hit_policy
+    /** The `collect` aggregate, or `null`. */
+    this.aggregate = audit.aggregate ?? null
+    /** The logic's name. */
+    this.logic = audit.logic
+    /** Whether evaluation is strict; witnesses are evaluated so. */
+    this.strict = audit.strict === true
+    /** The rule set digest of what was audited, when asked for (`rulesetDigest`); otherwise `null`. */
+    this.rulesetDigest = audit.ruleset_digest ?? null
+    /** The limits it ran with; one a later version adds appears in `toJSON()` until this object gains it. */
+    this.limits = Object.freeze({ maxTerms: jsonInt(audit.limits.max_terms), maxSteps: jsonInt(audit.limits.max_steps) })
+    /** The rules, in rule order. */
+    this.rules = frozen(audit.rules.map((rule) => new AuditedRule(INTERNAL, rule)))
+    /** Each check's status, in check order. */
+    this.checks = frozen(audit.checks.map((result) => new CheckResult(INTERNAL, result)))
+    /** The tests not modelled, in rule order and depth-first pre-order. */
+    this.notModelled = frozen(audit.not_modelled.map((item) => new NotModelled(INTERNAL, item)))
+    /** The items left undecided, in check order. */
+    this.undecided = frozen(audit.undecided.map((item) => new Undecided(INTERNAL, item)))
+    /** The findings, by code and then in their check's order. */
+    this.diagnostics = frozen(audit.diagnostics.map((item, i) => new Diagnostic(INTERNAL, item, witnesses[i], texts[i])))
+    /** The most serious severity among the diagnostics, or `null` without findings. */
+    this.maxSeverity = maxSeverity
+    Object.freeze(this)
+  }
+
+  /**
+   * Whether some diagnostic is at least as serious as `severity`
+   * (`'info'`, `'warning'` or `'error'`), as the core orders them: compare
+   * severities this way, not as strings. A `RangeError` for another name.
+   */
+  atLeast(severity) {
+    if (typeof severity !== 'string' || !Object.hasOwn(this.#atLeast, severity)) {
+      throw new RangeError(`unknown severity ${typeof severity === 'string' ? JSON.stringify(severity) : String(severity)}; use 'info', 'warning' or 'error'`)
+    }
+    return this.#atLeast[severity]
+  }
+
+  /** The status of a check; `"not_applicable"` for one the report does not list. */
+  status(name) {
+    return this.checks.find((result) => result.check === name)?.status ?? 'not_applicable'
+  }
+
+  /**
+   * The audit document of the JSON format (`spec/audit.md`, *JSON*), for
+   * `JSON.stringify` (`Expr.toJSON` says how); a copy. Witnesses are in the
+   * JSON encoding of values (a decimal is `{"$decimal": "0.15"}`).
+   */
+  toJSON() {
+    return JSON.parse(this.#document)
+  }
+
+  /** The audit as text, the same in every language (`spec/audit.md`, *Text*). */
+  toString() {
+    return this.#text
+  }
+
+  [INSPECT]() {
+    const what = this.source === 'ruleset' ? 'rule set' : 'decision table'
+    const count = this.diagnostics.length
+    const worst = this.maxSeverity === null ? '' : `, max severity ${this.maxSeverity}`
+    return `Audit(${what}: ${count} diagnostic${count === 1 ? '' : 's'}${worst})`
+  }
+
+  [DENO_INSPECT]() {
+    return this[INSPECT]()
+  }
+}
+
 // The binding's own objects are opaque as data.
 registerOpaque(
   RuleResult,
@@ -479,17 +677,28 @@ registerOpaque(
   RuleSummary,
   FieldUsage,
   Summary,
+  AuditedRule,
+  CheckResult,
+  NotModelled,
+  Undecided,
+  Diagnostic,
+  Audit,
 )
 
 export {
   ActionContext,
+  Audit,
+  AuditedRule,
   Cause,
   CauseGroup,
+  CheckResult,
   Counterfactual,
+  Diagnostic,
   Explanation,
   FieldUsage,
   INTERNAL,
   Note,
+  NotModelled,
   Reason,
   RuleExplanation,
   RuleResult,
@@ -498,5 +707,6 @@ export {
   Summary,
   TableOutput,
   TableRow,
+  Undecided,
   notFound,
 }

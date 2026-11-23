@@ -18,7 +18,7 @@ import { CleanRulesError } from '../errors.js'
 import { decode } from '../output.js'
 import { registerOpaque } from '../read.js'
 import { constantWire } from './expr.js'
-import { INTERNAL, TableOutput, TableRow } from './results.js'
+import { Audit, INTERNAL, TableOutput, TableRow } from './results.js'
 import { brand, options, sameBuild, show } from './shared.js'
 
 const INSPECT = Symbol.for('nodejs.util.inspect.custom')
@@ -28,6 +28,8 @@ const DENO_INSPECT = Symbol.for('Deno.customInspect')
 const NATIVE = Symbol('cleanrules.table')
 
 const TABLE_OPTIONS = ['hitPolicy', 'aggregate', 'logic', 'strict', 'limits']
+/** The options of `audit()`, as `RuleSet.audit` takes them. */
+const AUDIT_OPTIONS = ['limits', 'rulesetDigest']
 
 const iterable = (value) => value !== null && typeof value === 'object' && typeof value[Symbol.iterator] === 'function'
 
@@ -206,6 +208,18 @@ function tables(native, expressions, rules, build) {
     /** The summary of the compiled rule set (`RuleSet.summary`). */
     summary() {
       return this.ruleset.summary()
+    }
+
+    /**
+     * Audit the table without any input (`spec/audit.md`), as
+     * `RuleSet.audit` does: rows are read cell by cell, so pointers name
+     * cells and each rule its `row`, and cells that read a field no input
+     * reads are reported (`unlisted_field`, such as `ES` for `'ES'`).
+     * Witnesses are evaluated by the compiled rule set (`ruleset`).
+     */
+    audit(auditOptions) {
+      const { limits, rulesetDigest } = options(auditOptions, AUDIT_OPTIONS, '{ limits: { maxSteps: 10000 } }')
+      return new Audit(INTERNAL, native.auditTable(this.#native, { limits, rulesetDigest }))
     }
 
     /**

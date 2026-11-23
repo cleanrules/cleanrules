@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cleanrules.github.io/schemas/v1/audit.schema.json",
   "title": "cleanrules audit document, format version 1",
-  "description": "The JSON form of a static audit, output only. See spec/audit.md, which is normative. The enums of codes, checks, reasons and limits list what this version writes: within format version 1 new ones may be added, and consumers ignore those they do not know (spec/audit.md, JSON); the severities are a closed set.",
+  "description": "The JSON form of a static audit, output only. See spec/audit.md, which is normative. The enums of sources, codes, checks, reasons and limits list what this version writes: within format version 1 new ones may be added, and consumers ignore those they do not know (spec/audit.md, JSON); the severities and the statuses of a check are closed sets.",
   "type": "object",
   "properties": {
     "$schema": {

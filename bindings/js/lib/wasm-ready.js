@@ -13,6 +13,8 @@ const INTERNAL = [
   'NodeList',
   'RuleList',
   'actionErrorData',
+  'auditRuleset',
+  'auditTable',
   'bundleCaseDigestMatches',
   'bundleData',
   'bundleOfRuleset',

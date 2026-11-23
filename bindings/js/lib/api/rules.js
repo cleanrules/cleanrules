@@ -19,7 +19,7 @@ import { call, registry } from '../actions.js'
 import { CleanRulesError, RuleDefinitionError, UnsupportedError, fromNative } from '../errors.js'
 import { decode, int } from '../output.js'
 import { capture, encodeData, notData, registerOpaque } from '../read.js'
-import { ActionContext, Explanation, INTERNAL, RuleResult, Summary, notFound } from './results.js'
+import { ActionContext, Audit, Explanation, INTERNAL, RuleResult, Summary, notFound } from './results.js'
 import { brand, byCodePoint, options, sameBuild, show } from './shared.js'
 
 const INSPECT = Symbol.for('nodejs.util.inspect.custom')
@@ -33,6 +33,8 @@ const NATIVE = Symbol('cleanrules.native')
 const RULE_OPTIONS = ['id', 'priority', 'tags', 'description', 'metadata', 'do']
 const RULESET_OPTIONS = ['hitPolicy', 'aggregate', 'logic', 'strict']
 const EVALUATE_OPTIONS = ['limits']
+/** The options of `audit()`. */
+const AUDIT_OPTIONS = ['limits', 'rulesetDigest']
 
 const EMPTY = Object.freeze({})
 const I64_MIN = -(2n ** 63n)
@@ -546,6 +548,20 @@ function rules(native, expressions, trees, build) {
       return new Summary(INTERNAL, native.stringifiable(native.summaryWith(ruleset, actions, 'json')), () =>
         native.summaryWith(ruleset, actions, 'text'),
       )
+    }
+
+    /**
+     * Audit the rule set without any input (`spec/audit.md`): tests whose
+     * types never match, conditions never true, rules never selected, rules
+     * that fire together and inputs for which no rule fires, the last two
+     * with a witness this rule set has evaluated. Every finding is true; what
+     * it could not decide is in `undecided`. `limits.maxTerms` and
+     * `limits.maxSteps` bound it; `rulesetDigest` carries the rule set digest
+     * in the report.
+     */
+    audit(auditOptions) {
+      const { limits, rulesetDigest } = options(auditOptions, AUDIT_OPTIONS, '{ limits: { maxSteps: 10000 } }')
+      return new Audit(INTERNAL, native.auditRuleset(natives.get(this), { limits, rulesetDigest }))
     }
 
     /**

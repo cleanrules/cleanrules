@@ -170,11 +170,21 @@ output, never stopping at the first one.
 - **Audits** (`spec/audit.md`): the core's runner runs the `audit` vectors,
   and so do the command line's tests (`crates/cli/tests/conformance.rs`),
   through `cleanrules audit --format json`, with the `draw` vectors that draw
-  a document.
-  The bindings audit from task T.9 (Python and JavaScript; Java, Scala, Go
-  and C++ are beta): until then the C ABI, Python, C++, JavaScript, Java,
-  Scala and Go runners skip them in every route, count them and say why
-  (`audit` in the JavaScript, Go and JVM reports).
+  a document. The Python and JavaScript runners (Node, wasm and Deno) run
+  them on both routes: `json` audits the document with the core's
+  `audit_document` (`_audit` in Python, `Document.audit` in JavaScript) and
+  evaluates each witness from its JSON with the rule set the document gives
+  (a table's compiled one); `native` audits a rule set built in code, or a
+  table read, with `RuleSet.audit` or `DecisionTable.audit`, evaluates each
+  witness as native data, and checks the report's attributes against its
+  JSON form. Both check each witness as *Comparing* says, an `error` overlap
+  by a `hit_policy_error` that names both rules. The idiomatic APIs audit
+  rule sets and decision tables only, so the native route skips the vectors
+  whose document holds anything else (a bundle, a rule, a condition or a
+  case file; `audit_document` in the JavaScript report), which the `json`
+  route runs. Java, Scala, Go and C++ are beta and do not audit yet: the C
+  ABI, C++, Java, Scala and Go runners skip them in every route, count them
+  and say why (`audit` in the Go and JVM reports).
 - **Test runs** (`spec/tests.md`, *Running cases*): the core's runner runs
   the `test_run` vectors. Python and JavaScript run cases from task T.9b
   (Java, Scala, Go and C++ are beta): until then the C ABI, Python, C++,

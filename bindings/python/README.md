@@ -195,6 +195,51 @@ selected rules, the output, the rules left unknown, or the error). The bundle
 records the digest of its bytes; `loads` does not load case files yet
 (`UnsupportedError`), and running them comes in a later release.
 
+### Auditing rules
+
+`rules.audit()` (and `table.audit()`) examines a rule set or a decision table
+without any input ([`spec/audit.md`](../../spec/audit.md)) and reports tests
+whose types never match, conditions that are never true, rules that are never
+selected, rules that fire together and inputs for which no rule fires. Each
+finding that something can happen comes with a witness, an input the rules
+themselves have evaluated:
+
+```python
+rules = RuleSet(
+    [
+        Rule("adult", F.age >= 18, {"band": "adult"}),
+        Rule("senior", F.age >= 65, {"band": "senior"}),
+    ],
+    hit_policy="unique",
+)
+report = rules.audit()
+report.max_severity  # Severity.ERROR
+report.at_least(Severity.WARNING)  # True: compare severities this way
+overlap = report.diagnostics[0]
+overlap.code, overlap.rules  # (DiagnosticCode.OVERLAP, ('adult', 'senior'))
+rules.evaluate(overlap.witness)  # raises HitPolicyError: both rules fire
+print(report)  # the text, the same in every language
+report.to_dict()  # {"version": 1, "audit": {...}}, witnesses in JSON
+```
+
+The audit is sound but incomplete: every diagnostic is true, and what it
+could not decide is listed (`report.undecided`, `report.not_modelled`, and
+each check's status in `report.checks`). It is bounded by `max_terms` and
+`max_steps`, and `ruleset_digest=True` carries the rule set digest in the
+report. A diagnostic has a `code`, a `severity` (`Severity`: `INFO`,
+`WARNING` or `ERROR`, which takes the hit policy into account: an overlap is an
+error under `unique` and a fact under `first`; the core orders them so, while
+the members compare as strings, so ask `report.at_least(severity)`), the `rules` it names, a
+`message`, and, where it applies, a `pointer` into the rules' document, the
+field's `path` and `groups`, and the `witness` as Python data; `str()` of a
+diagnostic is its text in the audit's text (the core's). Codes, checks,
+reasons and limits come as `StrEnum` members (`DiagnosticCode`,
+`AuditCheck`, `UndecidedReason`, `AuditLimit`); a later version may add
+codes, which arrive as plain strings, so compare with `==` and keep the ones
+you do not know. Reports are immutable, and output only: `dumps` refuses them
+(use `json.dumps(report.to_dict())` or `str(report)`). The GIL is released
+while the core audits.
+
 `evaluate` never has side effects; `run` evaluates and then calls the actions
 of the selected rules. An action is a function given to `Rule(do=...)`, or a
 name that a rule file gives (`DO notify_sales` in text, `"do"` in JSON) and the

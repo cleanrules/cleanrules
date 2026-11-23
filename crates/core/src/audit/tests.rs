@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::panic, clippy::print_stdout)]
 
 use super::{
-    Audit, AuditLimit, AuditLimits, Check, CheckStatus, DiagnosticCode, Severity, UndecidedReason,
-    audit, audit_table,
+    Audit, AuditCheck, AuditLimit, AuditLimits, CheckStatus, DiagnosticCode, Severity,
+    UndecidedReason, audit, audit_table,
 };
 use crate::eval::{Options, evaluate_tree};
 use crate::format::Document;
@@ -99,9 +99,15 @@ fn unique_overlap_is_an_error_and_gaps_are_found() {
     );
     assert_eq!(report.rules[1].id.as_deref(), Some("AGE-2"));
     assert!(report.undecided.is_empty() && report.not_modelled.is_empty());
-    assert_eq!(report.status(Check::Shadowed), CheckStatus::NotApplicable);
-    assert_eq!(report.status(Check::Fields), CheckStatus::NotApplicable);
-    assert_eq!(report.status(Check::Overlap), CheckStatus::Complete);
+    assert_eq!(
+        report.status(AuditCheck::Shadowed),
+        CheckStatus::NotApplicable
+    );
+    assert_eq!(
+        report.status(AuditCheck::Fields),
+        CheckStatus::NotApplicable
+    );
+    assert_eq!(report.status(AuditCheck::Overlap), CheckStatus::Complete);
 }
 
 #[test]
@@ -112,7 +118,7 @@ fn exclusive_and_complete_rules_have_no_findings() {
     );
     assert!(report.diagnostics.is_empty(), "{report}");
     assert!(
-        Check::ALL
+        AuditCheck::ALL
             .iter()
             .all(|c| report.status(*c) != CheckStatus::Partial)
     );
@@ -136,7 +142,10 @@ fn unsatisfiable_conditions() {
     assert_eq!(never, ["a", "b", "c", "d", "e", "g", "h"]);
     // `f` is TRUE for every number: under first it then hides nothing
     // after it, and nothing before it fires.
-    assert_eq!(report.status(Check::Unsatisfiable), CheckStatus::Complete);
+    assert_eq!(
+        report.status(AuditCheck::Unsatisfiable),
+        CheckStatus::Complete
+    );
 }
 
 #[test]
@@ -213,13 +222,19 @@ fn shadowed_rules_by_policy() {
         let report = run(&format!(
             "HIT POLICY {policy}\nRULE a IF x > 3\nRULE b IF x > 5"
         ));
-        assert_eq!(report.status(Check::Shadowed), CheckStatus::NotApplicable);
+        assert_eq!(
+            report.status(AuditCheck::Shadowed),
+            CheckStatus::NotApplicable
+        );
     }
     for policy in ["rule_order", "collect"] {
         let report = run(&format!(
             "HIT POLICY {policy}\nRULE a IF x > 3\nRULE b IF x > 5"
         ));
-        assert_eq!(report.status(Check::Overlap), CheckStatus::NotApplicable);
+        assert_eq!(
+            report.status(AuditCheck::Overlap),
+            CheckStatus::NotApplicable
+        );
         assert_eq!(
             diagnostic(&report, DiagnosticCode::Gap).severity,
             Severity::Info
@@ -252,9 +267,14 @@ fn any_overlaps_compare_payloads() {
     // c fires too with another output: that witness does not show what a
     // warning about a and d says, so the pair is left undecided.
     assert_eq!(severity(&differ, "a", "d"), None);
-    assert!(differ.undecided.iter().any(|u| u.check == Check::Overlap
-        && u.rules == names(&["a", "d"])
-        && u.reason == UndecidedReason::NoWitness));
+    assert!(
+        differ
+            .undecided
+            .iter()
+            .any(|u| u.check == AuditCheck::Overlap
+                && u.rules == names(&["a", "d"])
+                && u.reason == UndecidedReason::NoWitness)
+    );
 }
 
 #[test]
@@ -296,7 +316,7 @@ fn groups_other_than_numbers() {
     assert!(!overlaps.contains(&&names(&["g", "h"])));
     assert!(overlaps.contains(&&names(&["a", "c"])));
     assert!(overlaps.contains(&&names(&["c", "e"])));
-    assert_eq!(report.status(Check::Overlap), CheckStatus::Complete);
+    assert_eq!(report.status(AuditCheck::Overlap), CheckStatus::Complete);
 }
 
 #[test]
@@ -325,7 +345,7 @@ fn not_modelled_tests_are_listed_and_left_undecided() {
             .iter()
             .all(|u| u.reason == UndecidedReason::NotModelled)
     );
-    assert_eq!(report.status(Check::Types), CheckStatus::Complete);
+    assert_eq!(report.status(AuditCheck::Types), CheckStatus::Complete);
     let text = report.to_string();
     assert!(
         text.contains("Not modelled (4):") && text.contains("Undecided ("),
@@ -337,7 +357,7 @@ fn not_modelled_tests_are_listed_and_left_undecided() {
 fn witnesses_that_cannot_be_built() {
     // An expression subject: the boxes meet, but no input is built.
     let report = run("HIT POLICY unique\nRULE a IF x * 2 > 10\nRULE b IF x * 2 > 20");
-    let checks: Vec<(Check, UndecidedReason)> = report
+    let checks: Vec<(AuditCheck, UndecidedReason)> = report
         .undecided
         .iter()
         .map(|u| (u.check, u.reason))
@@ -345,16 +365,16 @@ fn witnesses_that_cannot_be_built() {
     assert_eq!(
         checks,
         [
-            (Check::Unsatisfiable, UndecidedReason::NoWitness),
-            (Check::Unsatisfiable, UndecidedReason::NoWitness),
-            (Check::Overlap, UndecidedReason::NoWitness),
+            (AuditCheck::Unsatisfiable, UndecidedReason::NoWitness),
+            (AuditCheck::Unsatisfiable, UndecidedReason::NoWitness),
+            (AuditCheck::Overlap, UndecidedReason::NoWitness),
         ]
     );
     // The gap is shown by chance: its fields get values of a supported input.
     assert_eq!(diagnostic(&report, DiagnosticCode::Gap).rules, names(&[]));
     // Related paths: `c IS NULL` with `c.age > 1` cannot both hold.
     let report = run("HIT POLICY unique\nRULE a IF c IS NULL\nRULE b IF c.age > 1");
-    let checks: Vec<(Check, UndecidedReason)> = report
+    let checks: Vec<(AuditCheck, UndecidedReason)> = report
         .undecided
         .iter()
         .map(|u| (u.check, u.reason))
@@ -362,8 +382,8 @@ fn witnesses_that_cannot_be_built() {
     assert_eq!(
         checks,
         [
-            (Check::Overlap, UndecidedReason::NoWitness),
-            (Check::Gap, UndecidedReason::NoWitness),
+            (AuditCheck::Overlap, UndecidedReason::NoWitness),
+            (AuditCheck::Gap, UndecidedReason::NoWitness),
         ]
     );
     // Lists are indexed.
@@ -411,7 +431,7 @@ fn limits_are_reported() {
         report
             .undecided
             .iter()
-            .any(|u| u.check == Check::Gap && u.rules.is_empty())
+            .any(|u| u.check == AuditCheck::Gap && u.rules.is_empty())
     );
     let text = report.to_string();
     assert!(text.contains("(max_steps)"), "{text}");
@@ -442,7 +462,7 @@ fn decision_tables() {
         "HIT POLICY,unique\nRULE,country,age,THEN label\nes,ES,>= 18,'adult'\npt,'PT',>= 18,VIP\n\
          young,-,< 18,'young'\n,'PT',> 60,'senior'\n",
     );
-    assert_eq!(report.status(Check::Fields), CheckStatus::Complete);
+    assert_eq!(report.status(AuditCheck::Fields), CheckStatus::Complete);
     let unlisted: Vec<(&str, &str)> = report
         .diagnostics
         .iter()
@@ -498,7 +518,10 @@ fn decision_tables() {
         [("high", Some(1)), ("low", Some(0)), ("never", Some(2))]
     );
     assert_eq!(report.hit_policy, crate::table::TablePolicy::OutputOrder);
-    assert_eq!(report.status(Check::Overlap), CheckStatus::NotApplicable);
+    assert_eq!(
+        report.status(AuditCheck::Overlap),
+        CheckStatus::NotApplicable
+    );
 }
 
 #[test]
@@ -600,8 +623,8 @@ fn steps_may_run_out_anywhere() {
             );
         }
     }
-    assert!(seen.contains(&Check::Shadowed) && seen.contains(&Check::Overlap));
-    assert!(seen.contains(&Check::Gap) && seen.contains(&Check::Unsatisfiable));
+    assert!(seen.contains(&AuditCheck::Shadowed) && seen.contains(&AuditCheck::Overlap));
+    assert!(seen.contains(&AuditCheck::Gap) && seen.contains(&AuditCheck::Unsatisfiable));
 }
 
 #[test]
@@ -711,14 +734,14 @@ fn names_digests_and_severities() {
     for &code in super::DiagnosticCode::ALL {
         assert_eq!(DiagnosticCode::from_name(code.as_str()), Some(code));
     }
-    for &check in Check::ALL {
-        assert_eq!(Check::from_name(check.as_str()), Some(check));
+    for &check in AuditCheck::ALL {
+        assert_eq!(AuditCheck::from_name(check.as_str()), Some(check));
     }
     for severity in [Severity::Error, Severity::Warning, Severity::Info] {
         assert_eq!(Severity::from_name(severity.as_str()), Some(severity));
     }
     assert_eq!(Severity::from_name("fatal"), None);
-    assert_eq!(Check::from_name("spelling"), None);
+    assert_eq!(AuditCheck::from_name("spelling"), None);
     let text = "HIT POLICY unique\nRULE a IF x > 1\nRULE b IF x > 2";
     let ruleset = ruleset(text);
     let report = audit(&ruleset, &AuditLimits::default()).unwrap();
@@ -742,6 +765,23 @@ fn names_digests_and_severities() {
         run("HIT POLICY first").max_severity(),
         Some(Severity::Warning)
     );
+    // Ordered by seriousness, so the most serious is the maximum.
+    assert!(Severity::Info < Severity::Warning && Severity::Warning < Severity::Error);
+    assert!(report.at_least(Severity::Error) && report.at_least(Severity::Info));
+    let info = run("RULE a IF x > 1\nRULE b IF TRUE");
+    assert!(info.at_least(Severity::Info) && !info.at_least(Severity::Warning));
+    let first = run("HIT POLICY first");
+    assert!(first.at_least(Severity::Warning) && !first.at_least(Severity::Error));
+    let none = run("HIT POLICY unique\nRULE a IF x < 1\nRULE b IF x >= 1");
+    assert_eq!(none.max_severity(), None);
+    assert!(!none.at_least(Severity::Info));
+    // The text of an audit writes each diagnostic as its own text does.
+    let text = report.to_string();
+    for d in &report.diagnostics {
+        let line = d.to_string();
+        assert!(line.starts_with("error    overlap  a, b: ") || line.starts_with("warning  gap  "));
+        assert!(line.ends_with('\n') && text.contains(&line));
+    }
 }
 
 #[test]
@@ -759,7 +799,7 @@ fn a_gap_witness_gives_every_field_a_value() {
         report
             .undecided
             .iter()
-            .any(|u| u.check == Check::Gap && u.reason == UndecidedReason::NoWitness)
+            .any(|u| u.check == AuditCheck::Gap && u.reason == UndecidedReason::NoWitness)
     );
 }
 
@@ -896,7 +936,7 @@ fn a_rule_document_has_no_checks_between_rules() {
         report
             .undecided
             .iter()
-            .all(|u| u.check == Check::Unsatisfiable)
+            .all(|u| u.check == AuditCheck::Unsatisfiable)
     );
     assert!(
         report
@@ -956,4 +996,25 @@ fn places_that_are_not_cells_are_written_as_pointers() {
         rules.place("/decision_table/rows/0/inputs/0"),
         "/decision_table/rows/0/inputs/0"
     );
+}
+
+#[test]
+fn a_diagnostics_text_names_its_cell_in_the_audit_only() {
+    let report = table("RULE,country,THEN rate\nes,ES,1\npt,'PT',2\n");
+    let unlisted = &report.diagnostics[0];
+    assert_eq!(unlisted.code, DiagnosticCode::UnlistedField);
+    let alone = unlisted.to_string();
+    let in_audit = report.diagnostic_text(unlisted);
+    assert!(alone.contains("\n           at /decision_table/rows/0/inputs/0\n"));
+    assert!(
+        in_audit
+            .contains("\n           at row es, input country (/decision_table/rows/0/inputs/0)\n")
+    );
+    let text = report.to_string();
+    assert!(text.contains(&in_audit) && !text.contains(&alone));
+    // Without cells, both are the same.
+    let ruleset = run("HIT POLICY unique\nRULE a IF x > 1\nRULE b IF x > 2");
+    for d in &ruleset.diagnostics {
+        assert_eq!(ruleset.diagnostic_text(d), d.to_string());
+    }
 }

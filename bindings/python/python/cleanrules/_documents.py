@@ -246,6 +246,13 @@ def dumps(
     if isinstance(value, RuleSet):  # pyright: ignore[reportUnnecessaryIsInstance]
         _check_actions(list(value), "/ruleset/rules/{}", omit_actions)
         return _native.dump_ruleset(value._native, format)  # pyright: ignore[reportPrivateUsage]
+    from cleanrules._audit import Audit
+
+    if isinstance(value, Audit):
+        raise TypeError(
+            "an audit is output only, so dumps does not write it: use"
+            " json.dumps(report.to_dict()) for its document, or str(report) for its text"
+        )
     raise TypeError(
         "dumps takes a condition, a rule, a rule set, a decision table, a bundle or a decision,"
         f" not {type(value).__name__}"

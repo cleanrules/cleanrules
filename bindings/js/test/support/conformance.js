@@ -35,6 +35,16 @@
 // vectors compare two bundles read with `Document.read` and `compareBundle`
 // (json) or `loads` and `Bundle.compare` (native), both ways round.
 //
+// Audits (spec/audit.md): `audit` vectors audit the document with
+// `Document.audit`, the core's `audit_document` (json), or `RuleSet.audit`
+// of a rule set built in code and `DecisionTable.audit` of a table read
+// (native, which skips the documents that hold other rules). The `message` and `witness`
+// of each diagnostic are not compared: each witness is evaluated instead, by
+// `RuleSet.fromDocument(document).evaluateJson` (json) or the rule set's
+// `evaluate` (native), and must show its finding: an `overlap` of severity
+// `error` throws a `HitPolicyError` naming both rules, any other `overlap`
+// fires both, a `gap` fires none, and only those two codes have one.
+//
 // The runner only drives the library and compares: results are parsed with
 // ./json.js and compared with the vectors as trees, never with the library's
 // own JSON parser or equality.
@@ -54,7 +64,8 @@ export const SKIPS = {
   graded: 'conditions under a graded logic: the binding evaluates one node under boolean only until task J.1b',
   cases:
     'case files (spec/tests.md) have no type in the idiomatic API yet: loads refuses them, so their vectors run through cleanrules/native (the JSON route), and those whose file does not read run in both',
-  audit: 'the static audit (spec/audit.md) is made by the core and checked by its runner; the JavaScript API audits from task T.9',
+  audit_document:
+    'the idiomatic API audits rule sets and decision tables (RuleSet.audit, DecisionTable.audit), so audit vectors of other documents (a bundle, a rule, a condition, a case file) run in the json route, through Document.audit and the core\'s audit_document',
   test_run: 'test runs (spec/tests.md, Running cases) are made by the core and checked by its runner; the JavaScript API runs cases from task T.9b',
 }
 
@@ -67,6 +78,18 @@ export function needsCaseFiles(vector) {
   if (!String(vector.get('id')).startsWith('format/cases/')) return false
   const given = vector.get('given')
   return given.get('kind') === 'canonical' || given.has('write') || !vector.get('expect').has('error')
+}
+
+/**
+ * Whether the native route skips `vector`: an `audit` vector whose document
+ * holds neither a rule set nor a decision table, which only the core's
+ * `audit_document` audits (`Document.audit`, the json route).
+ */
+export function auditsDocument(vector) {
+  const given = vector.get('given')
+  if (given.get('kind') !== 'audit') return false
+  const document = given.get('document')
+  return !document.has('ruleset') && !document.has('decision_table')
 }
 
 /** The class of each error code (`spec/errors.md`, *Codes*). */
@@ -101,6 +124,9 @@ const LIMITS = {
   max_values: 'maxValues',
   max_path_segments: 'maxPathSegments',
 }
+
+/** The vector's audit limits, by the names of the API. */
+const AUDIT_LIMITS = { max_terms: 'maxTerms', max_steps: 'maxSteps' }
 
 const MAX_SAFE = 2n ** 53n - 1n
 
@@ -483,6 +509,174 @@ not
     return compare({ result: tree(forth) }, expect, 'comparison')
   }
 
+  // --- Audits ----------------------------------------------------------------
+
+  /** The vector's audit options, by the names of the API. */
+  function auditOptionsOf(given) {
+    const out = {}
+    const limits = given.get('limits')
+    if (limits !== undefined) {
+      out.limits = {}
+      for (const [k, v] of limits.entries) {
+        if (AUDIT_LIMITS[k] === undefined) throw new VectorError(`unknown audit limit ${k}`)
+        out.limits[AUDIT_LIMITS[k]] = Number(v.text)
+      }
+    }
+    if (given.get('ruleset_digest') === true) out.rulesetDigest = true
+    return out
+  }
+
+  /** An audit's content without the `message` and `witness` of its diagnostics. */
+  const withoutFreeText = (audit) =>
+    swap(audit, 'diagnostics', (items) => items.map((d) => new Obj(d.entries.filter(([k]) => k !== 'message' && k !== 'witness'))))
+
+  /**
+   * Whether a diagnostic's witness shows it (`spec/audit.md`, *Witnesses*):
+   * `''`, or what is wrong. `evaluate` evaluates the witness with the audited
+   * rule set and gives the names of the rules that fired.
+   */
+  function shows(code, severity, rules, witness, evaluate) {
+    const has = witness !== null && witness !== undefined
+    if (code !== 'overlap' && code !== 'gap') return has ? `a ${code} has a witness` : ''
+    if (!has) return `the ${code} has no witness`
+    const outcome = attempt(R, evaluate)
+    if (outcome.error !== undefined) {
+      const { code: raised, context } = outcome.error
+      const named = rules.every((rule) => (context.rules ?? []).includes(rule))
+      if (code === 'overlap' && severity === 'error' && raised === 'hit_policy_error' && named) return ''
+      return `its witness raises ${raised}: ${outcome.error.message}`
+    }
+    const fired = outcome.result
+    if (code === 'gap') return fired.length === 0 ? '' : `rules ${fired.join(', ')} fire for the gap's witness`
+    if (severity === 'error') return 'the witness of an error overlap raises no hit_policy_error'
+    return rules.every((rule) => fired.includes(rule)) ? '' : `only ${fired.join(', ') || 'no rule'} fire for the witness`
+  }
+
+  /** An `audit` vector through the native layer: `Document.audit`, witnesses by `evaluateJson`. */
+  function auditJson(given, expect) {
+    const source = write(need(given, 'document'))
+    const document = N.Document.read(source)
+    const options = auditOptionsOf(given)
+    const outcome = attempt(R, () => content(document.audit({ ...options, format: 'json' }), 'audit'))
+    if (outcome.error !== undefined) return compare(outcome, expect, 'audit')
+    const rules = N.RuleSet.fromDocument(document)
+    for (const d of outcome.result.get('diagnostics')) {
+      const issue = shows(d.get('code'), d.get('severity'), d.get('rules'), d.get('witness'), () =>
+        content(rules.evaluateJson(write(d.get('witness'))).write(), 'decision')
+          .get('results')
+          .filter((r) => r.get('fired') === true)
+          .map((r) => r.get('rule')),
+      )
+      if (issue !== '') return `${write(d)}: ${issue}`
+    }
+    const issues = [compare({ result: withoutFreeText(outcome.result) }, expect, 'audit')]
+    // A rule set document: the rule set read from it audits the same.
+    if (document.kind === 'ruleset') {
+      const again = content(rules.audit({ ...options, format: 'json' }), 'audit')
+      if (!same(again, outcome.result)) issues.push(`RuleSet.audit gives ${write(again)}`)
+    }
+    // The text and YAML of the same audit; the rule set the document gives
+    // audits the same rules, with its own pointers.
+    const text = document.audit(options)
+    const what = { ruleset: 'a rule set', decision_table: 'a decision table', bundle: 'a ', rule: 'a rule' }[document.kind]
+    if (!text.startsWith(`Audit of ${what}`)) issues.push(`the text starts ${JSON.stringify(text.slice(0, 40))}`)
+    const audited = outcome.result.get('document')
+    if ((document.kind === 'bundle' || document.kind === 'rule') && audited !== document.kind) issues.push(`a ${document.kind} audit has "document": ${audited}`)
+    if (!document.audit({ ...options, format: 'yaml' }).startsWith('version: 1\n')) issues.push('the YAML is not an audit document')
+    return issues.filter(Boolean).join('; ')
+  }
+
+  /** The attributes of an `Audit` against its JSON form: `''`, or what differs. */
+  function checkAudit(report, json) {
+    const present = (entries) => Object.fromEntries(entries.filter(([, v]) => v !== null))
+    const attributes = present([
+      ['source', report.source],
+      ['document', report.document],
+      ['hit_policy', report.hitPolicy],
+      ['aggregate', report.aggregate],
+      ['logic', report.logic],
+      ['strict', report.strict ? true : null],
+      ['ruleset_digest', report.rulesetDigest],
+      ['limits', { max_terms: report.limits.maxTerms, max_steps: report.limits.maxSteps }],
+      ['rules', report.rules.map((r) => present([['name', r.name], ['id', r.id], ['row', r.row]]))],
+      ['checks', report.checks.map((c) => ({ check: c.check, status: c.status }))],
+      ['not_modelled', report.notModelled.map((n) => present([['rule', n.rule], ['op', n.op], ['pointer', n.pointer], ['limit', n.limit]]))],
+      [
+        'undecided',
+        report.undecided.map((u) =>
+          present([['check', u.check], ['rules', [...u.rules]], ['reason', u.reason], ['limit', u.limit], ['remaining', u.remaining]]),
+        ),
+      ],
+      [
+        'diagnostics',
+        report.diagnostics.map((d) =>
+          present([
+            ['code', d.code],
+            ['severity', d.severity],
+            ['rules', [...d.rules]],
+            ['message', d.message],
+            ['pointer', d.pointer],
+            ['path', d.path === null ? null : [...d.path]],
+            ['groups', d.groups.length > 0 ? [...d.groups] : null],
+          ]),
+        ),
+      ],
+    ])
+    const written = swap(json, 'diagnostics', (items) => items.map((d) => new Obj(d.entries.filter(([k]) => k !== 'witness'))))
+    if (!same(tree(attributes), written)) return `the attributes give ${write(tree(attributes))}, the JSON ${write(written)}`
+    const witnesses = report.diagnostics.map((d) => d.witness !== null)
+    const inJson = json.get('diagnostics').map((d) => d.has('witness'))
+    if (witnesses.join() !== inJson.join()) return `witnesses ${witnesses}, in the JSON ${inJson}`
+    // Severities by seriousness (spec/audit.md, JSON, Extensions).
+    const rank = { info: 0, warning: 1, error: 2 }
+    const worst = report.diagnostics.map((d) => d.severity).sort((a, b) => rank[b] - rank[a])[0] ?? null
+    if (report.maxSeverity !== worst) return `maxSeverity is ${report.maxSeverity}, expected ${worst}`
+    for (const severity of Object.keys(rank)) {
+      const want = worst !== null && rank[worst] >= rank[severity]
+      if (report.atLeast(severity) !== want) return `atLeast(${severity}) is ${!want}`
+    }
+    const text = String(report)
+    if (!report.diagnostics.every((d) => text.includes(String(d)) && String(d).startsWith(`${d.severity.padEnd(8)} ${d.code}  `))) {
+      return "a diagnostic's text is not the audit's"
+    }
+    for (const c of report.checks) {
+      if (report.status(c.check) !== c.status) return `status(${c.check}) is ${report.status(c.check)}`
+    }
+    if (report.status('a check of a later version') !== 'not_applicable') return 'status of an unknown check'
+    const frozenAll = [report, report.rules, report.checks, report.diagnostics, ...report.diagnostics]
+    if (!frozenAll.every((o) => Object.isFrozen(o))) return 'an audit or one of its parts is not frozen'
+    if (report.diagnostics.some((d) => d.witness !== null && !Object.isFrozen(d.witness))) return 'a witness is not frozen'
+    return ''
+  }
+
+  /** An `audit` vector through the idiomatic API: `RuleSet.audit` or `DecisionTable.audit`, witnesses by `evaluate`. */
+  function auditNative(given, expect) {
+    const document = need(given, 'document')
+    const rules = document.has('ruleset') ? buildRuleSet(document.get('ruleset')) : R.loads(write(document))
+    if (!(rules instanceof R.RuleSet) && !(rules instanceof R.DecisionTable)) return `loads gives a ${rules?.constructor?.name}`
+    const options = auditOptionsOf(given)
+    const outcome = attempt(R, () => rules.audit(options))
+    if (outcome.error !== undefined) return compare(outcome, expect, 'audit', idiomatic)
+    const report = outcome.result
+    if (!(report instanceof R.Audit)) return 'audit() gives no Audit'
+    const ruleset = rules instanceof R.RuleSet ? rules : rules.ruleset
+    for (const d of report.diagnostics) {
+      const issue = shows(d.code, d.severity, d.rules, d.witness, () =>
+        ruleset
+          .evaluate(d.witness)
+          .results.filter((r) => r.fired)
+          .map((r) => r.rule.name),
+      )
+      if (issue !== '') return `${d}: ${issue}`
+    }
+    const json = need(parse(JSON.stringify(report)), 'audit')
+    const issues = [checkAudit(report, json), compare({ result: withoutFreeText(json) }, expect, 'audit')]
+    // The native layer audits the same rules with the same text.
+    const layer = document.has('ruleset') ? N.RuleSet.read(write(document)) : N.Document.read(write(document))
+    issues.push(compareText('the text', String(report), layer.audit(options)))
+    return issues.filter(Boolean).join('; ')
+  }
+
   /** The text a `read` vector reads, and its format. */
   function sourceOf(given) {
     if (given.has('text')) return [given.get('text'), 'json']
@@ -621,6 +815,8 @@ not
         return makeJson(given, expect)
       case 'bundle_compare':
         return compareJson(given, expect)
+      case 'audit':
+        return auditJson(given, expect)
       case 'condition':
       case 'value': {
         const node = N.Node.read(write(need(given, kind)))
@@ -1321,6 +1517,7 @@ not
     if (kind === 'canonical') return canonicalNative(given, expect)
     if (kind === 'bundle') return makeNative(given, expect)
     if (kind === 'bundle_compare') return compareNative(given, expect)
+    if (kind === 'audit') return auditsDocument(vector) ? { skip: 'audit_document' } : auditNative(given, expect)
     if (kind === 'summary') {
       const ruleset = buildRuleSet(need(given, 'ruleset'))
       const built = checkBuilt(ruleset, given)
@@ -1441,7 +1638,6 @@ not
   function run(vector, route) {
     current = `${route}:${vector.get('id')}`
     if (vector.get('given').get('kind') === 'tool') return { skip: 'agents' }
-    if (vector.get('given').get('kind') === 'audit') return { skip: 'audit' }
     if (vector.get('given').get('kind') === 'test_run') return { skip: 'test_run' }
     const logic = vector.get('given').get('logic')
     if (logic !== undefined && logic !== 'boolean') return { skip: 'graded' }

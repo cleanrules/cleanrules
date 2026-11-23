@@ -33,16 +33,20 @@ describe(`the package (${build})`, () => {
     assert.deepEqual(Object.keys(root).sort(), [
       'ActionContext',
       'ActionError',
+      'Audit',
+      'AuditedRule',
       'Bundle',
       'CaseFileRef',
       'Cause',
       'CauseGroup',
+      'CheckResult',
       'CleanRulesError',
       'Const',
       'Counterfactual',
       'Decimal',
       'Decision',
       'DecisionTable',
+      'Diagnostic',
       'EvaluationError',
       'Explanation',
       'Expr',
@@ -57,6 +61,7 @@ describe(`the package (${build})`, () => {
       'LocalDate',
       'MissingFieldError',
       'NaiveDateTime',
+      'NotModelled',
       'Note',
       'Reason',
       'RegistryError',
@@ -73,6 +78,7 @@ describe(`the package (${build})`, () => {
       'TableOutput',
       'TableRow',
       'TypeMismatchError',
+      'Undecided',
       'UnsupportedError',
       'ZonedDateTime',
       'and',
@@ -171,7 +177,7 @@ describe(`the package (${build})`, () => {
     }
     const internal = (layer) =>
       Object.keys(layer)
-        .filter((name) => /^(node|rule|decision|explanation|summary|action|document|write|canonical|digest|grid|file|maxValues|bundle|caseFile)[A-Z]|^(NodeList|RuleList|Native[A-Z]\w*|stringifiable|checkCaseFileRef)$/.test(name))
+        .filter((name) => /^(node|rule|decision|explanation|summary|action|audit|document|write|canonical|digest|grid|file|maxValues|bundle|caseFile)[A-Z]|^(NodeList|RuleList|Native[A-Z]\w*|stringifiable|checkCaseFileRef)$/.test(name))
         .sort()
     assert.deepEqual(internal(napiLayer), [...INTERNAL].sort())
     assert.deepEqual(internal(wasmLayer), [...INTERNAL].sort())

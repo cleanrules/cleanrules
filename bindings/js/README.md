@@ -670,6 +670,52 @@ spelling in every language: the difference `engine.limits.max_depth` is about
 the limit that `limits` and `bundle.engine.limits` call `maxDepth`. Two
 bundles are the same exactly when `digest(a) === digest(b)`.
 
+## Auditing rules
+
+```js
+const rules = new RuleSet(
+  [new Rule('adult', F.age.ge(18), { band: 'adult' }), new Rule('senior', F.age.ge(65), { band: 'senior' })],
+  { hitPolicy: 'unique' },
+)
+const report = rules.audit()
+report.maxSeverity                 // 'error'
+report.atLeast('warning')          // true: compare severities this way
+const [overlap] = report.diagnostics
+overlap.code, overlap.rules        // 'overlap', ['adult', 'senior']
+rules.evaluate(overlap.witness)    // throws a HitPolicyError: both rules fire
+String(report)                     // the text, the same in every language
+JSON.stringify(report)             // {"version":1,"audit":{...}}, witnesses in JSON
+```
+
+`ruleset.audit(options)` and `table.audit(options)` examine the rules without
+any input (`spec/audit.md`) and report tests whose types never match,
+conditions never true, rules never selected, rules that fire together and
+inputs for which no rule fires; each of the last two comes with a `witness`,
+native data (frozen) that the rules themselves have evaluated to show it. The
+audit is sound but incomplete: every diagnostic is true, and what it could not
+decide is in `undecided`, `notModelled` and each check's status (`checks`,
+`status(check)`). Its options are `limits: { maxTerms, maxSteps }` (whole numbers; a
+`RangeError` otherwise), as `Audit.limits` gives them back, and
+`rulesetDigest` (`rulesetDigest` on the report). Severities are ordered
+`info` < `warning` < `error`, which is not their string order: ask
+`report.atLeast(severity)`.
+A `Diagnostic` has `code`, `severity` (`'error'`, `'warning'` or `'info'`, a
+closed set that takes the hit policy into account), `rules`, `message`,
+`pointer` (into the rules' document), `path`, `groups` and `witness`, and
+its `String()` is its text in the audit's text (the core's, naming a
+table's cells). Codes,
+checks, reasons and limits are typed as string unions that also admit any
+string (`DiagnosticCode`, `AuditCheck`, `UndecidedReason`, `AuditLimit`): a
+later version may add codes, so keep the ones you do not know. In the native
+layer, `RuleSet.audit(options)` and `Document.audit(options)` take the same
+options plus `format`; `Document.audit` audits what the core audits as a
+document (a rule set, a decision table, a bundle under `/bundle`, or a rule
+under `/rule`, where `report.document` says which; a condition or a case
+file is an `UnsupportedError`),
+(`AuditWriteOptions`), and give the text by default, or an audit document
+with `format: 'json'` or `'yaml'`. An audit is output only: `dumps` refuses
+it (use `JSON.stringify(report)` or `String(report)`).
+
 ## Decision tables
 
 ```js

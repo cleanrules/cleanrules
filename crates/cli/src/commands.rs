@@ -88,11 +88,11 @@ pub(crate) fn audit(args: &AuditArgs) -> Result<Exit, Failure> {
         DocumentFormat::Text
     };
     write_stdout(&write_audit_as(&report, format).map_err(core)?)?;
-    let fails = match (args.fail_on.severity(), report.max_severity()) {
-        // `Error < Warning < Info`: at or above the threshold is at most it.
-        (Some(threshold), Some(found)) => found <= threshold,
-        _ => false,
-    };
+    // At or above the threshold, as the core orders severities.
+    let fails = args
+        .fail_on
+        .severity()
+        .is_some_and(|threshold| report.at_least(threshold));
     Ok(if fails { Exit::Findings } else { Exit::Clean })
 }
 

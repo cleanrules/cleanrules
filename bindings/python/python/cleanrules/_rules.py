@@ -38,6 +38,7 @@ from cleanrules.errors import (
 )
 
 if TYPE_CHECKING:
+    from cleanrules._audit import Audit
     from cleanrules._trees import ResultTree
 
 __all__ = [
@@ -739,6 +740,46 @@ class RuleSet(Sequence[Rule]):
         actions = [rule.do is not None for rule in self._rules]
         return Summary(json.loads(self._native.summary_json(actions)), self._native, actions)
 
+    def audit(
+        self,
+        *,
+        max_terms: int | None = None,
+        max_steps: int | None = None,
+        ruleset_digest: bool = False,
+    ) -> Audit:
+        """Audit the rule set without any input (`spec/audit.md`).
+
+            report = rules.audit()
+            for d in report.diagnostics:
+                print(d.severity, d.code, d.rules, d.message, d.witness)
+
+        The audit reports tests whose types never match, conditions that are
+        never true, rules never selected, rules that fire together and inputs
+        for which no rule fires, with an input that shows each of the last two
+        (`Diagnostic.witness`), which this rule set has evaluated. Every
+        finding is true; what the audit could not decide is listed in
+        `Audit.undecided`. The GIL is released while the core audits.
+
+        Args:
+            max_terms: The most boxes in the true or false description of one
+                node (256); a node that needs more is read as not modelled.
+            max_steps: The work of the whole audit, in steps (1,000,000); when
+                it runs out, each check stops and says how much it left.
+            ruleset_digest: Carry the rule set digest in the report and its
+                document (`Audit.ruleset_digest`), as a decision can.
+
+        Raises:
+            UnsupportedError: For a logic other than `"boolean"` (no rule set
+                takes one yet: the audit of graded logics comes with them).
+            TypeError: For a limit that is not an int, or a `ruleset_digest`
+                that is not a bool.
+            ValueError: For a negative limit.
+        """
+        from cleanrules._audit import Audit, _check_options  # pyright: ignore[reportPrivateUsage]
+
+        max_terms, max_steps = _check_options(max_terms, max_steps, ruleset_digest)
+        return Audit(_native.audit_ruleset(self._native, max_terms, max_steps, ruleset_digest))
+
     def __len__(self) -> int:
         return len(self._rules)
 
@@ -1288,6 +1329,9 @@ class Summary:
         "tags",
     )
 
+    _data: dict[str, Any]
+    _native: _native.RuleSet
+    _actions: list[bool]
     hit_policy: HitPolicy
     aggregate: Aggregate | None
     logic: str
@@ -1299,37 +1343,52 @@ class Summary:
 
     def __init__(self, data: dict[str, Any], native: _native.RuleSet, actions: list[bool]) -> None:
         """Internal: `RuleSet.summary()` builds summaries."""
-        self._data = data
-        self._native = native
-        self._actions = actions
-        self.hit_policy = HitPolicy(data["hit_policy"])
-        self.aggregate = Aggregate(data["aggregate"]) if "aggregate" in data else None
-        self.logic = data["logic"]
-        self.strict = bool(data.get("strict", False))
-        self.rules = tuple(
-            RuleSummary(
-                rule["name"],
-                _int(rule["priority"]),
-                tuple(rule["outputs"]),
-                rule.get("action", False),
-                rule.get("do"),
-            )
-            for rule in data["rules"]
+        set_ = object.__setattr__
+        set_(self, "_data", data)
+        set_(self, "_native", native)
+        set_(self, "_actions", actions)
+        set_(self, "hit_policy", HitPolicy(data["hit_policy"]))
+        set_(self, "aggregate", Aggregate(data["aggregate"]) if "aggregate" in data else None)
+        set_(self, "logic", data["logic"])
+        set_(self, "strict", bool(data.get("strict", False)))
+        set_(
+            self,
+            "rules",
+            tuple(
+                RuleSummary(
+                    rule["name"],
+                    _int(rule["priority"]),
+                    tuple(rule["outputs"]),
+                    rule.get("action", False),
+                    rule.get("do"),
+                )
+                for rule in data["rules"]
+            ),
         )
-        self.fields = tuple(
-            FieldUsage(
-                tuple(usage["path"]),
-                tuple(usage["conditions"]),
-                tuple((use["rule"], use["key"]) for use in usage["payloads"]),
-            )
-            for usage in data["fields"]
+        set_(
+            self,
+            "fields",
+            tuple(
+                FieldUsage(
+                    tuple(usage["path"]),
+                    tuple(usage["conditions"]),
+                    tuple((use["rule"], use["key"]) for use in usage["payloads"]),
+                )
+                for usage in data["fields"]
+            ),
         )
-        self.outputs = tuple(data["outputs"])
-        self.tags = MappingProxyType({e["tag"]: tuple(e["rules"]) for e in data["tags"]})
+        set_(self, "outputs", tuple(data["outputs"]))
+        set_(self, "tags", MappingProxyType({e["tag"]: tuple(e["rules"]) for e in data["tags"]}))
 
     def to_dict(self) -> dict[str, Any]:
         """The summary document of the JSON format (`spec/json-format.md`)."""
         return _document("summary", json.loads(json.dumps(self._data)))
+
+    def __setattr__(self, name: str, value: object) -> NoReturn:
+        raise AttributeError(f"summaries are immutable: cannot set {name!r}")
+
+    def __delattr__(self, name: str) -> NoReturn:
+        raise AttributeError(f"summaries are immutable: cannot delete {name!r}")
 
     def __repr__(self) -> str:
         return f"<Summary: {len(self.rules)} rules, {len(self.fields)} fields>"

@@ -111,16 +111,17 @@ impl AuditLimit {
 /// How serious a finding is. The set is closed: a command line maps it to
 /// its exit codes.
 ///
-/// Ordered from the most serious: `Error < Warning < Info`, so the most
-/// serious of several is their minimum ([`Audit::max_severity`]).
+/// Ordered by seriousness: `Info < Warning < Error`, so the most serious of
+/// several is their maximum ([`Audit::max_severity`]), and a severity is at
+/// least another when it is not less ([`Audit::at_least`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Severity {
-    /// Some input makes the evaluation fail, as the witness shows.
-    Error,
-    /// Part of the rules has no effect, or probably does not do what was meant.
-    Warning,
     /// A fact the policy makes acceptable.
     Info,
+    /// Part of the rules has no effect, or probably does not do what was meant.
+    Warning,
+    /// Some input makes the evaluation fail, as the witness shows.
+    Error,
 }
 
 impl Severity {
@@ -264,7 +265,7 @@ impl PartialEq for Diagnostic {
 /// format version 1.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
-pub enum Check {
+pub enum AuditCheck {
     /// `incompatible_types` and `mixed_types`.
     Types,
     /// `unlisted_field`, for decision tables.
@@ -279,27 +280,27 @@ pub enum Check {
     Gap,
 }
 
-impl Check {
+impl AuditCheck {
     /// Every check, in order.
-    pub const ALL: &'static [Check] = &[
-        Check::Types,
-        Check::Fields,
-        Check::Unsatisfiable,
-        Check::Shadowed,
-        Check::Overlap,
-        Check::Gap,
+    pub const ALL: &'static [AuditCheck] = &[
+        AuditCheck::Types,
+        AuditCheck::Fields,
+        AuditCheck::Unsatisfiable,
+        AuditCheck::Shadowed,
+        AuditCheck::Overlap,
+        AuditCheck::Gap,
     ];
 
     /// The check's name.
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
-            Check::Types => "types",
-            Check::Fields => "fields",
-            Check::Unsatisfiable => "unsatisfiable",
-            Check::Shadowed => "shadowed",
-            Check::Overlap => "overlap",
-            Check::Gap => "gap",
+            AuditCheck::Types => "types",
+            AuditCheck::Fields => "fields",
+            AuditCheck::Unsatisfiable => "unsatisfiable",
+            AuditCheck::Shadowed => "shadowed",
+            AuditCheck::Overlap => "overlap",
+            AuditCheck::Gap => "gap",
         }
     }
 
@@ -310,9 +311,8 @@ impl Check {
     }
 }
 
-/// Whether a check decided everything it looked at.
+/// Whether a check decided everything it looked at. The set is closed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum CheckStatus {
     /// Every item was decided.
     Complete,
@@ -339,7 +339,7 @@ impl CheckStatus {
 #[non_exhaustive]
 pub struct CheckResult {
     /// The check.
-    pub check: Check,
+    pub check: AuditCheck,
     /// Whether it decided everything.
     pub status: CheckStatus,
 }
@@ -388,7 +388,7 @@ impl UndecidedReason {
 #[non_exhaustive]
 pub struct Undecided {
     /// The check.
-    pub check: Check,
+    pub check: AuditCheck,
     /// The rules involved, by name; none for the gap check, and none for the
     /// items `max_steps` did not reach.
     pub rules: Vec<String>,
@@ -486,7 +486,7 @@ struct Headers {
 impl Audit {
     /// The status of a check.
     #[must_use]
-    pub fn status(&self, check: Check) -> CheckStatus {
+    pub fn status(&self, check: AuditCheck) -> CheckStatus {
         self.checks
             .iter()
             .find(|c| c.check == check)
@@ -496,7 +496,15 @@ impl Audit {
     /// The most serious severity among the diagnostics, if there are any.
     #[must_use]
     pub fn max_severity(&self) -> Option<Severity> {
-        self.diagnostics.iter().map(|d| d.severity).min()
+        self.diagnostics.iter().map(|d| d.severity).max()
+    }
+
+    /// Whether some diagnostic is at least as serious as `severity`: what a
+    /// command line fails on (`at_least(Severity::Warning)` for warnings and
+    /// errors).
+    #[must_use]
+    pub fn at_least(&self, severity: Severity) -> bool {
+        self.diagnostics.iter().any(|d| d.severity >= severity)
     }
 
     /// The same report, carrying the rule set digest or not
@@ -711,8 +719,12 @@ pub fn audit_document(document: &Document, limits: &AuditLimits) -> Result<Audit
             // The checks between rules are about a rule set, which a rule
             // document is not: its default policy would report a gap the
             // rule did not cause.
-            let between =
-                |check: Check| matches!(check, Check::Shadowed | Check::Overlap | Check::Gap);
+            let between = |check: AuditCheck| {
+                matches!(
+                    check,
+                    AuditCheck::Shadowed | AuditCheck::Overlap | AuditCheck::Gap
+                )
+            };
             for result in &mut report.checks {
                 if between(result.check) {
                     result.status = CheckStatus::NotApplicable;

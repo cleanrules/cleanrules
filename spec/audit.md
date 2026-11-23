@@ -385,11 +385,14 @@ points to the cell. `message`, like an error's, is free text that
 conformance vectors do not compare.
 
 **Extensions.** Within format version 1, new diagnostic codes, checks,
-reasons, limits and optional keys may be added. Consumers ignore those they
-do not know, and accept several diagnostics of any code, `gap` included:
-this version reports at most one gap, and a later one may describe each gap.
-The severities are a closed set, so a command line can map them to its exit
-codes.
+reasons, limits, sources (what can be audited) and optional keys may be
+added. Consumers ignore those they do not know, and accept several
+diagnostics of any code, `gap` included: this version reports at most one
+gap, and a later one may describe each gap. The severities and the statuses
+of a check (`complete`, `partial`, `not_applicable`) are closed sets, so a
+command line can map severities to its exit codes. Severities are ordered by
+seriousness, `info` below `warning` below `error`; a report is *at least* a
+severity when one of its diagnostics is that severity or a more serious one.
 
 ```json
 {

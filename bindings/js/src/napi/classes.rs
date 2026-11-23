@@ -11,14 +11,17 @@ use napi::{Env, Result, ValueType};
 use napi_derive::napi;
 
 use super::hooks::{hook, throw};
-use super::{OrFail, fail, raw, raw_cases, raw_limits, raw_list, raw_options, raw_ruleset_digest};
-use crate::common::bundles;
+use super::{
+    OrFail, fail, raw, raw_audit_options, raw_cases, raw_limits, raw_list, raw_options,
+    raw_ruleset_digest,
+};
 use crate::common::core::{
     ActionFailure, DecisionCore, DocumentCore, NodeCore, PathSegment, RulesCore, TreeKind,
     action_error, cause_index, max_values_error, not_a_batch, path_segments, undefined_row,
 };
 use crate::common::wire::{Read, decode};
 use crate::common::{Problem, Raw, UNDEFINED_INPUT, limits, strings, text, tree_options};
+use crate::common::{audit, bundles};
 
 // --- Types for the declarations -------------------------------------------
 //
@@ -177,6 +180,22 @@ pub struct BundleCaseInput {
     /// The file's content.
     #[napi(ts_type = "string | Uint8Array")]
     pub content: String,
+}
+
+/// The options of an audit (`spec/audit.md`) in the native layer: how its
+/// report is written, its limits, and whether it carries the rule set digest.
+#[napi(object, object_from_js = false, object_to_js = false)]
+pub struct AuditWriteOptions {
+    /// The format: `"text"` (the default), `"json"` or `"yaml"`.
+    #[napi(ts_type = "Format")]
+    pub format: Option<String>,
+    /// The limits: `maxTerms`, the most boxes in the true or false
+    /// description of one node (256), and `maxSteps`, the work of the whole
+    /// audit in steps (1,000,000); each one left out keeps its default.
+    #[napi(ts_type = "{ maxTerms?: number | null; maxSteps?: number | null } | null")]
+    pub limits: Option<String>,
+    /// Carry the rule set digest of what was audited in the report.
+    pub ruleset_digest: Option<bool>,
 }
 
 /// How a decision is written (`Decision.write`).
@@ -430,6 +449,24 @@ impl Document {
         };
         self.core.compare_bundle(&other.core).or_fail(env)
     }
+
+    /// The static audit (`spec/audit.md`) of the rule set or decision table
+    /// the document holds, without any input, in `options.format`: its text
+    /// (the default, as `RuleSet.summary`), or a `"json"` or `"yaml"` audit
+    /// document, whose pointers point into this document. `maxTerms` and
+    /// `maxSteps` bound it; `rulesetDigest` carries the rule set digest.
+    ///
+    /// # Errors
+    ///
+    /// `UnsupportedError` for CSV or the rule syntax; a `TypeError` for a
+    /// document that holds no rule set or decision table, or an option of the
+    /// wrong type; a `RangeError` for a limit that is negative or not a whole
+    /// number.
+    #[napi(ts_args_type = "options?: AuditWriteOptions | null")]
+    pub fn audit(&self, env: &Env, options: Option<Unknown<'_>>) -> Result<String> {
+        let options = raw_audit_options(options)?;
+        audit::document_as(&self.core, &options).or_fail(env)
+    }
 }
 
 /// A bundle of `rules` made from the arguments of a JavaScript call, as a
@@ -556,6 +593,19 @@ impl RuleSet {
     #[napi(ts_args_type = "format?: Format | null")]
     pub fn summary(&self, env: &Env, format: Option<Unknown<'_>>) -> Result<String> {
         self.core.summary(&optional(format)?).or_fail(env)
+    }
+
+    /// The static audit (`spec/audit.md`) of the rule set, without any input,
+    /// in `options.format`: its text (the default), or a `"json"` or `"yaml"`
+    /// audit document, as `Document.audit` gives them.
+    ///
+    /// # Errors
+    ///
+    /// As `Document.audit`.
+    #[napi(ts_args_type = "options?: AuditWriteOptions | null")]
+    pub fn audit(&self, env: &Env, options: Option<Unknown<'_>>) -> Result<String> {
+        let options = raw_audit_options(options)?;
+        audit::ruleset_as(&self.core.ruleset, &options).or_fail(env)
     }
 
     /// The canonical bytes of the rule set's document (`spec/json-format.md`,

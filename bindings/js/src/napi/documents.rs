@@ -16,12 +16,12 @@ use super::build::NativeRule;
 use super::classes::{
     Decision, Document, Node, RuleSet, chained, is_undefined, make_bundle, optional, read,
 };
-use super::{OrFail, fail, raw, raw_limits, raw_options};
-use crate::common::bundles;
+use super::{OrFail, fail, raw, raw_audit_options, raw_limits, raw_options};
 use crate::common::core::{NodeCore, TreeData, TreeKind};
 use crate::common::documents;
 use crate::common::tables::{GridCore, TableCore};
 use crate::common::{Problem, UNDEFINED_INPUT, no_constructor, tree_options};
+use crate::common::{audit, bundles};
 
 fn node(core: cleanrules::ast::Node) -> Node {
     Node {
@@ -170,6 +170,28 @@ impl NativeTable {
     pub fn digest(&self) -> String {
         self.core.digest()
     }
+}
+
+/// A rule set's audit for the idiomatic API (`common::audit`).
+///
+/// # Errors
+///
+/// As `RuleSet.audit`.
+#[napi(ts_args_type = "ruleset: RuleSet, options?: AuditWriteOptions | null")]
+pub fn audit_ruleset(env: &Env, ruleset: &RuleSet, options: Option<Unknown<'_>>) -> Result<String> {
+    let options = raw_audit_options(options)?;
+    audit::ruleset_data(&ruleset.core.ruleset, &options).or_fail(env)
+}
+
+/// A decision table's audit for the idiomatic API (`common::audit`).
+///
+/// # Errors
+///
+/// As `Document.audit`.
+#[napi(ts_args_type = "table: NativeTable, options?: AuditWriteOptions | null")]
+pub fn audit_table(env: &Env, table: &NativeTable, options: Option<Unknown<'_>>) -> Result<String> {
+    let options = raw_audit_options(options)?;
+    audit::table_data(&table.core.table, &options).or_fail(env)
 }
 
 /// A decision table being built from a grid (`spec/tables.md`, *Grids*):

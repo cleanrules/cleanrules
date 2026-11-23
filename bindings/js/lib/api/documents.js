@@ -19,6 +19,7 @@
 
 import { ExpressionError, RuleDefinitionError, UnsupportedError } from '../errors.js'
 import { fileSystem } from '../files.js'
+import { Audit } from './results.js'
 import { options, sameBuild, show } from './shared.js'
 
 /** The format of each file extension, as in Python. */
@@ -163,6 +164,9 @@ function documents(native, expressions, rules, tables, bundles, build) {
   function dumps(value, dumpOptions) {
     const { format, omitActions, rulesetDigest } = options(dumpOptions, DUMP_OPTIONS, "{ format: 'yaml' }")
     if (value instanceof Decision) return decisionNative(value).write(format, { rulesetDigest })
+    if (value instanceof Audit) {
+      throw new TypeError('an audit is output only, so dumps does not write it: use JSON.stringify(report) for its document, or String(report) for its text')
+    }
     if (rulesetDigest !== undefined && rulesetDigest !== null) {
       throw new TypeError(`rulesetDigest is an option of decisions, not of ${show(value)}`)
     }

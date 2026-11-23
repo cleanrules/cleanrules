@@ -10,15 +10,15 @@ use wasm_bindgen::prelude::*;
 
 use super::{
     OrFail, call_action, call_actions, call_read, core_error, fail, nullable, object, raw,
-    raw_cases, raw_limits, raw_list, raw_options, raw_ruleset_digest,
+    raw_audit_options, raw_cases, raw_limits, raw_list, raw_options, raw_ruleset_digest,
 };
-use crate::common::bundles;
 use crate::common::core::{
     ActionFailure, DecisionCore, DocumentCore, NodeCore, PathSegment, RulesCore, TreeKind,
     action_error, cause_index, max_values_error, not_a_batch, path_segments, undefined_row,
 };
 use crate::common::wire::{Read, decode};
 use crate::common::{Problem, RawLimits, UNDEFINED_INPUT, limits, strings, text, tree_options};
+use crate::common::{audit, bundles};
 
 /// The field paths `paths` as JavaScript arrays of strings and numbers.
 fn paths_to_js(paths: &[Vec<Segment>]) -> Array {
@@ -193,6 +193,17 @@ impl Document {
     pub fn compare_bundle(&self, other: &Document) -> Result<String, JsValue> {
         self.core.compare_bundle(&other.core).or_fail()
     }
+
+    /// The static audit of the rule set or decision table the document
+    /// holds, as in the napi-rs build.
+    ///
+    /// # Errors
+    ///
+    /// As in the napi-rs build.
+    pub fn audit(&self, options: &JsValue) -> Result<String, JsValue> {
+        let options = raw_audit_options(options)?;
+        audit::document_as(&self.core, &options).or_fail()
+    }
 }
 
 /// A bundle of `rules` made from the arguments of a JavaScript call, as a
@@ -287,6 +298,16 @@ impl RuleSet {
     /// As in the napi-rs build.
     pub fn summary(&self, format: &JsValue) -> Result<String, JsValue> {
         self.core.summary(&raw(format)).or_fail()
+    }
+
+    /// The static audit of the rule set, as in the napi-rs build.
+    ///
+    /// # Errors
+    ///
+    /// As in the napi-rs build.
+    pub fn audit(&self, options: &JsValue) -> Result<String, JsValue> {
+        let options = raw_audit_options(options)?;
+        audit::ruleset_as(&self.core.ruleset, &options).or_fail()
     }
 
     /// The canonical bytes of the rule set's document, as in the napi-rs

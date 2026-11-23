@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use super::{Audit, AuditDocument, CheckStatus, RulesSource, UndecidedReason};
+use super::{Audit, AuditDocument, CheckStatus, Diagnostic, RulesSource, UndecidedReason};
 use crate::format::write_value;
 use crate::json::to_string;
 
@@ -42,28 +42,7 @@ impl fmt::Display for Audit {
             writeln!(f, "No findings.")?;
         }
         for d in &self.diagnostics {
-            write!(f, "{:<8} {}  ", d.severity.as_str(), d.code.as_str())?;
-            if !d.rules.is_empty() {
-                write!(f, "{}: ", d.rules.join(", "))?;
-            }
-            writeln!(f, "{}", d.message)?;
-            if let Some(pointer) = &d.pointer {
-                writeln!(f, "           at {}", self.place(pointer))?;
-            }
-            if let Some(path) = &d.path {
-                writeln!(f, "           field {}", crate::text::path(path))?;
-            }
-            if !d.groups.is_empty() {
-                let groups: Vec<&str> = d.groups.iter().map(|g| g.as_str()).collect();
-                writeln!(f, "           groups {}", groups.join(", "))?;
-            }
-            if let Some(witness) = &d.witness {
-                writeln!(
-                    f,
-                    "           witness: {}",
-                    to_string(&write_value(witness))
-                )?;
-            }
+            write_diagnostic(f, d, |pointer| self.place(pointer))?;
         }
         let checks: Vec<String> = self
             .checks
@@ -144,4 +123,61 @@ impl Audit {
         };
         format!("row {}{column} ({pointer})", label.name)
     }
+}
+
+impl Audit {
+    /// A diagnostic of this audit as its text writes it: in a decision
+    /// table, `at` names the row and cell (`row adult, input age
+    /// (/decision_table/rows/0/inputs/1)`). Every line ends with a newline.
+    #[must_use]
+    pub fn diagnostic_text(&self, diagnostic: &Diagnostic) -> String {
+        struct Text<'a>(&'a Audit, &'a Diagnostic);
+        impl fmt::Display for Text<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write_diagnostic(f, self.1, |pointer| self.0.place(pointer))
+            }
+        }
+        Text(self, diagnostic).to_string()
+    }
+}
+
+/// A diagnostic on its own: as the text of an audit writes it, but `at` is
+/// the bare pointer ([`Audit::diagnostic_text`] names a table's cells).
+impl fmt::Display for Diagnostic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write_diagnostic(f, self, str::to_owned)
+    }
+}
+
+/// A diagnostic's lines: its severity, code, rules and message on one line,
+/// then its place (`at`), field, groups and witness, each on an indented
+/// line; every line ends with a newline.
+fn write_diagnostic(
+    f: &mut fmt::Formatter<'_>,
+    d: &Diagnostic,
+    place: impl Fn(&str) -> String,
+) -> fmt::Result {
+    write!(f, "{:<8} {}  ", d.severity.as_str(), d.code.as_str())?;
+    if !d.rules.is_empty() {
+        write!(f, "{}: ", d.rules.join(", "))?;
+    }
+    writeln!(f, "{}", d.message)?;
+    if let Some(pointer) = &d.pointer {
+        writeln!(f, "           at {}", place(pointer))?;
+    }
+    if let Some(path) = &d.path {
+        writeln!(f, "           field {}", crate::text::path(path))?;
+    }
+    if !d.groups.is_empty() {
+        let groups: Vec<&str> = d.groups.iter().map(|g| g.as_str()).collect();
+        writeln!(f, "           groups {}", groups.join(", "))?;
+    }
+    if let Some(witness) = &d.witness {
+        writeln!(
+            f,
+            "           witness: {}",
+            to_string(&write_value(witness))
+        )?;
+    }
+    Ok(())
 }
