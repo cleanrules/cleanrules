@@ -1,14 +1,16 @@
-//! The `audit` and `draw` conformance vectors (`conformance/vectors/audit`,
-//! `conformance/vectors/visual`) through the command line: each document on
-//! standard input, its report or diagram read from standard output, and the
-//! exit code checked against what the vector expects.
+//! The `audit`, `draw` and `test_run` conformance vectors
+//! (`conformance/vectors/audit`, `conformance/vectors/visual`,
+//! `conformance/vectors/tests`) through the command line: each document on
+//! standard input or in a file, its report or diagram read from standard
+//! output, and the exit code checked against what the vector expects.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, missing_docs)]
 
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use cleanrules::digest::Digest;
 use cleanrules::format::{ValueContext, read_value};
 use cleanrules::json::{Json, Limits, parse, same, to_string};
 use cleanrules::rules::Decision;
@@ -20,8 +22,13 @@ struct Run {
 }
 
 fn cleanrules(args: &[String], stdin: &str) -> Run {
+    cleanrules_in(Path::new("."), args, stdin)
+}
+
+fn cleanrules_in(dir: &Path, args: &[String], stdin: &str) -> Run {
     let mut child = Command::new(env!("CARGO_BIN_EXE_cleanrules"))
         .args(args)
+        .current_dir(dir)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -232,4 +239,178 @@ fn draw_vectors_through_the_command_line() {
         count += 1;
     }
     assert_eq!((count, skipped), (30, 14), "draw vectors run and skipped");
+}
+
+/// The compared fields of an error (`spec/errors.md`, *Comparing errors*),
+/// as the core's runner keeps them.
+fn compared_error(json: &mut Json) {
+    const COMPARED: [&str; 11] = [
+        "code", "pointer", "line", "column", "rule", "rules", "path", "types", "row", "name",
+        "executed",
+    ];
+    if let Json::Object(members) = json {
+        members.retain(|(k, _)| COMPARED.contains(&k.as_str()));
+    }
+}
+
+/// A member of an object, to change.
+fn member<'a>(json: &'a mut Json, key: &str) -> Option<&'a mut Json> {
+    match json {
+        Json::Object(members) => members.iter_mut().find(|(k, _)| k == key).map(|(_, v)| v),
+        _ => None,
+    }
+}
+
+/// The rules of a `test_run` vector in `rules.json` and its case files at
+/// their paths, under a folder of its own; and the arguments and standard
+/// input that run them: the case files at their paths, a bundle's under its
+/// folder, or `cases` on standard input.
+fn test_run_command(
+    root: &Path,
+    id: &str,
+    given: &Json,
+    files: &[(String, String)],
+) -> (PathBuf, Vec<String>, String) {
+    let dir = root.join(id.replace('/', "_"));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("rules.json"),
+        to_string(get(given, "document").unwrap()),
+    )
+    .unwrap();
+    for (path, text) in files {
+        let file = dir.join(path);
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(file, text).unwrap();
+    }
+    let bundle = get(get(given, "document").unwrap(), "bundle").is_some();
+    let mut args: Vec<String> = ["test", "rules.json", "--format", "json"]
+        .map(String::from)
+        .to_vec();
+    let mut stdin = String::new();
+    if let Some(cases) = get(given, "cases") {
+        args.push("-".into());
+        stdin = to_string(cases);
+    } else if !bundle {
+        args.extend(files.iter().map(|(path, _)| path.clone()));
+    }
+    if let Some(Json::Object(limits)) = get(given, "limits") {
+        for (key, value) in limits {
+            args.push(format!("--{}", key.replace('_', "-")));
+            args.push(to_string(value));
+        }
+    }
+    if get(given, "ruleset_digest") == Some(&Json::Bool(true)) {
+        args.push("--ruleset-digest".into());
+    }
+    (dir, args, stdin)
+}
+
+/// Every error of a written test run reduced to its compared fields: a
+/// result's `error`, and the `actual` of a mismatch of the key `error`.
+fn compared_errors(run: &mut Json) {
+    let Some(Json::Array(results)) = member(run, "results") else {
+        return;
+    };
+    for result in results {
+        if let Some(error) = member(result, "error") {
+            compared_error(error);
+        }
+        if let Some(Json::Array(mismatches)) = member(result, "mismatches") {
+            for mismatch in mismatches {
+                if get(mismatch, "key") == Some(&Json::String("error".into()))
+                    && let Some(error) = member(mismatch, "actual")
+                {
+                    compared_error(error);
+                }
+            }
+        }
+    }
+}
+
+/// Every `test_run` vector but those that cancel the run (the command has no
+/// callback) and those that give two different files the same path (one path
+/// names one file), through `test_run_command`, the test run read from
+/// standard output with its errors reduced to their compared fields
+/// (`conformance/README.md`, `test_run`). The exit code is 0 exactly when
+/// the run is complete, has results and every one passed. The `statistics`
+/// vectors of the same folder are skipped and counted: the command does not
+/// gather statistics yet (`spec/cli.md`, *Not yet*).
+#[test]
+fn test_run_vectors_through_the_command_line() {
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("test-run-vectors");
+    let (mut count, mut skipped, mut statistics) = (0, 0, 0);
+    for vector in vectors("tests") {
+        let id = text(get(&vector, "id")).to_owned();
+        let given = get(&vector, "given").unwrap();
+        if text(get(given, "kind")) == "statistics" {
+            statistics += 1;
+            continue;
+        }
+        let files: Vec<(String, String)> = match get(given, "files") {
+            Some(Json::Array(items)) => items
+                .iter()
+                .map(|f| {
+                    (
+                        text(get(f, "path")).to_owned(),
+                        text(get(f, "text")).to_owned(),
+                    )
+                })
+                .collect(),
+            _ => Vec::new(),
+        };
+        let repeats = files
+            .iter()
+            .enumerate()
+            .any(|(i, (path, text))| files[..i].iter().any(|(p, t)| p == path && t != text));
+        if get(given, "cancel_after").is_some() || repeats {
+            skipped += 1;
+            continue;
+        }
+        let (dir, args, stdin) = test_run_command(&root, &id, given, &files);
+        let run = cleanrules_in(&dir, &args, &stdin);
+        assert!(run.stderr.is_empty(), "{id}: {}", run.stderr);
+        let written = parse(run.stdout.trim_end(), &Limits::default()).unwrap();
+        assert_eq!(
+            get(&written, "version").map(to_string).as_deref(),
+            Some("1"),
+            "{id}"
+        );
+        let mut actual = get(&written, "test_run").unwrap().clone();
+        compared_errors(&mut actual);
+        let mut expect = get(get(&vector, "expect").unwrap(), "test_run")
+            .unwrap()
+            .clone();
+        // This engine's version; and a case file read from standard input,
+        // which the core's runner gives without bytes, has their digest.
+        *member(member(&mut expect, "engine").unwrap(), "version").unwrap() =
+            Json::String(cleanrules::bundle::ENGINE_VERSION.to_owned());
+        if !stdin.is_empty()
+            && let Some(Json::Array(entries)) = member(&mut expect, "files")
+            && let Some(Json::Object(entry)) = entries.first_mut()
+        {
+            entry.push((
+                "digest".into(),
+                Json::String(Digest::of(stdin.as_bytes()).to_string()),
+            ));
+        }
+        assert!(
+            same(&actual, &expect),
+            "{id}\ngot  {}\nwant {}",
+            to_string(&actual),
+            to_string(&expect)
+        );
+        let summary = get(&expect, "summary").unwrap();
+        let passes = get(summary, "partial") == Some(&Json::Bool(false))
+            && get(summary, "total") == get(summary, "passed")
+            && get(summary, "total").map(to_string).as_deref() != Some("0");
+        assert_eq!(run.code, i32::from(!passes), "{id}: exit code");
+        count += 1;
+    }
+    assert_eq!(
+        (count, skipped, statistics),
+        (25, 3, 9),
+        "test_run vectors run and skipped, and statistics vectors skipped"
+    );
 }

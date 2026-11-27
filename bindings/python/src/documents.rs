@@ -67,7 +67,7 @@ pub(crate) fn ruleset_parts<'py>(
 #[allow(clippy::too_many_arguments)] // The limits are keyword arguments in Python.
 pub(crate) fn load_document<'py>(
     py: Python<'py>,
-    text: &str,
+    text: &[u8],
     format: &str,
     max_size: Option<usize>,
     max_nesting: Option<usize>,
@@ -82,8 +82,7 @@ pub(crate) fn load_document<'py>(
     if let Some(segments) = max_path_segments {
         limits.max_path_segments = segments;
     }
-    let document =
-        read_document_as(text.as_bytes(), document_format(format)?, &limits).or_raise(py)?;
+    let document = read_document_as(text, document_format(format)?, &limits).or_raise(py)?;
     Ok(match document {
         Document::Condition(node) => ("condition", PyNode { node }.into_pyobject(py)?.into_any()),
         Document::Rule(rule) => ("rule", PyRule::from(rule).into_pyobject(py)?.into_any()),

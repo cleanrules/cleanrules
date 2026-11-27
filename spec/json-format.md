@@ -1170,6 +1170,9 @@ it would have (`/condition/right`), and an unknown or extra key by its own
 A reader reports **one** error, the first it finds in this order:
 
 1. size, JSON nesting and syntax (duplicate keys included), in text order;
+   size first, in every format: bytes beyond the size limit of their format
+   are a `limit_exceeded` before they are decoded, so they never give the
+   `format_error` of text that is not UTF-8;
 2. `version`, before any other key, so a document from a newer format version
    gets `unsupported_version` even if it uses new keys;
 3. shape (`format_error`), node depth and path length (`limit_exceeded`),

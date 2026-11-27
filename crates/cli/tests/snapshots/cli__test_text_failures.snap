@@ -1,0 +1,20 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stdout
+---
+Test run of a rule set: 2 rules, hit policy unique, logic boolean
+FAILED  cases/ages.json  "child"
+          selected: expected ["adult"], actual []
+          output: expected {"band":"adult"}, actual null
+          explanation:
+            HIT POLICY unique: selected no rule
+            [ ] adult (not fired): age >= 18
+                - age >= 18 is false (age = 10); short by 8
+            [ ] senior (not fired): age >= 65
+                - age >= 65 is false (age = 10); short by 55
+ERROR   cases/ages.json  "senior"
+          hit_policy_error: 2 rules fired under the unique hit policy
+          hint: make the conditions mutually exclusive, or use first or priority
+ERROR   cases/broken.json
+          format_error at line 1, column 36: expected a value, found the end of the document
+7 results: 4 passed, 1 failed, 2 errors

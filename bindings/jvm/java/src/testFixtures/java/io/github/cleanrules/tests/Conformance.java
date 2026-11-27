@@ -485,10 +485,27 @@ class Conformance {
         return Format.valueOf(name.toUpperCase(Locale.ROOT));
     }
 
-    /** The text a {@code read} vector reads, and its format. */
-    record Source(String text, Format format) {}
+    /**
+     * The text a {@code read} vector reads, and its format; for a vector of
+     * {@code bytes}, which may not be UTF-8, those bytes as well ({@code raw}),
+     * and the text they decode to, for messages only.
+     */
+    record Source(String text, Format format, byte[] raw) {
+        Source(String text, Format format) {
+            this(text, format, null);
+        }
+    }
 
     static Source sourceOf(Map<?, ?> given) {
+        if (given.get("bytes") instanceof List<?> items) {
+            byte[] raw = new byte[items.size()];
+            for (int i = 0; i < raw.length; i++) {
+                raw[i] = (byte) Integer.parseInt(((Num) items.get(i)).text());
+            }
+            String syntax = (String) need(given, "syntax");
+            return new Source(
+                    new String(raw, java.nio.charset.StandardCharsets.UTF_8), format(syntax), raw);
+        }
         if (given.get("text") instanceof String text) {
             return new Source(text, Format.JSON);
         }
@@ -748,7 +765,9 @@ class Conformance {
                 }
             }
         }
-        Attempt outcome = attempt(() -> Document.read(source.text(), source.format(), limits));
+        Attempt outcome = attempt(() -> source.raw() != null
+                ? Document.read(source.raw(), source.format(), limits)
+                : Document.read(source.text(), source.format(), limits));
         if (outcome.error() != null) {
             return compare(outcome, expect, "document", JSON_READ);
         }
@@ -1659,7 +1678,9 @@ class Conformance {
         } else {
             Source source = sourceOf(given);
             text = source.format() == Format.TEXT ? source.text() : null;
-            outcome = attempt(() -> Documents.loads(source.text(), source.format(), limits, null));
+            outcome = attempt(() -> source.raw() != null
+                    ? Documents.loads(source.raw(), source.format(), limits, null)
+                    : Documents.loads(source.text(), source.format(), limits, null));
         }
         List<String> issues = new ArrayList<>();
         if (text != null) {

@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::{self, Read};
 use std::path::Path;
 
-use cleanrules::format::{Document, DocumentFormat, read_document_as};
+use cleanrules::format::{Document, DocumentFormat, read_document_as, size_limit, too_large};
 use cleanrules::json::Limits;
 
 use crate::args::{Source, Syntax};
@@ -15,6 +15,8 @@ use crate::failure::Failure;
 pub(crate) struct Loaded {
     /// The bytes, at most one more than the size limit of their syntax.
     pub(crate) bytes: Vec<u8>,
+    /// The file's size, when it is a file larger than the size limit.
+    pub(crate) size: Option<u64>,
     /// Their syntax.
     pub(crate) format: DocumentFormat,
     /// The file as it was given (`-` for standard input).
@@ -22,19 +24,30 @@ pub(crate) struct Loaded {
 }
 
 impl Loaded {
+    /// The `limit_exceeded` of bytes beyond the size limit of their syntax,
+    /// which were not loaded whole: with the file's size when it is known.
+    pub(crate) fn too_large(&self, limits: &Limits) -> Option<cleanrules::Error> {
+        (self.bytes.len() > size_limit(self.format, limits))
+            .then(|| too_large(self.format, self.size, limits))
+    }
+
     /// Read the bytes as a document of their syntax.
     pub(crate) fn document(&self, limits: &Limits) -> Result<Document, Failure> {
-        read_document_as(&self.bytes, self.format, limits).map_err(|error| Failure::Core {
+        let core = |error| Failure::Core {
             file: Some(self.file.clone()),
             error,
-        })
+        };
+        if let Some(error) = self.too_large(limits) {
+            return Err(core(error));
+        }
+        read_document_as(&self.bytes, self.format, limits).map_err(core)
     }
 }
 
 /// Load the bytes of `source`'s document and tell their syntax.
 pub(crate) fn load(source: &Source, limits: &Limits) -> Result<Loaded, Failure> {
     let file = source.file.to_string_lossy().into_owned();
-    let stdin = file == "-";
+    let stdin = is_stdin(&source.file);
     let format = match source.syntax {
         Some(syntax) => syntax.format(),
         None if stdin => DocumentFormat::Json,
@@ -47,29 +60,44 @@ pub(crate) fn load(source: &Source, limits: &Limits) -> Result<Loaded, Failure> 
             })?
             .format(),
     };
-    // One byte more than the limit, so the reader refuses a larger file
-    // without it being read whole.
-    let largest = match format {
-        DocumentFormat::Yaml => limits.max_yaml_size,
-        DocumentFormat::Text | DocumentFormat::Csv => limits.max_text_size,
-        _ => limits.max_size,
-    };
-    let bound = u64::try_from(largest).unwrap_or(u64::MAX).saturating_add(1);
-    let mut bytes = Vec::new();
-    let read = if stdin {
-        io::stdin().lock().take(bound).read_to_end(&mut bytes)
-    } else {
-        File::open(&source.file).and_then(|f| f.take(bound).read_to_end(&mut bytes))
-    };
-    read.map_err(|error| {
+    let (bytes, size) = bounded(&source.file, size_limit(format, limits)).map_err(|error| {
         let shown = if stdin { "standard input" } else { &file };
         io_failure(&file, &format!("cannot read {shown}"), &error)
     })?;
     Ok(Loaded {
         bytes,
+        size,
         format,
         file,
     })
+}
+
+/// Whether `path` names standard input (`-`).
+pub(crate) fn is_stdin(path: &Path) -> bool {
+    path.as_os_str() == "-"
+}
+
+/// The bytes of the file at `path`, or of standard input for `-`: at most
+/// one byte more than `largest`, so the reader refuses a larger file without
+/// it being read whole; and, for a file larger than that, its size, which
+/// standard input does not tell.
+pub(crate) fn bounded(path: &Path, largest: usize) -> io::Result<(Vec<u8>, Option<u64>)> {
+    let bound = u64::try_from(largest).unwrap_or(u64::MAX).saturating_add(1);
+    let mut bytes = Vec::new();
+    if is_stdin(path) {
+        io::stdin().lock().take(bound).read_to_end(&mut bytes)?;
+        return Ok((bytes, None));
+    }
+    let file = File::open(path)?;
+    // The size of a regular file only: a pipe or a device has none.
+    let size = file
+        .metadata()
+        .ok()
+        .filter(std::fs::Metadata::is_file)
+        .map(|metadata| metadata.len())
+        .filter(|&size| size >= bound);
+    file.take(bound).read_to_end(&mut bytes)?;
+    Ok((bytes, size))
 }
 
 /// Load and read the document of `source` with `limits`.
@@ -79,7 +107,7 @@ pub(crate) fn read(source: &Source, limits: &Limits) -> Result<(Document, Loaded
 }
 
 /// The syntax a file's suffix gives, compared without case.
-fn syntax_of(path: &Path) -> Option<Syntax> {
+pub(crate) fn syntax_of(path: &Path) -> Option<Syntax> {
     let suffix = path.extension()?.to_str()?.to_ascii_lowercase();
     Some(match suffix.as_str() {
         "json" => Syntax::Json,

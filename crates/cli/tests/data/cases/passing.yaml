@@ -1,0 +1,9 @@
+version: 1
+cases:
+  items:
+    - id: adult
+      input: { age: 40 }
+      expect: { selected: [adult], output: { band: adult } }
+    - id: minor
+      input: { age: 12 }
+      expect: { selected: [], output: null }

@@ -1,7 +1,8 @@
-# Audit the rules of a repository with the cleanrules command line, and fail
-# the job when a rule set or decision table has a finding at or above a
-# severity (spec/cli.md, *audit*). Copy this file to .github/workflows/ in
-# your repository and set RULES_DIR to the folder of your rule files.
+# Audit and test the rules of a repository with the cleanrules command line,
+# and fail the job when a rule set or decision table has a finding at or
+# above a severity (spec/cli.md, *audit*) or a test case does not pass
+# (spec/cli.md, *test*). Copy this file to .github/workflows/ in your
+# repository and set RULES_DIR to the folder of your rule files.
 #
 # Every file with a suffix cleanrules reads (.json, .yaml, .yml, .rules,
 # .csv) under RULES_DIR is audited, except case files under a cases/ folder,
@@ -11,6 +12,20 @@
 # findings at or above FAIL_ON, 2 usage error, 3 a file that does not read
 # or cannot be audited; any code but 0 fails the job, after every file has
 # been audited. A missing RULES_DIR, or one without rule files, fails too.
+#
+# Then the test cases run (spec/cli.md, *test*). A bundle (found with
+# `cleanrules validate --format json`) runs the case files it lists, checked
+# against their digests; a bundle that lists none fails, as a run without
+# cases does. Every other rule file <dir>/<name>.<suffix> runs the case files
+# named after it in <dir>/cases/ (<name>.json, <name>.yaml or <name>.yml), if
+# any: so rules/discounts.json runs rules/cases/discounts.json. Each test run
+# is printed in its own group and kept as JSON in the artifact
+# cleanrules-test, with what cleanrules wrote to standard error, if anything,
+# next to it (<name>.stderr.json: an error or a note, one JSON line each).
+# Exit codes: 0 every case passed, 1 a case failed or erred (or a case file
+# that does not read, or no cases), 2 usage error, 3 rules that do not read or
+# a case file that cannot be opened; any code but 0 fails the job, after
+# every test has run.
 #
 # Installing cleanrules: until prebuilt binaries are released, this builds the
 # command from source with cargo, at the commit CLEANRULES_REF points to when
@@ -25,7 +40,7 @@
 # pin them by commit SHA, as GitHub recommends (`uses: owner/action@<sha> #
 # v1.2.3`). dtolnay/rust-toolchain@stable is a moving reference in
 # particular.
-name: Audit rules
+name: Audit and test rules
 
 on:
   pull_request:
@@ -70,6 +85,7 @@ jobs:
           cargo install --locked --git https://github.com/cleanrules/cleanrules
           --rev "$CLEANRULES_SHA" cleanrules-cli
       - name: Audit
+        id: audit
         shell: bash
         run: |
           cleanrules --version
@@ -80,6 +96,8 @@ jobs:
           status=0
           count=0
           while IFS= read -r -d '' file; do
+            # Without a leading ./, so no report is a hidden file.
+            file=${file#./}
             count=$((count + 1))
             echo "::group::$file"
             set +e
@@ -95,6 +113,7 @@ jobs:
               *) echo "::error file=$file::cleanrules could not audit this file (exit code $code)"; status=1 ;;
             esac
           done < <(find "$RULES_DIR" -type f -not -path '*/cases/*' -not -path '*/cleanrules-audit/*' \
+            -not -path '*/cleanrules-test/*' \
             \( -name '*.json' -o -name '*.yaml' -o -name '*.yml' -o -name '*.rules' -o -name '*.csv' \) \
             -print0 | sort -z)
           if [ "$count" -eq 0 ]; then
@@ -102,9 +121,65 @@ jobs:
           fi
           echo "$count files audited"
           exit "$status"
+      # After the audit, whatever it found.
+      - name: Test
+        if: ${{ !cancelled() && steps.audit.outcome != 'skipped' }}
+        shell: bash
+        run: |
+          mkdir -p cleanrules-test
+          status=0
+          count=0
+          # cleanrules test with the arguments after the label: its text in the
+          # log, its JSON (and standard error, if any) in the artifact.
+          run() {
+            label=$1; shift
+            count=$((count + 1))
+            report="cleanrules-test/$(echo "$label" | tr '/' '_')"
+            echo "::group::$label"
+            set +e
+            cleanrules test "$@"
+            code=$?
+            cleanrules test "$@" --format json > "$report.json" 2> "$report.stderr.json"
+            set -e
+            echo "::endgroup::"
+            [ -s "$report.json" ] || rm -f "$report.json"
+            [ -s "$report.stderr.json" ] || rm -f "$report.stderr.json"
+            case $code in
+              0) ;;
+              1) echo "::error file=$1::cases that do not pass: $label"; status=1 ;;
+              *) echo "::error file=$1::cleanrules could not run $label (exit code $code)"; status=1 ;;
+            esac
+          }
+          while IFS= read -r -d '' file; do
+            file=${file#./}
+            if cleanrules validate "$file" --format json 2> /dev/null | grep -q '"content":"bundle"'; then
+              run "$file" "$file"
+              continue
+            fi
+            name=$(basename "$file")
+            for cases in "$(dirname "$file")/cases/${name%.*}".{json,yaml,yml}; do
+              if [ -f "$cases" ]; then
+                run "$file--$(basename "$cases")" "$file" "$cases"
+              fi
+            done
+          done < <(find "$RULES_DIR" -type f -not -path '*/cases/*' -not -path '*/cleanrules-audit/*' \
+            -not -path '*/cleanrules-test/*' \
+            \( -name '*.json' -o -name '*.yaml' -o -name '*.yml' -o -name '*.rules' -o -name '*.csv' \) \
+            -print0 | sort -z)
+          if [ "$count" -eq 0 ]; then
+            echo "::notice::no bundles, and no case files under a cases/ folder of $RULES_DIR"
+          fi
+          echo "$count test runs"
+          exit "$status"
       - if: always()
         uses: actions/upload-artifact@v7
         with:
           name: cleanrules-audit
           path: cleanrules-audit/
+          if-no-files-found: ignore
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cleanrules-test
+          path: cleanrules-test/
           if-no-files-found: ignore

@@ -348,6 +348,19 @@ std::string run_read(const json::value &given_as_written, const json::value &exp
     } else if (const std::string *csv = given.string_at("table_csv")) {
         source = *csv;
         fmt = cr::format::csv;
+    } else if (const json::value *bytes = given.get("bytes")) {
+        // Bytes that may not be UTF-8, read in their syntax.
+        for (const json::value &item : bytes->items) {
+            source.push_back(static_cast<char>(std::stoi(item.text)));
+        }
+        const std::string *syntax = given.string_at("syntax");
+        if (syntax == nullptr) {
+            throw vector_error("bytes without a syntax");
+        }
+        fmt = *syntax == "yaml"   ? cr::format::yaml
+              : *syntax == "text" ? cr::format::text
+              : *syntax == "csv"  ? cr::format::csv
+                                  : cr::format::json;
     } else if (given.get("table_grid") == nullptr) {
         throw vector_error("nothing to read");
     }

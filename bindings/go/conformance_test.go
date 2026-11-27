@@ -307,6 +307,19 @@ func source(given *jsonObject) (string, Format) {
 		return given.str("rules_text"), FormatText
 	case given.has("table_csv"):
 		return given.str("table_csv"), FormatCSV
+	case given.has("bytes"):
+		// Bytes that may not be UTF-8, read in their syntax: a Go string
+		// holds any bytes.
+		items, _ := given.get("bytes").([]any)
+		bytes := make([]byte, len(items))
+		for i, item := range items {
+			n, err := item.(interface{ Int64() (int64, error) }).Int64()
+			if err != nil || n < 0 || n > 255 {
+				failf("the byte %v", item)
+			}
+			bytes[i] = byte(n)
+		}
+		return string(bytes), Format(given.str("syntax"))
 	}
 	failf("nothing to read")
 	return "", ""

@@ -53,8 +53,11 @@ Options:
           Print help (see a summary with '-h')
 
 Exit codes:
-  0  done, nothing found at or above --fail-on
-  1  findings at or above --fail-on (audit)
+  0  done, nothing found at or above --fail-on; for test, every case ran and
+     passed
+  1  findings at or above --fail-on (audit), a document that does not read
+     (validate), or a case that failed or erred, a partial run or no cases
+     (test)
   2  usage error
   3  a file could not be read or written, a document did not read, or the
      operation is not supported for it

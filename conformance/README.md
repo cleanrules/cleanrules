@@ -52,7 +52,7 @@ A vector file is a JSON document:
 
 | Kind | Given | Runner calls | Expected |
 |---|---|---|---|
-| `read` | `text` (a JSON text, for lexical cases), `yaml` (a YAML text, `json-format.md`, *YAML*) or `document`; `ruleset` when reading a decision; optional `limits` (`max_size` in bytes, `max_nesting`, `max_depth`, `max_table_size`, `max_path_segments`); optional `current_engine` (below) | the document reader | `document`: the canonical form that is read back, or `error` |
+| `read` | `text` (a JSON text, for lexical cases), `yaml` (a YAML text, `json-format.md`, *YAML*), `bytes` with `syntax` (a text's bytes as an array of ints from 0 to 255, for bytes that are not UTF-8, read in that syntax: `json`, `yaml`, `text` or `csv`) or `document`; `ruleset` when reading a decision; optional `limits` (`max_size` in bytes, `max_nesting`, `max_depth`, `max_table_size`, `max_path_segments`); optional `current_engine` (below) | the document reader | `document`: the canonical form that is read back, or `error` |
 | `condition` | `condition` (a condition node), `input` (a data value), optional `logic` and `strict` | `evaluate_tree` (`spec/ast.md`, *Evaluating one node*) | `result`: its result tree, or `error` |
 | `value` | `value` (a value node), `input`, optional `strict` | `evaluate_value_tree` | `result`: its result tree, or `error` |
 | `evaluate` | `ruleset` (a rule set document's content), and `input` or `inputs` (a batch); optional `limits` (`max_values`, `spec/data-model.md`, *Reading native data*, *Limits*) | `evaluate`, or its batch form | `decision`, or `decisions` for a batch, or `error` |

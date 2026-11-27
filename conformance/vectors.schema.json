@@ -151,6 +151,24 @@
             "current_engine": {
               "const": true,
               "description": "The document is a bundle made by the engine that runs the vector: the runner sets its engine.version, and that of expect.document, to its own engine's version (spec/bundles.md, Contract)."
+            },
+            "bytes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "description": "A document's bytes, for texts that a JSON string cannot hold (bytes that are not UTF-8), read in the format of syntax."
+            },
+            "syntax": {
+              "enum": [
+                "json",
+                "yaml",
+                "text",
+                "csv"
+              ],
+              "description": "The format bytes are read in."
             }
           },
           "required": [
@@ -186,9 +204,23 @@
               "required": [
                 "document"
               ]
+            },
+            {
+              "required": [
+                "bytes",
+                "syntax"
+              ]
             }
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "dependentRequired": {
+            "bytes": [
+              "syntax"
+            ],
+            "syntax": [
+              "bytes"
+            ]
+          }
         },
         {
           "type": "object",

@@ -1,0 +1,10 @@
+{
+  "note": {
+    "code": "no_cases",
+    "message": "x"
+  },
+  "error": {
+    "code": "io_error",
+    "message": "y"
+  }
+}

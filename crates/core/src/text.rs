@@ -1797,15 +1797,11 @@ pub(crate) fn parse_output(text: &str, limits: &Limits) -> Result<(String, Vec<V
 
 fn check_size(text: &str, limits: &Limits) -> Result<()> {
     if text.len() > limits.max_text_size {
-        return Err(Error::new(
-            ErrorCode::LimitExceeded,
-            format!(
-                "the text has {} bytes, more than the limit of {}",
-                text.len(),
-                limits.max_text_size
-            ),
-        )
-        .with_hint("raise the size limit if the text is trusted"));
+        return Err(crate::format::too_large(
+            crate::format::DocumentFormat::Text,
+            u64::try_from(text.len()).ok(),
+            limits,
+        ));
     }
     Ok(())
 }

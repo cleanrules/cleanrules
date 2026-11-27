@@ -311,6 +311,26 @@ fn run_read(given: &Json, expect: &Json) -> Result<(), String> {
     };
     let (source, format) = if let Some(text) = string(get(given, "text")) {
         (text.to_owned(), CR_FORMAT_JSON)
+    } else if let Some(Json::Array(bytes)) = get(given, "bytes") {
+        // Bytes that may not be UTF-8, read in their syntax.
+        let bytes: Vec<u8> = bytes
+            .iter()
+            .map(|b| match b {
+                Json::Number(n) => u8::try_from(n.as_i128().unwrap()).unwrap(),
+                _ => panic!("not a byte"),
+            })
+            .collect();
+        let format = match string(get(given, "syntax")) {
+            Some("json") => CR_FORMAT_JSON,
+            Some("yaml") => CR_FORMAT_YAML,
+            Some("text") => CR_FORMAT_TEXT,
+            Some("csv") => CR_FORMAT_CSV,
+            other => panic!("unknown syntax {other:?}"),
+        };
+        let read = common::read_document(&bytes, format, limits_of(given).as_ref())
+            .and_then(|d| common::write_document(&d, CR_FORMAT_JSON))
+            .map(|text| json(&text));
+        return compare(read, expect, "document", &READ_FIELDS);
     } else if let Some(document) = get(given, "document") {
         (to_string(document), CR_FORMAT_JSON)
     } else if let Some(yaml) = string(get(given, "yaml")) {

@@ -342,7 +342,13 @@ differ, the file's result is a `decision_mismatch` at
 none of its cases runs, since they are not the ones the bundle was made with.
 Then the file is read as above, under the limits the bundle records
 (`bundles.md`, *Engine*: they are the ones that can change a result), and
-the test run records those limits (*Test runs*, `engine`).
+the test run records those limits (*Test runs*, `engine`). A caller that
+loads each file up to a bound, as a command line does, loads up to the
+larger of the size limit the bundle records for the file's syntax and the
+default one, so that a file the bundle's limit refuses is still checked
+against its digest first; a file with more bytes than that is not loaded
+whole, and its result is `limit_exceeded`, without its digest being checked
+and without a `digest` in `files`.
 
 *Rationale.* `decision_mismatch` is the code that says that a record does not
 match what it is checked against, as for a bundle's `ruleset_digest`

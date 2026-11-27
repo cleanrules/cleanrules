@@ -66,22 +66,26 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: astral-sh/setup-uv@v7
       # The binary and its tests (also run by the rust job on every system):
-      # exit codes, text and JSON output, errors, and the audit and draw
-      # conformance vectors through the command line.
+      # exit codes, text and JSON output, errors, and the audit, draw and
+      # test_run conformance vectors through the command line.
       - run: cargo build -p cleanrules-cli --locked
       - run: cargo test -p cleanrules-cli --locked
       # The example workflow for users (docs/examples/ci/cleanrules-audit.yml):
-      # its audit script, as written there, on the rule files of
-      # docs/examples, with this build of cleanrules; then on a rule set with
-      # an error, and on a folder that is missing or empty, where it must fail.
+      # its audit and test scripts, as written there, on the rule files and
+      # case files of docs/examples, with this build of cleanrules; then on a
+      # rule set with an error or with failing cases, and on a folder that is
+      # missing or empty, where the audit must fail.
       - name: Example audit workflow
         run: |
-          uv run --no-project --with pyyaml python - > "$RUNNER_TEMP/audit.sh" <<'EOF'
+          for name in Audit Test; do
+            uv run --no-project --with pyyaml python - "$name" > "$RUNNER_TEMP/${name,,}.sh" <<'EOF'
+          import sys
           import yaml
           workflow = yaml.safe_load(open("docs/examples/ci/cleanrules-audit.yml"))
-          step = next(s for s in workflow["jobs"]["audit"]["steps"] if s.get("name") == "Audit")
+          step = next(s for s in workflow["jobs"]["audit"]["steps"] if s.get("name") == sys.argv[1])
           print(step["run"])
           EOF
+          done
           export PATH="$PWD/target/debug:$PATH" FAIL_ON=error
           # The rule files of docs/examples, with its case file under cases/.
           mkdir -p "$RUNNER_TEMP/rules"
@@ -89,11 +93,30 @@ jobs:
             docs/examples/risk.csv docs/examples/cases "$RUNNER_TEMP/rules/"
           RULES_DIR="$RUNNER_TEMP/rules" bash -eo pipefail "$RUNNER_TEMP/audit.sh"
           test "$(ls cleanrules-audit | wc -l)" -eq 4
+          # cases/discounts.json against discounts.json, .yaml and .rules.
+          RULES_DIR="$RUNNER_TEMP/rules" bash -eo pipefail "$RUNNER_TEMP/test.sh"
+          test "$(ls cleanrules-test | wc -l)" -eq 3
           mkdir -p "$RUNNER_TEMP/failing"
           cp crates/cli/tests/data/unique.rules "$RUNNER_TEMP/failing/"
           if RULES_DIR="$RUNNER_TEMP/failing" bash -eo pipefail "$RUNNER_TEMP/audit.sh"; then
             echo "::error::the example audit passed on a rule set with an error"; exit 1
           fi
+          mkdir -p "$RUNNER_TEMP/failing/cases"
+          cp crates/cli/tests/data/cases/ages.json "$RUNNER_TEMP/failing/cases/unique.json"
+          # It fails on the cases, not for another reason.
+          if RULES_DIR="$RUNNER_TEMP/failing" bash -eo pipefail "$RUNNER_TEMP/test.sh" > "$RUNNER_TEMP/test.log"; then
+            echo "::error::the example test passed on cases that fail"; exit 1
+          fi
+          grep -q '::error file=.*::cases that do not pass: ' "$RUNNER_TEMP/test.log"
+          if grep -q 'could not run' "$RUNNER_TEMP/test.log"; then
+            echo "::error::the example test could not run the failing cases"; exit 1
+          fi
+          # A bundle runs the case files it lists, found by validate.
+          rm -rf cleanrules-test
+          cp -r crates/cli/tests/data/bundle "$RUNNER_TEMP/bundled"
+          RULES_DIR="$RUNNER_TEMP/bundled" bash -eo pipefail "$RUNNER_TEMP/test.sh"
+          test "$(ls cleanrules-test | wc -l)" -eq 1
+          grep -q '"bundle":{"id":"example/discounts"' cleanrules-test/*.json
           # A folder that is missing, or holds no rule files, fails too.
           mkdir -p "$RUNNER_TEMP/empty"
           for dir in "$RUNNER_TEMP/missing" "$RUNNER_TEMP/empty"; do

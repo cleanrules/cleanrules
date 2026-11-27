@@ -183,7 +183,7 @@ def _make_bundle(
 ) -> str: ...
 def _compare_bundles(a_json: str, b_json: str) -> str: ...
 def load_document(
-    text: str,
+    text: bytes,
     format: str,
     max_size: int | None = None,
     max_nesting: int | None = None,

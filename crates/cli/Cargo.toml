@@ -1,6 +1,6 @@
 [package]
 name = "cleanrules-cli"
-description = "The cleanrules command line: audit, validate and draw rule sets and decision tables, with exit codes for CI"
+description = "The cleanrules command line: audit, test, validate and draw rule sets and decision tables, with exit codes for CI"
 readme = "README.md"
 keywords = ["rules-engine", "cli", "audit", "decision-table", "explainable"]
 categories = ["command-line-utilities", "algorithms"]

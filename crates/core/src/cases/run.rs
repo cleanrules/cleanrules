@@ -535,14 +535,22 @@ impl<'r> Runner<'r> {
     /// files come from [`CaseFile::bundle_files`].
     #[must_use]
     pub fn for_bundle(bundle: &'r Bundle) -> Self {
-        let runner = match bundle.rules() {
-            BundleRules::DecisionTable(table) => Self::for_table(table),
-            BundleRules::RuleSet(ruleset) => Self::new(ruleset),
-        };
         Self {
             engine_limits: *bundle.engine().limits(),
             bundle: Some((bundle.id().clone(), bundle.revision().clone())),
-            ..runner
+            ..Self::for_bundle_rules(bundle)
+        }
+    }
+
+    /// A runner of cases against a bundle's rules alone, as for a rule set or
+    /// a decision table: for case files that are not the bundle's own, read
+    /// with the limits the caller declares ([`Runner::with_engine_limits`],
+    /// the defaults otherwise), so the test run has no `bundle`.
+    #[must_use]
+    pub fn for_bundle_rules(bundle: &'r Bundle) -> Self {
+        match bundle.rules() {
+            BundleRules::DecisionTable(table) => Self::for_table(table),
+            BundleRules::RuleSet(ruleset) => Self::new(ruleset),
         }
     }
 

@@ -139,7 +139,7 @@ impl Failure {
 pub(crate) fn usage(error: &clap::Error, arguments: &[std::ffi::OsString]) -> Failure {
     let message =
         if error.kind() == clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand {
-            "no command given: use validate, audit or draw".to_owned()
+            "no command given: use validate, audit, test or draw".to_owned()
         } else {
             // The first paragraph of the parser's error, without its `error: `.
             let rendered = error.to_string();
@@ -152,10 +152,11 @@ pub(crate) fn usage(error: &clap::Error, arguments: &[std::ffi::OsString]) -> Fa
             let joined = joined.join(" ");
             joined.strip_prefix("error: ").unwrap_or(&joined).to_owned()
         };
-    let command = arguments
-        .iter()
-        .skip(1)
-        .find_map(|a| ["validate", "audit", "draw"].into_iter().find(|c| a == c));
+    let command = arguments.iter().skip(1).find_map(|a| {
+        ["validate", "audit", "test", "draw"]
+            .into_iter()
+            .find(|c| a == c)
+    });
     let hint = match command {
         Some(command) => format!("see cleanrules {command} --help"),
         None => "see cleanrules --help".to_owned(),

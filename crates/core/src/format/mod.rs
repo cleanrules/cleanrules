@@ -23,8 +23,8 @@ pub use condition::write_node;
 pub use document::{
     Document, DocumentFormat, parse_as, read_decision_document, read_decision_document_as,
     read_document, read_document_as, read_parsed_decision_document, read_parsed_document,
-    write_audit_as, write_decision_as, write_document, write_document_as, write_explanation_as,
-    write_summary_as, write_test_run_as,
+    size_limit, too_large, write_audit_as, write_decision_as, write_document, write_document_as,
+    write_explanation_as, write_summary_as, write_test_run_as,
 };
 #[cfg(feature = "yaml")]
 pub use document::{read_yaml_decision_document, read_yaml_document};

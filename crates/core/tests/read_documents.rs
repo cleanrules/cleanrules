@@ -11,7 +11,7 @@ use cleanrules::format::{
     Document, read_decision_document, read_document, read_ruleset, write_decision, write_document,
     write_ruleset,
 };
-use cleanrules::format::{ValueContext, read_value};
+use cleanrules::format::{DocumentFormat, ValueContext, read_document_as, read_value};
 use cleanrules::json::{Json, JsonNumber, Limits, to_string};
 use cleanrules::logic::LogicName;
 use cleanrules::rules::Aggregate;
@@ -166,6 +166,40 @@ fn read(given: &Json, source: &str) -> Result<Json, Error> {
     }
 }
 
+/// The bytes of a vector's `bytes`, read in its `syntax`.
+fn read_bytes(given: &Json, bytes: &[Json]) -> Result<Json, Error> {
+    let bytes: Vec<u8> = bytes
+        .iter()
+        .map(|b| u8::try_from(int(Some(b)).unwrap()).unwrap())
+        .collect();
+    let format = DocumentFormat::from_name(text(get(given, "syntax")).unwrap()).unwrap();
+    read_document_as(&bytes, format, &limits_of(given)).map(|d| write_document(&d))
+}
+
+/// A vector of `bytes`: read them in their `syntax`, and compare.
+fn check_bytes(vector: &Json, bytes: &[Json]) -> Option<String> {
+    let (given, expect) = (get(vector, "given")?, get(vector, "expect")?);
+    if text(get(given, "syntax")) == Some("yaml") && !cfg!(feature = "yaml") {
+        return None; // YAML vectors need the `yaml` feature.
+    }
+    match (read_bytes(given, bytes), get(expect, "error")) {
+        (Ok(written), None) => {
+            let wanted = get(expect, "document").unwrap();
+            (!same(&written, wanted)).then(|| format!("wrote {}", to_string(&written)))
+        }
+        (Ok(written), Some(_)) => Some(format!("read {}", to_string(&written))),
+        (Err(error), Some(wanted)) => {
+            let got = cleanrules::format::write_error(&error);
+            let differs = match wanted {
+                Json::Object(fields) => fields.iter().any(|(k, v)| get(&got, k) != Some(v)),
+                _ => true,
+            };
+            differs.then(|| format!("error {}, expected {}", to_string(&got), to_string(wanted)))
+        }
+        (Err(error), None) => Some(format!("error {error}")),
+    }
+}
+
 fn check(vector: &Json) -> Option<String> {
     let given = get(vector, "given").unwrap();
     if get(given, "yaml").is_some() && !cfg!(feature = "yaml") {
@@ -280,7 +314,11 @@ fn read_vectors() {
             let Json::Array(list) = &all else { panic!() };
             for vector in list {
                 run += 1;
-                if let Some(problem) = check(vector) {
+                let checked = match get(get(vector, "given").unwrap(), "bytes") {
+                    Some(Json::Array(bytes)) => check_bytes(vector, bytes),
+                    _ => check(vector),
+                };
+                if let Some(problem) = checked {
                     failures.push(format!("{}: {problem}", text(get(vector, "id")).unwrap()));
                 }
             }

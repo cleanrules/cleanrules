@@ -2,13 +2,14 @@
 source: crates/cli/tests/cli.rs
 expression: help.stdout
 ---
-Audit, validate and draw rule sets and decision tables
+Audit, test, validate and draw rule sets and decision tables
 
 Usage: cleanrules <COMMAND>
 
 Commands:
   validate  Read a document and say what it holds
   audit     Audit the rules of a rule set, decision table, bundle or rule
+  test      Run test cases against rules
   draw      Draw the diagram of a document
   help      Print this message or the help of the given subcommand(s)
 
@@ -17,8 +18,11 @@ Options:
   -V, --version  Print version
 
 Exit codes:
-  0  done, nothing found at or above --fail-on
-  1  findings at or above --fail-on (audit)
+  0  done, nothing found at or above --fail-on; for test, every case ran and
+     passed
+  1  findings at or above --fail-on (audit), a document that does not read
+     (validate), or a case that failed or erred, a partial run or no cases
+     (test)
   2  usage error
   3  a file could not be read or written, a document did not read, or the
      operation is not supported for it

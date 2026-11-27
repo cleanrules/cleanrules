@@ -7,7 +7,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use cleanrules::bundle::{Bundle, BundleId, Revision};
+use cleanrules::bundle::{Bundle, BundleId, CaseFileRef, Revision};
 use cleanrules::format::{DocumentFormat, write_document_as};
 use cleanrules::json::{Json, Limits, parse};
 
@@ -500,7 +500,7 @@ fn help_and_version() {
     let help = run(&["--help"]);
     assert_eq!(help.code, 0);
     insta::assert_snapshot!("help", help.stdout);
-    for command in ["validate", "audit", "draw"] {
+    for command in ["validate", "audit", "test", "draw"] {
         let result = run(&[command, "--help"]);
         assert_eq!(result.code, 0);
         insta::assert_snapshot!(format!("help_{command}"), result.stdout);
@@ -510,5 +510,626 @@ fn help_and_version() {
     assert_eq!(
         version.stdout,
         format!("cleanrules {}\n", env!("CARGO_PKG_VERSION"))
+    );
+}
+
+// `test` (`spec/cli.md`, *`test`*).
+
+/// The JSON of a test run with the engine's version, which changes with
+/// every release, written as `<version>`.
+fn without_version(stdout: &str) -> String {
+    stdout.replace(
+        &format!(r#""version":"{}""#, env!("CARGO_PKG_VERSION")),
+        r#""version":"<version>""#,
+    )
+}
+
+fn test_run(stdout: &str) -> Json {
+    let written = json(stdout);
+    assert_eq!(
+        get(&written, "version")
+            .map(cleanrules::json::to_string)
+            .as_deref(),
+        Some("1")
+    );
+    get(&written, "test_run").unwrap().clone()
+}
+
+/// A member of a test run's summary.
+fn count(run: &Json, key: &str) -> String {
+    cleanrules::json::to_string(get(get(run, "summary").unwrap(), key).unwrap())
+}
+
+/// The example cases pass against the example rules, in every syntax.
+#[test]
+fn test_runs_the_example_cases() {
+    let examples = examples();
+    let text = run_in(
+        &examples,
+        &["test", "discounts.json", "cases/discounts.json"],
+        None,
+    );
+    assert_eq!(text.code, 0, "{}{}", text.stdout, text.stderr);
+    assert_eq!(text.stderr, "");
+    insta::assert_snapshot!("test_text_examples", text.stdout);
+    for rules in ["discounts.yaml", "discounts.rules"] {
+        let other = run_in(&examples, &["test", rules, "cases/discounts.json"], None);
+        assert_eq!((other.code, &other.stdout), (0, &text.stdout), "{rules}");
+    }
+    let result = run_in(
+        &examples,
+        &[
+            "test",
+            "discounts.json",
+            "cases/discounts.json",
+            "--format",
+            "json",
+            "--ruleset-digest",
+        ],
+        None,
+    );
+    assert_eq!(result.code, 0);
+    assert!(result.stdout.ends_with("}\n") && result.stdout.lines().count() == 1);
+    let run = test_run(&result.stdout);
+    assert_eq!(count(&run, "total"), "4");
+    assert_eq!(count(&run, "passed"), "4");
+    let Some(Json::Array(files)) = get(&run, "files") else {
+        panic!("no files");
+    };
+    assert_eq!(string(get(&files[0], "path")), "cases/discounts.json");
+    let bytes = std::fs::read(examples.join("cases/discounts.json")).unwrap();
+    assert_eq!(
+        string(get(&files[0], "digest")),
+        cleanrules::digest::Digest::of(&bytes).to_string()
+    );
+    // The rule set digest of the rules tested, as `audit` carries it.
+    let audit = run_in(
+        &examples,
+        &[
+            "audit",
+            "discounts.json",
+            "--format",
+            "json",
+            "--ruleset-digest",
+        ],
+        None,
+    );
+    assert_eq!(
+        get(&run, "ruleset_digest"),
+        get(
+            get(&json(&audit.stdout), "audit").unwrap(),
+            "ruleset_digest"
+        )
+    );
+    // The default limits the case files were read with.
+    let engine = get(&run, "engine").unwrap();
+    assert_eq!(string(get(engine, "name")), "cleanrules");
+    let d = cleanrules::bundle::EngineLimits::default();
+    assert_eq!(
+        cleanrules::json::to_string(get(engine, "limits").unwrap()),
+        format!(
+            r#"{{"max_size":{},"max_nesting":{},"max_depth":{},"max_path_segments":{},"max_table_size":{},"max_values":{}}}"#,
+            d.max_size,
+            d.max_nesting,
+            d.max_depth,
+            d.max_path_segments,
+            d.max_table_size,
+            d.max_values
+        )
+    );
+}
+
+/// Failed and erring cases, and files that do not read: exit 1, with the
+/// run written whole.
+#[test]
+fn test_reports_failures_and_errors() {
+    let args = [
+        "test",
+        "unique.rules",
+        "cases/ages.json",
+        "cases/passing.yaml",
+        "cases/broken.json",
+    ];
+    let result = run(&args);
+    assert_eq!(result.code, 1);
+    assert_eq!(result.stderr, "");
+    insta::assert_snapshot!("test_text_failures", result.stdout);
+    let mut json_args = args.to_vec();
+    json_args.extend(["--format", "json"]);
+    let result = run(&json_args);
+    assert_eq!(result.code, 1);
+    insta::assert_snapshot!("test_json_failures", without_version(&result.stdout));
+    let run_json = test_run(&result.stdout);
+    assert_eq!(
+        (
+            count(&run_json, "passed"),
+            count(&run_json, "failed"),
+            count(&run_json, "error")
+        ),
+        ("4".into(), "1".into(), "2".into())
+    );
+    // No explanations.
+    let quiet = run(&[
+        "test",
+        "unique.rules",
+        "cases/ages.json",
+        "--max-explained",
+        "0",
+    ]);
+    assert_eq!(quiet.code, 1);
+    assert!(!quiet.stdout.contains("explanation:"), "{}", quiet.stdout);
+    // Cases that all pass, in YAML, against a rule document read from
+    // standard input.
+    let yaml = run(&["test", "unique.rules", "cases/passing.yaml"]);
+    assert_eq!(yaml.code, 0, "{}", yaml.stdout);
+    let rule = run_in(
+        &data(),
+        &["test", "-", "cases/passing.yaml", "--syntax", "text"],
+        Some(b"RULE adult IF age >= 18 THEN band = 'adult'"),
+    );
+    assert_eq!(rule.code, 0, "{}{}", rule.stdout, rule.stderr);
+    assert!(
+        rule.stdout
+            .starts_with("Test run of a rule set: 1 rule, hit policy first")
+    );
+}
+
+/// A partial run, and a run without cases, exit with 1.
+#[test]
+fn test_partial_and_empty_runs_do_not_pass() {
+    let examples = examples();
+    for (limit, reason) in [
+        ("--max-results", "max_results"),
+        ("--max-steps", "max_steps"),
+    ] {
+        let bound = if reason == "max_steps" { "3" } else { "1" };
+        let result = run_in(
+            &examples,
+            &[
+                "test",
+                "discounts.json",
+                "cases/discounts.json",
+                limit,
+                bound,
+            ],
+            None,
+        );
+        assert_eq!(result.code, 1, "{limit}");
+        assert!(
+            result.stdout.ends_with(&format!(
+                "1 result: 1 passed, 0 failed, 0 errors\nPartial run: interrupted by {reason}, 3 not run\n"
+            )),
+            "{}",
+            result.stdout
+        );
+    }
+    // Limits that the run does not reach: complete.
+    let result = run_in(
+        &examples,
+        &[
+            "test",
+            "discounts.json",
+            "cases/discounts.json",
+            "--max-results",
+            "4",
+            "--max-steps",
+            "12",
+        ],
+        None,
+    );
+    assert_eq!(result.code, 0, "{}", result.stdout);
+    let result = run(&["test", "unique.rules", "cases/empty.json"]);
+    assert_eq!(result.code, 1);
+    assert_eq!(
+        result.stdout,
+        "Test run of a rule set: 2 rules, hit policy unique, logic boolean\n0 results: 0 \
+         passed, 0 failed, 0 errors\n"
+    );
+    let result = run(&[
+        "test",
+        "unique.rules",
+        "cases/empty.json",
+        "--format",
+        "json",
+    ]);
+    assert_eq!(result.code, 1);
+    assert_eq!(count(&test_run(&result.stdout), "total"), "0");
+}
+
+/// Case files from standard input, given twice, and read from a decision
+/// table's rules.
+#[test]
+fn test_reads_case_files_as_given() {
+    let cases = std::fs::read(data().join("cases/passing.yaml")).unwrap();
+    let as_json = br#"{"version": 1, "cases": {"items": [{"id": "a", "input": {"age": 20}, "expect": {"selected": ["adult"]}}]}}"#;
+    let piped = run_in(
+        &data(),
+        &["test", "unique.rules", "-", "--format", "json"],
+        Some(as_json),
+    );
+    assert_eq!(piped.code, 0, "{}{}", piped.stdout, piped.stderr);
+    let run_json = test_run(&piped.stdout);
+    let Some(Json::Array(results)) = get(&run_json, "results") else {
+        panic!("no results");
+    };
+    // No path: standard input has none.
+    assert!(get(&results[0], "path").is_none());
+    let Some(Json::Array(files)) = get(&run_json, "files") else {
+        panic!("no files");
+    };
+    assert_eq!(
+        string(get(&files[0], "digest")),
+        cleanrules::digest::Digest::of(as_json).to_string()
+    );
+    // YAML on standard input is not read as a case file: it is JSON.
+    let piped = run_in(&data(), &["test", "unique.rules", "-"], Some(&cases));
+    assert_eq!(piped.code, 1);
+    assert!(
+        piped
+            .stdout
+            .contains("ERROR   (a case file without a path)"),
+        "{}",
+        piped.stdout
+    );
+    // The same file twice: the second is an error, and none of its cases runs.
+    let twice = run(&[
+        "test",
+        "unique.rules",
+        "cases/passing.yaml",
+        "cases/passing.yaml",
+    ]);
+    assert_eq!(twice.code, 1);
+    assert!(
+        twice
+            .stdout
+            .ends_with("3 results: 2 passed, 0 failed, 1 error\n"),
+        "{}",
+        twice.stdout
+    );
+    // A decision table's rules.
+    let table = run_in(
+        &examples(),
+        &["test", "risk.csv", "-", "--format", "json"],
+        Some(br#"{"version": 1, "cases": {"items": [{"id": "x", "input": {}}]}}"#),
+    );
+    assert_eq!(
+        string(get(&test_run(&table.stdout), "source")),
+        "decision_table"
+    );
+    // A suffix is compared without case.
+    let upper = scratch("PASSING.YML");
+    std::fs::write(&upper, &cases).unwrap();
+    let result = run(&["test", "unique.rules", upper.to_str().unwrap()]);
+    assert_eq!(result.code, 0, "{}", result.stdout);
+}
+
+#[test]
+fn test_case_files_larger_than_the_limit_are_results() {
+    let big = scratch("big.json");
+    std::fs::write(&big, vec![b' '; 16 * 1024 * 1024 + 10]).unwrap();
+    let result = run(&[
+        "test",
+        "unique.rules",
+        big.to_str().unwrap(),
+        "--format",
+        "json",
+    ]);
+    assert_eq!(result.code, 1, "{}", result.stderr);
+    let run_json = test_run(&result.stdout);
+    let Some(Json::Array(results)) = get(&run_json, "results") else {
+        panic!("no results");
+    };
+    assert_eq!(
+        string(get(get(&results[0], "error").unwrap(), "code")),
+        "limit_exceeded"
+    );
+    let Some(Json::Array(files)) = get(&run_json, "files") else {
+        panic!("no files");
+    };
+    assert!(get(&files[0], "digest").is_none());
+}
+
+/// What stops `test`: usage errors (2), and files it cannot open or rules
+/// that do not read (3), with nothing on standard output.
+#[test]
+fn test_errors() {
+    for (args, code, error) in [
+        (&["test", "unique.rules"][..], 2, "usage_error"),
+        (&["test", "unique.rules", "notes.txt"][..], 2, "usage_error"),
+        (
+            &["test", "unique.rules", "clean.rules"][..],
+            2,
+            "usage_error",
+        ),
+        (&["test", "-", "-"][..], 2, "usage_error"),
+        (
+            &["test", "unique.rules", "cases/missing.json"][..],
+            3,
+            "io_error",
+        ),
+        (
+            &["test", "missing.rules", "cases/ages.json"][..],
+            3,
+            "io_error",
+        ),
+        (
+            &["test", "broken.rules", "cases/ages.json"][..],
+            3,
+            "rule_syntax_error",
+        ),
+        (
+            &["test", "condition.rules", "cases/ages.json"][..],
+            3,
+            "format_error",
+        ),
+        (
+            &["test", "cases/ages.json", "unique.rules"][..],
+            2,
+            "usage_error",
+        ),
+        (
+            &["test", "cases/empty.json", "cases/ages.json"][..],
+            3,
+            "format_error",
+        ),
+        (
+            &[
+                "test",
+                "unique.rules",
+                "cases/ages.json",
+                "--max-results",
+                "x",
+            ][..],
+            2,
+            "usage_error",
+        ),
+    ] {
+        let result = run(args);
+        assert_eq!(result.code, code, "{args:?}: {}", result.stderr);
+        assert_eq!(result.stdout, "", "{args:?}");
+        assert!(
+            result.stderr.starts_with(&format!("error[{error}]: ")),
+            "{args:?}: {}",
+            result.stderr
+        );
+        let mut json_args = args.to_vec();
+        json_args.extend(["--format", "json"]);
+        let result = run(&json_args);
+        assert_eq!(result.code, code, "{json_args:?}");
+        assert_eq!(
+            string(get(get(&json(&result.stderr), "error").unwrap(), "code")),
+            error
+        );
+    }
+    insta::assert_snapshot!("test_error_no_cases", run(&["test", "unique.rules"]).stderr);
+    insta::assert_snapshot!(
+        "test_error_missing_case_file",
+        run(&[
+            "test",
+            "unique.rules",
+            "cases/missing.json",
+            "--format",
+            "json"
+        ])
+        .stderr
+        .replace("No such file or directory (os error 2)", "<os error>")
+        .replace(
+            "The system cannot find the file specified. (os error 2)",
+            "<os error>"
+        )
+    );
+}
+
+/// A bundle's own case files, at their paths relative to the bundle's
+/// folder and checked against their digests.
+#[test]
+fn test_runs_a_bundles_case_files() {
+    let folder = scratch("bundle-test");
+    std::fs::create_dir_all(folder.join("cases")).unwrap();
+    let passing = std::fs::read(data().join("cases/passing.yaml")).unwrap();
+    let ages = std::fs::read(data().join("cases/ages.json")).unwrap();
+    let rules = cleanrules::text::parse(
+        &std::fs::read_to_string(data().join("unique.rules")).unwrap(),
+        &Limits::default(),
+    )
+    .unwrap()
+    .into_ruleset()
+    .unwrap();
+    let make = |cases: &[(&str, &[u8])]| {
+        Bundle::new(
+            rules.clone(),
+            BundleId::new("acme/ages").unwrap(),
+            Revision::new("7").unwrap(),
+        )
+        .with_cases(
+            cases
+                .iter()
+                .map(|(path, bytes)| CaseFileRef::new(path, bytes).unwrap()),
+        )
+        .unwrap()
+        .into_document()
+    };
+    let write = |name: &str, cases: &[(&str, &[u8])]| {
+        let path = folder.join(name);
+        std::fs::write(
+            &path,
+            write_document_as(&make(cases), DocumentFormat::Json).unwrap(),
+        )
+        .unwrap();
+        path
+    };
+    std::fs::write(folder.join("cases/passing.yaml"), &passing).unwrap();
+    let bundle = write("bundle.json", &[("cases/passing.yaml", &passing)]);
+    // From another folder: the paths are the bundle's.
+    let result = run(&["test", bundle.to_str().unwrap(), "--format", "json"]);
+    assert_eq!(result.code, 0, "{}{}", result.stdout, result.stderr);
+    let run_json = test_run(&result.stdout);
+    assert_eq!(
+        cleanrules::json::to_string(get(&run_json, "bundle").unwrap()),
+        r#"{"id":"acme/ages","revision":"7"}"#
+    );
+    let Some(Json::Array(results)) = get(&run_json, "results") else {
+        panic!("no results");
+    };
+    assert_eq!(string(get(&results[0], "path")), "cases/passing.yaml");
+    // From standard input: relative to the current folder.
+    let piped = run_in(
+        &folder,
+        &["test", "-"],
+        Some(&std::fs::read(&bundle).unwrap()),
+    );
+    assert_eq!(piped.code, 0, "{}{}", piped.stdout, piped.stderr);
+    // A case file that is not the one the bundle was made with.
+    let changed = write("changed.json", &[("cases/passing.yaml", &ages)]);
+    let result = run(&["test", changed.to_str().unwrap()]);
+    assert_eq!(result.code, 1);
+    assert!(
+        result
+            .stdout
+            .contains("decision_mismatch at /bundle/cases/0/digest"),
+        "{}",
+        result.stdout
+    );
+    // A case file that is not there.
+    let missing = write("missing.json", &[("cases/ages.json", &ages)]);
+    let result = run(&["test", missing.to_str().unwrap()]);
+    assert_eq!((result.code, result.stdout.as_str()), (3, ""));
+    assert!(
+        result.stderr.starts_with("error[io_error]: cannot read "),
+        "{}",
+        result.stderr
+    );
+    assert!(
+        result.stderr.contains(&format!(
+            "hint: the bundle {} lists it at /bundle/cases/0/path, relative to the bundle's \
+             folder, or the current folder when the bundle comes from standard input",
+            missing.display()
+        )),
+        "{}",
+        result.stderr
+    );
+    // No case files: nothing tested, and a note says so.
+    let empty = write("empty.json", &[]);
+    let result = run(&["test", empty.to_str().unwrap()]);
+    assert_eq!(result.code, 1);
+    assert!(result.stderr.starts_with("note[no_cases]: no cases ran"));
+    assert!(
+        result
+            .stdout
+            .ends_with("0 results: 0 passed, 0 failed, 0 errors\n")
+    );
+    // Other case files: the bundle's rules on them, without the bundle.
+    let other = run(&[
+        "test",
+        missing.to_str().unwrap(),
+        "cases/passing.yaml",
+        "--format",
+        "json",
+    ]);
+    assert_eq!(other.code, 0, "{}{}", other.stdout, other.stderr);
+    assert!(get(&test_run(&other.stdout), "bundle").is_none());
+}
+
+/// Bytes beyond the size limit are refused with `limit_exceeded`, whatever
+/// byte the cut lands on, with the file's real size, or "more bytes than"
+/// the limit for standard input.
+#[test]
+fn larger_documents_are_refused_whatever_their_bytes() {
+    // A YAML file of 1 MiB and some, whose cut lands inside an `é`.
+    let limit = 1024 * 1024;
+    let mut yaml = b"version: 1\nnote: '".to_vec();
+    yaml.resize(limit - 1, b'a');
+    yaml.extend("ééé'\n".as_bytes());
+    let path = scratch("big.yaml");
+    std::fs::write(&path, &yaml).unwrap();
+    let result = run(&["audit", path.to_str().unwrap()]);
+    assert_eq!(result.code, 3);
+    assert!(
+        result.stderr.starts_with(&format!(
+            "error[limit_exceeded]: the YAML text has {} bytes, more than the limit of {limit}\n",
+            yaml.len()
+        )),
+        "{}",
+        result.stderr
+    );
+    let piped = run_in(&data(), &["audit", "-", "--syntax", "yaml"], Some(&yaml));
+    assert!(
+        piped.stderr.starts_with(&format!(
+            "error[limit_exceeded]: the YAML text has more bytes than the limit of {limit}\n"
+        )),
+        "{}",
+        piped.stderr
+    );
+    // validate in JSON gives the reader's error too.
+    let result = run(&["validate", path.to_str().unwrap(), "--format", "json"]);
+    assert_eq!(result.code, 1);
+    let answer = json(&result.stdout);
+    assert_eq!(get(&answer, "valid"), Some(&Json::Bool(false)));
+    assert_eq!(
+        string(get(get(&answer, "error").unwrap(), "code")),
+        "limit_exceeded"
+    );
+    // A case file: its result, with its size.
+    let big = scratch("big-cases.yaml");
+    std::fs::write(&big, &yaml).unwrap();
+    let result = run(&["test", "unique.rules", big.to_str().unwrap()]);
+    assert_eq!(result.code, 1);
+    assert!(
+        result.stdout.contains(&format!(
+            "limit_exceeded: the YAML text has {} bytes, more than the limit of {limit}",
+            yaml.len()
+        )),
+        "{}",
+        result.stdout
+    );
+}
+
+/// The path recorded for a case file has no leading `./`; an empty run
+/// writes its note as JSON under `--format json`.
+#[test]
+fn test_records_paths_and_notes() {
+    let result = run(&[
+        "test",
+        "unique.rules",
+        "./cases/passing.yaml",
+        "--format",
+        "json",
+    ]);
+    assert_eq!(result.code, 0, "{}", result.stderr);
+    let run_json = test_run(&result.stdout);
+    let Some(Json::Array(results)) = get(&run_json, "results") else {
+        panic!("no results");
+    };
+    assert_eq!(string(get(&results[0], "path")), "cases/passing.yaml");
+    let result = run(&[
+        "test",
+        "unique.rules",
+        "cases/empty.json",
+        "--format",
+        "json",
+    ]);
+    assert_eq!(result.code, 1);
+    insta::assert_snapshot!("test_note_json", result.stderr);
+    let note = json(&result.stderr);
+    assert_eq!(string(get(get(&note, "note").unwrap(), "code")), "no_cases");
+}
+
+/// The bundle of the example rules and cases that the example CI workflow
+/// runs (`docs/examples/ci/cleanrules-audit.yml`), which finds bundles by
+/// the compact JSON of `validate`.
+#[test]
+fn the_example_bundle_runs_its_cases() {
+    let result = run(&["test", "bundle/discounts.json"]);
+    assert_eq!(result.code, 0, "{}{}", result.stdout, result.stderr);
+    assert!(
+        result
+            .stdout
+            .ends_with("4 results: 4 passed, 0 failed, 0 errors\n")
+    );
+    let validated = run(&["validate", "bundle/discounts.json", "--format", "json"]);
+    assert!(
+        validated.stdout.contains(r#""content":"bundle""#),
+        "{}",
+        validated.stdout
     );
 }

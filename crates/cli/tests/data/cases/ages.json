@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "cases": {
+    "description": "cases of unique.rules: one passes, one fails, one errs, one expects the error",
+    "items": [
+      { "id": "adult", "input": { "age": 30 }, "expect": { "selected": ["adult"], "output": { "band": "adult" } } },
+      { "id": "child", "input": { "age": 10 }, "expect": { "selected": ["adult"], "output": { "band": "adult" } } },
+      { "id": "senior", "input": { "age": 70 }, "expect": { "output": { "band": "senior" } } },
+      { "id": "senior overlaps", "input": { "age": 70 }, "expect": { "error": { "code": "hit_policy_error" } } }
+    ]
+  }
+}

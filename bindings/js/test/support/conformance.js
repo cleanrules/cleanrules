@@ -685,6 +685,8 @@ not
     if (given.has('yaml')) return [given.get('yaml'), 'yaml']
     if (given.has('rules_text')) return [given.get('rules_text'), 'text']
     if (given.has('table_csv')) return [given.get('table_csv'), 'csv']
+    // Bytes that may not be UTF-8, read in their syntax.
+    if (given.has('bytes')) return [Uint8Array.from(given.get('bytes'), (b) => Number(b.text)), given.get('syntax')]
     if (given.has('table_grid')) return [null, null]
     throw new VectorError('nothing to read')
   }

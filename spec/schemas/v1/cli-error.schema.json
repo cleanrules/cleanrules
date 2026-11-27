@@ -1,21 +1,52 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cleanrules.github.io/schemas/v1/cli-error.schema.json",
-  "title": "cleanrules command line error",
-  "description": "What the cleanrules command line writes to standard error, on one line, for an error when it writes JSON (spec/cli.md, Errors). Not a document: it has no version.",
-  "type": "object",
-  "properties": {
-    "error": {
-      "$ref": "error.schema.json",
-      "description": "The error's JSON form (spec/errors.md, JSON form), with the command line's own codes usage_error and io_error."
+  "title": "cleanrules command line error or note",
+  "description": "What the cleanrules command line writes to standard error, one line each, when it writes JSON (spec/cli.md, Errors): an error that stops the command, or a note about what it did. Not a document: it has no version.",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "error": {
+          "$ref": "error.schema.json",
+          "description": "The error's JSON form (spec/errors.md, JSON form), with the command line's own codes usage_error and io_error."
+        },
+        "file": {
+          "type": "string",
+          "description": "The file the error concerns, as it was given: - for standard input."
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "additionalProperties": false
     },
-    "file": {
-      "type": "string",
-      "description": "The file the error concerns, as it was given: - for standard input."
+    {
+      "type": "object",
+      "properties": {
+        "note": {
+          "type": "object",
+          "description": "A note: its stable code (no_cases: a test run without cases; more may be added, and consumers show a note of a code they do not know by its message) and its message, free text for people.",
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "note"
+      ],
+      "additionalProperties": false
     }
-  },
-  "required": [
-    "error"
-  ],
-  "additionalProperties": false
+  ]
 }

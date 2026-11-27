@@ -222,14 +222,11 @@ pub fn parse(text: &str, limits: &Limits) -> Result<Json> {
 }
 
 fn too_large(size: usize, limits: &Limits) -> Error {
-    Error::new(
-        ErrorCode::LimitExceeded,
-        format!(
-            "the document has {size} bytes, more than the limit of {}",
-            limits.max_size
-        ),
+    crate::format::too_large(
+        crate::format::DocumentFormat::Json,
+        u64::try_from(size).ok(),
+        limits,
     )
-    .with_hint("raise the size limit if the document is trusted")
 }
 
 fn syntax(line: u64, column: u64, message: impl Into<String>) -> Error {

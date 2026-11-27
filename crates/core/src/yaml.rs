@@ -169,15 +169,11 @@ fn is_json_number(text: &str) -> bool {
 #[allow(clippy::too_many_lines)] // One arm per YAML event, as the spec lists them.
 pub fn parse(text: &str, limits: &Limits) -> Result<Json> {
     if text.len() > limits.max_yaml_size {
-        return Err(Error::new(
-            ErrorCode::LimitExceeded,
-            format!(
-                "the YAML text has {} bytes, more than the limit of {}",
-                text.len(),
-                limits.max_yaml_size
-            ),
-        )
-        .with_hint("raise the YAML size limit if the file is trusted"));
+        return Err(crate::format::too_large(
+            crate::format::DocumentFormat::Yaml,
+            u64::try_from(text.len()).ok(),
+            limits,
+        ));
     }
     check_characters(text)?;
     let mut open: Vec<Open> = Vec::new();

@@ -102,6 +102,9 @@ def check_read(vector: dict[str, Any]) -> list[str]:
     if "table_grid" in given:
         # Grid errors point into the grid.
         source, document = None, given["table_grid"]
+    elif "bytes" in given:
+        # Bytes that may not be UTF-8: an invalid byte counts as one character.
+        source, document = bytes(given["bytes"]).decode("utf-8", "replace"), None
     elif yaml is not None:
         # YAML, rule texts and CSV are not parsed here: only locations are checked.
         source, document = yaml, None

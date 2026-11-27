@@ -1,0 +1,60 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stdout
+---
+Run test cases against rules
+
+Usage: cleanrules test [OPTIONS] <RULES> [CASES]...
+
+Arguments:
+  <RULES>
+          The rules: a rule set, decision table, bundle or rule, or - for standard input
+
+  [CASES]...
+          Case files (.json, .yaml, .yml), or - for standard input; without them, a bundle runs the case files it lists
+
+Options:
+      --syntax <SYNTAX>
+          The syntax of the rules; by default, from their file's suffix (.json, .yaml, .yml, .rules, .csv), and json for standard input
+
+          Possible values:
+          - json: JSON
+          - yaml: YAML
+          - text: The rule syntax
+          - csv:  CSV, for decision tables
+
+      --format <FORMAT>
+          What to write
+
+          Possible values:
+          - text: Text for people
+          - json: The JSON document, on one line
+          
+          [default: text]
+
+      --max-results <N>
+          Stop the run after this many results (run limit max_results)
+
+      --max-steps <N>
+          Stop the run before it takes more steps, one per rule and case (run limit max_steps)
+
+      --max-explained <N>
+          Explain at most this many failed cases (run limit max_explained) [default: 5]
+
+      --ruleset-digest
+          Carry the rule set digest of the rules tested in the JSON
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Exit codes:
+  0  done, nothing found at or above --fail-on; for test, every case ran and
+     passed
+  1  findings at or above --fail-on (audit), a document that does not read
+     (validate), or a case that failed or erred, a partial run or no cases
+     (test)
+  2  usage error
+  3  a file could not be read or written, a document did not read, or the
+     operation is not supported for it
+
+Specification: https://github.com/cleanrules/cleanrules/blob/main/spec/cli.md

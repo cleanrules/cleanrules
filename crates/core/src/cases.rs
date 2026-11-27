@@ -39,7 +39,7 @@ use std::collections::BTreeSet;
 /// What a test run tested: a rule set, or a decision table. Shared with
 /// audits.
 pub use crate::rules::RulesSource;
-pub use file::CaseFile;
+pub use file::{CaseFile, CaseFileBytes};
 pub use run::{
     CaseResult, CaseRun, CaseStatus, DEFAULT_MAX_EXPLAINED, ExpectationKey, Interrupted,
     Interruption, Mismatch, Runner, Summary, TestRun, TestRunFile, TestRunLimits, TestRunState,

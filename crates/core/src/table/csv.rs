@@ -576,15 +576,11 @@ impl DecisionTable {
     /// column where the problem is.
     pub fn from_csv(text: &str, limits: &Limits) -> Result<Self> {
         if text.len() > limits.max_text_size {
-            return Err(Error::new(
-                ErrorCode::LimitExceeded,
-                format!(
-                    "the text has {} bytes, more than the limit of {}",
-                    text.len(),
-                    limits.max_text_size
-                ),
-            )
-            .with_hint("raise the size limit if the text is trusted"));
+            return Err(crate::format::too_large(
+                crate::format::DocumentFormat::Csv,
+                u64::try_from(text.len()).ok(),
+                limits,
+            ));
         }
         // The settings and the header: the records up to the first that is not a
         // setting. Rows are read one at a time, and not kept as records.

@@ -842,6 +842,19 @@ def run_json(vector: dict[str, Any]) -> None:
         return
     if kind == "read":
         limits = cast(Limits, {k: int(v) for k, v in given.get("limits", {}).items()})
+        if "bytes" in given:
+            # Bytes that may not be UTF-8, read in their syntax.
+            data = bytes(int(b) for b in given["bytes"])
+            syntax: Any = given["syntax"]
+            expect_result(
+                lambda: json.loads(
+                    cleanrules.dumps(cleanrules.loads(data, format=syntax, **limits))
+                ),
+                expect,
+                "document",
+                read=True,
+            )
+            return
         if "rules_text" in given or given.get("write") == "text":
             run_text(given, expect, limits)
             return

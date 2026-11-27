@@ -18,8 +18,8 @@ name: CLI binaries
 # Each archive holds the binary, README.md, LICENSE and NOTICE, and comes with
 # its SHA-256 (cleanrules-<target>.tar.gz or .zip, plus .sha256). Each binary
 # is smoke-tested on its own runner: --version, and the exit codes of
-# `audit`, `validate` and `draw` on the documents of docs/examples and the
-# CLI's test data.
+# `audit`, `validate`, `test` and `draw` on the documents of docs/examples
+# and the CLI's test data.
 
 on:
   push:
@@ -102,6 +102,12 @@ jobs:
           expect 3 audit crates/cli/tests/data/broken.json
           expect 1 validate crates/cli/tests/data/broken.json --format json
           expect 0 draw docs/examples/discounts.json --format dot
+          expect 0 test docs/examples/discounts.yaml docs/examples/cases/discounts.json
+          expect 0 test crates/cli/tests/data/bundle/discounts.json
+          expect 1 test crates/cli/tests/data/unique.rules crates/cli/tests/data/cases/ages.json --format json
+          expect 1 test docs/examples/discounts.json docs/examples/cases/discounts.json --max-results 1
+          expect 2 test docs/examples/discounts.json
+          expect 3 test docs/examples/discounts.json crates/cli/tests/data/cases/missing.json
           # No dynamic library beyond the system's, and no C runtime DLL on
           # Windows.
           case "$RUNNER_OS" in

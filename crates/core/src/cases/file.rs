@@ -10,8 +10,23 @@ use super::{Case, Cases};
 use crate::bundle::{Bundle, CaseFileRef};
 use crate::digest::Digest;
 use crate::error::{Error, ErrorCode, Result};
-use crate::format::{Document, DocumentFormat, read_document_as};
+use crate::format::{Document, DocumentFormat, read_document_as, size_limit, too_large};
 use crate::json::Limits;
+
+/// What a caller loaded of a case file, up to the bound
+/// [`CaseFile::bundle_files_bounded`] gives it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CaseFileBytes {
+    /// Every byte of the file.
+    Whole(Vec<u8>),
+    /// The file has more bytes than the bound, and was not loaded whole: its
+    /// size in bytes, when the caller knows it.
+    TooLarge {
+        /// The file's size, in bytes, when the caller knows it.
+        size: Option<u64>,
+    },
+}
 
 /// One case file given to a run: its path, when it has one, the digest of
 /// the bytes it was read from, when it was, and its cases or the error of
@@ -47,12 +62,7 @@ impl CaseFile {
     /// kept, and becomes the file's result when it is run.
     #[must_use]
     pub fn read(path: &str, bytes: &[u8], limits: &Limits) -> Self {
-        let format = if is_yaml(path) {
-            DocumentFormat::Yaml
-        } else {
-            DocumentFormat::Json
-        };
-        Self::read_as(Some(path), bytes, format, limits)
+        Self::read_as(Some(path), bytes, format_of(path), limits)
     }
 
     /// The case file whose bytes are `bytes`, in `format` (JSON or YAML),
@@ -73,6 +83,20 @@ impl CaseFile {
             digest: Some(Digest::of(bytes)),
             content,
         }
+    }
+
+    /// A case file larger than the size limit of `format`, which its caller
+    /// did not load whole (`spec/cli.md`, *`test`*): its result is the
+    /// reader's `limit_exceeded`, with the file's `size` when the caller
+    /// knows it, and it has no digest, since its bytes were not all read.
+    #[must_use]
+    pub fn too_large(
+        path: Option<&str>,
+        format: DocumentFormat,
+        size: Option<u64>,
+        limits: &Limits,
+    ) -> Self {
+        Self::unreadable(path, too_large(format, size, limits))
     }
 
     /// A case file that could not be read, with the error that says why: the
@@ -106,6 +130,51 @@ impl CaseFile {
             .iter()
             .enumerate()
             .map(|(index, case_ref)| Ok(Self::of_ref(case_ref, index, &read(case_ref)?, &limits)))
+            .collect()
+    }
+
+    /// The case files of a bundle, as [`CaseFile::bundle_files`] gives them,
+    /// from a caller that loads each file up to a bound (`spec/cli.md`,
+    /// *`test`*): `load` is given the reference and the most bytes to load,
+    /// the larger of the size limit the bundle records for the file's syntax
+    /// and the default one, so that a file the bundle's limit refuses is
+    /// still checked against its digest first. A file with more bytes than
+    /// the bound gives `limit_exceeded` ([`CaseFile::too_large`]) without its
+    /// digest being checked; every other file is checked and read as
+    /// [`CaseFile::bundle_files`] does.
+    ///
+    /// # Errors
+    ///
+    /// The first error `load` returns: a file the caller cannot open is the
+    /// caller's error, not a result.
+    pub fn bundle_files_bounded<E>(
+        bundle: &Bundle,
+        mut load: impl FnMut(&CaseFileRef, usize) -> Result<CaseFileBytes, E>,
+    ) -> Result<Vec<CaseFile>, E> {
+        let limits = bundle.engine().limits().to_limits();
+        let defaults = Limits::default();
+        bundle
+            .cases()
+            .iter()
+            .enumerate()
+            .map(|(index, case_ref)| {
+                let format = format_of(case_ref.path());
+                let bound = size_limit(format, &limits).max(size_limit(format, &defaults));
+                Ok(match load(case_ref, bound)? {
+                    CaseFileBytes::Whole(bytes) if bytes.len() <= bound => {
+                        Self::of_ref(case_ref, index, &bytes, &limits)
+                    }
+                    CaseFileBytes::Whole(bytes) => Self::too_large(
+                        Some(case_ref.path()),
+                        format,
+                        u64::try_from(bytes.len()).ok(),
+                        &limits,
+                    ),
+                    CaseFileBytes::TooLarge { size } => {
+                        Self::too_large(Some(case_ref.path()), format, size, &limits)
+                    }
+                })
+            })
             .collect()
     }
 
@@ -180,13 +249,18 @@ impl CaseFile {
     }
 }
 
-/// Whether a case file's path names a YAML file: its last segment ends in
-/// `.yaml` or `.yml`, in any ASCII case.
-fn is_yaml(path: &str) -> bool {
+/// The syntax of a case file at `path`: YAML when its last segment ends in
+/// `.yaml` or `.yml`, in any ASCII case, and JSON otherwise.
+fn format_of(path: &str) -> DocumentFormat {
     let name = path.rsplit('/').next().unwrap_or(path);
-    name.rsplit_once('.').is_some_and(|(_, extension)| {
+    let yaml = name.rsplit_once('.').is_some_and(|(_, extension)| {
         extension.eq_ignore_ascii_case("yaml") || extension.eq_ignore_ascii_case("yml")
-    })
+    });
+    if yaml {
+        DocumentFormat::Yaml
+    } else {
+        DocumentFormat::Json
+    }
 }
 
 /// The error of a document that is not a case file.

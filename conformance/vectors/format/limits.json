@@ -4244,6 +4244,165 @@
           "name": "max_path_segments"
         }
       }
+    },
+    {
+      "id": "format/limits/size-before-utf8-yaml",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a YAML beyond the size limit is limit_exceeded before its bytes are decoded, though they are not UTF-8",
+      "given": {
+        "kind": "read",
+        "bytes": [
+          97,
+          58,
+          32,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255
+        ],
+        "syntax": "yaml",
+        "limits": {
+          "max_size": 8
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded"
+        }
+      }
+    },
+    {
+      "id": "format/limits/size-before-utf8-text",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a rule text beyond the size limit is limit_exceeded before its bytes are decoded, though they are not UTF-8",
+      "given": {
+        "kind": "read",
+        "bytes": [
+          97,
+          58,
+          32,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255
+        ],
+        "syntax": "text",
+        "limits": {
+          "max_size": 8
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded"
+        }
+      }
+    },
+    {
+      "id": "format/limits/size-before-utf8-csv",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a CSV text beyond the size limit is limit_exceeded before its bytes are decoded, though they are not UTF-8",
+      "given": {
+        "kind": "read",
+        "bytes": [
+          97,
+          58,
+          32,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255
+        ],
+        "syntax": "csv",
+        "limits": {
+          "max_size": 8
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded"
+        }
+      }
+    },
+    {
+      "id": "format/limits/size-before-utf8-json",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "a JSON text beyond the size limit is limit_exceeded before its bytes are decoded, though they are not UTF-8",
+      "given": {
+        "kind": "read",
+        "bytes": [
+          97,
+          58,
+          32,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255
+        ],
+        "syntax": "json",
+        "limits": {
+          "max_size": 8
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "limit_exceeded"
+        }
+      }
+    },
+    {
+      "id": "format/limits/not-utf8-within-size",
+      "spec": [
+        "json-format.md#errors-and-limits"
+      ],
+      "description": "bytes within the size limit that are not UTF-8 are a format_error at the line and column of the first invalid byte",
+      "given": {
+        "kind": "read",
+        "bytes": [
+          118,
+          101,
+          114,
+          115,
+          105,
+          111,
+          110,
+          58,
+          32,
+          49,
+          10,
+          97,
+          58,
+          32,
+          255
+        ],
+        "syntax": "yaml"
+      },
+      "expect": {
+        "error": {
+          "code": "format_error",
+          "line": 2,
+          "column": 4
+        }
+      }
     }
   ]
 }

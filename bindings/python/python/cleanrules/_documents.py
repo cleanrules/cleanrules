@@ -76,7 +76,7 @@ def loads(
 
     Args:
         text: The document, in JSON, YAML, the text syntax or CSV; `bytes` are
-            read as UTF-8.
+            read as UTF-8, once their size is checked against the limit.
         format: `"json"`, `"yaml"`, `"text"` or `"csv"` (a decision table,
             `spec/tables.md`).
         max_size: The largest document, in bytes: 16 MiB by default for JSON,
@@ -118,16 +118,17 @@ def loads(
         UnsupportedError: For a case file (`spec/tests.md`), which Python does
             not load yet.
     """
-    text = _text(
-        text,
+    _check_limits(
         max_size=max_size,
         max_nesting=max_nesting,
         max_depth=max_depth,
         max_table_size=max_table_size,
         max_path_segments=max_path_segments,
     )
+    # Bytes as they are: the core checks their size before it decodes them.
+    data = text.encode("utf-8") if isinstance(text, str) else text
     kind, content = _native.load_document(
-        text, format, max_size, max_nesting, max_depth, max_table_size, max_path_segments
+        data, format, max_size, max_nesting, max_depth, max_table_size, max_path_segments
     )
     if kind == "condition":
         return _wrap(content)
@@ -160,11 +161,16 @@ def _ruleset(parts: tuple[list[_native.Rule], str, str | None, str, bool]) -> Ru
     )
 
 
-def _text(text: str | bytes, **limits: int | None) -> str:
-    """The text as `str`, once the limits are checked."""
+def _check_limits(**limits: int | None) -> None:
+    """Refuse a limit below 1."""
     for name, limit in limits.items():
         if limit is not None and limit < 1:
             raise ValueError(f"{name} must be at least 1, got {limit}")
+
+
+def _text(text: str | bytes, **limits: int | None) -> str:
+    """The text as `str`, once the limits are checked."""
+    _check_limits(**limits)
     if isinstance(text, bytes):
         try:
             return text.decode("utf-8")

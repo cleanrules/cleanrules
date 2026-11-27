@@ -1,0 +1,6 @@
+---
+source: crates/cli/tests/cli.rs
+expression: "run(&[\"test\", \"unique.rules\"]).stderr"
+---
+error[usage_error]: no case files given to run against unique.rules: give them after the rules, or give a bundle that lists its own
+  hint: see cleanrules test --help

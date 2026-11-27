@@ -1,0 +1,5 @@
+---
+source: crates/cli/tests/cli.rs
+expression: result.stderr
+---
+{"note":{"code":"no_cases","message":"no cases ran, so nothing was tested: the run exits with 1"}}

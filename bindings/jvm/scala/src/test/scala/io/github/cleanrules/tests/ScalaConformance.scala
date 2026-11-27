@@ -988,7 +988,8 @@ final class ScalaConformance extends Conformance:
       case _ =>
         val source = Conformance.sourceOf(setup)
         if source.format == Format.TEXT then add(fromText(source.text, limits, expect))
-        if wellFormed(source.text) && turn(2) == 0 then attempt(loads(source.text.getBytes(UTF_8), source.format, limits = limits))
+        if source.raw != null then attempt(loads(source.raw, source.format, limits = limits))
+        else if wellFormed(source.text) && turn(2) == 0 then attempt(loads(source.text.getBytes(UTF_8), source.format, limits = limits))
         else attempt(loads(source.text, source.format, limits = limits))
     if outcome.error() != null then
       add(compare(outcome, expect, "document", ExactRead))

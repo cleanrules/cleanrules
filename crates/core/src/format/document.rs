@@ -412,14 +412,66 @@ impl DocumentFormat {
     }
 }
 
+/// The size limit of a document in `format`, in bytes (`spec/json-format.md`,
+/// *Errors and limits*): `max_size` for JSON, `max_yaml_size` for YAML and
+/// `max_text_size` for the rule syntax and CSV.
+#[must_use]
+pub fn size_limit(format: DocumentFormat, limits: &Limits) -> usize {
+    match format {
+        DocumentFormat::Json => limits.max_size,
+        DocumentFormat::Yaml => limits.max_yaml_size,
+        DocumentFormat::Text | DocumentFormat::Csv => limits.max_text_size,
+    }
+}
+
+/// The `limit_exceeded` error of a document in `format` larger than its size
+/// limit ([`size_limit`]): with its `size`, in bytes, when it is known, or
+/// saying only that it has more bytes than the limit, for one that its caller
+/// did not load whole (a command line reads at most one byte more than the
+/// limit).
+#[must_use]
+pub fn too_large(format: DocumentFormat, size: Option<u64>, limits: &Limits) -> Error {
+    let limit = size_limit(format, limits);
+    let (what, hint) = match format {
+        DocumentFormat::Json => (
+            "the document",
+            "raise the size limit if the document is trusted",
+        ),
+        DocumentFormat::Yaml => (
+            "the YAML text",
+            "raise the YAML size limit if the file is trusted",
+        ),
+        DocumentFormat::Text | DocumentFormat::Csv => {
+            ("the text", "raise the size limit if the text is trusted")
+        }
+    };
+    let message = match size {
+        Some(size) => format!("{what} has {size} bytes, more than the limit of {limit}"),
+        None => format!("{what} has more bytes than the limit of {limit}"),
+    };
+    Error::new(ErrorCode::LimitExceeded, message).with_hint(hint)
+}
+
+/// The error of `bytes` beyond the size limit of `format`, which is checked
+/// before they are decoded as UTF-8 (`spec/json-format.md`, *Errors and
+/// limits*).
+fn check_size(bytes: &[u8], format: DocumentFormat, limits: &Limits) -> Result<()> {
+    if bytes.len() > size_limit(format, limits) {
+        return Err(too_large(format, u64::try_from(bytes.len()).ok(), limits));
+    }
+    Ok(())
+}
+
 /// Read a document from bytes in `format`.
 ///
 /// # Errors
 ///
-/// `format_error` for bytes that are not UTF-8, at the first invalid byte;
-/// then the errors of that format's reader; `unsupported` for YAML in a build
-/// without the `yaml` feature.
+/// `limit_exceeded` for bytes beyond the size limit of `format`, before they
+/// are decoded; `format_error` for bytes that are not UTF-8, at the first
+/// invalid byte; then the errors of that format's reader; `unsupported` for
+/// YAML in a build without the `yaml` feature.
 pub fn read_document_as(bytes: &[u8], format: DocumentFormat, limits: &Limits) -> Result<Document> {
+    check_size(bytes, format, limits)?;
     match format {
         DocumentFormat::Json => {
             read_parsed_document(&crate::json::parse_bytes(bytes, limits)?, limits)
@@ -489,6 +541,9 @@ fn unsupported_as(what: &str, format: DocumentFormat, formats: &str) -> Error {
 /// As [`crate::json::parse_bytes`] or [`crate::yaml::parse`]; `unsupported`
 /// for the rule syntax and CSV, and for YAML without the `yaml` feature.
 pub fn parse_as(bytes: &[u8], format: DocumentFormat, limits: &Limits) -> Result<Json> {
+    if matches!(format, DocumentFormat::Json | DocumentFormat::Yaml) {
+        check_size(bytes, format, limits)?;
+    }
     match format {
         DocumentFormat::Json => crate::json::parse_bytes(bytes, limits),
         #[cfg(feature = "yaml")]
@@ -618,4 +673,73 @@ pub fn write_test_run_as(run: &crate::cases::TestRun, format: DocumentFormat) ->
         Some(&|| run.to_string()),
         format,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DocumentFormat, read_document_as, size_limit, too_large};
+    use crate::error::ErrorCode;
+    use crate::json::Limits;
+
+    /// Size first, before the bytes are decoded as UTF-8, in every format
+    /// (`spec/json-format.md`, *Errors and limits*).
+    #[test]
+    fn size_is_checked_before_utf8() {
+        let limits = Limits::default().with_max_size(8);
+        let bytes = b"a: \xff\xff\xff\xff\xff\xff\xff";
+        for format in [
+            DocumentFormat::Json,
+            DocumentFormat::Yaml,
+            DocumentFormat::Text,
+            DocumentFormat::Csv,
+        ] {
+            let error = read_document_as(bytes, format, &limits).unwrap_err();
+            assert_eq!(error.code(), ErrorCode::LimitExceeded, "{format:?}");
+            assert!(
+                error
+                    .message()
+                    .contains("10 bytes, more than the limit of 8")
+            );
+            // Within the limit, the bytes that are not UTF-8 (YAML without
+            // its feature is unsupported).
+            let error = read_document_as(&bytes[..8], format, &limits).unwrap_err();
+            if cfg!(feature = "yaml") || format != DocumentFormat::Yaml {
+                assert_eq!(error.code(), ErrorCode::FormatError, "{format:?}");
+            }
+        }
+        let error = super::parse_as(bytes, DocumentFormat::Yaml, &limits).unwrap_err();
+        assert_eq!(error.code(), ErrorCode::LimitExceeded);
+    }
+
+    #[test]
+    fn size_limits_by_format() {
+        let limits = Limits::default();
+        assert_eq!(size_limit(DocumentFormat::Json, &limits), limits.max_size);
+        assert_eq!(
+            size_limit(DocumentFormat::Yaml, &limits),
+            limits.max_yaml_size
+        );
+        assert_eq!(
+            size_limit(DocumentFormat::Text, &limits),
+            limits.max_text_size
+        );
+        assert_eq!(
+            size_limit(DocumentFormat::Csv, &limits),
+            limits.max_text_size
+        );
+        let error = too_large(DocumentFormat::Csv, None, &limits);
+        assert_eq!(
+            error.message(),
+            "the text has more bytes than the limit of 4194304"
+        );
+        assert_eq!(
+            error.hint(),
+            Some("raise the size limit if the text is trusted")
+        );
+        let error = too_large(DocumentFormat::Json, Some(20_000_000), &limits);
+        assert_eq!(
+            error.message(),
+            "the document has 20000000 bytes, more than the limit of 16777216"
+        );
+    }
 }

@@ -1,10 +1,10 @@
 //! `cleanrules`, the command line of the cleanrules engine (`spec/cli.md`).
 //!
 //! It reads documents from files and calls the core: every report, diagram
-//! and error it prints is the core's, and it never evaluates, audits or draws
-//! on its own (`CLAUDE.md`, invariant 2). Its exit codes are for CI: `0`
-//! clean, `1` findings at or above `--fail-on`, `2` usage errors, `3` errors
-//! that stop the command.
+//! and error it prints is the core's, and it never evaluates, audits, tests
+//! or draws on its own (`CLAUDE.md`, invariant 2). Its exit codes are for CI: `0`
+//! clean, `1` findings at or above `--fail-on` or cases that do not pass,
+//! `2` usage errors, `3` errors that stop the command.
 
 mod args;
 mod commands;
@@ -44,6 +44,7 @@ fn main() -> ExitCode {
     let (json_errors, outcome) = match &cli.command {
         Command::Validate(args) => (args.format.is_json(), commands::validate(args)),
         Command::Audit(args) => (args.format.is_json(), commands::audit(args)),
+        Command::Test(args) => (args.format.is_json(), commands::test(args)),
         Command::Draw(args) => (false, commands::draw(args)),
     };
     match outcome {

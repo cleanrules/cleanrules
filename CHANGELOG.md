@@ -109,6 +109,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   artifacts, not yet published; an example workflow for users that audits a
   repository's rules and fails on errors is
   `docs/examples/ci/cleanrules-audit.yml`.
+- `cleanrules test <rules> [<cases>...]` (task T.8b, the `test` part;
+  [`spec/cli.md`](spec/cli.md), *`test`*): runs case files against a rule
+  set, decision table, bundle or rule with the core's runner and writes the
+  test run in its text or, with `--format json`, as the `test_run` document;
+  without case files, a bundle runs its own, opened relative to the bundle's
+  folder and checked against their digests. `--syntax` applies to the rules,
+  case files are JSON or YAML by their suffix, and `-` (standard input)
+  appears at most once; `--max-results`, `--max-steps`, `--max-explained`
+  and `--ruleset-digest`. Exit codes: `0` when every case ran and passed,
+  `1` when a case failed or erred, a case file did not read, the run is
+  partial or it had no cases, `2` usage errors, `3` rules that do not read
+  or a case file that cannot be opened. The command line's tests run the
+  `test_run` conformance vectors through it; the binaries' smoke test and
+  the example CI workflow (`docs/examples/ci/cleanrules-audit.yml`, now with
+  a test step that also runs bundles with their own case files) run it on
+  `docs/examples`. Case file paths are recorded with `/` and without a
+  leading `./`; a run without cases writes the note `no_cases` on standard
+  error (in text, or as a JSON line under `--format json`, in
+  `spec/schemas/v1/cli-error.schema.json`).
+- In the Rust core, for callers that read files (task T.8b):
+  `format::size_limit` and `format::too_large` (the `limit_exceeded` of a
+  document beyond the size limit of its syntax, with its size or, when the
+  caller did not load it whole, "more bytes than the limit"),
+  `cases::CaseFile::too_large`, `cases::CaseFile::bundle_files_bounded` with
+  `cases::CaseFileBytes` (a bundle's case files loaded up to a bound the core
+  gives, digest checks included; `spec/tests.md`, *Case files of a bundle*),
+  and `cases::Runner::for_bundle_rules` (a bundle's rules for other case
+  files, without `bundle` in the test run).
+- `read` conformance vectors may give `bytes` with a `syntax`, for texts
+  that are not UTF-8; five new vectors in `format/limits.json` (size before
+  UTF-8 in every syntax, and a `format_error` at the first invalid byte),
+  run by the core, C ABI, Python, JavaScript, Go, Java, Scala and C++
+  runners.
 - `audit::audit_document` in the Rust core (`spec/audit.md`, *Documents*):
   audits the rules a document holds, with pointers into that document: a
   bundle's prefixed with `/bundle`, and a rule document's under `/rule`,
@@ -1686,6 +1719,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`CLAUDE.md`, `.claude/`).
 
 ### Changed
+
+- Size before UTF-8 (`spec/json-format.md`, *Errors and limits*): reading
+  bytes in any format (`format::read_document_as`, `format::parse_as`)
+  checks the size limit of the format before decoding them, so bytes beyond
+  it are `limit_exceeded` even when they are not UTF-8 (they were a
+  `format_error` in YAML, the rule syntax and CSV). Python's `loads` gives
+  `bytes` to the core as they are, so bytes that are not UTF-8 are now the
+  core's `FormatError` at their line and column, after the size check (they
+  were decoded in Python first). The size-limit messages of every reader
+  come from `format::too_large`, with the same text as before.
 
 - The text of an audit of a decision table names each cell by its row and
   column before its pointer, as `row es, input country

@@ -974,3 +974,134 @@ fn a_bundle_runs_under_its_recorded_limits() {
         .run(&[]);
     assert_eq!(other.engine_limits, EngineLimits::default());
 }
+
+/// A caller that loads a bundle's case files up to a bound
+/// (`CaseFile::bundle_files_bounded`): the core checks digests and gives the
+/// result of a file it was not given whole.
+#[test]
+fn a_bundles_case_files_are_loaded_up_to_a_bound() {
+    use cleanrules::bundle::{CaseFileRef, EngineLimit, EngineLimits};
+    use cleanrules::cases::CaseFileBytes;
+    let good = r#"{"version":1,"cases":{"items":[{"id":"a","input":{"x":2},"expect":{"selected":["r"]}}]}}"#;
+    let paths = [
+        "cases/good.json",
+        "cases/cut.yaml",
+        "cases/big.json",
+        "cases/known.json",
+    ];
+    let refs = paths.map(|path| CaseFileRef::new(path, good.as_bytes()).unwrap());
+    // The bundle's limit is below the size of every file.
+    let limits = EngineLimits::default().with(EngineLimit::MaxSize, 20);
+    let bundle = Bundle::new(
+        parse("RULE r IF x > 1 THEN v = 1"),
+        BundleId::new("acme/bounds").unwrap(),
+        Revision::new("1").unwrap(),
+    )
+    .with_cases(refs)
+    .unwrap()
+    .with_engine_limits(limits)
+    .unwrap();
+    let mut bounds = Vec::new();
+    let files = CaseFile::bundle_files_bounded(&bundle, |r, bound| {
+        bounds.push(bound);
+        Ok::<_, ()>(match r.path() {
+            "cases/good.json" => CaseFileBytes::Whole(good.as_bytes().to_vec()),
+            "cases/cut.yaml" => CaseFileBytes::TooLarge { size: None },
+            "cases/known.json" => CaseFileBytes::TooLarge {
+                size: Some(1 << 30),
+            },
+            // More than the bound, though the caller loaded it.
+            _ => CaseFileBytes::Whole(vec![b' '; bound + 1]),
+        })
+    })
+    .unwrap();
+    let defaults = Limits::default();
+    // The larger of the bundle's limit and the default one, by syntax.
+    assert_eq!(
+        bounds,
+        [
+            defaults.max_size,
+            defaults.max_yaml_size,
+            defaults.max_size,
+            defaults.max_size
+        ]
+    );
+    // Within the bound: checked against its digest, then read under the
+    // bundle's limit, which refuses it.
+    assert!(files[0].digest().is_some());
+    let errors: Vec<_> = files.iter().map(|file| file.cases().unwrap_err()).collect();
+    assert!(errors.iter().all(|e| e.code() == ErrorCode::LimitExceeded));
+    assert_eq!(
+        errors[0].message(),
+        "the document has 88 bytes, more than the limit of 20"
+    );
+    assert_eq!(
+        errors[1].message(),
+        "the YAML text has more bytes than the limit of 1048576"
+    );
+    assert_eq!(
+        errors[2].message(),
+        format!(
+            "the document has {} bytes, more than the limit of 20",
+            defaults.max_size + 1
+        )
+    );
+    assert_eq!(
+        errors[3].message(),
+        "the document has 1073741824 bytes, more than the limit of 20"
+    );
+    assert!(files[1..].iter().all(|file| file.digest().is_none()));
+    // A file not loaded whole is never checked against its digest.
+    let changed = CaseFile::bundle_files_bounded(&bundle, |_, _| {
+        Ok::<_, ()>(CaseFileBytes::TooLarge { size: None })
+    })
+    .unwrap();
+    assert!(
+        changed
+            .iter()
+            .all(|f| f.cases().unwrap_err().code() == ErrorCode::LimitExceeded)
+    );
+    assert_eq!(
+        CaseFile::bundle_files_bounded(&bundle, |_, _| Err("no such file")).unwrap_err(),
+        "no such file"
+    );
+    // The bundle's rules alone: the defaults, and no bundle.
+    let run = Runner::for_bundle_rules(&bundle).run(&[file("cases/good.json", good)]);
+    assert!(run.all_passed());
+    assert!(run.bundle.is_none());
+    assert_eq!(run.engine_limits, EngineLimits::default());
+    let table = DecisionTable::from_csv("x,THEN v\n> 1,1\n", &Limits::default()).unwrap();
+    let tabled = Bundle::new(
+        table,
+        BundleId::new("acme/t").unwrap(),
+        Revision::new("1").unwrap(),
+    );
+    assert_eq!(
+        Runner::for_bundle_rules(&tabled).run(&[]).source,
+        RulesSource::DecisionTable
+    );
+}
+
+/// A case file its caller did not load whole: `limit_exceeded`, no digest.
+#[test]
+fn a_case_file_too_large_to_load_is_its_error() {
+    let limits = Limits::default();
+    let file = CaseFile::too_large(
+        Some("cases/big.yml"),
+        DocumentFormat::Yaml,
+        Some(5 << 20),
+        &limits,
+    );
+    assert_eq!(file.path(), Some("cases/big.yml"));
+    assert!(file.digest().is_none());
+    let error = file.cases().unwrap_err();
+    assert_eq!(error.code(), ErrorCode::LimitExceeded);
+    assert_eq!(
+        error.message(),
+        "the YAML text has 5242880 bytes, more than the limit of 1048576"
+    );
+    assert_eq!(
+        error.hint(),
+        Some("raise the YAML size limit if the file is trusted")
+    );
+}

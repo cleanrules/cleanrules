@@ -9,15 +9,18 @@ use cleanrules::visual::DiagramFormat;
 
 const EXIT_CODES: &str = "\
 Exit codes:
-  0  done, nothing found at or above --fail-on
-  1  findings at or above --fail-on (audit)
+  0  done, nothing found at or above --fail-on; for test, every case ran and
+     passed
+  1  findings at or above --fail-on (audit), a document that does not read
+     (validate), or a case that failed or erred, a partial run or no cases
+     (test)
   2  usage error
   3  a file could not be read or written, a document did not read, or the
      operation is not supported for it
 
 Specification: https://github.com/cleanrules/cleanrules/blob/main/spec/cli.md";
 
-/// Audit, validate and draw rule sets and decision tables.
+/// Audit, test, validate and draw rule sets and decision tables.
 #[derive(Debug, Parser)]
 #[command(name = "cleanrules", bin_name = "cleanrules", version, after_help = EXIT_CODES)]
 pub(crate) struct Cli {
@@ -31,6 +34,8 @@ pub(crate) enum Command {
     Validate(ValidateArgs),
     /// Audit the rules of a rule set, decision table, bundle or rule
     Audit(AuditArgs),
+    /// Run test cases against rules
+    Test(TestArgs),
     /// Draw the diagram of a document
     Draw(DrawArgs),
 }
@@ -144,6 +149,48 @@ pub(crate) struct AuditArgs {
     pub(crate) ruleset_digest: bool,
 }
 
+#[derive(Debug, Args)]
+#[command(after_help = EXIT_CODES)]
+pub(crate) struct TestArgs {
+    /// The rules: a rule set, decision table, bundle or rule, or - for
+    /// standard input
+    #[arg(value_name = "RULES")]
+    pub(crate) rules: PathBuf,
+    /// Case files (.json, .yaml, .yml), or - for standard input; without
+    /// them, a bundle runs the case files it lists
+    #[arg(value_name = "CASES")]
+    pub(crate) cases: Vec<PathBuf>,
+    /// The syntax of the rules; by default, from their file's suffix (.json,
+    /// .yaml, .yml, .rules, .csv), and json for standard input
+    #[arg(long, value_enum, value_name = "SYNTAX")]
+    pub(crate) syntax: Option<Syntax>,
+    /// What to write
+    #[arg(long, value_enum, default_value_t = ReportFormat::Text)]
+    pub(crate) format: ReportFormat,
+    #[arg(
+        long,
+        value_name = "N",
+        help = "Stop the run after this many results (run limit max_results)"
+    )]
+    pub(crate) max_results: Option<usize>,
+    #[arg(
+        long,
+        value_name = "N",
+        help = "Stop the run before it takes more steps, one per rule and case (run limit \
+                max_steps)"
+    )]
+    pub(crate) max_steps: Option<usize>,
+    #[arg(
+        long,
+        value_name = "N",
+        help = "Explain at most this many failed cases (run limit max_explained) [default: 5]"
+    )]
+    pub(crate) max_explained: Option<usize>,
+    /// Carry the rule set digest of the rules tested in the JSON
+    #[arg(long)]
+    pub(crate) ruleset_digest: bool,
+}
+
 /// A diagram format.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 pub(crate) enum Diagram {
@@ -188,6 +235,7 @@ pub(crate) struct DrawArgs {
 mod tests {
     use clap::CommandFactory;
     use cleanrules::audit::AuditLimits;
+    use cleanrules::cases::TestRunLimits;
     use cleanrules::json::Limits;
 
     use super::Cli;
@@ -205,10 +253,12 @@ mod tests {
         };
         let audit = AuditLimits::default();
         let draw = Limits::default();
+        let run = TestRunLimits::default();
         for (command, id, default) in [
             ("audit", "max_terms", audit.max_terms),
             ("audit", "max_steps", audit.max_steps),
             ("draw", "max_diagram_size", draw.max_diagram_size),
+            ("test", "max_explained", run.max_explained),
         ] {
             let text = help(command, id);
             assert!(
