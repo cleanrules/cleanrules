@@ -6,7 +6,10 @@
 //! read and written like every other document. Each case has an id, unique in
 //! its file, an input, and an [`Expectation`] on the selected rules, the
 //! outputs, the rules left unknown, or the error. Cases are run with
-//! `evaluate`, never with `run`: a test never calls an action.
+//! `evaluate`, never with `run`: a test never calls an action. A [`Runner`]
+//! runs them against rules (`spec/tests.md`, *Running cases*), and a
+//! [`Comparator`] against two versions of rules, saying which decisions
+//! changed and whether each change was expected (`spec/comparison.md`).
 //!
 //! ```
 //! use cleanrules::cases::{Case, Cases, Expectation, ExpectedOutput};
@@ -29,6 +32,8 @@
 //! # Ok::<(), cleanrules::Error>(())
 //! ```
 
+mod compare;
+mod compare_text;
 mod file;
 mod run;
 mod statistics;
@@ -36,9 +41,16 @@ mod text;
 
 use std::collections::BTreeSet;
 
+/// How two rule versions relate: the relation of a test comparison, as of a
+/// bundle comparison.
+pub use crate::bundle::Relation;
 /// What a test run tested: a rule set, or a decision table. Shared with
 /// audits.
 pub use crate::rules::RulesSource;
+pub use compare::{
+    CaseDecision, CaseOutcome, ChangeKind, ChangedPart, Comparator, ComparedItem, ComparedRun,
+    OutcomeCounts, SingleOutput, TestComparison, TestComparisonSummary, Unstated,
+};
 pub use file::{CaseFile, CaseFileBytes};
 pub use run::{
     CaseResult, CaseRun, CaseStatus, DEFAULT_MAX_EXPLAINED, ExpectationKey, Interrupted,

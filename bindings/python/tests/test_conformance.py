@@ -1042,6 +1042,11 @@ STATISTICS_SKIP = (
     " runner; the binding does not gather them yet"
 )
 
+TEST_COMPARISON_SKIP = (
+    "test comparisons (spec/comparison.md) are made by the core and checked by its runner;"
+    " the binding compares versions from task T.9b"
+)
+
 
 def collect() -> list[Any]:
     params: list[Any] = []
@@ -1102,6 +1107,18 @@ def collect() -> list[Any]:
                             run,
                             id=f"{run}:{vector['id']}",
                             marks=pytest.mark.skip(reason=STATISTICS_SKIP),
+                        )
+                    )
+                continue
+            if given["kind"] == "test_comparison":
+                # The comparator is the core's; the Python API to it comes with T.9b.
+                for run in ("json", "native"):
+                    params.append(
+                        pytest.param(
+                            vector,
+                            run,
+                            id=f"{run}:{vector['id']}",
+                            marks=pytest.mark.skip(reason=TEST_COMPARISON_SKIP),
                         )
                     )
                 continue

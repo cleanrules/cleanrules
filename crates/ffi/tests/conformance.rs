@@ -661,6 +661,9 @@ fn the_vectors_pass_through_the_c_abi() {
         // Nor are a run's statistics (`spec/tests.md`, *Statistics*;
         // `docs/PLAN.md`, T.10).
         let mut statistics = 0;
+        // Nor is the comparator (`spec/comparison.md`; `docs/PLAN.md`, T.4
+        // and T.9b).
+        let mut comparisons = 0;
         for file in files() {
             let document = json(&fs::read_to_string(&file).unwrap());
             let Some(Json::Array(vectors)) = get(&document, "vectors") else {
@@ -691,6 +694,10 @@ fn the_vectors_pass_through_the_c_abi() {
                     statistics += 1;
                     continue;
                 }
+                if string(get(given, "kind")) == Some("test_comparison") {
+                    comparisons += 1;
+                    continue;
+                }
                 // Conditions under a graded logic: the C ABI evaluates one
                 // node under `boolean` only until task J.1b.
                 if get(given, "logic").is_some_and(|l| string(Some(l)) != Some("boolean")) {
@@ -714,8 +721,12 @@ fn the_vectors_pass_through_the_c_abi() {
         assert!(graded >= 96, "{graded} graded-logic vectors skipped");
         assert!(test_runs >= 26, "{test_runs} test run vectors skipped");
         assert!(statistics >= 8, "{statistics} statistics vectors skipped");
+        assert!(
+            comparisons >= 29,
+            "{comparisons} test comparison vectors skipped"
+        );
         println!(
-            "{ran} ran, {skipped} native-only, {tools} tool vectors (agents), {audits} audit vectors, {test_runs} test run vectors, {statistics} statistics vectors and {graded} graded-logic vectors skipped"
+            "{ran} ran, {skipped} native-only, {tools} tool vectors (agents), {audits} audit vectors, {test_runs} test run vectors, {statistics} statistics vectors, {comparisons} test comparison vectors and {graded} graded-logic vectors skipped"
         );
     });
 }

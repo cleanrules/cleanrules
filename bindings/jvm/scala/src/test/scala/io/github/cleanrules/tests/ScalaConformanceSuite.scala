@@ -18,8 +18,8 @@ import scala.jdk.CollectionConverters.*
 class ScalaConformanceSuite extends munit.FunSuite:
   /**
    * The skips the Scala route may have, as the Java route's: values no JVM value holds, the tools for agents (O.1),
-   * the static audit (T.7), the case runner (T.3) and its statistics (T.10), diagrams (V.2) and conditions under a
-   * graded logic until task J.1b. Any other is a failure.
+   * the static audit (T.7), the case runner (T.3) and its statistics (T.10), the comparator (T.4), diagrams (V.2)
+   * and conditions under a graded logic until task J.1b. Any other is a failure.
    */
   private val allowedSkips =
     Set(
@@ -29,6 +29,7 @@ class ScalaConformanceSuite extends munit.FunSuite:
       "audit",
       "test_run",
       "statistics",
+      "test_comparison",
       "diagram",
       "graded",
       "bundle",
@@ -108,6 +109,7 @@ class ScalaConformanceSuite extends munit.FunSuite:
     assertEquals(skipped.getOrElse("audit", Vector()), ofKind("audit"))
     assertEquals(skipped.getOrElse("test_run", Vector()), ofKind("test_run"))
     assertEquals(skipped.getOrElse("statistics", Vector()), ofKind("statistics"))
+    assertEquals(skipped.getOrElse("test_comparison", Vector()), ofKind("test_comparison"))
     assertEquals(skipped.getOrElse("diagram", Vector()), ofKind("draw"))
     assertEquals(skipped.getOrElse("graded", Vector()), vectors.collect { case (id, vector) if Conformance.isGraded(vector) => id }.toVector)
     // Canonical bytes and digests run the Scala way, never skipped.

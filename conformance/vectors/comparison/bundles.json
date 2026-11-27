@@ -1,0 +1,920 @@
+{
+  "version": 1,
+  "area": "comparison",
+  "vectors": [
+    {
+      "id": "comparison/bundles/two-bundles",
+      "spec": [
+        "comparison.md#bundles",
+        "comparison.md#relation",
+        "comparison.md#expected-changes"
+      ],
+      "description": "two bundles run their own case files under the limits they record, and the comparison holds the comparison of the two bundles",
+      "given": {
+        "kind": "test_comparison",
+        "a": {
+          "document": {
+            "version": 1,
+            "bundle": {
+              "id": "acme/discounts",
+              "revision": "1",
+              "ruleset": {
+                "hit_policy": "first",
+                "logic": "boolean",
+                "rules": [
+                  {
+                    "name": "a",
+                    "when": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 0
+                      }
+                    },
+                    "then": {
+                      "v": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    }
+                  },
+                  {
+                    "name": "b",
+                    "when": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    "then": {
+                      "v": {
+                        "op": "const",
+                        "value": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              "ruleset_digest": "sha256:af9ebc5933f9140ba400809fb4b9cb06ae408ce641b5777cd86557e476435f41",
+              "engine": {
+                "name": "cleanrules",
+                "version": "1.0.0-conformance.1",
+                "limits": {
+                  "max_size": 16777216,
+                  "max_nesting": 1024,
+                  "max_depth": 256,
+                  "max_path_segments": 256,
+                  "max_table_size": 2097152,
+                  "max_values": 1000000
+                }
+              },
+              "contract": {
+                "input": {
+                  "type": "object"
+                },
+                "output": {
+                  "keys": [
+                    "discount"
+                  ]
+                }
+              },
+              "cases": [
+                {
+                  "path": "cases/c.json",
+                  "digest": "sha256:69bf3a35f037b75cd3fcec31dd06c641c816acc40224fbd16bfc92322a578b6e"
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "cases/c.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"x1\", \"input\": {\"x\": 1}}, {\"id\": \"x2\", \"input\": {\"x\": 2}}, {\"id\": \"none\", \"input\": {}}]}}"
+            }
+          ]
+        },
+        "b": {
+          "document": {
+            "version": 1,
+            "bundle": {
+              "id": "acme/discounts",
+              "revision": "2",
+              "ruleset": {
+                "hit_policy": "first",
+                "logic": "boolean",
+                "rules": [
+                  {
+                    "name": "a",
+                    "when": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 0
+                      }
+                    },
+                    "then": {
+                      "v": {
+                        "op": "const",
+                        "value": 3
+                      }
+                    }
+                  },
+                  {
+                    "name": "b",
+                    "when": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    "then": {
+                      "v": {
+                        "op": "const",
+                        "value": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              "ruleset_digest": "sha256:f47510357421545a1abc4d9c634c04b5dbd2784b842ca1fbf77daaa4d7e40307",
+              "engine": {
+                "name": "cleanrules",
+                "version": "1.0.0-conformance.1",
+                "limits": {
+                  "max_size": 16777216,
+                  "max_nesting": 1024,
+                  "max_depth": 256,
+                  "max_path_segments": 256,
+                  "max_table_size": 2097152,
+                  "max_values": 1000000
+                }
+              },
+              "contract": {
+                "input": {
+                  "type": "object"
+                },
+                "output": {
+                  "keys": [
+                    "discount"
+                  ]
+                }
+              },
+              "cases": [
+                {
+                  "path": "cases/c.json",
+                  "digest": "sha256:ce3a19a0e1ff5608b10efdaf58e9d4874ac7b8d182855eaef63d005ae798fb8e"
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "cases/c.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"x1\", \"input\": {\"x\": 1}, \"expect\": {\"output\": {\"v\": 3}}}, {\"id\": \"x2\", \"input\": {\"x\": 2}}, {\"id\": \"none\", \"input\": {}}]}}"
+            }
+          ]
+        },
+        "max_explained": 0
+      },
+      "expect": {
+        "test_comparison": {
+          "relation": "other_rules_same_engine",
+          "bundles": {
+            "relation": "other_rules_same_engine",
+            "identical": false,
+            "differences": [
+              "revision",
+              "rules",
+              "cases"
+            ]
+          },
+          "a": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:af9ebc5933f9140ba400809fb4b9cb06ae408ce641b5777cd86557e476435f41",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "bundle": {
+              "id": "acme/discounts",
+              "revision": "1"
+            },
+            "files": [
+              {
+                "path": "cases/c.json",
+                "digest": "sha256:69bf3a35f037b75cd3fcec31dd06c641c816acc40224fbd16bfc92322a578b6e"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 3,
+              "passed": 3,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 3,
+              "nothing_selected": 1,
+              "with_unknown": 1,
+              "error": 0
+            }
+          },
+          "b": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:f47510357421545a1abc4d9c634c04b5dbd2784b842ca1fbf77daaa4d7e40307",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "bundle": {
+              "id": "acme/discounts",
+              "revision": "2"
+            },
+            "files": [
+              {
+                "path": "cases/c.json",
+                "digest": "sha256:ce3a19a0e1ff5608b10efdaf58e9d4874ac7b8d182855eaef63d005ae798fb8e"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 3,
+              "passed": 3,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 3,
+              "nothing_selected": 1,
+              "with_unknown": 1,
+              "error": 0
+            }
+          },
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 3,
+            "unchanged": 1,
+            "changed": 2,
+            "expected": 1,
+            "unexpected": 1,
+            "added": 0,
+            "removed": 0,
+            "not_compared": 0,
+            "partial": false,
+            "by_change": {
+              "same_selection_other_output": 2,
+              "other_selection_same_output": 0,
+              "other_selection_other_output": 0,
+              "other_unknown": 0,
+              "error": 0
+            }
+          },
+          "items": [
+            {
+              "path": "cases/c.json",
+              "id": "x1",
+              "change": "same_selection_other_output",
+              "expected": true,
+              "differences": [
+                "output"
+              ],
+              "a": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 1
+                },
+                "outputs": [
+                  {
+                    "v": 1
+                  }
+                ],
+                "unknown": []
+              },
+              "b": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 3
+                },
+                "outputs": [
+                  {
+                    "v": 3
+                  }
+                ],
+                "unknown": []
+              }
+            },
+            {
+              "path": "cases/c.json",
+              "id": "x2",
+              "change": "same_selection_other_output",
+              "expected": false,
+              "differences": [
+                "output"
+              ],
+              "unstated": [
+                "output"
+              ],
+              "a": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 1
+                },
+                "outputs": [
+                  {
+                    "v": 1
+                  }
+                ],
+                "unknown": []
+              },
+              "b": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 3
+                },
+                "outputs": [
+                  {
+                    "v": 3
+                  }
+                ],
+                "unknown": []
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "comparison/bundles/same-rules-other-limits",
+      "spec": [
+        "comparison.md#bundles",
+        "comparison.md#relation"
+      ],
+      "description": "the same rules under other recorded limits: the same rules on another engine, for the runs as for the bundles",
+      "given": {
+        "kind": "test_comparison",
+        "a": {
+          "document": {
+            "version": 1,
+            "bundle": {
+              "id": "acme/discounts",
+              "revision": "1",
+              "ruleset": {
+                "hit_policy": "first",
+                "logic": "boolean",
+                "rules": [
+                  {
+                    "name": "a",
+                    "when": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 0
+                      }
+                    },
+                    "then": {
+                      "v": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    }
+                  },
+                  {
+                    "name": "b",
+                    "when": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    "then": {
+                      "v": {
+                        "op": "const",
+                        "value": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              "ruleset_digest": "sha256:af9ebc5933f9140ba400809fb4b9cb06ae408ce641b5777cd86557e476435f41",
+              "engine": {
+                "name": "cleanrules",
+                "version": "1.0.0-conformance.1",
+                "limits": {
+                  "max_size": 16777216,
+                  "max_nesting": 1024,
+                  "max_depth": 256,
+                  "max_path_segments": 256,
+                  "max_table_size": 2097152,
+                  "max_values": 1000000
+                }
+              },
+              "contract": {
+                "input": {
+                  "type": "object"
+                },
+                "output": {
+                  "keys": [
+                    "discount"
+                  ]
+                }
+              },
+              "cases": [
+                {
+                  "path": "cases/c.json",
+                  "digest": "sha256:69bf3a35f037b75cd3fcec31dd06c641c816acc40224fbd16bfc92322a578b6e"
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "cases/c.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"x1\", \"input\": {\"x\": 1}}, {\"id\": \"x2\", \"input\": {\"x\": 2}}, {\"id\": \"none\", \"input\": {}}]}}"
+            }
+          ]
+        },
+        "b": {
+          "document": {
+            "version": 1,
+            "bundle": {
+              "id": "acme/discounts",
+              "revision": "1",
+              "ruleset": {
+                "hit_policy": "first",
+                "logic": "boolean",
+                "rules": [
+                  {
+                    "name": "a",
+                    "when": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 0
+                      }
+                    },
+                    "then": {
+                      "v": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    }
+                  },
+                  {
+                    "name": "b",
+                    "when": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    "then": {
+                      "v": {
+                        "op": "const",
+                        "value": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              "ruleset_digest": "sha256:af9ebc5933f9140ba400809fb4b9cb06ae408ce641b5777cd86557e476435f41",
+              "engine": {
+                "name": "cleanrules",
+                "version": "1.0.0-conformance.1",
+                "limits": {
+                  "max_size": 16777216,
+                  "max_nesting": 1024,
+                  "max_depth": 100,
+                  "max_path_segments": 256,
+                  "max_table_size": 2097152,
+                  "max_values": 1000000
+                }
+              },
+              "contract": {
+                "input": {
+                  "type": "object"
+                },
+                "output": {
+                  "keys": [
+                    "discount"
+                  ]
+                }
+              },
+              "cases": [
+                {
+                  "path": "cases/c.json",
+                  "digest": "sha256:69bf3a35f037b75cd3fcec31dd06c641c816acc40224fbd16bfc92322a578b6e"
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "cases/c.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"x1\", \"input\": {\"x\": 1}}, {\"id\": \"x2\", \"input\": {\"x\": 2}}, {\"id\": \"none\", \"input\": {}}]}}"
+            }
+          ]
+        },
+        "max_explained": 0
+      },
+      "expect": {
+        "test_comparison": {
+          "relation": "same_rules_other_engine",
+          "bundles": {
+            "relation": "same_rules_other_engine",
+            "identical": false,
+            "differences": [
+              "engine.limits.max_depth"
+            ]
+          },
+          "a": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:af9ebc5933f9140ba400809fb4b9cb06ae408ce641b5777cd86557e476435f41",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "bundle": {
+              "id": "acme/discounts",
+              "revision": "1"
+            },
+            "files": [
+              {
+                "path": "cases/c.json",
+                "digest": "sha256:69bf3a35f037b75cd3fcec31dd06c641c816acc40224fbd16bfc92322a578b6e"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 3,
+              "passed": 3,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 3,
+              "nothing_selected": 1,
+              "with_unknown": 1,
+              "error": 0
+            }
+          },
+          "b": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:af9ebc5933f9140ba400809fb4b9cb06ae408ce641b5777cd86557e476435f41",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 100,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "bundle": {
+              "id": "acme/discounts",
+              "revision": "1"
+            },
+            "files": [
+              {
+                "path": "cases/c.json",
+                "digest": "sha256:69bf3a35f037b75cd3fcec31dd06c641c816acc40224fbd16bfc92322a578b6e"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 3,
+              "passed": 3,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 3,
+              "nothing_selected": 1,
+              "with_unknown": 1,
+              "error": 0
+            }
+          },
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 3,
+            "unchanged": 3,
+            "changed": 0,
+            "expected": 0,
+            "unexpected": 0,
+            "added": 0,
+            "removed": 0,
+            "not_compared": 0,
+            "partial": false,
+            "by_change": {
+              "same_selection_other_output": 0,
+              "other_selection_same_output": 0,
+              "other_selection_other_output": 0,
+              "other_unknown": 0,
+              "error": 0
+            }
+          },
+          "items": []
+        }
+      }
+    },
+    {
+      "id": "comparison/bundles/conflict",
+      "spec": [
+        "comparison.md#bundles"
+      ],
+      "description": "two bundles of one id and revision with other rules are a conflict: refused, and nothing runs",
+      "given": {
+        "kind": "test_comparison",
+        "a": {
+          "document": {
+            "version": 1,
+            "bundle": {
+              "id": "acme/discounts",
+              "revision": "1",
+              "ruleset": {
+                "hit_policy": "first",
+                "logic": "boolean",
+                "rules": [
+                  {
+                    "name": "a",
+                    "when": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 0
+                      }
+                    },
+                    "then": {
+                      "v": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    }
+                  },
+                  {
+                    "name": "b",
+                    "when": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    "then": {
+                      "v": {
+                        "op": "const",
+                        "value": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              "ruleset_digest": "sha256:af9ebc5933f9140ba400809fb4b9cb06ae408ce641b5777cd86557e476435f41",
+              "engine": {
+                "name": "cleanrules",
+                "version": "1.0.0-conformance.1",
+                "limits": {
+                  "max_size": 16777216,
+                  "max_nesting": 1024,
+                  "max_depth": 256,
+                  "max_path_segments": 256,
+                  "max_table_size": 2097152,
+                  "max_values": 1000000
+                }
+              },
+              "contract": {
+                "input": {
+                  "type": "object"
+                },
+                "output": {
+                  "keys": [
+                    "discount"
+                  ]
+                }
+              },
+              "cases": [
+                {
+                  "path": "cases/c.json",
+                  "digest": "sha256:69bf3a35f037b75cd3fcec31dd06c641c816acc40224fbd16bfc92322a578b6e"
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "cases/c.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"x1\", \"input\": {\"x\": 1}}, {\"id\": \"x2\", \"input\": {\"x\": 2}}, {\"id\": \"none\", \"input\": {}}]}}"
+            }
+          ]
+        },
+        "b": {
+          "document": {
+            "version": 1,
+            "bundle": {
+              "id": "acme/discounts",
+              "revision": "1",
+              "ruleset": {
+                "hit_policy": "first",
+                "logic": "boolean",
+                "rules": [
+                  {
+                    "name": "a",
+                    "when": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 0
+                      }
+                    },
+                    "then": {
+                      "v": {
+                        "op": "const",
+                        "value": 3
+                      }
+                    }
+                  },
+                  {
+                    "name": "b",
+                    "when": {
+                      "op": "gt",
+                      "left": {
+                        "op": "field",
+                        "path": [
+                          "x"
+                        ]
+                      },
+                      "right": {
+                        "op": "const",
+                        "value": 1
+                      }
+                    },
+                    "then": {
+                      "v": {
+                        "op": "const",
+                        "value": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              "ruleset_digest": "sha256:f47510357421545a1abc4d9c634c04b5dbd2784b842ca1fbf77daaa4d7e40307",
+              "engine": {
+                "name": "cleanrules",
+                "version": "1.0.0-conformance.1",
+                "limits": {
+                  "max_size": 16777216,
+                  "max_nesting": 1024,
+                  "max_depth": 256,
+                  "max_path_segments": 256,
+                  "max_table_size": 2097152,
+                  "max_values": 1000000
+                }
+              },
+              "contract": {
+                "input": {
+                  "type": "object"
+                },
+                "output": {
+                  "keys": [
+                    "discount"
+                  ]
+                }
+              }
+            }
+          },
+          "files": []
+        },
+        "max_explained": 0
+      },
+      "expect": {
+        "error": {
+          "code": "decision_mismatch"
+        }
+      }
+    }
+  ]
+}

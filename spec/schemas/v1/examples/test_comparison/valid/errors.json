@@ -1,0 +1,223 @@
+{
+  "version": 1,
+  "test_comparison": {
+    "relation": "other_rules_same_engine",
+    "a": {
+      "source": "ruleset",
+      "hit_policy": "rule_order",
+      "logic": "boolean",
+      "ruleset_digest": "sha256:1e4322768de85644d9ae55f96f1996263580a84075c1a995cd0f32699dc369d5",
+      "engine": {
+        "name": "cleanrules",
+        "version": "1.0.0",
+        "limits": {
+          "max_size": 16777216,
+          "max_nesting": 1024,
+          "max_depth": 256,
+          "max_path_segments": 256,
+          "max_table_size": 2097152,
+          "max_values": 1000000
+        }
+      },
+      "files": [
+        {
+          "path": "xy.json",
+          "digest": "sha256:2d44bd6bfec863473555058feb5d25057726160193a378b45b0bb52cadace5e8"
+        }
+      ],
+      "limits": {},
+      "summary": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "error": 0,
+        "partial": false
+      },
+      "outcomes": {
+        "decisions": 3,
+        "nothing_selected": 1,
+        "with_unknown": 1,
+        "error": 0
+      }
+    },
+    "b": {
+      "source": "ruleset",
+      "hit_policy": "unique",
+      "logic": "boolean",
+      "strict": true,
+      "ruleset_digest": "sha256:ad75e51af7ba84c43ba5d797aad56d41733010c6e169da2b3c9f5970357ae9c3",
+      "engine": {
+        "name": "cleanrules",
+        "version": "1.0.0",
+        "limits": {
+          "max_size": 16777216,
+          "max_nesting": 1024,
+          "max_depth": 256,
+          "max_path_segments": 256,
+          "max_table_size": 2097152,
+          "max_values": 1000000
+        }
+      },
+      "files": [
+        {
+          "path": "xy.json",
+          "digest": "sha256:2d44bd6bfec863473555058feb5d25057726160193a378b45b0bb52cadace5e8"
+        }
+      ],
+      "limits": {},
+      "summary": {
+        "total": 3,
+        "passed": 1,
+        "failed": 0,
+        "error": 2,
+        "partial": false
+      },
+      "outcomes": {
+        "decisions": 1,
+        "nothing_selected": 0,
+        "with_unknown": 0,
+        "error": 2
+      }
+    },
+    "limits": {
+      "max_explained": 0
+    },
+    "summary": {
+      "total": 3,
+      "unchanged": 0,
+      "changed": 3,
+      "expected": 0,
+      "unexpected": 3,
+      "added": 0,
+      "removed": 0,
+      "not_compared": 0,
+      "partial": false,
+      "by_change": {
+        "same_selection_other_output": 1,
+        "other_selection_same_output": 0,
+        "other_selection_other_output": 0,
+        "other_unknown": 0,
+        "error": 2
+      }
+    },
+    "items": [
+      {
+        "path": "xy.json",
+        "id": "x1",
+        "change": "same_selection_other_output",
+        "expected": false,
+        "differences": [
+          "output"
+        ],
+        "unstated": [
+          "output"
+        ],
+        "a": {
+          "status": "passed",
+          "selected": [
+            "a"
+          ],
+          "outputs": [
+            {
+              "v": 1
+            }
+          ],
+          "unknown": []
+        },
+        "b": {
+          "status": "passed",
+          "selected": [
+            "a"
+          ],
+          "output": {
+            "v": 1
+          },
+          "outputs": [
+            {
+              "v": 1
+            }
+          ],
+          "unknown": []
+        }
+      },
+      {
+        "path": "xy.json",
+        "id": "x2",
+        "change": "error",
+        "expected": false,
+        "differences": [
+          "error"
+        ],
+        "unstated": [
+          "status"
+        ],
+        "a": {
+          "status": "passed",
+          "selected": [
+            "a",
+            "b"
+          ],
+          "outputs": [
+            {
+              "v": 1
+            },
+            {
+              "v": 2
+            }
+          ],
+          "unknown": []
+        },
+        "b": {
+          "status": "error",
+          "error": {
+            "code": "hit_policy_error",
+            "message": "2 rules fired under the unique hit policy",
+            "hint": "make the conditions mutually exclusive, or use first or priority",
+            "rules": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      },
+      {
+        "path": "xy.json",
+        "id": "none",
+        "change": "error",
+        "expected": false,
+        "differences": [
+          "error"
+        ],
+        "unstated": [
+          "status"
+        ],
+        "a": {
+          "status": "passed",
+          "selected": [],
+          "outputs": [],
+          "unknown": [
+            "a",
+            "b"
+          ]
+        },
+        "b": {
+          "status": "error",
+          "error": {
+            "code": "missing_field",
+            "message": "missing field x",
+            "rule": "a",
+            "path": [
+              "x"
+            ],
+            "node": {
+              "op": "field",
+              "path": [
+                "x"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  }
+}

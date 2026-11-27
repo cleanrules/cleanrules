@@ -16,7 +16,7 @@ use cleanrules::Error;
 use cleanrules::agents::Catalog;
 use cleanrules::audit::{AuditLimits, audit_document};
 use cleanrules::bundle::{self, Bundle, BundleId, BundleRules, CaseFileRef, Revision};
-use cleanrules::cases::{CaseFile, Runner, TestRunLimits};
+use cleanrules::cases::{CaseFile, Comparator, Runner, TestRunLimits};
 use cleanrules::eval::{Options, evaluate_value_tree};
 use cleanrules::explain::{explain, summary};
 use cleanrules::format::{
@@ -802,6 +802,147 @@ fn run_test_run(vector: &Json) -> Result<(), String> {
     compare(Ok(written), &expect, "test_run")
 }
 
+/// One side of a `test_comparison` vector: its rules and its case files,
+/// read as a `test_run` vector reads them, and its run's limits.
+fn comparison_side(given: &Json) -> Result<(Document, Vec<CaseFile>, TestRunLimits), String> {
+    let limits = Limits::default();
+    let document = read_document(&to_string(get(given, "document").unwrap()), &limits)
+        .map_err(|e| format!("reading the rules: {e}"))?;
+    let texts: Vec<(String, String)> = match get(given, "files") {
+        Some(Json::Array(items)) => items
+            .iter()
+            .map(|item| {
+                (
+                    text(get(item, "path")).unwrap().to_owned(),
+                    text(get(item, "text")).unwrap().to_owned(),
+                )
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
+    let files: Vec<CaseFile> = match (&document, get(given, "cases")) {
+        (_, Some(cases)) => match read_document(&to_string(cases), &limits) {
+            Ok(Document::Cases(cases)) => vec![CaseFile::new(cases)],
+            other => return Err(format!("not a case file: {other:?}")),
+        },
+        (Document::Bundle(bundle), None) => CaseFile::bundle_files(bundle, |r| {
+            texts
+                .iter()
+                .find(|(path, _)| path == r.path())
+                .map(|(_, text)| text.as_bytes().to_vec())
+                .ok_or_else(|| format!("no file {}", r.path()))
+        })?,
+        (_, None) => texts
+            .iter()
+            .map(|(path, text)| CaseFile::read(path, text.as_bytes(), &limits))
+            .collect(),
+    };
+    let mut run_limits = TestRunLimits::default();
+    if let Some(Json::Object(members)) = get(given, "limits") {
+        for (key, value) in members {
+            let Json::Number(n) = value else {
+                return Err(format!("limit {key} is not a number"));
+            };
+            let n = usize::try_from(n.as_i128().unwrap()).unwrap();
+            run_limits = match key.as_str() {
+                "max_results" => run_limits.with_max_results(n),
+                "max_steps" => run_limits.with_max_steps(n),
+                other => return Err(format!("unknown limit {other}")),
+            };
+        }
+    }
+    Ok((document, files, run_limits))
+}
+
+fn side_runner(document: &Document, limits: TestRunLimits) -> Result<Runner<'_>, String> {
+    Ok(match document {
+        Document::RuleSet(ruleset) => Runner::new(ruleset),
+        Document::DecisionTable(table) => Runner::for_table(table),
+        Document::Bundle(bundle) => Runner::for_bundle(bundle),
+        _ => return Err("not rules".into()),
+    }
+    .with_limits(limits))
+}
+
+/// A `test_comparison` vector (`spec/comparison.md`): compare side `a` with
+/// side `b`, then compare the comparison with its errors reduced to their
+/// compared fields, or the error that refuses it.
+fn run_test_comparison(vector: &Json) -> Result<(), String> {
+    let given = get(vector, "given").unwrap();
+    let (doc_a, files_a, limits_a) = comparison_side(get(given, "a").unwrap())?;
+    let (doc_b, files_b, limits_b) = comparison_side(get(given, "b").unwrap())?;
+    let comparator = match (&doc_a, &doc_b) {
+        (Document::Bundle(a), Document::Bundle(b)) => Comparator::new(
+            Runner::for_bundle(a).with_limits(limits_a),
+            Runner::for_bundle(b).with_limits(limits_b),
+        )
+        .and_then(|c| c.with_bundles(a, b)),
+        _ => Comparator::new(
+            side_runner(&doc_a, limits_a)?,
+            side_runner(&doc_b, limits_b)?,
+        ),
+    };
+    let expect = get(vector, "expect").unwrap();
+    let comparator = match comparator {
+        Ok(comparator) => comparator,
+        Err(error) => return compare(Err(error), expect, "test_comparison"),
+    };
+    let max_explained = match get(given, "max_explained") {
+        Some(Json::Number(n)) => usize::try_from(n.as_i128().unwrap()).unwrap(),
+        _ => cleanrules::cases::DEFAULT_MAX_EXPLAINED,
+    };
+    let comparator = comparator.with_max_explained(max_explained);
+    let report = match get(given, "cancel_after") {
+        Some(Json::Number(n)) => {
+            let after = usize::try_from(n.as_i128().unwrap()).unwrap();
+            let mut asked = 0;
+            comparator.compare_until(&files_a, &files_b, || {
+                asked += 1;
+                asked > after
+            })
+        }
+        _ => comparator.compare(&files_a, &files_b),
+    };
+    let mut written = cleanrules::format::write_test_comparison(&report);
+    // Errors by their compared fields: what each side gave an item.
+    if let Json::Object(members) = &mut written
+        && let Some((_, Json::Array(items))) = members.iter_mut().find(|(k, _)| k == "items")
+    {
+        for item in items {
+            let Json::Object(fields) = item else { continue };
+            for (key, side) in fields.iter_mut() {
+                if (key == "a" || key == "b")
+                    && let Json::Object(parts) = side
+                {
+                    for (k, v) in parts.iter_mut() {
+                        if k == "error" {
+                            compared_error(v);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // The expected `engine.version` of each side is this engine's.
+    let mut expect = expect.clone();
+    if let Json::Object(members) = &mut expect
+        && let Some((_, Json::Object(content))) =
+            members.iter_mut().find(|(k, _)| k == "test_comparison")
+    {
+        for (key, side) in content.iter_mut() {
+            if (key == "a" || key == "b")
+                && let Json::Object(side) = side
+                && let Some((_, Json::Object(engine))) =
+                    side.iter_mut().find(|(k, _)| k == "engine")
+                && let Some((_, version)) = engine.iter_mut().find(|(k, _)| k == "version")
+            {
+                *version = Json::String(cleanrules::bundle::ENGINE_VERSION.to_owned());
+            }
+        }
+    }
+    compare(Ok(written), &expect, "test_comparison")
+}
+
 fn run(vector: &Json) -> Result<(), String> {
     let given = get(vector, "given").unwrap();
     let kind = text(get(given, "kind")).unwrap();
@@ -837,6 +978,9 @@ fn run(vector: &Json) -> Result<(), String> {
     }
     if kind == "statistics" {
         return run_statistics(vector);
+    }
+    if kind == "test_comparison" {
+        return run_test_comparison(vector);
     }
     let limits = Limits::default();
     let node_key = if kind == "condition" {
@@ -926,6 +1070,7 @@ fn conformance_vectors() {
                         | "audit"
                         | "test_run"
                         | "statistics"
+                        | "test_comparison"
                 ) {
                     *pending.entry(kind.to_owned()).or_default() += 1;
                     continue;

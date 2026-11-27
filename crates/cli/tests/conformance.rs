@@ -2,7 +2,9 @@
 //! (`conformance/vectors/audit`, `conformance/vectors/visual`,
 //! `conformance/vectors/tests`) through the command line: each document on
 //! standard input or in a file, its report or diagram read from standard
-//! output, and the exit code checked against what the vector expects.
+//! output, and the exit code checked against what the vector expects. The
+//! `test_comparison` vectors (`conformance/vectors/comparison`) are counted
+//! and skipped until `diff`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, missing_docs)]
 
@@ -413,4 +415,18 @@ fn test_run_vectors_through_the_command_line() {
         (25, 3, 9),
         "test_run vectors run and skipped, and statistics vectors skipped"
     );
+}
+
+/// The `test_comparison` vectors (`conformance/vectors/comparison`) are
+/// skipped and counted: the command line compares versions with `diff`,
+/// which comes after T.4 (`spec/cli.md`, *Not yet*).
+#[test]
+fn test_comparison_vectors_are_skipped_until_diff() {
+    let mut skipped = 0;
+    for vector in vectors("comparison") {
+        let given = get(&vector, "given").unwrap();
+        assert_eq!(text(get(given, "kind")), "test_comparison");
+        skipped += 1;
+    }
+    assert_eq!(skipped, 29, "test_comparison vectors skipped");
 }

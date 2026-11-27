@@ -421,6 +421,33 @@
       }
     },
     {
+      "id": "format/documents/test-comparison-is-output-only",
+      "spec": [
+        "json-format.md#documents",
+        "json-format.md#test-comparisons",
+        "comparison.md#json"
+      ],
+      "description": "test comparisons are output only",
+      "given": {
+        "kind": "read",
+        "document": {
+          "version": 1,
+          "test_comparison": {
+            "relation": "same_rules_same_engine",
+            "limits": {
+              "max_explained": 5
+            },
+            "items": []
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported"
+        }
+      }
+    },
+    {
       "id": "format/documents/lone-surrogate",
       "spec": [
         "json-format.md#documents",

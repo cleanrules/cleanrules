@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "test_comparison": {
+    "relation": "other_rules_same_engine",
+    "bundles": {
+      "relation": "other_rules_same_engine",
+      "identical": false,
+      "differences": [
+        "revision",
+        "rules",
+        "cases"
+      ]
+    },
+    "a": {
+      "source": "ruleset",
+      "hit_policy": "priority",
+      "logic": "boolean",
+      "ruleset_digest": "sha256:8fbea85c5715c98c5d026e8a85bffcb48d9a0fecfccd6641249f14ab82b263bd",
+      "engine": {
+        "name": "cleanrules",
+        "version": "1.0.0",
+        "limits": {
+          "max_size": 16777216,
+          "max_nesting": 1024,
+          "max_depth": 256,
+          "max_path_segments": 256,
+          "max_table_size": 2097152,
+          "max_values": 1000000
+        }
+      },
+      "bundle": {
+        "id": "acme/discounts",
+        "revision": "1"
+      },
+      "files": [
+        {
+          "path": "cases/discounts.json",
+          "digest": "sha256:9076dcc125c059ce1ed94a7bef2bfc41436d0437f1a2bc5786cc9df5b5160dde"
+        }
+      ],
+      "limits": {},
+      "summary": {
+        "total": 4,
+        "passed": 4,
+        "failed": 0,
+        "error": 0,
+        "partial": false
+      },
+      "outcomes": {
+        "decisions": 4,
+        "nothing_selected": 1,
+        "with_unknown": 1,
+        "error": 0
+      }
+    },
+    "b": {
+      "source": "ruleset",
+      "hit_policy": "priority",
+      "logic": "boolean",
+      "ruleset_digest": "sha256:d46695c1f45a34646895abac362da9c116947c1d6e2b145297646eb7ea257c18",
+      "engine": {
+        "name": "cleanrules",
+        "version": "1.0.0",
+        "limits": {
+          "max_size": 16777216,
+          "max_nesting": 1024,
+          "max_depth": 256,
+          "max_path_segments": 256,
+          "max_table_size": 2097152,
+          "max_values": 1000000
+        }
+      },
+      "bundle": {
+        "id": "acme/discounts",
+        "revision": "2"
+      },
+      "files": [
+        {
+          "path": "cases/discounts.json",
+          "digest": "sha256:5442a78394bca92a8bc83603f12895c5bb353ba1b0ee78fec777e7c75332ec72"
+        }
+      ],
+      "limits": {},
+      "summary": {
+        "total": 4,
+        "passed": 4,
+        "failed": 0,
+        "error": 0,
+        "partial": false
+      },
+      "outcomes": {
+        "decisions": 4,
+        "nothing_selected": 1,
+        "with_unknown": 1,
+        "error": 0
+      }
+    },
+    "limits": {
+      "max_explained": 0
+    },
+    "summary": {
+      "total": 4,
+      "unchanged": 3,
+      "changed": 1,
+      "expected": 1,
+      "unexpected": 0,
+      "added": 0,
+      "removed": 0,
+      "not_compared": 0,
+      "partial": false,
+      "by_change": {
+        "same_selection_other_output": 1,
+        "other_selection_same_output": 0,
+        "other_selection_other_output": 0,
+        "other_unknown": 0,
+        "error": 0
+      }
+    },
+    "items": [
+      {
+        "path": "cases/discounts.json",
+        "id": "vip-gets-15",
+        "change": "same_selection_other_output",
+        "expected": true,
+        "differences": [
+          "output"
+        ],
+        "a": {
+          "status": "passed",
+          "selected": [
+            "vip"
+          ],
+          "output": {
+            "discount": {
+              "$decimal": "0.15"
+            }
+          },
+          "outputs": [
+            {
+              "discount": {
+                "$decimal": "0.15"
+              }
+            }
+          ],
+          "unknown": [
+            "blocked"
+          ]
+        },
+        "b": {
+          "status": "passed",
+          "selected": [
+            "vip"
+          ],
+          "output": {
+            "discount": {
+              "$decimal": "0.20"
+            }
+          },
+          "outputs": [
+            {
+              "discount": {
+                "$decimal": "0.20"
+              }
+            }
+          ],
+          "unknown": [
+            "blocked"
+          ]
+        }
+      }
+    ]
+  }
+}

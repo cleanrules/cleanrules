@@ -92,3 +92,8 @@ path = "../../docs/examples/test_run.rs"
 [[example]]
 name = "statistics"
 path = "../../docs/examples/statistics.rs"
+
+# The example of comparing two versions in the documentation (task T.4).
+[[example]]
+name = "comparison"
+path = "../../docs/examples/comparison.rs"

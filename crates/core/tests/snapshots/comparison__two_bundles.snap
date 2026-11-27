@@ -1,0 +1,13 @@
+---
+source: crates/core/tests/comparison.rs
+expression: comparison.to_string()
+---
+Comparison of two test runs: other rules, same engine (other_rules_same_engine)
+a: bundle acme/discounts revision 1, a rule set, 3 rules, hit policy priority, logic boolean, sha256:8fbea85c5715c98c5d026e8a85bffcb48d9a0fecfccd6641249f14ab82b263bd
+b: bundle acme/discounts revision 2, a rule set, 3 rules, hit policy priority, logic boolean, sha256:d46695c1f45a34646895abac362da9c116947c1d6e2b145297646eb7ea257c18
+bundles: other_rules_same_engine, differences revision, rules, cases
+EXPECTED    cases/discounts.json  "vip-gets-15"
+            same_selection_other_output (output)
+            a: passed, selected ["vip"], output {"discount":{"$decimal":"0.15"}}, unknown ["blocked"]
+            b: passed, selected ["vip"], output {"discount":{"$decimal":"0.20"}}, unknown ["blocked"]
+4 items: 3 unchanged, 1 changed (1 expected, 0 unexpected), 0 added, 0 removed, 0 not compared

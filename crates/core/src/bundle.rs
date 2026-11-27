@@ -783,7 +783,7 @@ impl Bundle {
 
     /// Compare with another bundle (`spec/bundles.md`, *Comparing bundles*).
     #[must_use]
-    pub fn compare(&self, other: &Bundle) -> Comparison {
+    pub fn compare(&self, other: &Bundle) -> BundleComparison {
         compare(self, other)
     }
 
@@ -808,7 +808,10 @@ impl Hash for Bundle {
     }
 }
 
-/// How two bundles relate (`spec/bundles.md`, *Comparing bundles*).
+/// How two rule versions relate: by their rule set digests and their
+/// engines. Comparing two bundles gives it (`spec/bundles.md`, *Comparing
+/// bundles*), and so does comparing two test runs (`spec/comparison.md`,
+/// *Relation*), where it is also `cases::Relation`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Relation {
@@ -936,12 +939,12 @@ impl PartialEq<&str> for Difference {
 
 /// The comparison of two bundles (`spec/bundles.md`, *Comparing bundles*).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Comparison {
+pub struct BundleComparison {
     relation: Relation,
     differences: Vec<Difference>,
 }
 
-impl Comparison {
+impl BundleComparison {
     /// How the bundles relate.
     #[must_use]
     pub fn relation(&self) -> Relation {
@@ -984,7 +987,7 @@ impl Comparison {
     }
 }
 
-fn compare(a: &Bundle, b: &Bundle) -> Comparison {
+fn compare(a: &Bundle, b: &Bundle) -> BundleComparison {
     let same_rules = a.ruleset_digest() == b.ruleset_digest();
     let mut differences = Vec::new();
     let mut differ = |different: bool, difference: Difference| {
@@ -1030,7 +1033,7 @@ fn compare(a: &Bundle, b: &Bundle) -> Comparison {
             (false, false) => Relation::OtherRulesOtherEngine,
         }
     };
-    Comparison {
+    BundleComparison {
         relation,
         differences,
     }

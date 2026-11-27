@@ -34,10 +34,10 @@ class ConformanceTest {
 
     /** The skips each route may have; any other is a failure. */
     private static final Map<String, Set<String>> ALLOWED_SKIPS =
-            Map.of("json", Set.of("grid", "native", "agents", "audit", "test_run", "statistics", "diagram", "graded",
-                            "bundle"),
+            Map.of("json", Set.of("grid", "native", "agents", "audit", "test_run", "statistics", "test_comparison",
+                            "diagram", "graded", "bundle"),
                     "native", Set.of("decimal_infinity", "zone_unknown_to_java", "agents", "audit", "test_run",
-                            "statistics", "diagram", "graded", "bundle", "cases"));
+                            "statistics", "test_comparison", "diagram", "graded", "bundle", "cases"));
 
     /** What a route did with the vectors. */
     private static final class Counts {
@@ -160,6 +160,15 @@ class ConformanceTest {
                     .toList();
             for (String route : ROUTES) {
                 assertEquals(statistics, counts.get(route).skipped.getOrDefault("statistics", List.of()), route);
+            }
+            // And the comparator, which this beta binding does not run.
+            List<String> comparisons = vectors.entrySet().stream()
+                    .filter(v -> "test_comparison".equals(((Map<?, ?>) v.getValue().get("given")).get("kind")))
+                    .map(Map.Entry::getKey)
+                    .toList();
+            for (String route : ROUTES) {
+                assertEquals(
+                        comparisons, counts.get(route).skipped.getOrDefault("test_comparison", List.of()), route);
             }
             // And the diagrams, which the Java API draws from phase V.2.
             List<String> drawn = vectors.entrySet().stream()

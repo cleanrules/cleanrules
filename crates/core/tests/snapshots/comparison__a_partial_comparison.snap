@@ -1,0 +1,14 @@
+---
+source: crates/core/tests/comparison.rs
+expression: comparison.to_string()
+---
+Comparison of two test runs: other rules, same engine (other_rules_same_engine)
+a: a rule set, 3 rules, hit policy priority, logic boolean, sha256:8fbea85c5715c98c5d026e8a85bffcb48d9a0fecfccd6641249f14ab82b263bd
+b: a rule set, 3 rules, hit policy priority, logic boolean, sha256:d46695c1f45a34646895abac362da9c116947c1d6e2b145297646eb7ea257c18
+UNEXPECTED  cases/discounts.json  "vip-gets-15"
+            same_selection_other_output (output)
+            b did not pass its case
+            a: passed, selected ["vip"], output {"discount":{"$decimal":"0.15"}}, unknown ["blocked"]
+            b: failed, selected ["vip"], output {"discount":{"$decimal":"0.20"}}, unknown ["blocked"]
+4 items: 0 unchanged, 1 changed (0 expected, 1 unexpected), 0 added, 0 removed, 3 not compared
+Partial run of b: interrupted by max_results, 3 not run

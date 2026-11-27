@@ -18,8 +18,8 @@ are bound or not, and it can be run any number of times. Running cases gives a
 result per case and a summary (*Running cases*, *Test runs*), one result at a
 time and with limits (*Batches and interruption*), and, when asked, what the
 cases made each rule and condition do and which parts of the rules they never
-reached (*Statistics*); comparing two versions on the same cases (task T.4)
-builds on it.
+reached (*Statistics*); comparing two versions on the same cases
+([`comparison.md`](comparison.md)) builds on it.
 
 ```json
 {
@@ -129,7 +129,8 @@ the result, and a key that is absent checks nothing:
 
 An empty expectation, or none, checks only that evaluation does not fail: a
 case without expectations still gives a result, which comparing two versions
-of the rules (task T.4) uses. `error` is given alone: with any other key, it
+of the rules uses (`comparison.md`: a change of its decision is never
+expected). `error` is given alone: with any other key, it
 is a `format_error` at the expectation's `error`.
 
 `output` and the items of `outputs` are objects whose keys are payload keys,
@@ -814,8 +815,8 @@ it as optional keys (`json-format.md`, *Versioning*) without changing what
 existing case files mean.*
 
 - The rules and engine that recorded the expectations of a case file (a
-  `ruleset_digest` and an engine, as a bundle states them), planned for
-  comparing two versions (task T.4).
+  `ruleset_digest` and an engine, as a bundle states them), for comparing
+  with results recorded by another engine (`comparison.md`, *Not yet*).
 - Expectations on the rules that fired, on the truth value of each rule, or
   on the explanation (a rule's status or requirement, a counterfactual).
 - Expecting that an output has no value under a key, or comparing numbers
@@ -825,8 +826,6 @@ existing case files mean.*
 - Tags or other selections of cases, and a name besides the id.
 - Case files in CSV (a column per input field and expected output) and a
   streaming form, such as one case per line, for files beyond the size limit.
-- Expected changes between two versions of the rules, which comparing them
-  (task T.4) defines.
 - Settings of a case that change how the rules evaluate (strict mode, limits):
   they are settings of the rules, under their digest.
 - Running only some of the cases (by id, tag or file), and keeping only some

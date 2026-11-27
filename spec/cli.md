@@ -299,9 +299,18 @@ cases.
 *Not checked by vectors: the command line's tests (`crates/cli/tests`) check it.*
 
 - **`diff`** (task T.8b, after T.4): `cleanrules diff <old> <new> [<cases>...]`
-  compares two versions on the same cases, and exits with `1` on unexpected
-  changes. It reads its documents as `test` does: `--syntax` applies to both
-  versions, case files go by their suffix, and `-` appears at most once.
+  compares two versions on the same cases (`comparison.md`), or two bundles
+  on their own case files, and writes the comparison in its text or as the
+  `test_comparison` document in JSON, with the run limits of `test` for both
+  sides and `--max-explained` for the changes explained. It refuses two
+  bundles in conflict (`decision_mismatch`, `3`). It reads its documents as
+  `test` does: `--syntax` applies to both versions, case files go by their
+  suffix, and `-` appears at most once. The recommended exit codes: `1` when a change is unexpected (`summary.unexpected`)
+  or the comparison is not complete (`comparison.md`, *Joining*: a side
+  partial, or items not compared); `0` for added and removed cases, which
+  `--fail-on changed` can make fail; and when no item was compared at all, a
+  note on the standard error and `1`, as `test` does for a run without cases
+  (`no_cases`).
 - **`report`** (task T.8b, after T.5): the report of a bundle or rules with
   their cases, audit and coverage, with `--format text|json|html` and
   `--output`, and `--fail-on` as for `audit`.

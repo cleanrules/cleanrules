@@ -370,9 +370,9 @@ than decisions, are a `TypeError`.
 | `Engine` | `BundleEngine` | `BundleEngine` | (JSON) |
 | `EngineLimits`, `EngineLimit` | `BundleLimits` | `BundleLimits`, `BundleLimitName` | (JSON) |
 | `Contract` | `BundleContract` | `BundleContract` | (JSON) |
-| `Relation` | `BundleRelation` | `BundleRelation` | (JSON) |
+| `Relation` (also `cases::Relation`) | `BundleRelation` | `BundleRelation` | (JSON) |
 | `Difference` | `BundleDifference` | `BundleDifference` | (JSON) |
-| `Comparison` | `BundleComparison` | `BundleComparison` | `cr_document_compare_bundle` |
+| `BundleComparison` | `BundleComparison` | `BundleComparison` | `cr_document_compare_bundle` |
 | `CaseFileRef` (path and digest), `.digest_matches(bytes)` | `CaseFileRef`, `.digest_matches(content)` | `CaseFileRef`, `.digestMatches(content)` | — |
 | `CaseFileRef::new(path, bytes)` | `(path, content)` pairs | `BundleCaseInput` `{ path, content }` | `struct cr_case_input` |
 | `Bundle::case_digest_matches(path, bytes)` | `Bundle.case_digest_matches(path, content)` | `bundle.caseDigestMatches(path, content)` | — |

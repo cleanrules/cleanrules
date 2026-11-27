@@ -1252,6 +1252,8 @@ int main(int argc, char **argv) {
     // Nor the statistics of a run (spec/tests.md, Statistics; docs/PLAN.md,
     // T.10).
     std::size_t statistics = 0;
+    // Nor does it compare versions (spec/comparison.md; docs/PLAN.md, T.4).
+    std::size_t test_comparisons = 0;
     std::size_t skipped_draw = 0;
     std::size_t graded = 0;
     // cleanrules.hpp has no bundles yet (a beta binding, docs/PLAN.md, R.5):
@@ -1302,6 +1304,10 @@ int main(int argc, char **argv) {
                     ++statistics;
                     continue;
                 }
+                if (need(given, "kind").text == "test_comparison") {
+                    ++test_comparisons;
+                    continue;
+                }
                 if (need(given, "kind").text == "bundle" ||
                     need(given, "kind").text == "bundle_compare") {
                     ++bundles;
@@ -1343,12 +1349,12 @@ int main(int argc, char **argv) {
     }
     std::printf("conformance: %zu vectors; json %zu of %zu passed, native %zu of %zu passed; %zu "
                 "native-only, %zu tool vectors (agents, not in C++ yet), %zu audits, %zu test "
-                "runs and %zu statistics (not in C++ yet), %zu diagrams "
+                "runs, %zu statistics and %zu test comparisons (not in C++ yet), %zu diagrams "
                 "(spec/visual.md: checked through the C ABI until cleanrules.hpp draws them),"
                 " %zu under a graded logic (task J.1b) and %zu that make or compare bundles (not in "
                 "C++ yet) skipped\n",
                 ran, passed_json, ran, passed_native, ran_native, skipped, tools, audits, test_runs,
-                statistics, skipped_draw, graded, bundles);
+                statistics, test_comparisons, skipped_draw, graded, bundles);
     if (!failures.empty()) {
         std::fprintf(stderr, "conformance: %zu failures\n", failures.size());
         return EXIT_FAILURE;

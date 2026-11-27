@@ -1,0 +1,18 @@
+---
+source: crates/core/tests/comparison.rs
+expression: comparison.to_string()
+---
+Comparison of two test runs: same rules, same engine (same_rules_same_engine)
+a: a rule set, 1 rule, hit policy first, logic boolean, sha256:cd04072485e082eeaf7479b2fb165848e06f434abdbb124639ad838f8dbea583
+b: a rule set, 1 rule, hit policy first, logic boolean, sha256:cd04072485e082eeaf7479b2fb165848e06f434abdbb124639ad838f8dbea583
+REMOVED     one.json  "gone"
+            a: passed, selected ["a"], output {"v":1}
+ADDED       one.json  "new"
+            b: passed, selected [], output null
+UNEXPECTED  two.json
+            error (error)
+            a case file has no expectation
+            b: error, format_error at line 1, column 2: expected "null", found 'o'
+ADDED       three.json  "t"
+            b: passed, selected ["a"], output {"v":1}
+7 items: 1 unchanged, 1 changed (0 expected, 1 unexpected), 2 added, 1 removed, 2 not compared

@@ -1,0 +1,23 @@
+---
+source: crates/core/tests/comparison.rs
+expression: comparison.to_string()
+---
+Comparison of two test runs: other rules, same engine (other_rules_same_engine)
+a: a rule set, 1 rule, hit policy collect, aggregate sum, logic boolean, strict, sha256:c4e8597ec9553aa17f01855107358a94bee4089ba55798ea2c6668e08acd94fe
+b: a rule set, 2 rules, hit policy unique, logic boolean, sha256:1549c5fa6650ffb2b65a5a8eebc0b3b329ef4829b23fa41e9ab92f09e9ba479f
+UNEXPECTED  root.json
+            error (error)
+            a case file has no expectation
+            a: error, format_error at the root: a document is a JSON object
+            b: error, unsupported_version at /version: this reader knows format version 1
+UNEXPECTED  "two"
+            error (error)
+            b did not pass its case
+            a: passed, selected ["a"], output {"v":1}
+            b: error, hit_policy_error in rules ["a","b"]: 2 rules fired under the unique hit policy
+            a explanation:
+              HIT POLICY collect AGGREGATE sum: selected a
+              [x] a (selected): x > 0
+                  - x > 0 is true (x = 2)
+3 items: 0 unchanged, 2 changed (0 expected, 2 unexpected), 0 added, 0 removed, 1 not compared
+Partial run of a: interrupted by max_results, 1 not run

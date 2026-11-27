@@ -1,20 +1,20 @@
 //! The JSON form of a test run (`spec/tests.md`, *Test runs*), output only.
 
-use crate::bundle::{ENGINE_NAME, ENGINE_VERSION};
-use crate::cases::{CaseResult, ExpectedOutput, Mismatch, Summary, TestRun};
+use crate::bundle::{BundleId, ENGINE_NAME, ENGINE_VERSION, EngineLimits, Revision};
+use crate::cases::{CaseResult, ExpectedOutput, Mismatch, Summary, TestRun, TestRunFile};
 use crate::format::{write_error, write_statistics, write_value};
 use crate::json::{Json, JsonNumber};
 use crate::value::Map;
 
-fn string(text: &str) -> Json {
+pub(crate) fn string(text: &str) -> Json {
     Json::String(text.to_owned())
 }
 
-fn number(n: usize) -> Json {
+pub(crate) fn number(n: usize) -> Json {
     Json::Number(JsonNumber::from_literal(n.to_string()))
 }
 
-fn strings<S: AsRef<str>>(items: impl IntoIterator<Item = S>) -> Json {
+pub(crate) fn strings<S: AsRef<str>>(items: impl IntoIterator<Item = S>) -> Json {
     Json::Array(
         items
             .into_iter()
@@ -56,38 +56,12 @@ pub fn write_test_run(run: &TestRun) -> Json {
     if let Some(digest) = run.ruleset_digest {
         members.push(("ruleset_digest".into(), string(&digest.to_string())));
     }
-    members.push((
-        "engine".into(),
-        Json::Object(vec![
-            ("name".into(), string(ENGINE_NAME)),
-            ("version".into(), string(ENGINE_VERSION)),
-            ("limits".into(), run.engine_limits.to_json()),
-        ]),
-    ));
-    if let Some((id, revision)) = &run.bundle {
-        members.push((
-            "bundle".into(),
-            Json::Object(vec![
-                ("id".into(), string(id.as_str())),
-                ("revision".into(), string(revision.as_str())),
-            ]),
-        ));
-    }
-    let files = run
-        .files
-        .iter()
-        .map(|file| {
-            let mut entry = Vec::new();
-            if let Some(path) = &file.path {
-                entry.push(("path".to_owned(), string(path)));
-            }
-            if let Some(digest) = file.digest {
-                entry.push(("digest".to_owned(), string(&digest.to_string())));
-            }
-            Json::Object(entry)
-        })
-        .collect();
-    members.push(("files".into(), Json::Array(files)));
+    write_engine_and_files(
+        &mut members,
+        &run.engine_limits,
+        run.bundle.as_ref(),
+        &run.files,
+    );
     let mut limits = vec![("max_explained".to_owned(), number(run.limits.max_explained))];
     if let Some(max) = run.limits.max_results {
         limits.push(("max_results".into(), number(max)));
@@ -107,7 +81,47 @@ pub fn write_test_run(run: &TestRun) -> Json {
     Json::Object(members)
 }
 
-fn write_summary(summary: &Summary) -> Json {
+/// The `engine`, `bundle` and `files` of a test run's header.
+pub(crate) fn write_engine_and_files(
+    members: &mut Vec<(String, Json)>,
+    engine_limits: &EngineLimits,
+    bundle: Option<&(BundleId, Revision)>,
+    files: &[TestRunFile],
+) {
+    members.push((
+        "engine".into(),
+        Json::Object(vec![
+            ("name".into(), string(ENGINE_NAME)),
+            ("version".into(), string(ENGINE_VERSION)),
+            ("limits".into(), engine_limits.to_json()),
+        ]),
+    ));
+    if let Some((id, revision)) = bundle {
+        members.push((
+            "bundle".into(),
+            Json::Object(vec![
+                ("id".into(), string(id.as_str())),
+                ("revision".into(), string(revision.as_str())),
+            ]),
+        ));
+    }
+    let files = files
+        .iter()
+        .map(|file| {
+            let mut entry = Vec::new();
+            if let Some(path) = &file.path {
+                entry.push(("path".to_owned(), string(path)));
+            }
+            if let Some(digest) = file.digest {
+                entry.push(("digest".to_owned(), string(&digest.to_string())));
+            }
+            Json::Object(entry)
+        })
+        .collect();
+    members.push(("files".into(), Json::Array(files)));
+}
+
+pub(crate) fn write_summary(summary: &Summary) -> Json {
     let mut members = vec![
         ("total".to_owned(), number(summary.total())),
         ("passed".to_owned(), number(summary.passed)),

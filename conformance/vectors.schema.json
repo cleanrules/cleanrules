@@ -752,6 +752,37 @@
             }
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Compare two versions of rules on test cases (spec/comparison.md).",
+          "properties": {
+            "kind": {
+              "const": "test_comparison"
+            },
+            "a": {
+              "$ref": "#/$defs/comparisonSide"
+            },
+            "b": {
+              "$ref": "#/$defs/comparisonSide"
+            },
+            "max_explained": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The most changes explained (spec/comparison.md, Explaining changes); 5 when absent."
+            },
+            "cancel_after": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Cancel the comparison by a callback that says so when it is asked after this many items, side a's first (spec/comparison.md, Interruption)."
+            }
+          },
+          "required": [
+            "kind",
+            "a",
+            "b"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -919,8 +950,77 @@
         "statistics": {
           "$ref": "https://cleanrules.github.io/schemas/v1/test_run.schema.json#/$defs/statistics",
           "description": "The statistics of the run (spec/tests.md, Statistics, JSON), compared as they are."
+        },
+        "test_comparison": {
+          "type": "object",
+          "description": "The test comparison (spec/comparison.md, JSON), with the error of each side of an item written with its code and compared fields only, which the runner compares as errors are (conformance/README.md, Comparing)."
         }
       },
+      "additionalProperties": false
+    },
+    "comparisonSide": {
+      "type": "object",
+      "description": "One side of a comparison: its rules and case files, as a test_run vector gives them, and its run's limits.",
+      "properties": {
+        "document": {
+          "type": "object",
+          "description": "The rules: a rule set, decision table or bundle document (spec/json-format.md)."
+        },
+        "cases": {
+          "type": "object",
+          "description": "A case file document, run without a path."
+        },
+        "files": {
+          "type": "array",
+          "description": "Case files with their paths and contents as UTF-8 text, in order; for a bundle, the files it names, by path.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "max_results": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_steps": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "document"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "cases"
+          ]
+        },
+        {
+          "required": [
+            "files"
+          ]
+        }
+      ],
       "additionalProperties": false
     }
   }

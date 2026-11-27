@@ -118,7 +118,7 @@ func TestConformance(t *testing.T) {
 	// The only skips of the JSON route: grids, evaluate vectors with limits
 	// (max_values bounds native data only), tools for agents, audits, diagrams
 	// and conditions under a graded logic.
-	var grids, limited, zero, tools, audits, runs, statistics, drawn, graded []string
+	var grids, limited, zero, tools, audits, runs, statistics, comparisons, drawn, graded []string
 	for _, file := range files {
 		for _, vector := range file.vectors {
 			given, id := vector.obj("given"), vector.str("id")
@@ -133,6 +133,9 @@ func TestConformance(t *testing.T) {
 			}
 			if given.str("kind") == "statistics" {
 				statistics = append(statistics, id)
+			}
+			if given.str("kind") == "test_comparison" {
+				comparisons = append(comparisons, id)
 			}
 			if given.str("kind") == "draw" {
 				drawn = append(drawn, id)
@@ -180,6 +183,9 @@ func TestConformance(t *testing.T) {
 		}
 		if !slices.Equal(counts[route].skipped["statistics"], statistics) {
 			t.Errorf("%s skipped %v as statistics, the statistics vectors are %v", route, counts[route].skipped["statistics"], statistics)
+		}
+		if !slices.Equal(counts[route].skipped["test_comparison"], comparisons) {
+			t.Errorf("%s skipped %v as test comparisons, the test comparison vectors are %v", route, counts[route].skipped["test_comparison"], comparisons)
 		}
 	}
 	// Both routes skip the diagrams, which this binding draws from phase V.2.

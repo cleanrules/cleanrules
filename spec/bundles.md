@@ -12,7 +12,7 @@ then say exactly what was run: the same bundle on the same engine gives the
 same decisions, explanations and errors (`CLAUDE.md`, invariant 7).
 
 Comparing two bundles answers two different questions, which a comparison of
-results (task T.4) keeps apart:
+results ([`comparison.md`](comparison.md), *Relation*) keeps apart:
 
 - **the same rules under another engine**: same rule set digest, another
   engine version or configuration. Any change in the results comes from the
@@ -189,7 +189,7 @@ it never refuses one for being made elsewhere. Only the format version can
 refuse a bundle: an unknown one is `unsupported_version`, as for every
 document. Running the bundle's cases under another engine is the first
 comparison above, and saying whether the results stayed the same is the work
-of the comparison of results (T.4), not of the reader.
+of the comparison of results (`comparison.md`), not of the reader.
 
 The engine and configuration of a bundle are the ones it was made with: an
 engine that makes a bundle writes its own name and version, and the limits it
@@ -328,8 +328,9 @@ tags, metadata and the names of actions too. Editing only a description, or
 renaming a rule, makes "other rules", although the rules decide exactly as
 before; the digest says that the documents differ, not that the decisions do.
 Whether two versions decide alike on their cases is the work of the
-comparison of results (T.4); to keep a renamed rule the same rule there, give
-it an `id` (`rules.md`, *Identity*).
+comparison of results (`comparison.md`), which holds this comparison when it
+compares two bundles' runs, and refuses a conflict; to keep a renamed rule
+the same rule there, give it an `id` (`rules.md`, *Identity*).
 
 ```json
 { "relation": "same_rules_other_engine", "identical": false, "differences": ["engine.version", "contract.input"] }

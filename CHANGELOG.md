@@ -38,6 +38,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `conformance/tools/statistics_vectors.py`), which the binding runners skip
   and count until a binding gathers statistics; example
   `docs/examples/statistics.rs`.
+- Comparing two versions of rules on the same cases (task T.4;
+  [`spec/comparison.md`](spec/comparison.md)).
+  - Rust API (`cleanrules::cases`): `Comparator` runs case files against two
+    sides, `a` and `b`, each a `Runner` with its own limits
+    (`Comparator::new`), or two bundles on their own case files
+    (`Comparator::for_bundles`, or `with_bundles` for runners with limits),
+    and gives a `TestComparison` (`compare`, `compare_until` to cancel both
+    sides; `has_unexpected_changes`, `is_complete`, `is_partial`,
+    `engine_limit_differences`). Its parts: `relation` (`Relation`, also
+    `cases::Relation`: same or other rules by rule set digest, same or other
+    engine by name, version and limits, so the two questions of
+    `spec/bundles.md` stay apart); `bundles`, the `BundleComparison` of two
+    bundles; each side as a `ComparedRun` (its test run's header with its
+    `ruleset_digest`, its `TestRunLimits`, its summary and `OutcomeCounts`:
+    `decisions`, `nothing_selected`, `with_unknown`, `error`); a
+    `TestComparisonSummary`; and the listed `ComparedItem`s in comparison
+    order, joined by path and id, each with a `ChangeKind`
+    (`same_selection_other_output`, `other_selection_same_output`,
+    `other_selection_other_output`, `other_unknown`, `error`, or a case
+    `added` or `removed`), the `ChangedPart`s that differ (`selected`,
+    `output`, `unknown`, `error`; errors by code and compared fields), why
+    an unexpected change is unexpected (`Unstated`), and what each side gave
+    (`CaseOutcome`, with a `CaseDecision` and its `SingleOutput`, or the
+    error); a side whose runner gathers statistics (task T.10) carries them
+    (`ComparedRun::statistics`). `TestComparison` is `Send + 'static` and
+    `Comparator` is `Send + Sync`.
+  - Expected changes add nothing to the case file format: a change is
+    expected when side `b` passes a non-empty expectation that checks every
+    part that differs, and for outputs names every payload key whose value
+    differs (and states a switch between an output and none, or another
+    number of outputs). A gone error is expected only by an expectation that
+    states the new decision. Unexpected changes are explained first (the
+    first `max_explained`, 5 by default, carry each side's
+    `explanation_text`). A case one side cannot read the file of, did not
+    reach because its run was interrupted, or whose file neither side can
+    read, is not compared, never unchanged; a conflict (one bundle id and
+    revision with other rules) is refused with `decision_mismatch`.
+  - Format: output-only document `{"version": 1, "test_comparison": {...}}`
+    (content key added to format version 1; readers give `unsupported`),
+    with `format::write_test_comparison`, `write_compared_item` and
+    `write_test_comparison_as` (JSON, YAML or the text fixed by snapshot
+    tests), and JSON Schema `spec/schemas/v1/test_comparison.schema.json`
+    with valid and invalid examples; kinds of change, parts and reasons may
+    grow within version 1.
+  - Conformance: 29 vectors of the new kind `test_comparison`
+    (`conformance/vectors/comparison/`, written by
+    `conformance/tools/comparison_vectors.py`), which the C ABI, Python,
+    C++, JavaScript, Java, Scala and Go runners skip and count until T.9b;
+    example `docs/examples/comparison.rs`.
 - Case runner with incremental batches (tasks T.2 and T.3;
   [`spec/tests.md`](spec/tests.md), *Running cases*, *Test runs*): in the
   Rust core, `cases::Runner` (for a rule set, `Runner::for_table` and
@@ -320,8 +369,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `BundleRules`, `Engine` (`is_current`), `EngineLimits` (`of`, `get`,
     `with`, `iter`, `check`, `to_limits`, `to_json`), the enum
     `EngineLimit`, `Contract` (`to_json`), `CaseFileRef` (the reference to
-    a case file: path and digest, `digest_matches`), `Comparison`
-    (`differences()` gives the enum `Difference`), `Relation`,
+    a case file: path and digest, `digest_matches`), `BundleComparison`
+    (named `Comparison` until task T.4; `differences()` gives the enum
+    `Difference`), `Relation`,
     `ENGINE_NAME`, `ENGINE_VERSION` and `MAX_RECORDED_LIMIT`;
     `Bundle::case_digest_matches`; `Bundle` is `Eq` and `Hash` by its digest,
     computed once. `Document::Bundle` and `format::write_bundle`.
@@ -1729,6 +1779,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   core's `FormatError` at their line and column, after the size check (they
   were decoded in Python first). The size-limit messages of every reader
   come from `format::too_large`, with the same text as before.
+
+- The Rust core's `bundle::Comparison` is now `bundle::BundleComparison`,
+  the name it has in Python and JavaScript, so that it does not read as the
+  comparison of test runs (task T.4, `cases::TestComparison`).
 
 - The text of an audit of a decision table names each cell by its row and
   column before its pointer, as `row es, input country

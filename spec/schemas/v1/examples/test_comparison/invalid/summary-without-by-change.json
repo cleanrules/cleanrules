@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "test_comparison": {
+    "relation": "same_rules_same_engine",
+    "a": {
+      "source": "ruleset",
+      "hit_policy": "first",
+      "logic": "boolean",
+      "ruleset_digest": "sha256:cd04072485e082eeaf7479b2fb165848e06f434abdbb124639ad838f8dbea583",
+      "engine": {
+        "name": "cleanrules",
+        "version": "1.0.0",
+        "limits": {
+          "max_size": 16777216,
+          "max_nesting": 1024,
+          "max_depth": 256,
+          "max_path_segments": 256,
+          "max_table_size": 2097152,
+          "max_values": 1000000
+        }
+      },
+      "files": [
+        {
+          "path": "one.json",
+          "digest": "sha256:dab59c3c76cbaa9386d961eb6cb4189d58221c20360a8a3f1bf68dc41f68074e"
+        },
+        {
+          "path": "two.json",
+          "digest": "sha256:415146216a593d4aba83cae97b2e230bc208a9e99c59363efe781543fa0ae25b"
+        }
+      ],
+      "limits": {},
+      "summary": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "error": 0,
+        "partial": false
+      },
+      "outcomes": {
+        "decisions": 3,
+        "nothing_selected": 0,
+        "with_unknown": 0,
+        "error": 0
+      }
+    },
+    "b": {
+      "source": "ruleset",
+      "hit_policy": "first",
+      "logic": "boolean",
+      "ruleset_digest": "sha256:cd04072485e082eeaf7479b2fb165848e06f434abdbb124639ad838f8dbea583",
+      "engine": {
+        "name": "cleanrules",
+        "version": "1.0.0",
+        "limits": {
+          "max_size": 16777216,
+          "max_nesting": 1024,
+          "max_depth": 256,
+          "max_path_segments": 256,
+          "max_table_size": 2097152,
+          "max_values": 1000000
+        }
+      },
+      "files": [
+        {
+          "path": "one.json",
+          "digest": "sha256:d0ecdd13a458cabe1ba49ad4e986e0874e5979e5f1a07400048d566adda3921c"
+        },
+        {
+          "path": "two.json",
+          "digest": "sha256:7ccfa1fbf3940e6f0c0375d87c0f9235a50514e14cb427bdfaf5077987b26ccf"
+        }
+      ],
+      "limits": {},
+      "summary": {
+        "total": 3,
+        "passed": 2,
+        "failed": 0,
+        "error": 1,
+        "partial": false
+      },
+      "outcomes": {
+        "decisions": 2,
+        "nothing_selected": 1,
+        "with_unknown": 0,
+        "error": 0
+      }
+    },
+    "limits": {
+      "max_explained": 5
+    },
+    "summary": {
+      "total": 5,
+      "unchanged": 1,
+      "changed": 1,
+      "expected": 0,
+      "unexpected": 1,
+      "added": 1,
+      "removed": 1,
+      "not_compared": 1,
+      "partial": false
+    },
+    "items": [
+      {
+        "path": "one.json",
+        "id": "gone",
+        "change": "removed",
+        "a": {
+          "status": "passed",
+          "selected": [
+            "a"
+          ],
+          "output": {
+            "v": 1
+          },
+          "outputs": [
+            {
+              "v": 1
+            }
+          ],
+          "unknown": []
+        }
+      },
+      {
+        "path": "one.json",
+        "id": "new",
+        "change": "added",
+        "b": {
+          "status": "passed",
+          "selected": [],
+          "output": null,
+          "outputs": [],
+          "unknown": []
+        }
+      },
+      {
+        "path": "two.json",
+        "change": "error",
+        "expected": false,
+        "differences": [
+          "error"
+        ],
+        "unstated": [
+          "error"
+        ],
+        "b": {
+          "status": "error",
+          "error": {
+            "code": "format_error",
+            "message": "expected \"null\", found 'o'",
+            "line": 1,
+            "column": 2
+          }
+        }
+      }
+    ]
+  }
+}

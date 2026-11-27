@@ -13,6 +13,7 @@ pub mod result;
 mod rules;
 mod statistics;
 pub(crate) mod table;
+pub(crate) mod test_comparison;
 pub(crate) mod test_run;
 pub mod value;
 
@@ -24,7 +25,7 @@ pub use document::{
     Document, DocumentFormat, parse_as, read_decision_document, read_decision_document_as,
     read_document, read_document_as, read_parsed_decision_document, read_parsed_document,
     size_limit, too_large, write_audit_as, write_decision_as, write_document, write_document_as,
-    write_explanation_as, write_summary_as, write_test_run_as,
+    write_explanation_as, write_summary_as, write_test_comparison_as, write_test_run_as,
 };
 #[cfg(feature = "yaml")]
 pub use document::{read_yaml_decision_document, read_yaml_document};
@@ -38,6 +39,7 @@ pub use result::{
 pub use rules::{write_decision, write_rule, write_ruleset};
 pub use statistics::write_statistics;
 pub use table::write_table;
+pub use test_comparison::{write_compared_item, write_test_comparison};
 pub use test_run::{write_case_result, write_test_run};
 pub use value::{ValueContext, read_value, write_value};
 

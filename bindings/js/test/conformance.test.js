@@ -113,6 +113,11 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
   // And a run's statistics, which the binding does not gather yet.
   const counted = [...vectors.values()].filter((v) => v.get('given').get('kind') === 'statistics').map((v) => v.get('id'))
   if (counted.length > 0) runs.push('statistics')
+  // And the comparator, until task T.9b.
+  const testComparisons = [...vectors.values()]
+    .filter((v) => v.get('given').get('kind') === 'test_comparison')
+    .map((v) => v.get('id'))
+  const comparisons = testComparisons.length > 0 ? ['test_comparison'] : []
   const diagrams = drawn.length > 0 ? ['diagram'] : []
   const grades = graded.length > 0 ? ['graded'] : []
   // The native route skips case files that the idiomatic API would load.
@@ -126,6 +131,7 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
       ...diagrams,
       ...agents,
       ...runs,
+      ...comparisons,
       ...grades,
     ].sort(),
   )
@@ -136,7 +142,11 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
   assert.deepEqual(counts.json.skipped.get('graded') ?? [], graded)
   assert.deepEqual(counts.json.skipped.get('test_run') ?? [], testRuns)
   assert.deepEqual(counts.json.skipped.get('statistics') ?? [], counted)
-  assert.deepEqual([...counts.native.skipped.keys()].sort(), [...diagrams, ...agents, ...documents, ...runs, ...grades, ...cases].sort())
+  assert.deepEqual(counts.json.skipped.get('test_comparison') ?? [], testComparisons)
+  assert.deepEqual(
+    [...counts.native.skipped.keys()].sort(),
+    [...diagrams, ...agents, ...documents, ...runs, ...comparisons, ...grades, ...cases].sort(),
+  )
   assert.deepEqual(counts.native.skipped.get('cases') ?? [], caseFiles)
   assert.deepEqual(counts.native.skipped.get('diagram') ?? [], drawn)
   assert.deepEqual(counts.native.skipped.get('agents') ?? [], tools)
@@ -144,6 +154,7 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
   assert.deepEqual(counts.native.skipped.get('audit_document') ?? [], auditedDocuments)
   assert.deepEqual(counts.native.skipped.get('test_run') ?? [], testRuns)
   assert.deepEqual(counts.native.skipped.get('statistics') ?? [], counted)
+  assert.deepEqual(counts.native.skipped.get('test_comparison') ?? [], testComparisons)
 })
 
 /** `vector` with `from` replaced by `to` in its expected output only. */

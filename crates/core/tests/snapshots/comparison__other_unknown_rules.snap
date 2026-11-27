@@ -1,0 +1,23 @@
+---
+source: crates/core/tests/comparison.rs
+expression: comparison.to_string()
+---
+Comparison of two test runs: other rules, same engine (other_rules_same_engine)
+a: a rule set, 2 rules, hit policy first, logic boolean, sha256:af9ebc5933f9140ba400809fb4b9cb06ae408ce641b5777cd86557e476435f41
+b: a rule set, 3 rules, hit policy first, logic boolean, sha256:bcd97ab34dd607efcd237d0e5780809e753e10a76f2d107ef492fa2fa1162d06
+UNEXPECTED  xy.json  "x1"
+            other_unknown (unknown)
+            b's expectation does not check: unknown
+            a: passed, selected ["a"], output {"v":1}
+            b: passed, selected ["a"], output {"v":1}, unknown ["c"]
+UNEXPECTED  xy.json  "x2"
+            other_unknown (unknown)
+            b's expectation does not check: unknown
+            a: passed, selected ["a"], output {"v":1}
+            b: passed, selected ["a"], output {"v":1}, unknown ["c"]
+UNEXPECTED  xy.json  "none"
+            other_unknown (unknown)
+            b's expectation does not check: unknown
+            a: passed, selected [], output null, unknown ["a","b"]
+            b: passed, selected [], output null, unknown ["a","b","c"]
+3 items: 0 unchanged, 3 changed (0 expected, 3 unexpected), 0 added, 0 removed, 0 not compared

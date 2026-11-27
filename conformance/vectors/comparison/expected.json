@@ -1,0 +1,2124 @@
+{
+  "version": 1,
+  "area": "comparison",
+  "vectors": [
+    {
+      "id": "comparison/expected/unnamed-key-is-unexpected",
+      "spec": [
+        "comparison.md#expected-changes",
+        "comparison.md#changes"
+      ],
+      "description": "an expected output states the keys it names: a change of a key it does not name is unexpected, though the case passes",
+      "given": {
+        "kind": "test_comparison",
+        "a": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "first",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "a",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  },
+                  "then": {
+                    "discount": {
+                      "op": "const",
+                      "value": 1
+                    },
+                    "tier": {
+                      "op": "const",
+                      "value": "gold"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "k.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"tier\", \"input\": {\"x\": 1}}, {\"id\": \"both\", \"input\": {\"x\": 1}}]}}"
+            }
+          ]
+        },
+        "b": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "first",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "a",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  },
+                  "then": {
+                    "discount": {
+                      "op": "const",
+                      "value": 1
+                    },
+                    "tier": {
+                      "op": "const",
+                      "value": "silver"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "k.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"tier\", \"input\": {\"x\": 1}, \"expect\": {\"output\": {\"discount\": 1}}}, {\"id\": \"both\", \"input\": {\"x\": 1}, \"expect\": {\"output\": {\"discount\": 3, \"tier\": \"silver\"}}}]}}"
+            }
+          ]
+        },
+        "max_explained": 0
+      },
+      "expect": {
+        "test_comparison": {
+          "relation": "other_rules_same_engine",
+          "a": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:41bf2a135257ac661563f90088d9a0d9b6f87d981e8d1b5115372d3381b9f463",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "files": [
+              {
+                "path": "k.json",
+                "digest": "sha256:1eb37a15721e5840310c3958e956f4b8389f5b961cf2a7028a30ec1c7d5b82a4"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 2,
+              "nothing_selected": 0,
+              "with_unknown": 0,
+              "error": 0
+            }
+          },
+          "b": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:1b4bf3565ff06cc8c1d46003d3c441ff224aeffeee78d5fe24aeb71088a467b5",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "files": [
+              {
+                "path": "k.json",
+                "digest": "sha256:e8b4ff9aebaafea55937c655536ab762e9a04c3e7fc5a6f6adf53052cc4ba8eb"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 2,
+              "passed": 1,
+              "failed": 1,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 2,
+              "nothing_selected": 0,
+              "with_unknown": 0,
+              "error": 0
+            }
+          },
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 2,
+            "unchanged": 0,
+            "changed": 2,
+            "expected": 0,
+            "unexpected": 2,
+            "added": 0,
+            "removed": 0,
+            "not_compared": 0,
+            "partial": false,
+            "by_change": {
+              "same_selection_other_output": 2,
+              "other_selection_same_output": 0,
+              "other_selection_other_output": 0,
+              "other_unknown": 0,
+              "error": 0
+            }
+          },
+          "items": [
+            {
+              "path": "k.json",
+              "id": "tier",
+              "change": "same_selection_other_output",
+              "expected": false,
+              "differences": [
+                "output"
+              ],
+              "unstated": [
+                "output"
+              ],
+              "a": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "discount": 1,
+                  "tier": "gold"
+                },
+                "outputs": [
+                  {
+                    "discount": 1,
+                    "tier": "gold"
+                  }
+                ],
+                "unknown": []
+              },
+              "b": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "discount": 1,
+                  "tier": "silver"
+                },
+                "outputs": [
+                  {
+                    "discount": 1,
+                    "tier": "silver"
+                  }
+                ],
+                "unknown": []
+              }
+            },
+            {
+              "path": "k.json",
+              "id": "both",
+              "change": "same_selection_other_output",
+              "expected": false,
+              "differences": [
+                "output"
+              ],
+              "unstated": [
+                "status"
+              ],
+              "a": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "discount": 1,
+                  "tier": "gold"
+                },
+                "outputs": [
+                  {
+                    "discount": 1,
+                    "tier": "gold"
+                  }
+                ],
+                "unknown": []
+              },
+              "b": {
+                "status": "failed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "discount": 1,
+                  "tier": "silver"
+                },
+                "outputs": [
+                  {
+                    "discount": 1,
+                    "tier": "silver"
+                  }
+                ],
+                "unknown": []
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "comparison/expected/every-changed-key-named",
+      "spec": [
+        "comparison.md#expected-changes",
+        "comparison.md#changes"
+      ],
+      "description": "a change of an output is expected when the case names every key that differs, in output or at its position in outputs; naming only some of them leaves it unexpected, though the case passes",
+      "given": {
+        "kind": "test_comparison",
+        "a": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "first",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "a",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  },
+                  "then": {
+                    "discount": {
+                      "op": "const",
+                      "value": 1
+                    },
+                    "tier": {
+                      "op": "const",
+                      "value": "gold"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "k.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"tier\", \"input\": {\"x\": 1}}, {\"id\": \"both\", \"input\": {\"x\": 1}}]}}"
+            }
+          ]
+        },
+        "b": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "first",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "a",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  },
+                  "then": {
+                    "discount": {
+                      "op": "const",
+                      "value": 3
+                    },
+                    "tier": {
+                      "op": "const",
+                      "value": "silver"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "k.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"tier\", \"input\": {\"x\": 1}, \"expect\": {\"output\": {\"tier\": \"silver\"}}}, {\"id\": \"both\", \"input\": {\"x\": 1}, \"expect\": {\"outputs\": [{\"tier\": \"silver\", \"discount\": 3}]}}]}}"
+            }
+          ]
+        },
+        "max_explained": 0
+      },
+      "expect": {
+        "test_comparison": {
+          "relation": "other_rules_same_engine",
+          "a": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:41bf2a135257ac661563f90088d9a0d9b6f87d981e8d1b5115372d3381b9f463",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "files": [
+              {
+                "path": "k.json",
+                "digest": "sha256:1eb37a15721e5840310c3958e956f4b8389f5b961cf2a7028a30ec1c7d5b82a4"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 2,
+              "nothing_selected": 0,
+              "with_unknown": 0,
+              "error": 0
+            }
+          },
+          "b": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:315c0a327c7fb7823c59945155b2f4a2681fa9cbd7a299499dd36f28b3d720cd",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "files": [
+              {
+                "path": "k.json",
+                "digest": "sha256:08b8a32402c12e7997e72069ad3d562ab83e83747c7de298837e84993d44d9e0"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 2,
+              "nothing_selected": 0,
+              "with_unknown": 0,
+              "error": 0
+            }
+          },
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 2,
+            "unchanged": 0,
+            "changed": 2,
+            "expected": 1,
+            "unexpected": 1,
+            "added": 0,
+            "removed": 0,
+            "not_compared": 0,
+            "partial": false,
+            "by_change": {
+              "same_selection_other_output": 2,
+              "other_selection_same_output": 0,
+              "other_selection_other_output": 0,
+              "other_unknown": 0,
+              "error": 0
+            }
+          },
+          "items": [
+            {
+              "path": "k.json",
+              "id": "tier",
+              "change": "same_selection_other_output",
+              "expected": false,
+              "differences": [
+                "output"
+              ],
+              "unstated": [
+                "output"
+              ],
+              "a": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "discount": 1,
+                  "tier": "gold"
+                },
+                "outputs": [
+                  {
+                    "discount": 1,
+                    "tier": "gold"
+                  }
+                ],
+                "unknown": []
+              },
+              "b": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "discount": 3,
+                  "tier": "silver"
+                },
+                "outputs": [
+                  {
+                    "discount": 3,
+                    "tier": "silver"
+                  }
+                ],
+                "unknown": []
+              }
+            },
+            {
+              "path": "k.json",
+              "id": "both",
+              "change": "same_selection_other_output",
+              "expected": true,
+              "differences": [
+                "output"
+              ],
+              "a": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "discount": 1,
+                  "tier": "gold"
+                },
+                "outputs": [
+                  {
+                    "discount": 1,
+                    "tier": "gold"
+                  }
+                ],
+                "unknown": []
+              },
+              "b": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "discount": 3,
+                  "tier": "silver"
+                },
+                "outputs": [
+                  {
+                    "discount": 3,
+                    "tier": "silver"
+                  }
+                ],
+                "unknown": []
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "comparison/expected/stated-by-b",
+      "spec": [
+        "comparison.md#expected-changes",
+        "comparison.md#joining"
+      ],
+      "description": "the new version's cases state the new output: the changes are expected, though one states only the part that differs; the old version fails them",
+      "given": {
+        "kind": "test_comparison",
+        "a": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "first",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "a",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "name": "b",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 2
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "c.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"x1\", \"input\": {\"x\": 1}}, {\"id\": \"x2\", \"input\": {\"x\": 2}}, {\"id\": \"none\", \"input\": {}}]}}"
+            }
+          ]
+        },
+        "b": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "first",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "a",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 3
+                    }
+                  }
+                },
+                {
+                  "name": "b",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 2
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "c.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"x1\", \"input\": {\"x\": 1}, \"expect\": {\"selected\": [\"a\"], \"output\": {\"v\": 3}}}, {\"id\": \"x2\", \"input\": {\"x\": 2}, \"expect\": {\"output\": {\"v\": 3}}}, {\"id\": \"none\", \"input\": {}}]}}"
+            }
+          ]
+        },
+        "max_explained": 0
+      },
+      "expect": {
+        "test_comparison": {
+          "relation": "other_rules_same_engine",
+          "a": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:af9ebc5933f9140ba400809fb4b9cb06ae408ce641b5777cd86557e476435f41",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "files": [
+              {
+                "path": "c.json",
+                "digest": "sha256:69bf3a35f037b75cd3fcec31dd06c641c816acc40224fbd16bfc92322a578b6e"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 3,
+              "passed": 3,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 3,
+              "nothing_selected": 1,
+              "with_unknown": 1,
+              "error": 0
+            }
+          },
+          "b": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:f47510357421545a1abc4d9c634c04b5dbd2784b842ca1fbf77daaa4d7e40307",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "files": [
+              {
+                "path": "c.json",
+                "digest": "sha256:bb48c1931c0645499454bb8dc08afd24d83dc6027728aefca62235bb7ae5868e"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 3,
+              "passed": 3,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 3,
+              "nothing_selected": 1,
+              "with_unknown": 1,
+              "error": 0
+            }
+          },
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 3,
+            "unchanged": 1,
+            "changed": 2,
+            "expected": 2,
+            "unexpected": 0,
+            "added": 0,
+            "removed": 0,
+            "not_compared": 0,
+            "partial": false,
+            "by_change": {
+              "same_selection_other_output": 2,
+              "other_selection_same_output": 0,
+              "other_selection_other_output": 0,
+              "other_unknown": 0,
+              "error": 0
+            }
+          },
+          "items": [
+            {
+              "path": "c.json",
+              "id": "x1",
+              "change": "same_selection_other_output",
+              "expected": true,
+              "differences": [
+                "output"
+              ],
+              "a": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 1
+                },
+                "outputs": [
+                  {
+                    "v": 1
+                  }
+                ],
+                "unknown": []
+              },
+              "b": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 3
+                },
+                "outputs": [
+                  {
+                    "v": 3
+                  }
+                ],
+                "unknown": []
+              }
+            },
+            {
+              "path": "c.json",
+              "id": "x2",
+              "change": "same_selection_other_output",
+              "expected": true,
+              "differences": [
+                "output"
+              ],
+              "a": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 1
+                },
+                "outputs": [
+                  {
+                    "v": 1
+                  }
+                ],
+                "unknown": []
+              },
+              "b": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 3
+                },
+                "outputs": [
+                  {
+                    "v": 3
+                  }
+                ],
+                "unknown": []
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "comparison/expected/every-part-checked",
+      "spec": [
+        "comparison.md#expected-changes"
+      ],
+      "description": "a change is expected only when the case checks every part that differs: the selection alone does not cover another output",
+      "given": {
+        "kind": "test_comparison",
+        "a": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "first",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "a",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "name": "b",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 2
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "p.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"only-selected\", \"input\": {\"x\": 2}}, {\"id\": \"both\", \"input\": {\"x\": 2}}]}}"
+            }
+          ]
+        },
+        "b": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "first",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "b",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 2
+                    }
+                  }
+                },
+                {
+                  "name": "a",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "p.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"only-selected\", \"input\": {\"x\": 2}, \"expect\": {\"selected\": [\"b\"]}}, {\"id\": \"both\", \"input\": {\"x\": 2}, \"expect\": {\"selected\": [\"b\"], \"outputs\": [{\"v\": 2}]}}]}}"
+            }
+          ]
+        },
+        "max_explained": 0
+      },
+      "expect": {
+        "test_comparison": {
+          "relation": "other_rules_same_engine",
+          "a": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:af9ebc5933f9140ba400809fb4b9cb06ae408ce641b5777cd86557e476435f41",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "files": [
+              {
+                "path": "p.json",
+                "digest": "sha256:2c7f90ef70a1fcca837a119318e7d0d191dc341dca12cbcd01b52e1601048ccc"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 2,
+              "nothing_selected": 0,
+              "with_unknown": 0,
+              "error": 0
+            }
+          },
+          "b": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:bb8c2b2bc16377a4c77320097282f7bf525abe7a3471c1a45ff4a677931275b8",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "files": [
+              {
+                "path": "p.json",
+                "digest": "sha256:125463718ed48de5875b48149a8ca024552471beb1478d9b39cb8325ecad03ea"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 2,
+              "nothing_selected": 0,
+              "with_unknown": 0,
+              "error": 0
+            }
+          },
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 2,
+            "unchanged": 0,
+            "changed": 2,
+            "expected": 1,
+            "unexpected": 1,
+            "added": 0,
+            "removed": 0,
+            "not_compared": 0,
+            "partial": false,
+            "by_change": {
+              "same_selection_other_output": 0,
+              "other_selection_same_output": 0,
+              "other_selection_other_output": 2,
+              "other_unknown": 0,
+              "error": 0
+            }
+          },
+          "items": [
+            {
+              "path": "p.json",
+              "id": "only-selected",
+              "change": "other_selection_other_output",
+              "expected": false,
+              "differences": [
+                "selected",
+                "output"
+              ],
+              "unstated": [
+                "output"
+              ],
+              "a": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 1
+                },
+                "outputs": [
+                  {
+                    "v": 1
+                  }
+                ],
+                "unknown": []
+              },
+              "b": {
+                "status": "passed",
+                "selected": [
+                  "b"
+                ],
+                "output": {
+                  "v": 2
+                },
+                "outputs": [
+                  {
+                    "v": 2
+                  }
+                ],
+                "unknown": []
+              }
+            },
+            {
+              "path": "p.json",
+              "id": "both",
+              "change": "other_selection_other_output",
+              "expected": true,
+              "differences": [
+                "selected",
+                "output"
+              ],
+              "a": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 1
+                },
+                "outputs": [
+                  {
+                    "v": 1
+                  }
+                ],
+                "unknown": []
+              },
+              "b": {
+                "status": "passed",
+                "selected": [
+                  "b"
+                ],
+                "output": {
+                  "v": 2
+                },
+                "outputs": [
+                  {
+                    "v": 2
+                  }
+                ],
+                "unknown": []
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "comparison/expected/b-fails",
+      "spec": [
+        "comparison.md#expected-changes"
+      ],
+      "description": "a change is expected only when the new version passes its case",
+      "given": {
+        "kind": "test_comparison",
+        "a": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "first",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "a",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "name": "b",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 2
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "f.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"fails\", \"input\": {\"x\": 2}}]}}"
+            }
+          ]
+        },
+        "b": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "first",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "b",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 2
+                    }
+                  }
+                },
+                {
+                  "name": "a",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "f.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"fails\", \"input\": {\"x\": 2}, \"expect\": {\"selected\": [\"a\"], \"output\": {\"v\": 2}}}]}}"
+            }
+          ]
+        },
+        "max_explained": 0
+      },
+      "expect": {
+        "test_comparison": {
+          "relation": "other_rules_same_engine",
+          "a": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:af9ebc5933f9140ba400809fb4b9cb06ae408ce641b5777cd86557e476435f41",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "files": [
+              {
+                "path": "f.json",
+                "digest": "sha256:0a8ed09b4b1294e13cb18da993cac850f8a9e6f54bfdfe1ea4abbb91ac617700"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 1,
+              "nothing_selected": 0,
+              "with_unknown": 0,
+              "error": 0
+            }
+          },
+          "b": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:bb8c2b2bc16377a4c77320097282f7bf525abe7a3471c1a45ff4a677931275b8",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "files": [
+              {
+                "path": "f.json",
+                "digest": "sha256:955c3a075d9209553ede917b6fbae478172d242f98956775d337d3a30ee53aff"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 1,
+              "nothing_selected": 0,
+              "with_unknown": 0,
+              "error": 0
+            }
+          },
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 1,
+            "unchanged": 0,
+            "changed": 1,
+            "expected": 0,
+            "unexpected": 1,
+            "added": 0,
+            "removed": 0,
+            "not_compared": 0,
+            "partial": false,
+            "by_change": {
+              "same_selection_other_output": 0,
+              "other_selection_same_output": 0,
+              "other_selection_other_output": 1,
+              "other_unknown": 0,
+              "error": 0
+            }
+          },
+          "items": [
+            {
+              "path": "f.json",
+              "id": "fails",
+              "change": "other_selection_other_output",
+              "expected": false,
+              "differences": [
+                "selected",
+                "output"
+              ],
+              "unstated": [
+                "status"
+              ],
+              "a": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 1
+                },
+                "outputs": [
+                  {
+                    "v": 1
+                  }
+                ],
+                "unknown": []
+              },
+              "b": {
+                "status": "failed",
+                "selected": [
+                  "b"
+                ],
+                "output": {
+                  "v": 2
+                },
+                "outputs": [
+                  {
+                    "v": 2
+                  }
+                ],
+                "unknown": []
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "comparison/expected/error-fixed",
+      "spec": [
+        "comparison.md#expected-changes"
+      ],
+      "description": "an error that is gone is expected only by an expectation that states the new decision (its selection or outputs): not by an empty one, nor by unknown alone",
+      "given": {
+        "kind": "test_comparison",
+        "a": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "unique",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "a",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "name": "b",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 2
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "e.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"empty\", \"input\": {\"x\": 2}}, {\"id\": \"unknown-only\", \"input\": {\"x\": 2}}, {\"id\": \"stated\", \"input\": {\"x\": 2}}]}}"
+            }
+          ]
+        },
+        "b": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "first",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "a",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "name": "b",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 2
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "e.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"empty\", \"input\": {\"x\": 2}}, {\"id\": \"unknown-only\", \"input\": {\"x\": 2}, \"expect\": {\"unknown\": []}}, {\"id\": \"stated\", \"input\": {\"x\": 2}, \"expect\": {\"selected\": [\"a\"]}}]}}"
+            }
+          ]
+        },
+        "max_explained": 0
+      },
+      "expect": {
+        "test_comparison": {
+          "relation": "other_rules_same_engine",
+          "a": {
+            "source": "ruleset",
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:1549c5fa6650ffb2b65a5a8eebc0b3b329ef4829b23fa41e9ab92f09e9ba479f",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "files": [
+              {
+                "path": "e.json",
+                "digest": "sha256:b4f03adc8e1bb36999f549f9af9e7f5c4b8b864dd10a8b78e135a5f711fd3e5e"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 3,
+              "passed": 0,
+              "failed": 0,
+              "error": 3,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 0,
+              "nothing_selected": 0,
+              "with_unknown": 0,
+              "error": 3
+            }
+          },
+          "b": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:af9ebc5933f9140ba400809fb4b9cb06ae408ce641b5777cd86557e476435f41",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "files": [
+              {
+                "path": "e.json",
+                "digest": "sha256:85c5adcac5dd12fe4bec24d88b5666fa05eb94bc3e060a25e87776fafdf5df6e"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 3,
+              "passed": 3,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 3,
+              "nothing_selected": 0,
+              "with_unknown": 0,
+              "error": 0
+            }
+          },
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 3,
+            "unchanged": 0,
+            "changed": 3,
+            "expected": 1,
+            "unexpected": 2,
+            "added": 0,
+            "removed": 0,
+            "not_compared": 0,
+            "partial": false,
+            "by_change": {
+              "same_selection_other_output": 0,
+              "other_selection_same_output": 0,
+              "other_selection_other_output": 0,
+              "other_unknown": 0,
+              "error": 3
+            }
+          },
+          "items": [
+            {
+              "path": "e.json",
+              "id": "empty",
+              "change": "error",
+              "expected": false,
+              "differences": [
+                "error"
+              ],
+              "unstated": [
+                "error"
+              ],
+              "a": {
+                "status": "error",
+                "error": {
+                  "code": "hit_policy_error",
+                  "rules": [
+                    "a",
+                    "b"
+                  ]
+                }
+              },
+              "b": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 1
+                },
+                "outputs": [
+                  {
+                    "v": 1
+                  }
+                ],
+                "unknown": []
+              }
+            },
+            {
+              "path": "e.json",
+              "id": "unknown-only",
+              "change": "error",
+              "expected": false,
+              "differences": [
+                "error"
+              ],
+              "unstated": [
+                "error"
+              ],
+              "a": {
+                "status": "error",
+                "error": {
+                  "code": "hit_policy_error",
+                  "rules": [
+                    "a",
+                    "b"
+                  ]
+                }
+              },
+              "b": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 1
+                },
+                "outputs": [
+                  {
+                    "v": 1
+                  }
+                ],
+                "unknown": []
+              }
+            },
+            {
+              "path": "e.json",
+              "id": "stated",
+              "change": "error",
+              "expected": true,
+              "differences": [
+                "error"
+              ],
+              "a": {
+                "status": "error",
+                "error": {
+                  "code": "hit_policy_error",
+                  "rules": [
+                    "a",
+                    "b"
+                  ]
+                }
+              },
+              "b": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 1
+                },
+                "outputs": [
+                  {
+                    "v": 1
+                  }
+                ],
+                "unknown": []
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "comparison/expected/error-expected",
+      "spec": [
+        "comparison.md#expected-changes",
+        "comparison.md#json"
+      ],
+      "description": "a new error that the new version's case expects: the change is expected, and the side passed with its error",
+      "given": {
+        "kind": "test_comparison",
+        "a": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "first",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "a",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "name": "b",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 2
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "e.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"x2\", \"input\": {\"x\": 2}}]}}"
+            }
+          ]
+        },
+        "b": {
+          "document": {
+            "version": 1,
+            "ruleset": {
+              "hit_policy": "unique",
+              "logic": "boolean",
+              "rules": [
+                {
+                  "name": "a",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 0
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "name": "b",
+                  "when": {
+                    "op": "gt",
+                    "left": {
+                      "op": "field",
+                      "path": [
+                        "x"
+                      ]
+                    },
+                    "right": {
+                      "op": "const",
+                      "value": 1
+                    }
+                  },
+                  "then": {
+                    "v": {
+                      "op": "const",
+                      "value": 2
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "files": [
+            {
+              "path": "e.json",
+              "text": "{\"version\": 1, \"cases\": {\"items\": [{\"id\": \"x2\", \"input\": {\"x\": 2}, \"expect\": {\"error\": {\"code\": \"hit_policy_error\"}}}]}}"
+            }
+          ]
+        },
+        "max_explained": 0
+      },
+      "expect": {
+        "test_comparison": {
+          "relation": "other_rules_same_engine",
+          "a": {
+            "source": "ruleset",
+            "hit_policy": "first",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:af9ebc5933f9140ba400809fb4b9cb06ae408ce641b5777cd86557e476435f41",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "files": [
+              {
+                "path": "e.json",
+                "digest": "sha256:5bd99f1cd20b174db6b6f06b5300800fcec760c59802dbdedbe6ed870a9421e6"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 1,
+              "nothing_selected": 0,
+              "with_unknown": 0,
+              "error": 0
+            }
+          },
+          "b": {
+            "source": "ruleset",
+            "hit_policy": "unique",
+            "logic": "boolean",
+            "ruleset_digest": "sha256:1549c5fa6650ffb2b65a5a8eebc0b3b329ef4829b23fa41e9ab92f09e9ba479f",
+            "engine": {
+              "name": "cleanrules",
+              "version": "0.0.0-this-engine",
+              "limits": {
+                "max_size": 16777216,
+                "max_nesting": 1024,
+                "max_depth": 256,
+                "max_path_segments": 256,
+                "max_table_size": 2097152,
+                "max_values": 1000000
+              }
+            },
+            "files": [
+              {
+                "path": "e.json",
+                "digest": "sha256:2615708a2b8e55f91dd15fdf9ad78defd93d153039f9cf4f1c388e09be7a415d"
+              }
+            ],
+            "limits": {},
+            "summary": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0,
+              "error": 0,
+              "partial": false
+            },
+            "outcomes": {
+              "decisions": 0,
+              "nothing_selected": 0,
+              "with_unknown": 0,
+              "error": 1
+            }
+          },
+          "limits": {
+            "max_explained": 0
+          },
+          "summary": {
+            "total": 1,
+            "unchanged": 0,
+            "changed": 1,
+            "expected": 1,
+            "unexpected": 0,
+            "added": 0,
+            "removed": 0,
+            "not_compared": 0,
+            "partial": false,
+            "by_change": {
+              "same_selection_other_output": 0,
+              "other_selection_same_output": 0,
+              "other_selection_other_output": 0,
+              "other_unknown": 0,
+              "error": 1
+            }
+          },
+          "items": [
+            {
+              "path": "e.json",
+              "id": "x2",
+              "change": "error",
+              "expected": true,
+              "differences": [
+                "error"
+              ],
+              "a": {
+                "status": "passed",
+                "selected": [
+                  "a"
+                ],
+                "output": {
+                  "v": 1
+                },
+                "outputs": [
+                  {
+                    "v": 1
+                  }
+                ],
+                "unknown": []
+              },
+              "b": {
+                "status": "passed",
+                "error": {
+                  "code": "hit_policy_error",
+                  "rules": [
+                    "a",
+                    "b"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

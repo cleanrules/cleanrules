@@ -1,0 +1,13 @@
+---
+source: crates/core/tests/comparison.rs
+expression: comparison.to_string()
+---
+Comparison of two test runs: same rules, same engine (same_rules_same_engine)
+a: bundle acme/discounts revision 1, a rule set, 1 rule, hit policy first, logic boolean, sha256:cd04072485e082eeaf7479b2fb165848e06f434abdbb124639ad838f8dbea583
+b: bundle acme/discounts revision 1, a rule set, 1 rule, hit policy first, logic boolean, sha256:cd04072485e082eeaf7479b2fb165848e06f434abdbb124639ad838f8dbea583
+bundles: same_rules_same_engine, identical
+UNEXPECTED  cases/c.json
+            error (error)
+            a case file has no expectation
+            a: error, decision_mismatch at /bundle/cases/0/digest: the case file cases/c.json is not the one the bundle names: its digest is sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a, not sha256:2d44bd6bfec863473555058feb5d25057726160193a378b45b0bb52cadace5e8
+1 item: 0 unchanged, 1 changed (0 expected, 1 unexpected), 0 added, 0 removed, 0 not compared

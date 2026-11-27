@@ -311,13 +311,17 @@ impl CaseResult {
 
 /// What a decision gives that an expectation checks: each rule's status,
 /// without result trees (`spec/tests.md`, *Explaining failures*).
-struct Outcome {
-    selected: Vec<String>,
-    outputs: Vec<Map>,
+pub(crate) struct Outcome {
+    pub(crate) selected: Vec<String>,
+    pub(crate) outputs: Vec<Map>,
     /// The single output, or `Err` when the decision has none.
-    output: std::result::Result<Option<Map>, ()>,
-    unknown: Vec<String>,
+    pub(crate) output: std::result::Result<Option<Map>, ()>,
+    pub(crate) unknown: Vec<String>,
 }
+
+/// What evaluating a case gave, reduced: a decision's parts, or the error
+/// (of the evaluation, or of a file that cannot be run).
+pub(crate) type Given = std::result::Result<Outcome, Error>;
 
 impl Outcome {
     fn of(decision: &Decision<'_>) -> Self {
@@ -355,7 +359,7 @@ impl Outcome {
 
 /// Whether two values have the same canonical bytes (`spec/tests.md`,
 /// *Values*): nulls are written `null`, whatever their reason.
-fn same_value(expected: &Value, actual: &Value) -> bool {
+pub(crate) fn same_value(expected: &Value, actual: &Value) -> bool {
     to_string(&write_value(expected)) == to_string(&write_value(actual))
 }
 
@@ -368,7 +372,7 @@ fn includes(expected: &Map, actual: &Map) -> bool {
 
 /// Whether the file at `index` repeats the path of an earlier one, or is a
 /// second file without a path (`spec/tests.md`, *Running cases*).
-fn repeated(files: &[CaseFile], index: usize) -> bool {
+pub(crate) fn repeated(files: &[CaseFile], index: usize) -> bool {
     files[..index]
         .iter()
         .any(|earlier| earlier.path() == files[index].path())
@@ -674,6 +678,19 @@ impl<'r> Runner<'r> {
         state: &mut TestRunState,
         cancel: impl FnOnce() -> bool,
     ) -> Option<CaseResult> {
+        self.next_given(files, state, cancel, false)
+            .map(|(result, _)| result)
+    }
+
+    /// The next result, as [`Runner::next_result`] gives it, with what the
+    /// case's evaluation gave when `keep` is set (a comparison's record).
+    pub(crate) fn next_given(
+        &self,
+        files: &[CaseFile],
+        state: &mut TestRunState,
+        cancel: impl FnOnce() -> bool,
+        keep: bool,
+    ) -> Option<(CaseResult, Option<Given>)> {
         if state.finished {
             return None;
         }
@@ -699,7 +716,7 @@ impl<'r> Runner<'r> {
         state.steps += cost;
         state.case += 1;
         let path = files[state.file].path();
-        let result = match item {
+        let (result, given) = match item {
             Item::Case(case) => {
                 let explain = state.explained < self.limits.max_explained;
                 let counts = if self.statistics {
@@ -707,20 +724,21 @@ impl<'r> Runner<'r> {
                 } else {
                     None
                 };
-                let result = self.check(path, case, explain, counts);
+                let (result, given) = self.check(path, case, explain, counts, keep);
                 if result.explanation_text.is_some() {
                     state.explained += 1;
                 }
-                result
+                (result, given)
             }
             Item::Unreadable(error) => {
+                let given = keep.then(|| Err(error.duplicate()));
                 let mut result = CaseResult::new(path, None, CaseStatus::Error);
                 result.error = Some(error);
-                result
+                (result, given)
             }
         };
         state.summary.count(result.status);
-        Some(result)
+        Some((result, given))
     }
 
     /// Stop the run of `files` that `state` is at: it gives no more results,
@@ -740,12 +758,24 @@ impl<'r> Runner<'r> {
         results: Vec<CaseResult>,
     ) -> TestRun {
         state.stop(files, Interruption::Cancelled);
-        let statistics = self.statistics(&state);
         debug_assert_eq!(
             results.len(),
             state.summary.total(),
             "the results given, in order"
         );
+        self.finish(files, state, results)
+    }
+
+    /// The test run of `files` that `state` ended, stopping it first, with
+    /// `results`, which a comparison leaves empty.
+    pub(crate) fn finish(
+        &self,
+        files: &[CaseFile],
+        mut state: TestRunState,
+        results: Vec<CaseResult>,
+    ) -> TestRun {
+        state.stop(files, Interruption::Cancelled);
+        let statistics = self.statistics(&state);
         TestRun {
             source: self.source,
             hit_policy: self.hit_policy,
@@ -776,7 +806,18 @@ impl<'r> Runner<'r> {
     /// it.
     #[must_use]
     pub fn run_case(&self, case: &Case) -> CaseResult {
-        self.check(None, case, self.limits.max_explained > 0, None)
+        self.check(None, case, self.limits.max_explained > 0, None, false)
+            .0
+    }
+
+    /// The rules being tested.
+    pub(crate) fn ruleset(&self) -> &'r RuleSet {
+        self.ruleset
+    }
+
+    /// The bundle's id and revision, for a bundle's runner.
+    pub(crate) fn bundle(&self) -> Option<&(BundleId, crate::bundle::Revision)> {
+        self.bundle.as_ref()
     }
 
     /// Evaluate a case's input again, as a run does: the decision of a
@@ -826,14 +867,16 @@ impl<'r> Runner<'r> {
     }
 
     /// Run one case (`spec/tests.md`, *Matching*), counting its decision
-    /// in `counts` when the run gathers statistics.
+    /// in `counts` when the run gathers statistics, and keeping what its
+    /// evaluation gave when `keep` is set.
     fn check(
         &self,
         path: Option<&str>,
         case: &Case,
         explain_failure: bool,
         counts: Option<&mut (Layout, Counts)>,
-    ) -> CaseResult {
+        keep: bool,
+    ) -> (CaseResult, Option<Given>) {
         let expect = case.expect();
         let mut result = CaseResult::new(path, Some(case.id()), CaseStatus::Passed);
         let evaluated = self.ruleset.evaluate(case.input());
@@ -844,28 +887,36 @@ impl<'r> Runner<'r> {
                 Err(_) => counts.error(),
             }
         }
+        let mut given = None;
         match evaluated {
-            Err(error) => match expect.error() {
-                None => {
-                    result.status = CaseStatus::Error;
-                    result.error = Some(error);
+            Err(error) => {
+                if keep {
+                    given = Some(Err(error.duplicate()));
                 }
-                Some(code) if error.code() == code => {}
-                Some(code) => {
-                    result.status = CaseStatus::Failed;
-                    result.mismatches.push(Mismatch::Error {
-                        expected: code,
-                        actual: Some(error),
-                    });
+                match expect.error() {
+                    None => {
+                        result.status = CaseStatus::Error;
+                        result.error = Some(error);
+                    }
+                    Some(code) if error.code() == code => {}
+                    Some(code) => {
+                        result.status = CaseStatus::Failed;
+                        result.mismatches.push(Mismatch::Error {
+                            expected: code,
+                            actual: Some(error),
+                        });
+                    }
                 }
-            },
+            }
             Ok(decision) => {
-                result.mismatches = match expect.error() {
-                    Some(code) => vec![Mismatch::Error {
+                let outcome = (keep || expect.error().is_none()).then(|| Outcome::of(&decision));
+                result.mismatches = match (expect.error(), &outcome) {
+                    (Some(code), _) => vec![Mismatch::Error {
                         expected: code,
                         actual: None,
                     }],
-                    None => self.compare(expect, &Outcome::of(&decision)),
+                    (None, Some(outcome)) => self.compare(expect, outcome),
+                    (None, None) => Vec::new(),
                 };
                 if !result.mismatches.is_empty() {
                     result.status = CaseStatus::Failed;
@@ -873,9 +924,12 @@ impl<'r> Runner<'r> {
                         result.explanation_text = Some(explain(&decision).to_string());
                     }
                 }
+                if keep {
+                    given = outcome.map(Ok);
+                }
             }
         }
-        result
+        (result, given)
     }
 
     /// The keys of `expect` that `outcome` does not match, in the order of

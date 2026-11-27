@@ -18,7 +18,7 @@ use crate::rules::{Decision, Rule, RuleSet};
 use crate::table::DecisionTable;
 
 /// The content keys a document may have, in the order of the spec.
-const CONTENT_KEYS: [&str; 11] = [
+const CONTENT_KEYS: [&str; 12] = [
     "condition",
     "rule",
     "ruleset",
@@ -30,6 +30,7 @@ const CONTENT_KEYS: [&str; 11] = [
     "cases",
     "audit",
     "test_run",
+    "test_comparison",
 ];
 
 /// What a document holds.
@@ -101,7 +102,7 @@ impl Document {
     /// The document's content key (`spec/json-format.md`, *Documents*):
     /// `condition`, `rule`, `ruleset`, `decision_table`, `bundle` or `cases`.
     /// The output-only keys (`decision`, `explanation`, `summary`, `audit`,
-    /// `test_run`) are never read into a document.
+    /// `test_run`, `test_comparison`) are never read into a document.
     #[must_use]
     pub fn content_key(&self) -> &'static str {
         match self {
@@ -193,7 +194,7 @@ pub fn read_parsed_document(json: &Json, limits: &Limits) -> Result<Document> {
             check_top_level()?;
             Ok(Document::Cases(cases))
         }
-        "explanation" | "summary" | "audit" | "test_run" => {
+        "explanation" | "summary" | "audit" | "test_run" | "test_comparison" => {
             check_top_level()?;
             Err(Error::new(
                 ErrorCode::Unsupported,
@@ -671,6 +672,24 @@ pub fn write_test_run_as(run: &crate::cases::TestRun, format: DocumentFormat) ->
         "test_run",
         || crate::format::write_test_run(run),
         Some(&|| run.to_string()),
+        format,
+    )
+}
+
+/// Write a test comparison document in JSON or YAML, or its text
+/// (`spec/comparison.md`, *Text*) for [`DocumentFormat::Text`].
+///
+/// # Errors
+///
+/// `unsupported` for CSV.
+pub fn write_test_comparison_as(
+    comparison: &crate::cases::TestComparison,
+    format: DocumentFormat,
+) -> Result<String> {
+    write_output_as(
+        "test_comparison",
+        || crate::format::write_test_comparison(comparison),
+        Some(&|| comparison.to_string()),
         format,
     )
 }

@@ -27,8 +27,9 @@ other value is a `format_error` at the root) with:
   `"summary"`, `"decision_table"`, `"bundle"` (a reproducible package of
   rules, [`bundles.md`](bundles.md)), `"cases"` (test cases,
   [`tests.md`](tests.md)), `"audit"` (the report of a static audit,
-  [`audit.md`](audit.md)) or `"test_run"` (the results of running test
-  cases, [`tests.md`](tests.md));
+  [`audit.md`](audit.md)), `"test_run"` (the results of running test
+  cases, [`tests.md`](tests.md)) or `"test_comparison"` (two versions of
+  rules compared on the same cases, [`comparison.md`](comparison.md));
 - optionally `"$schema"`, a string that readers ignore, so editors can find the
   schema. Writers do not emit it.
 
@@ -838,6 +839,18 @@ output only, so readers reject it with `unsupported`, and the *Versioning*
 rules apply: it was added to version 1, and consumers should expect new
 optional keys and new reasons of interruption. Writers write its keys in the
 order of its tables, and every array even when it is empty.
+
+## Test comparisons
+
+A test comparison document has the content key `"test_comparison"`: two
+versions of rules compared on the same test cases, with each change, whether
+it was expected, and each side's run. Its keys and what they hold are in
+[`comparison.md`](comparison.md) (*JSON*). Like a test run, it is output
+only, so readers reject it with `unsupported`, and the *Versioning* rules
+apply: it was added to version 1, and consumers should expect new optional
+keys, kinds of change, parts and relations (`comparison.md`, *JSON*,
+*Extensions*). Writers write its keys in the order of its tables, and every
+array even when it is empty.
 
 ## Bundles
 

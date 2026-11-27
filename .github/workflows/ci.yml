@@ -583,3 +583,5 @@ jobs:
       - run: python3 conformance/tools/test_run_vectors.py --check
       # The statistics vectors: generated file up to date.
       - run: python3 conformance/tools/statistics_vectors.py --check
+      # The comparator's vectors: generated files up to date.
+      - run: python3 conformance/tools/comparison_vectors.py --check

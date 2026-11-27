@@ -1,0 +1,18 @@
+---
+source: crates/core/tests/comparison.rs
+expression: comparison.to_string()
+---
+Comparison of two test runs: other rules, same engine (other_rules_same_engine)
+a: a rule set, 1 rule, hit policy first, logic boolean, strict, sha256:e2264b7c5323146dd4b7335ecad243b1ef7fc015b67eb6614aa8405955feb53c
+b: a rule set, 1 rule, hit policy first, logic boolean, strict, sha256:e02878b21443c60654744ebea6dbbec6269ce85369dc43dc72d1d099f00f1f26
+UNEXPECTED  c.json  "missing"
+            error (error)
+            b did not pass its case
+            a: error, missing_field in rule "a": missing field x
+            b: error, missing_field in rule "z": missing field x
+UNEXPECTED  c.json  "text"
+            error (error)
+            b did not pass its case
+            a: error, type_mismatch in rule "a": type mismatch: string vs number
+            b: error, type_mismatch in rule "z": type mismatch: string vs number
+2 items: 0 unchanged, 2 changed (0 expected, 2 unexpected), 0 added, 0 removed, 0 not compared
