@@ -51,6 +51,7 @@ cargo clippy -p cleanrules-js --target wasm32-unknown-unknown --all-targets -- -
 (cd bindings/go && go test ./...)
 (cd bindings/erlang && rebar3 ct)
 cargo run -p cleanrules-mcp -- --rules <dir>   # servidor MCP (fase O)
+cargo run -p cleanrules-cli -- audit <file> [--format json] [--fail-on warning]   # CLI (T.8): validate, audit, draw
 
 # Especificación y vectores
 uv run --no-project --with jsonschema python spec/schemas/check.py
