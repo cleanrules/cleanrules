@@ -45,6 +45,17 @@
 // `error` throws a `HitPolicyError` naming both rules, any other `overlap`
 // fires both, a `gap` fires none, and only those two codes have one.
 //
+// Case files (spec/tests.md, `format/cases/*`) run on both routes: through
+// `Document.read` (json) and through `loads`, `dumps`, `canonicalBytes` and
+// `digest`, each file read also rebuilt with `Expectation`, `Case` and `Cases`
+// (native). Test runs (`tests/*`) run through `Document.test` of the native
+// layer, which reads the vector's documents (json), and through
+// `RuleSet.iterTest`, `DecisionTable.iterTest` or `Bundle.iterTest` with case
+// files built in code (native); both compare the test run with each error
+// reduced to its compared fields and `engine.version` set to this engine's,
+// as the core's runner does, and the native route checks the `TestRun`'s
+// members against its JSON form and the text against the native layer's.
+//
 // The runner only drives the library and compares: results are parsed with
 // ./json.js and compared with the vectors as trees, never with the library's
 // own JSON parser or equality.
@@ -62,25 +73,11 @@ export const SKIPS = {
   diagram:
     "diagrams (spec/visual.md) are drawn by the core and checked through the C ABI's runner; the JavaScript API draws them from phase V.2",
   graded: 'conditions under a graded logic: the binding evaluates one node under boolean only until task J.1b',
-  cases:
-    'case files (spec/tests.md) have no type in the idiomatic API yet: loads refuses them, so their vectors run through cleanrules/native (the JSON route), and those whose file does not read run in both',
   audit_document:
     'the idiomatic API audits rule sets and decision tables (RuleSet.audit, DecisionTable.audit), so audit vectors of other documents (a bundle, a rule, a condition, a case file) run in the json route, through Document.audit and the core\'s audit_document',
-  test_run: 'test runs (spec/tests.md, Running cases) are made by the core and checked by its runner; the JavaScript API runs cases from task T.9b',
   statistics: "statistics of a run (spec/tests.md, Statistics) are made by the core and checked by its runner; the JavaScript API does not gather them yet",
   test_comparison:
     'test comparisons (spec/comparison.md) are made by the core and checked by its runner; the JavaScript API compares versions from task T.9b',
-}
-
-/**
- * Whether the native route skips `vector`: a vector of a case file
- * (`format/cases/*`) that needs a case file loaded by the idiomatic API,
- * which refuses them; one whose file does not read still runs there.
- */
-export function needsCaseFiles(vector) {
-  if (!String(vector.get('id')).startsWith('format/cases/')) return false
-  const given = vector.get('given')
-  return given.get('kind') === 'canonical' || given.has('write') || !vector.get('expect').has('error')
 }
 
 /**
@@ -677,6 +674,233 @@ not
     // The native layer audits the same rules with the same text.
     const layer = document.has('ruleset') ? N.RuleSet.read(write(document)) : N.Document.read(write(document))
     issues.push(compareText('the text', String(report), layer.audit(options)))
+    return issues.filter(Boolean).join('; ')
+  }
+
+  // --- Test runs -----------------------------------------------------------------
+
+  /** The fields of an error compared in a test run (`spec/errors.md`, *Comparing errors*). */
+  const RUN_ERROR = ['code', 'pointer', 'line', 'column', 'rule', 'rules', 'path', 'types', 'row', 'name', 'executed']
+
+  /** A test run's content with each error reduced to its compared fields. */
+  function comparedErrors(run) {
+    const reduce = (error) => (error instanceof Obj ? new Obj(error.entries.filter(([k]) => RUN_ERROR.includes(k))) : error)
+    return swap(run, 'results', (results) =>
+      results.map((result) => {
+        let fixed = result.has('error') ? swap(result, 'error', reduce) : result
+        if (fixed.has('mismatches')) {
+          fixed = swap(fixed, 'mismatches', (items) =>
+            items.map((m) => (m.get('key') === 'error' && m.has('actual') ? swap(m, 'actual', reduce) : m)),
+          )
+        }
+        return fixed
+      }),
+    )
+  }
+
+  /** A `test_run` vector's expected test run, with this engine's version (`conformance/README.md`). */
+  function expectedRun(expect) {
+    return swap(need(expect, 'test_run'), 'engine', (engine) => swap(engine, 'version', () => R.version))
+  }
+
+  /** A `test_run` vector's options: `limits`, `rulesetDigest`, and a `cancel` that counts what it is asked. */
+  function testRunOptions(given) {
+    const limits = {}
+    const names = { max_results: 'maxResults', max_steps: 'maxSteps', max_explained: 'maxExplained' }
+    for (const [k, v] of given.get('limits')?.entries ?? []) {
+      if (names[k] === undefined) throw new VectorError(`unknown limit ${k}`)
+      limits[names[k]] = Number(v.text)
+    }
+    const options = { limits }
+    if (given.get('ruleset_digest') === true) options.rulesetDigest = true
+    const after = given.get('cancel_after')
+    if (after !== undefined) {
+      let asked = 0
+      options.cancel = () => {
+        asked += 1
+        return asked > Number(after.text)
+      }
+    }
+    return options
+  }
+
+  /** The `{ path, text }` files of a `test_run` vector. */
+  const runFiles = (given) => (given.get('files') ?? []).map((f) => [need(f, 'path'), need(f, 'text')])
+
+  /** A `test_run` vector through the native layer: `Document.test`, written as JSON. */
+  function testRunJson(vector) {
+    const given = need(vector, 'given')
+    const document = N.Document.read(write(need(given, 'document')))
+    const files = given.has('cases')
+      ? [{ cases: N.Document.read(write(given.get('cases'))) }]
+      : runFiles(given).map(([path, text], i) => ({ path, content: i % 2 === 1 ? new TextEncoder().encode(text) : text }))
+    const outcome = attempt(R, () => comparedErrors(content(document.test(files, { ...testRunOptions(given), format: 'json' }), 'test_run')))
+    if (outcome.error !== undefined) return `unexpected error ${write(jsonForm(outcome.error))}: ${outcome.error.message}`
+    const want = expectedRun(need(vector, 'expect'))
+    return same(outcome.result, want) ? '' : `\n  got  ${write(outcome.result)}\n  want ${write(want)}`
+  }
+
+  /** A case file document's content built in code: `Cases` of `Case`s and `Expectation`s. */
+  function casesOfDocument(document) {
+    const content = need(document, 'cases')
+    const items = need(content, 'items').map((item) => {
+      const expect = item.get('expect') ?? new Obj([])
+      const parts = {}
+      for (const key of ['selected', 'unknown']) if (expect.has(key)) parts[key] = expect.get(key)
+      if (expect.has('output')) parts.output = expect.get('output') === null ? null : nativeOf(expect.get('output'))
+      if (expect.has('outputs')) parts.outputs = expect.get('outputs').map(nativeOf)
+      if (expect.has('error')) parts.error = need(expect.get('error'), 'code')
+      const options = { expect: new R.Expectation(parts) }
+      if (item.has('description')) options.description = item.get('description')
+      return new R.Case(need(item, 'id'), nativeOf(need(item, 'input')), options)
+    })
+    const options = {}
+    if (content.has('description')) options.description = content.get('description')
+    if (content.has('metadata')) options.metadata = nativeOf(content.get('metadata'))
+    return new R.Cases(items, options)
+  }
+
+  /** A case file read, rebuilt from its members with the constructors: the same document. */
+  function checkCases(cases) {
+    const rebuilt = attempt(R, () =>
+      new R.Cases(
+        cases.items.map(
+          (item) =>
+            new R.Case(item.id, item.input, {
+              description: item.description,
+              expect: new R.Expectation({
+                selected: item.expect.selected,
+                output: item.expect.output,
+                outputs: item.expect.outputs,
+                unknown: item.expect.unknown,
+                error: item.expect.error,
+              }),
+            }),
+        ),
+        { description: cases.description, metadata: cases.metadata },
+      ),
+    )
+    if (rebuilt.error !== undefined) return `rebuilding the case file: ${rebuilt.error.message}`
+    const issues = [compareText('rebuilt', R.dumps(rebuilt.result), R.dumps(cases))]
+    issues.push(compareText('rebuilt, digest', R.digest(rebuilt.result), R.digest(cases)))
+    if (cases.length !== cases.items.length || [...cases].length !== cases.length) issues.push('length and iteration disagree')
+    if (cases.items.some((item) => cases.get(item.id) !== item)) issues.push('get(id) does not find each case')
+    const frozenAll = [cases, cases.items, cases.metadata, ...cases.items, ...cases.items.map((item) => item.expect)]
+    if (!frozenAll.every((o) => Object.isFrozen(o))) issues.push('a case file or one of its parts is not frozen')
+    return issues.filter(Boolean).join('; ')
+  }
+
+  /** A `TestRun`'s members against its JSON form (`toJSON()`), and the run's own summary. */
+  function checkTestRun(run, report, results, json) {
+    const present = (entries) => Object.fromEntries(entries.filter(([, v]) => v !== null))
+    const summary = report.summary
+    const attributes = present([
+      ['source', report.source],
+      ['hit_policy', report.hitPolicy],
+      ['aggregate', report.aggregate],
+      ['logic', report.logic],
+      ['strict', report.strict ? true : null],
+      ['ruleset_digest', report.rulesetDigest],
+      ['bundle', report.bundle === null ? null : { id: report.bundle.id, revision: report.bundle.revision }],
+      ['files', report.files.map((f) => present([['path', f.path], ['digest', f.digest]]))],
+      ['limits', present([['max_explained', report.limits.maxExplained], ['max_results', report.limits.maxResults], ['max_steps', report.limits.maxSteps]])],
+      [
+        'summary',
+        present([
+          ['total', summary.total],
+          ['passed', summary.passed],
+          ['failed', summary.failed],
+          ['error', summary.error],
+          ['partial', summary.partial],
+          ['interrupted', summary.interrupted === null ? null : { ...summary.interrupted }],
+        ]),
+      ],
+      [
+        'results',
+        report.results.map((r) =>
+          present([
+            ['path', r.path],
+            ['id', r.id],
+            ['status', r.status],
+            ['mismatches', r.mismatches.length === 0 ? null : r.mismatches.map((m) => m.key)],
+            ['error', r.error === null ? null : r.error.code],
+            ['explanation_text', r.explanationText],
+          ]),
+        ),
+      ],
+    ])
+    const view = new Obj(
+      json.entries
+        .filter(([k]) => k !== 'engine')
+        .map(([k, v]) =>
+          k !== 'results'
+            ? [k, v]
+            : [
+                k,
+                v.map((r) =>
+                  new Obj(
+                    r.entries.map(([key, value]) => {
+                      if (key === 'mismatches') return [key, value.map((m) => m.get('key'))]
+                      if (key === 'error') return [key, value.get('code')]
+                      return [key, value]
+                    }),
+                  ),
+                ),
+              ],
+        ),
+    )
+    if (!same(tree(attributes), view)) return `the members give ${write(tree(attributes))}, the JSON ${write(view)}`
+    if (report.engine.name !== 'cleanrules' || report.engine.version !== R.version || !report.engine.isCurrent) return `the engine is ${write(tree(report.engine))}`
+    if (results.length !== report.results.length) return `the run gave ${results.length} results, its test run holds ${report.results.length}`
+    for (const [i, result] of results.entries()) {
+      if (JSON.stringify(result) !== JSON.stringify(report.results[i])) return `result ${i} differs between the run and its test run`
+    }
+    if (!same(tree({ ...run.summary, interrupted: run.summary.interrupted === null ? null : { ...run.summary.interrupted } }), tree({ ...summary, interrupted: summary.interrupted === null ? null : { ...summary.interrupted } }))) {
+      return "the run's summary is not its test run's"
+    }
+    if (!run.isFinished || run.remaining !== 0) return 'the run is not finished after its test run'
+    if (run.testRun() !== report) return 'testRun() makes a new test run'
+    const passed = summary.failed === 0 && summary.error === 0 && !summary.partial
+    if (report.allPassed !== passed) return `allPassed is ${report.allPassed}`
+    const frozenAll = [report, report.results, report.files, report.summary, report.limits, report.engine, ...report.results]
+    if (!frozenAll.every((o) => Object.isFrozen(o))) return 'a test run or one of its parts is not frozen'
+    return ''
+  }
+
+  /** A `test_run` vector through the idiomatic API: `iterTest` of rules and case files built in code. */
+  function testRunNative(vector) {
+    const given = need(vector, 'given')
+    const document = need(given, 'document')
+    const options = testRunOptions(given)
+    const files = runFiles(given)
+    let run
+    let layer
+    if (document.has('bundle')) {
+      const bundle = R.loads(write(document))
+      const texts = new Map(files)
+      run = bundle.iterTest((ref) => texts.get(ref.path), options)
+      layer = { files: files.map(([path, text]) => ({ path, content: text })), rules: N.Document.read(write(document)) }
+    } else {
+      const rules = document.has('ruleset') ? buildRuleSet(document.get('ruleset')) : R.loads(write(document))
+      const cases = given.has('cases')
+        ? [casesOfDocument(given.get('cases'))]
+        : files.map(([path, text], i) => R.CaseFile.read(i % 2 === 1 ? new TextEncoder().encode(text) : text, { path }))
+      run = rules.iterTest(cases, options)
+      layer = {
+        files: given.has('cases') ? [{ cases: N.Document.read(write(given.get('cases'))) }] : files.map(([path, text]) => ({ path, content: text })),
+        rules: N.Document.read(write(document)),
+      }
+    }
+    const results = [...run]
+    const report = run.testRun()
+    if (!(report instanceof R.TestRun)) return 'testRun() gives no TestRun'
+    const json = need(parse(JSON.stringify(report)), 'test_run')
+    const issues = [checkTestRun(run, report, results, json)]
+    const got = comparedErrors(json)
+    const want = stringified(expectedRun(need(vector, 'expect')))
+    if (!same(got, want)) issues.push(`\n  got  ${write(got)}\n  want ${write(want)}`)
+    // The native layer runs the same cases to the same text.
+    issues.push(compareText('the text', String(report), layer.rules.test(layer.files, testRunOptions(given))))
     return issues.filter(Boolean).join('; ')
   }
 
@@ -1431,6 +1655,7 @@ not
       issues.push(compare(attempt(R, () => parse(R.dumps(loaded))), expect, 'document', read))
       issues.push(checkReload(loaded))
     }
+    if (loaded instanceof R.Cases) issues.push(checkCases(loaded))
     if (expect.get('document')?.has('bundle')) {
       if (!(loaded instanceof R.Bundle)) return `read a ${loaded.constructor.name}, expected a Bundle`
       issues.push(checkBundle(loaded, expect.get('document')))
@@ -1517,7 +1742,6 @@ not
     const expect = need(vector, 'expect')
     const kind = need(given, 'kind')
     if (kind === 'draw') return { skip: 'diagram' }
-    if (needsCaseFiles(vector)) return { skip: 'cases' }
     if (kind === 'read') return readNative(given, expect)
     if (kind === 'canonical') return canonicalNative(given, expect)
     if (kind === 'bundle') return makeNative(given, expect)
@@ -1643,7 +1867,7 @@ not
   function run(vector, route) {
     current = `${route}:${vector.get('id')}`
     if (vector.get('given').get('kind') === 'tool') return { skip: 'agents' }
-    if (vector.get('given').get('kind') === 'test_run') return { skip: 'test_run' }
+    if (vector.get('given').get('kind') === 'test_run') return route === 'json' ? testRunJson(vector) : testRunNative(vector)
     if (vector.get('given').get('kind') === 'statistics') return { skip: 'statistics' }
     if (vector.get('given').get('kind') === 'test_comparison') return { skip: 'test_comparison' }
     const logic = vector.get('given').get('logic')

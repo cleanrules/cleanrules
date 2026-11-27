@@ -9,10 +9,15 @@ export const FORMAT_VERSION = native.FORMAT_VERSION
 export const version = native.version()
 export const {
   Bundle,
+  Case,
+  CaseFile,
   CaseFileRef,
+  CaseRun,
+  Cases,
   Const,
   Decision,
   DecisionTable,
+  Expectation,
   Expr,
   F,
   Field,

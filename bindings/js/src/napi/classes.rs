@@ -10,10 +10,11 @@ use napi::bindgen_prelude::{
 use napi::{Env, Result, ValueType};
 use napi_derive::napi;
 
+use super::hooks::type_error;
 use super::hooks::{hook, throw};
 use super::{
-    OrFail, fail, raw, raw_audit_options, raw_cases, raw_limits, raw_list, raw_options,
-    raw_ruleset_digest,
+    OrFail, fail, raw, raw_audit_options, raw_case_files, raw_cases, raw_limits, raw_list,
+    raw_options, raw_ruleset_digest, raw_test_options,
 };
 use crate::common::core::{
     ActionFailure, DecisionCore, DocumentCore, NodeCore, PathSegment, RulesCore, TreeKind,
@@ -180,6 +181,49 @@ pub struct BundleCaseInput {
     /// The file's content.
     #[napi(ts_type = "string | Uint8Array")]
     pub content: String,
+}
+
+/// A case file given to `Document.test` (`spec/tests.md`, *Running cases*):
+/// its path, and its bytes or the case file document already read.
+#[napi(object, object_from_js = false, object_to_js = false)]
+pub struct CaseFileInput {
+    /// The file's path, with `/` between segments: it names its cases in the
+    /// results, and a path that ends in `.yaml` or `.yml` is read as YAML.
+    /// For a bundle, the path the bundle gives it.
+    #[napi(ts_type = "string | null")]
+    pub path: Option<String>,
+    /// The file's bytes (a string, as UTF-8), whose digest the test run
+    /// records; not with `cases`.
+    #[napi(ts_type = "string | Uint8Array")]
+    pub content: Option<String>,
+    /// A case file document already read, run as it is; not with `content`,
+    /// and not for a bundle, whose files are checked against their digests.
+    #[napi(ts_type = "Document")]
+    pub cases: Option<String>,
+}
+
+/// The options of `Document.test` (`spec/tests.md`): how the test run is
+/// written, its limits, whether it carries the rule set digest, and a
+/// cancel callback.
+#[napi(object, object_from_js = false, object_to_js = false)]
+pub struct TestWriteOptions {
+    /// The format: `"text"` (the default), `"json"` or `"yaml"`.
+    #[napi(ts_type = "Format")]
+    pub format: Option<String>,
+    /// The limits: `maxResults`, the most results given; `maxSteps`, the most
+    /// steps, one per rule for each case (both unbounded by default); and
+    /// `maxExplained`, the most failures explained (5).
+    #[napi(
+        ts_type = "{ maxResults?: number | null; maxSteps?: number | null; maxExplained?: number | null } | null"
+    )]
+    pub limits: Option<String>,
+    /// Carry the rule set digest of the rules tested in the test run.
+    pub ruleset_digest: Option<bool>,
+    /// Asked before each case, never while one is evaluated: returning
+    /// `true` stops the run, which is then partial. It returns a boolean;
+    /// what it throws is thrown, the run stopped.
+    #[napi(ts_type = "(() => boolean) | null")]
+    pub cancel: Option<String>,
 }
 
 /// The options of an audit (`spec/audit.md`) in the native layer: how its
@@ -466,6 +510,55 @@ impl Document {
     pub fn audit(&self, env: &Env, options: Option<Unknown<'_>>) -> Result<String> {
         let options = raw_audit_options(options)?;
         audit::document_as(&self.core, &options).or_fail(env)
+    }
+
+    /// Run test cases (`spec/tests.md`, *Running cases*) against the rule
+    /// set, decision table or bundle the document holds, and write the test
+    /// run in `options.format`: its text (the default, as the command line
+    /// prints it), or a `"json"` or `"yaml"` test run document. `files` are
+    /// the case files in run order; a bundle's are found by the paths it
+    /// gives, in its order, and checked against their digests.
+    ///
+    /// # Errors
+    ///
+    /// A `TypeError` for a document that holds no rules, a file or an option
+    /// of the wrong type, or a `cancel` that does not return a boolean; a
+    /// `RangeError` for a limit that is negative or not a whole number, or a
+    /// bundle's case file that is not given; what `cancel` throws. A case
+    /// file that cannot be read is a result, not an error.
+    #[napi(ts_args_type = "files?: CaseFileInput[] | null, options?: TestWriteOptions | null")]
+    pub fn test(
+        &self,
+        env: &Env,
+        files: Option<Unknown<'_>>,
+        options: Option<Unknown<'_>>,
+    ) -> Result<String> {
+        let files = raw_case_files(env, files)?;
+        let (options, cancel) = raw_test_options(env, options)?;
+        let mut raised = None;
+        let outcome = crate::common::cases::document_test(&self.core, files, &options, || {
+            let Some(cancel) = &cancel else {
+                return false;
+            };
+            if raised.is_some() {
+                return true;
+            }
+            match cancel.call(()).and_then(|answer| raw(&answer)) {
+                Ok(Raw::Bool(answer)) => answer,
+                Ok(_) => {
+                    raised = Some(type_error(env, "options.cancel must return a boolean"));
+                    true
+                }
+                Err(error) => {
+                    raised = Some(error);
+                    true
+                }
+            }
+        });
+        if let Some(error) = raised {
+            return Err(error);
+        }
+        outcome.or_fail(env)
     }
 }
 

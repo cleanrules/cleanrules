@@ -13,7 +13,7 @@ import path from 'node:path'
 import test from 'node:test'
 
 import { build, deno, native, root } from './support/cr.js'
-import { MINIMUM_VECTORS, SKIPS, auditsDocument, checkComparison, conformance, needsCaseFiles } from './support/conformance.js'
+import { MINIMUM_VECTORS, SKIPS, auditsDocument, checkComparison, conformance } from './support/conformance.js'
 import { Obj, parse, write } from './support/json.js'
 
 const VECTORS = path.join(import.meta.dirname, '..', '..', '..', 'conformance', 'vectors')
@@ -107,22 +107,16 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
   // The audit's native route: rule sets and tables only.
   const auditedDocuments = [...vectors.values()].filter(auditsDocument).map((v) => v.get('id'))
   const documents = auditedDocuments.length > 0 ? ['audit_document'] : []
-  // And the case runner, until task T.9b.
-  const testRuns = [...vectors.values()].filter((v) => v.get('given').get('kind') === 'test_run').map((v) => v.get('id'))
-  const runs = testRuns.length > 0 ? ['test_run'] : []
   // And a run's statistics, which the binding does not gather yet.
   const counted = [...vectors.values()].filter((v) => v.get('given').get('kind') === 'statistics').map((v) => v.get('id'))
-  if (counted.length > 0) runs.push('statistics')
-  // And the comparator, until task T.9b.
+  const runs = counted.length > 0 ? ['statistics'] : []
+  // And the comparator, until the comparator step of task T.9b.
   const testComparisons = [...vectors.values()]
     .filter((v) => v.get('given').get('kind') === 'test_comparison')
     .map((v) => v.get('id'))
   const comparisons = testComparisons.length > 0 ? ['test_comparison'] : []
   const diagrams = drawn.length > 0 ? ['diagram'] : []
   const grades = graded.length > 0 ? ['graded'] : []
-  // The native route skips case files that the idiomatic API would load.
-  const caseFiles = [...vectors.values()].filter(needsCaseFiles).map((v) => v.get('id'))
-  const cases = caseFiles.length > 0 ? ['cases'] : []
   assert.deepEqual(
     [...counts.json.skipped.keys()].sort(),
     [
@@ -140,19 +134,16 @@ test('every vector ran both ways, but those listed with their reason', (t) => {
   assert.deepEqual(counts.json.skipped.get('diagram') ?? [], drawn)
   assert.deepEqual(counts.json.skipped.get('agents') ?? [], tools)
   assert.deepEqual(counts.json.skipped.get('graded') ?? [], graded)
-  assert.deepEqual(counts.json.skipped.get('test_run') ?? [], testRuns)
   assert.deepEqual(counts.json.skipped.get('statistics') ?? [], counted)
   assert.deepEqual(counts.json.skipped.get('test_comparison') ?? [], testComparisons)
   assert.deepEqual(
     [...counts.native.skipped.keys()].sort(),
-    [...diagrams, ...agents, ...documents, ...runs, ...comparisons, ...grades, ...cases].sort(),
+    [...diagrams, ...agents, ...documents, ...runs, ...comparisons, ...grades].sort(),
   )
-  assert.deepEqual(counts.native.skipped.get('cases') ?? [], caseFiles)
   assert.deepEqual(counts.native.skipped.get('diagram') ?? [], drawn)
   assert.deepEqual(counts.native.skipped.get('agents') ?? [], tools)
   assert.deepEqual(counts.native.skipped.get('graded') ?? [], graded)
   assert.deepEqual(counts.native.skipped.get('audit_document') ?? [], auditedDocuments)
-  assert.deepEqual(counts.native.skipped.get('test_run') ?? [], testRuns)
   assert.deepEqual(counts.native.skipped.get('statistics') ?? [], counted)
   assert.deepEqual(counts.native.skipped.get('test_comparison') ?? [], testComparisons)
 })
@@ -198,6 +189,12 @@ test('a wrong expected output fails both ways', () => {
     ['audit/gaps/boundary', '"status":"complete"', '"status":"partial"'],
     ['audit/tables/unlisted-fields', '"pointer":"/decision_table/rows/', '"pointer":"/decision_table/rows/9'],
     ['audit/tables/unlisted-fields', '"row":0', '"row":1'],
+    // Test runs: a mismatch's value, a summary count, why a run stopped and a
+    // file's digest.
+    ['tests/matching/every-key-in-order', '"actual":{"v":1,"w":"a"}}', '"actual":{"v":1.0,"w":"a"}}'],
+    ['tests/interruption/max-results', '"remaining":3', '"remaining":2'],
+    ['tests/interruption/max-steps', '"reason":"max_steps"', '"reason":"max_results"'],
+    ['tests/bundles/case-files', '"digest":"sha256:48', '"digest":"sha256:49'],
   ]
   for (const [id, from, to] of wrong) {
     const vector = mutated(id, from, to)

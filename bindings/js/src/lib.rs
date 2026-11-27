@@ -22,7 +22,8 @@
 //! functions (`build` in each front end), which build conditions and rules
 //! through the core's constructors and give values back in a private encoding
 //! (`common::out`), and read and write documents, result trees and decision
-//! tables, and make, read and compare bundles (`documents` in each front end).
+//! tables, and make, read and compare bundles (`documents` in each front end),
+//! and build case files and run them (`cases` in each front end).
 
 // napi-rs and wasm-bindgen hand arguments over by value, and napi-rs ties
 // JavaScript values to the lifetime of `&'env Env`: these two lints would ask
@@ -44,10 +45,15 @@ pub use napi::build::{
     node_string_test, node_unary, rule_details, rule_new, rule_set_new, summary_with,
 };
 #[cfg(not(target_arch = "wasm32"))]
+pub use napi::cases::{
+    NativeCaseFile, NativeCaseRun, case_file_of, case_file_read, cases_data, cases_new, run_bundle,
+    run_ruleset, run_table,
+};
+#[cfg(not(target_arch = "wasm32"))]
 pub use napi::classes::{
-    ActionCall, Aggregate, AuditWriteOptions, BundleCaseInput, Decision, DecisionWriteOptions,
-    Document, DocumentKind, Format, HitPolicy, Limits, Node, ReadOptions, RuleSet, TreeOptions,
-    Truth, ValueTreeOptions,
+    ActionCall, Aggregate, AuditWriteOptions, BundleCaseInput, CaseFileInput, Decision,
+    DecisionWriteOptions, Document, DocumentKind, Format, HitPolicy, Limits, Node, ReadOptions,
+    RuleSet, TestWriteOptions, TreeOptions, Truth, ValueTreeOptions,
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use napi::documents::{
@@ -69,6 +75,11 @@ pub use wasm::build::{
     max_values_error_data, node_arith, node_between, node_children, node_compare, node_connective,
     node_constant, node_details, node_field, node_is_in, node_matches, node_round, node_same_as,
     node_string_test, node_unary, rule_details, rule_new, rule_set_new, summary_with,
+};
+#[cfg(target_arch = "wasm32")]
+pub use wasm::cases::{
+    NativeCaseFile, NativeCaseRun, case_file_of, case_file_read, cases_data, cases_new, run_bundle,
+    run_ruleset, run_table,
 };
 #[cfg(target_arch = "wasm32")]
 pub use wasm::classes::{Decision, Document, Node, RuleSet};

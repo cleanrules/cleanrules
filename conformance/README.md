@@ -190,10 +190,17 @@ output, never stopping at the first one.
   ABI, C++, Java, Scala and Go runners skip them in every route, count them
   and say why (`audit` in the Go and JVM reports).
 - **Test runs** (`spec/tests.md`, *Running cases*): the core's runner runs
-  the `test_run` vectors. Python and JavaScript run cases from task T.9b
-  (Java, Scala, Go and C++ are beta): until then the C ABI, Python, C++,
-  JavaScript, Java, Scala and Go runners skip them in every route, count them
-  and say why (`test_run` in the JavaScript, Go and JVM reports). The
+  the `test_run` vectors, and so do the Python and JavaScript runners (Node,
+  wasm and Deno) on both routes: `json` runs the vector's documents through
+  the core (`_test_run` in Python, `Document.test` of the native layer in
+  JavaScript), `native` runs case files built in code (`Expectation`, `Case`,
+  `Cases`, `CaseFile`) with `iter_test`/`iterTest` of a rule set built in
+  code, a table or a bundle read, and checks the `TestRun`'s members against
+  its JSON form. Both reduce each error to
+  its compared fields, as the core's runner does. Java, Scala, Go and C++ are
+  beta and do not run cases yet: the C ABI, C++, Java, Scala and Go runners
+  skip them in every route, count them and say why (`test_run` in the Go and
+  JVM reports). The
   vectors are written by `tools/test_run_vectors.py` (`--write`; `--check` in
   CI), whose expected results are written by hand from the spec; it computes
   only the digests of case files and bundles, with the canonical-bytes

@@ -6,6 +6,8 @@ import { install } from './install.js'
 
 /** The idiomatic API's internal functions and classes, the same as the Node addon's. */
 const INTERNAL = [
+  'NativeCaseFile',
+  'NativeCaseRun',
   'NativeGrid',
   'NativeRule',
   'NativeTable',
@@ -23,7 +25,11 @@ const INTERNAL = [
   'bundleTable',
   'canonicalCondition',
   'canonicalRule',
+  'caseFileOf',
+  'caseFileRead',
   'caseFileRefDigestMatches',
+  'casesData',
+  'casesNew',
   'checkCaseFileRef',
   'decisionData',
   'digestCondition',
@@ -33,8 +39,8 @@ const INTERNAL = [
   'documentTable',
   'explanationData',
   'fileSizeCheck',
-  'maxValuesErrorData',
   'gridNew',
+  'maxValuesErrorData',
   'nodeArith',
   'nodeBetween',
   'nodeChildren',
@@ -58,6 +64,9 @@ const INTERNAL = [
   'ruleSetRules',
   'ruleText',
   'ruleTree',
+  'runBundle',
+  'runRuleset',
+  'runTable',
   'stringifiable',
   'summaryWith',
   'writeCondition',
@@ -132,12 +141,25 @@ function layer(glue) {
     decimalProblem: glue.decimalProblem,
     setHooks: glue.setHooks,
   }
-  // The idiomatic API's internal functions and classes (`src/wasm/build.rs`
-  // and `src/wasm/documents.rs`).
+  // The idiomatic API's internal functions and classes (`src/wasm/build.rs`,
+  // `src/wasm/documents.rs` and `src/wasm/cases.rs`).
   for (const name of INTERNAL) {
     native[name] = glue[name]
   }
-  const classes = ['Document', 'RuleSet', 'Decision', 'Node', 'NodeList', 'RuleList', 'NativeRule', 'NativeTable', 'NativeGrid', 'NativeTree']
+  const classes = [
+    'Document',
+    'RuleSet',
+    'Decision',
+    'Node',
+    'NodeList',
+    'RuleList',
+    'NativeRule',
+    'NativeTable',
+    'NativeGrid',
+    'NativeTree',
+    'NativeCaseFile',
+    'NativeCaseRun',
+  ]
   for (const Class of classes.map((name) => native[name])) {
     guardFreed(Class)
   }
@@ -161,6 +183,26 @@ function layer(glue) {
       return makeBundle.call(this, rules, ...rest)
     },
   }.makeBundle
+  // A case file document given to `Document.test` crosses as the JSON text
+  // the core writes of it, under a member of its own, which the module reads
+  // again under limits that hold it (it takes engine objects only by
+  // reference); anything else in `cases` reaches the module as it is, which
+  // refuses it as the addon does.
+  const test = Object.getOwnPropertyDescriptor(native.Document.prototype, 'test').value
+  Object.defineProperty(native.Document.prototype, 'test', {
+    value: {
+      test(files, options) {
+        if (!Array.isArray(files)) return test.call(this, files, options)
+        const given = files.map((file) => {
+          if (file === null || typeof file !== 'object' || !(file.cases instanceof native.Document)) return file
+          return { path: file.path, content: file.content, __cleanrulesCasesText: file.cases.write('json') }
+        })
+        return test.call(this, given, options)
+      },
+    }.test,
+    writable: true,
+    configurable: true,
+  })
   const compareBundle = Object.getOwnPropertyDescriptor(native.Document.prototype, 'compareBundle').value
   Object.defineProperty(native.Document.prototype, 'compareBundle', {
     value: {

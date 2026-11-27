@@ -25,6 +25,8 @@ export function install(native, types) {
     native.NativeTable,
     native.NativeGrid,
     native.NativeTree,
+    native.NativeCaseFile,
+    native.NativeCaseRun,
   ]
   // The engine's own objects passed as data are opaque.
   useTypes(types, classes)

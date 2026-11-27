@@ -42,6 +42,8 @@ function deepFreeze(value) {
 
 /** The bundles of one build (`build` names it). */
 function bundles(native, rules, tables, build) {
+  // The case runner (`cases.js`), made after this module.
+  let testing = null
   const { RuleSet, checkActions, fromNativeRuleSet, ruleSetNative } = rules
   const { DecisionTable, fromNativeTable, tableNative } = tables
   // The native bundle document of each `Bundle`.
@@ -228,6 +230,26 @@ function bundles(native, rules, tables, build) {
     }
 
     /**
+     * Run the bundle's case files against its rules (`spec/tests.md`, *Case
+     * files of a bundle*): a `TestRun`. `read` gives the bytes of each case
+     * file, a function called with each `CaseFileRef` (a `string`, as UTF-8,
+     * or a `Uint8Array`), synchronously; what it throws is thrown, a file the
+     * caller cannot open being the caller's error. The files run in the
+     * bundle's order, each named by its path; a file whose bytes are not the
+     * ones the bundle records is one `decision_mismatch` result, and the
+     * files are read under the limits the bundle records. The options are
+     * `RuleSet.test`'s.
+     */
+    test(read, testOptions) {
+      return testing.test('bundle', this, read, testOptions)
+    }
+
+    /** Run the bundle's case files one at a time, as `RuleSet.iterTest` does. */
+    iterTest(read, testOptions) {
+      return testing.iterTest('bundle', this, read, testOptions)
+    }
+
+    /**
      * Compare with another bundle (`spec/bundles.md`, *Comparing bundles*)
      * (frozen): `relation` (`'conflict'`, `'same_rules_same_engine'`,
      * `'same_rules_other_engine'`, `'other_rules_same_engine'` or
@@ -273,6 +295,10 @@ function bundles(native, rules, tables, build) {
     fromNativeBundle: (made) => new Bundle(NATIVE, made),
     /** The bundle document of the native layer of a `Bundle`. */
     bundleNative: (bundle) => natives.get(bundle),
+    /** Give `Bundle.test` its runner (`cases.js`). */
+    useTesting: (api) => {
+      testing = api
+    },
   }
 }
 

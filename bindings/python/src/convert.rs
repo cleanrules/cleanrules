@@ -424,7 +424,21 @@ pub(crate) const MAX_DEPTH: usize = 256;
 /// `Stop::Limit` beyond `max_values`.
 pub(crate) fn metadata(value: &Bound<'_, PyAny>) -> Result<Result<Value, String>, Stop> {
     let mut count = ValueCount::for_constants();
-    metadata_at(value, "metadata", &mut Vec::new(), &mut count)
+    metadata_at(value, "metadata", &mut Vec::new(), &mut count, false)
+}
+
+/// Data of a case file (`spec/tests.md`): an input, an expected output or
+/// the file's metadata, at `at`, converted as metadata is but for numbers out
+/// of range, which are nulls with their reason, as a case file read from JSON
+/// holds them: the core then accepts them in an input and refuses them where
+/// it must, with its own message.
+///
+/// # Errors
+///
+/// As [`metadata`].
+pub(crate) fn case_data(value: &Bound<'_, PyAny>, at: &str) -> Result<Result<Value, String>, Stop> {
+    let mut count = ValueCount::for_constants();
+    metadata_at(value, at, &mut Vec::new(), &mut count, true)
 }
 
 fn metadata_at(
@@ -432,6 +446,7 @@ fn metadata_at(
     at: &str,
     open: &mut Vec<usize>,
     count: &mut ValueCount,
+    overflow_is_null: bool,
 ) -> Result<Result<Value, String>, Stop> {
     count.add(1)?;
     let is_dict = value.cast::<PyDict>().is_ok();
@@ -460,7 +475,13 @@ fn metadata_at(
             entries.sort_by(|(a, _), (b, _)| a.cmp(b));
             let mut map = Map::new();
             for (key, item) in entries {
-                match metadata_at(&item, &format!("{at}[{key:?}]"), open, count)? {
+                match metadata_at(
+                    &item,
+                    &format!("{at}[{key:?}]"),
+                    open,
+                    count,
+                    overflow_is_null,
+                )? {
                     Ok(item) => map.insert(key, item),
                     Err(problem) => return Ok(Err(problem)),
                 }
@@ -469,7 +490,13 @@ fn metadata_at(
         } else {
             let mut items = Vec::new();
             for (index, item) in value.try_iter()?.enumerate() {
-                match metadata_at(&item?, &format!("{at}[{index}]"), open, count)? {
+                match metadata_at(
+                    &item?,
+                    &format!("{at}[{index}]"),
+                    open,
+                    count,
+                    overflow_is_null,
+                )? {
                     Ok(item) => items.push(item),
                     Err(problem) => return Ok(Err(problem)),
                 }
@@ -484,6 +511,10 @@ fn metadata_at(
         .map_or_else(|_| "?".to_owned(), |r| r.to_string());
     Ok(match scalar(value)? {
         Ok(converted) => Ok(converted),
+        Err(Problem::IntOverflow) if overflow_is_null => Ok(Value::Null(NullCause::IntOverflow)),
+        Err(Problem::DecimalOverflow) if overflow_is_null => {
+            Ok(Value::Null(NullCause::DecimalOverflow))
+        }
         Err(Problem::NotANumber) => Err(format!("{at} is NaN, which is not data")),
         Err(_) => Err(format!("{at} is not a data value: {shown}")),
     })

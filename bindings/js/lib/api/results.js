@@ -6,7 +6,7 @@
 // engine makes their objects, except `TableOutput`, which a table's header
 // may also hold.
 
-import { RuleNotFoundError } from '../errors.js'
+import { RuleNotFoundError, fromNative } from '../errors.js'
 import { decode, decodeGap, jsonInt, plainObject } from '../output.js'
 import { registerOpaque } from '../read.js'
 
@@ -660,6 +660,202 @@ class Audit {
   }
 }
 
+// --- Test runs ------------------------------------------------------------
+
+/** The engine's limits as a test run's `engine` names them, by the binding's names. */
+const ENGINE_LIMITS = {
+  max_size: 'maxSize',
+  max_nesting: 'maxNesting',
+  max_depth: 'maxDepth',
+  max_path_segments: 'maxPathSegments',
+  max_table_size: 'maxTableSize',
+  max_values: 'maxValues',
+}
+
+/** A key of an expectation that does not match (`spec/tests.md`, *Test runs*). */
+class Mismatch {
+  constructor(token, data, form) {
+    check(token, 'Mismatch')
+    const [key, expected, actual, given, known] = data
+    /**
+     * The key: `"selected"`, `"output"`, `"outputs"`, `"unknown"`,
+     * `"error"`, or one a later version adds, whose `expected` and `actual`
+     * are in their JSON form.
+     */
+    this.key = key
+    let wanted = expected
+    let got = actual
+    if (!known) {
+      wanted = form.expected
+      got = form.actual
+    } else if (key === 'output') {
+      // What is expected reads as a case file writes it: a float stays one.
+      wanted = decode(expected, [], true)
+      got = given ? decode(actual, []) : undefined
+    } else if (key === 'outputs') {
+      wanted = expected.map((form) => decode(form, [], true))
+      got = actual.map((form) => decode(form, []))
+    } else if (key === 'error') {
+      got = actual === null ? null : fromNative(actual, null, null)
+    }
+    /**
+     * What the case expects: rule ids (`selected`, `unknown`, sorted), an
+     * object or `null` for nothing selected (`output`), objects
+     * (`outputs`), or an error code (`error`); frozen.
+     */
+    this.expected = frozenData(wanted)
+    /**
+     * What was given, in the same form; for `error`, the error raised (a
+     * `CleanRulesError`) or `null`. `undefined` when nothing was given (a
+     * decision without a single output), and then `reason` says why.
+     */
+    this.actual = got instanceof Error ? got : frozenData(got)
+    /** Why nothing was given to compare, or `null`. */
+    this.reason = form.reason ?? null
+    Object.freeze(this)
+  }
+}
+
+/** The result of one case, or of a case file that cannot be run (`spec/tests.md`, *Test runs*). */
+class CaseResult {
+  #form
+
+  constructor(token, data) {
+    check(token, 'CaseResult')
+    const [form, mismatches, error] = JSON.parse(data)
+    this.#form = JSON.stringify(form)
+    /** The path of the case's file, or `null`. */
+    this.path = form.path ?? null
+    /** The case's id; `null` for a case file that cannot be run. */
+    this.id = form.id ?? null
+    /** `"passed"`, `"failed"` or `"error"`. */
+    this.status = form.status
+    /** For a failed case, the keys that do not match, in the order of the expectation's keys. */
+    this.mismatches = frozen(mismatches.map((item, i) => new Mismatch(INTERNAL, item, form.mismatches[i])))
+    /** For an error, the error (a `CleanRulesError`); otherwise `null`. */
+    this.error = error === null ? null : fromNative(error, null, null)
+    /** For a failed case explained, the text of its decision's explanation; otherwise `null`. */
+    this.explanationText = form.explanation_text ?? null
+    Object.freeze(this)
+  }
+
+  /**
+   * The result's JSON form, as a test run document writes it, for
+   * `JSON.stringify`; a copy.
+   */
+  toJSON() {
+    return JSON.parse(this.#form)
+  }
+
+  [INSPECT]() {
+    const where = [this.path, this.id === null ? null : JSON.stringify(this.id)].filter((part) => part !== null)
+    return `CaseResult(${where.length === 0 ? '(a case file without a path)' : where.join(' ')}: ${this.status})`
+  }
+
+  [DENO_INSPECT]() {
+    return this[INSPECT]()
+  }
+}
+
+/**
+ * A summary as the native layer gives it, the core's counts: `[passed,
+ * failed, error, interrupted, total, partial]`.
+ */
+function testRunSummary([passed, failed, error, interrupted, total, partial]) {
+  return Object.freeze({
+    total,
+    passed,
+    failed,
+    error,
+    partial,
+    interrupted: interrupted === null ? null : Object.freeze({ reason: interrupted[0], remaining: interrupted[1] }),
+  })
+}
+
+/**
+ * The results of a run and their summary (`spec/tests.md`, *Test runs*):
+ * `RuleSet.test`, `DecisionTable.test`, `Bundle.test` and `CaseRun.testRun()`
+ * make it.
+ */
+class TestRun {
+  #document
+  #text
+
+  constructor(token, data) {
+    check(token, 'TestRun')
+    const [document, text, results, summary, allPassed, isCurrent] = JSON.parse(data)
+    this.#document = JSON.stringify(document)
+    this.#text = text
+    const run = document.test_run
+    /** What was tested: `"ruleset"` or `"decision_table"` (a later version may add sources). */
+    this.source = run.source
+    /** The hit policy: a rule set's, as the table policy of the same name, or a table's. */
+    this.hitPolicy = run.hit_policy
+    /** The `collect` aggregate, or `null`. */
+    this.aggregate = run.aggregate ?? null
+    /** The logic's name. */
+    this.logic = run.logic
+    /** Whether evaluation is strict. */
+    this.strict = run.strict === true
+    /** The rule set digest of the rules tested, when asked for (`rulesetDigest`); otherwise `null`. */
+    this.rulesetDigest = run.ruleset_digest ?? null
+    const limits = Object.fromEntries(
+      Object.entries(run.engine.limits).map(([key, value]) => [ENGINE_LIMITS[key] ?? key, jsonInt(value)]),
+    )
+    /**
+     * The engine that ran the cases (this one): `name`, `version`, the
+     * `limits` its case files were read with (a bundle's own, for a
+     * bundle's cases), by the binding's names, and `isCurrent`, whether it
+     * is this engine (the same name and version), as a bundle's engine says.
+     */
+    this.engine = Object.freeze({ name: run.engine.name, version: run.engine.version, limits: Object.freeze(limits), isCurrent })
+    /** The bundle's `id` and `revision`, for a bundle's cases; otherwise `null`. */
+    this.bundle = run.bundle === undefined ? null : Object.freeze({ id: run.bundle.id, revision: run.bundle.revision })
+    /** The case files given to the run, in order: each `{ path, digest }`, `null` for what it has not. */
+    this.files = frozen(run.files.map((file) => Object.freeze({ path: file.path ?? null, digest: file.digest ?? null })))
+    /** The limits it ran with: `maxExplained`, and `maxResults` and `maxSteps` (or `null`). */
+    this.limits = Object.freeze({
+      maxExplained: jsonInt(run.limits.max_explained),
+      maxResults: run.limits.max_results === undefined ? null : jsonInt(run.limits.max_results),
+      maxSteps: run.limits.max_steps === undefined ? null : jsonInt(run.limits.max_steps),
+    })
+    /**
+     * The counts (`total`, `passed`, `failed`, `error`), `partial`, and
+     * `interrupted` (`{ reason, remaining }`) for a partial run, or `null`.
+     */
+    this.summary = testRunSummary(summary)
+    /** The results, in run order. */
+    this.results = frozen(results.map((result) => new CaseResult(INTERNAL, result)))
+    /** Whether every case ran and passed: no failure, no error, and not partial; true for a run of no cases. */
+    this.allPassed = allPassed
+    Object.freeze(this)
+  }
+
+  /**
+   * The test run document of the JSON format (`spec/tests.md`, *Test
+   * runs*), for `JSON.stringify` (`Expr.toJSON` says how); a copy. Values
+   * are in the JSON encoding of values (a decimal is `{"$decimal": "0.15"}`).
+   */
+  toJSON() {
+    return JSON.parse(this.#document)
+  }
+
+  /** The test run as text, the same in every language (`spec/tests.md`, *Text*). */
+  toString() {
+    return this.#text
+  }
+
+  [INSPECT]() {
+    const what = this.source === 'ruleset' ? 'rule set' : 'decision table'
+    const { passed, failed, error, partial } = this.summary
+    return `TestRun(${what}: ${passed} passed, ${failed} failed, ${error} error${error === 1 ? '' : 's'}${partial ? ', partial' : ''})`
+  }
+
+  [DENO_INSPECT]() {
+    return this[INSPECT]()
+  }
+}
+
 // The binding's own objects are opaque as data.
 registerOpaque(
   RuleResult,
@@ -683,12 +879,16 @@ registerOpaque(
   Undecided,
   Diagnostic,
   Audit,
+  Mismatch,
+  CaseResult,
+  TestRun,
 )
 
 export {
   ActionContext,
   Audit,
   AuditedRule,
+  CaseResult,
   Cause,
   CauseGroup,
   CheckResult,
@@ -697,6 +897,7 @@ export {
   Explanation,
   FieldUsage,
   INTERNAL,
+  Mismatch,
   Note,
   NotModelled,
   Reason,
@@ -707,6 +908,9 @@ export {
   Summary,
   TableOutput,
   TableRow,
+  TestRun,
   Undecided,
+  frozenData,
   notFound,
+  testRunSummary,
 }

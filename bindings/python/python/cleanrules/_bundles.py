@@ -22,9 +22,9 @@ from __future__ import annotations
 
 import enum
 import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, NoReturn, TypedDict, cast
+from typing import TYPE_CHECKING, Any, NoReturn, TypedDict, cast
 
 from cleanrules import _cleanrules as _native
 from cleanrules._documents import (
@@ -35,6 +35,9 @@ from cleanrules._documents import (
 )
 from cleanrules._rules import RuleSet
 from cleanrules._tables import DecisionTable
+
+if TYPE_CHECKING:
+    from cleanrules._cases import BundleCases, CaseRun, TestRun
 
 __all__ = [
     "Bundle",
@@ -404,6 +407,81 @@ class Bundle:
                 lists the paths it has.
         """
         return self._native.case_digest_matches(path, _bytes(content, "content"))
+
+    def test(
+        self,
+        read: BundleCases,
+        *,
+        max_results: int | None = None,
+        max_steps: int | None = None,
+        max_explained: int | None = None,
+        cancel: Callable[[], object] | None = None,
+        ruleset_digest: bool = False,
+    ) -> TestRun:
+        """Run the bundle's case files against its rules (`spec/tests.md`).
+
+            run = bundle.test("path/to/bundle/directory")
+            run = bundle.test(lambda ref: storage.get(ref.path))
+
+        The files run in the bundle's order (*Case files of a bundle*), each
+        named by its path. Before a file is read, its bytes are checked
+        against the digest the bundle records: a file that differs is one
+        `decision_mismatch` result, at `/bundle/cases/<i>/digest`, and none of
+        its cases runs. Files are read under the limits the bundle records,
+        which the test run's `engine` records. The other arguments are those
+        of `RuleSet.test`.
+
+        Args:
+            read: Where the bytes of each case file come from: a callable
+                given each `CaseFileRef` (returning bytes, or a str as UTF-8),
+                or the bundle's directory, which the paths are relative to.
+            max_results: As `RuleSet.test`.
+            max_steps: As `RuleSet.test`.
+            max_explained: As `RuleSet.test`.
+            cancel: As `RuleSet.test`.
+            ruleset_digest: As `RuleSet.test`.
+
+        Raises:
+            OSError: If a file cannot be read from the directory; an exception
+                that `read` raises propagates too: a file the caller cannot
+                open is the caller's error, not a result.
+        """
+        from cleanrules._cases import _bundle_files, _test  # pyright: ignore[reportPrivateUsage]
+
+        return _test(
+            "bundle",
+            self._native,
+            _bundle_files(self, read),
+            max_results=max_results,
+            max_steps=max_steps,
+            max_explained=max_explained,
+            cancel=cancel,
+            ruleset_digest=ruleset_digest,
+        )
+
+    def iter_test(
+        self,
+        read: BundleCases,
+        *,
+        max_results: int | None = None,
+        max_steps: int | None = None,
+        max_explained: int | None = None,
+        cancel: Callable[[], object] | None = None,
+        ruleset_digest: bool = False,
+    ) -> CaseRun:
+        """Run the bundle's case files one at a time, as `RuleSet.iter_test` does."""
+        from cleanrules._cases import _bundle_files, _iter_test  # pyright: ignore[reportPrivateUsage]
+
+        return _iter_test(
+            "bundle",
+            self._native,
+            _bundle_files(self, read),
+            max_results=max_results,
+            max_steps=max_steps,
+            max_explained=max_explained,
+            cancel=cancel,
+            ruleset_digest=ruleset_digest,
+        )
 
     def compare(self, other: Bundle) -> BundleComparison:
         """Compare this bundle with another (`spec/bundles.md`, *Comparing bundles*).

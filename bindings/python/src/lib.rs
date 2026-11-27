@@ -11,6 +11,7 @@
 mod agents;
 mod audit;
 mod bundles;
+mod cases;
 mod convert;
 mod documents;
 mod errors;
@@ -54,6 +55,22 @@ fn native_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<audit::PyAudit>()?;
     module.add_function(wrap_pyfunction!(audit::audit_ruleset, module)?)?;
     module.add_function(wrap_pyfunction!(audit::audit_decision_table, module)?)?;
+    module.add_class::<cases::PyCases>()?;
+    module.add_class::<cases::PyCase>()?;
+    module.add_class::<cases::PyExpectation>()?;
+    module.add_class::<cases::PyCaseFile>()?;
+    module.add_class::<cases::PyCaseRun>()?;
+    module.add_class::<cases::PyTestRun>()?;
+    module.add_function(wrap_pyfunction!(cases::expectation_new, module)?)?;
+    module.add_function(wrap_pyfunction!(cases::case_new, module)?)?;
+    module.add_function(wrap_pyfunction!(cases::cases_new, module)?)?;
+    module.add_function(wrap_pyfunction!(cases::case_file_of, module)?)?;
+    module.add_function(wrap_pyfunction!(cases::case_file_read, module)?)?;
+    module.add_function(wrap_pyfunction!(cases::bundle_case_files, module)?)?;
+    module.add_function(wrap_pyfunction!(cases::run_ruleset, module)?)?;
+    module.add_function(wrap_pyfunction!(cases::run_table, module)?)?;
+    module.add_function(wrap_pyfunction!(cases::run_bundle, module)?)?;
+    module.add_function(wrap_pyfunction!(documents::dump_cases, module)?)?;
     module.add_function(wrap_pyfunction!(bundles::make_bundle, module)?)?;
     module.add_function(wrap_pyfunction!(bundles::case_digest_matches, module)?)?;
     module.add_function(wrap_pyfunction!(bundles::check_case_file, module)?)?;
@@ -91,5 +108,6 @@ fn native_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(json_api::py_make_bundle, module)?)?;
     module.add_function(wrap_pyfunction!(json_api::py_compare_bundles, module)?)?;
     module.add_function(wrap_pyfunction!(audit::py_audit, module)?)?;
+    module.add_function(wrap_pyfunction!(cases::py_test_run, module)?)?;
     Ok(())
 }

@@ -28,10 +28,16 @@ the expected document of a `bundle` vector, name this engine's version
 Audits (`spec/audit.md`) run on both routes but for documents other than
 rule sets and tables, which only the `json` route audits (`run_audit`).
 
-Case files (`spec/tests.md`, `format/cases/*`) have no Python type yet:
-`loads` refuses them with `UnsupportedError`. Their `read` vectors run through
-`_read_document` (`json`); those that write a case file in another format, and
-their `canonical` vectors, are skipped.
+Case files (`spec/tests.md`, `format/cases/*`) run on both routes: `read`
+vectors through `_read_document` (`json`) and through `cleanrules.loads` and
+`dumps`, rebuilding the file with `Cases`, `Case` and `Expectation`
+(`native`); `canonical` vectors as any other document.
+
+Test runs (`spec/tests.md`, *Running cases*, `tests/*`) run through
+`_test_run`, which reads the vector's documents (`json`), and through
+`RuleSet.iter_test`, `DecisionTable.iter_test` or `Bundle.iter_test` with case
+files built in Python (`native`); both compare the test run with its errors
+reduced to their compared fields, as the core's runner does.
 """
 
 from __future__ import annotations
@@ -796,23 +802,188 @@ def is_case_file_vector(vector: dict[str, Any]) -> bool:
     return str(vector["id"]).startswith("format/cases/")
 
 
-CASES_SKIP = (
-    "case files (spec/tests.md) have no Python type yet: cleanrules.loads refuses them, and"
-    " the core and C ABI runners write them and check their canonical bytes"
-)
+def run_read_case_file(vector: dict[str, Any], route: str) -> None:
+    """A `read` vector of a case file, on one route.
 
-
-def run_read_case_file(vector: dict[str, Any]) -> None:
-    """A `read` vector of a case file, through the private JSON entry point."""
+    Through the private JSON entry point (`json`), or with `loads` and
+    `dumps`, the file rebuilt in Python (`native`). A vector that writes
+    another format runs `dumps` on both routes.
+    """
     given, expect = vector["given"], vector["expect"]
     fmt: Any = "yaml" if "yaml" in given else "json"
     source = given["yaml"] if "yaml" in given else dumps(given["document"])
-    expect_result(
-        lambda: json.loads(_cleanrules._read_document(source, format=fmt)),  # pyright: ignore[reportPrivateUsage]
-        expect,
-        "document",
-        read=True,
+    if route == "json" and "write" not in given:
+        expect_result(
+            lambda: json.loads(_cleanrules._read_document(source, format=fmt)),  # pyright: ignore[reportPrivateUsage]
+            expect,
+            "document",
+            read=True,
+        )
+        return
+
+    def read() -> Any:
+        cases = cleanrules.loads(source, format=fmt)
+        assert isinstance(cases, cleanrules.Cases)
+        if "write" in given:
+            return cleanrules.dumps(cases, format=given["write"])
+        document = json.loads(cleanrules.dumps(cases))
+        again = rebuild_cases(cases)
+        assert again == cases, f"rebuilt {cleanrules.dumps(again)}"
+        assert json.loads(cleanrules.dumps(again)) == document
+        assert cleanrules.loads(cleanrules.dumps(cases, format="yaml"), format="yaml") == cases
+        return document
+
+    expect_result(read, expect, "document", read=True)
+
+
+def rebuild_cases(cases: cleanrules.Cases) -> cleanrules.Cases:
+    """`cases` built again from its attributes, with the Python constructors."""
+    items = [
+        cleanrules.Case(
+            case.id,
+            case.input,
+            expect=cleanrules.Expectation(
+                selected=case.expect.selected,
+                output=case.expect.output,
+                outputs=case.expect.outputs,
+                unknown=case.expect.unknown,
+                error=case.expect.error,
+            ),
+            description=case.description,
+        )
+        for case in cases
+    ]
+    return cleanrules.Cases(items, description=cases.description, metadata=cases.metadata)
+
+
+# --- Test runs -------------------------------------------------------------------------
+
+# The fields of an error that are compared (`spec/errors.md`, *Comparing errors*).
+ERROR_FIELDS = (
+    "code",
+    "pointer",
+    "line",
+    "column",
+    "rule",
+    "rules",
+    "path",
+    "types",
+    "row",
+    "name",
+    "executed",
+)
+
+
+def compared_errors(run: dict[str, Any]) -> dict[str, Any]:
+    """A test run's content with each error reduced to its compared fields."""
+
+    def reduce(error: Any) -> Any:
+        if not isinstance(error, dict):
+            return error
+        return {k: v for k, v in cast(dict[str, Any], error).items() if k in ERROR_FIELDS}
+
+    for result in run["results"]:
+        if "error" in result:
+            result["error"] = reduce(result["error"])
+        for mismatch in result.get("mismatches", []):
+            if mismatch["key"] == "error" and "actual" in mismatch:
+                mismatch["actual"] = reduce(mismatch["actual"])
+    return run
+
+
+def native_cases(document: dict[str, Any]) -> cleanrules.Cases:
+    """A case file document's content built with `Cases`, `Case` and `Expectation`."""
+    content = document["cases"]
+    items: list[cleanrules.Case] = []
+    for item in content["items"]:
+        given = item.get("expect", {})
+        output: Any = None
+        if "output" in given:
+            output = (
+                cleanrules.ExpectedOutput.NOTHING_SELECTED
+                if given["output"] is None
+                else native(given["output"])
+            )
+        expect = cleanrules.Expectation(
+            selected=given.get("selected"),
+            output=output,
+            outputs=None if "outputs" not in given else native(given["outputs"]),
+            unknown=given.get("unknown"),
+            error=given["error"]["code"] if "error" in given else None,
+        )
+        items.append(
+            cleanrules.Case(
+                item["id"],
+                native(item["input"]),
+                expect=expect,
+                description=item.get("description"),
+            )
+        )
+    return cleanrules.Cases(
+        items, description=content.get("description"), metadata=native(content.get("metadata"))
     )
+
+
+def run_test_run(vector: dict[str, Any], route: str) -> None:
+    """A `test_run` vector (`conformance/README.md`): run the cases, compare the test run."""
+    given, expect = vector["given"], vector["expect"]
+    limits = {k: int(v) for k, v in given.get("limits", {}).items()}
+    digest = bool(given.get("ruleset_digest", False))
+    after = given.get("cancel_after")
+    files = [(f["path"], f["text"]) for f in given.get("files", [])]
+    document = given["document"]
+    if route == "json":
+        content = json.loads(
+            _cleanrules._test_run(  # pyright: ignore[reportPrivateUsage]
+                dumps(document),
+                None if "cases" not in given else dumps(given["cases"]),
+                files,
+                cancel_after=None if after is None else int(after),
+                ruleset_digest=digest,
+                **limits,
+            )
+        )
+    else:
+        asked = 0
+
+        def cancel() -> bool:
+            nonlocal asked
+            asked += 1
+            return after is not None and asked > int(after)
+
+        options: dict[str, Any] = {"ruleset_digest": digest, "cancel": cancel, **limits}
+        if "bundle" in document:
+            bundle = cleanrules.loads(dumps(document))
+            assert isinstance(bundle, cleanrules.Bundle)
+            texts = dict(files)
+            run = bundle.iter_test(lambda ref: texts[ref.path], **options)
+        else:
+            rules: Any = (
+                build_ruleset(document["ruleset"])
+                if "ruleset" in document
+                else cleanrules.loads(dumps(document))
+            )
+            case_files: list[Any] = (
+                [native_cases(given["cases"])]
+                if "cases" in given
+                else [cleanrules.CaseFile.read(text, path=path) for path, text in files]
+            )
+            run = rules.iter_test(case_files, **options)
+        results = list(run)
+        report = run.test_run()
+        assert run.is_finished and run.remaining == 0
+        assert report.results == tuple(results)
+        summary = report.summary
+        assert summary.total == len(results) == summary.passed + summary.failed + summary.error
+        assert summary == run.summary
+        assert str(report).startswith("Test run of a ")
+        content = report.to_dict()["test_run"]
+        assert [r.to_dict() for r in report.results] == content["results"]
+    content = compared_errors(content)
+    # The expected `engine.version` is this engine's (`conformance/README.md`).
+    wanted = copy.deepcopy(typed(expect["test_run"]))
+    wanted["engine"]["version"] = cleanrules.__version__
+    assert same(content, wanted), f"\ngot  {json.dumps(content)}\nwant {json.dumps(wanted)}"
 
 
 def run_bundle(vector: dict[str, Any], route: str) -> bool:
@@ -832,9 +1003,6 @@ def run_bundle(vector: dict[str, Any], route: str) -> bool:
 def run_json(vector: dict[str, Any]) -> None:
     given, expect = vector["given"], vector["expect"]
     kind = given["kind"]
-    if kind == "read" and is_case_file_vector(vector):
-        run_read_case_file(vector)
-        return
     if run_bundle(vector, "json"):
         return
     if kind == "canonical":
@@ -1033,10 +1201,6 @@ DRAW_SKIP = (
     " the binding draws them from phase V.2"
 )
 
-TEST_RUN_SKIP = (
-    "test runs (spec/tests.md, Running cases) are made by the core and checked by its runner;"
-    " the binding runs cases from task T.9b"
-)
 STATISTICS_SKIP = (
     "statistics of a run (spec/tests.md, Statistics) are made by the core and checked by its"
     " runner; the binding does not gather them yet"
@@ -1065,16 +1229,9 @@ def collect() -> list[Any]:
                     )
                 )
                 continue
-            if is_case_file_vector(vector) and (given["kind"] == "canonical" or "write" in given):
-                for run in ("json", "native") if given["kind"] == "canonical" else ("json",):
-                    params.append(
-                        pytest.param(
-                            vector,
-                            run,
-                            id=f"{run}:{vector['id']}",
-                            marks=pytest.mark.skip(reason=CASES_SKIP),
-                        )
-                    )
+            if is_case_file_vector(vector) and given["kind"] == "read":
+                params.append(pytest.param(vector, "json", id=f"json:{vector['id']}"))
+                params.append(pytest.param(vector, "native", id=f"native:{vector['id']}"))
                 continue
             if given["kind"] == "audit" and audits_document(vector):
                 params.append(pytest.param(vector, "json", id=f"json:{vector['id']}"))
@@ -1086,18 +1243,6 @@ def collect() -> list[Any]:
                         marks=pytest.mark.skip(reason=AUDIT_DOCUMENT_SKIP),
                     )
                 )
-                continue
-            if given["kind"] == "test_run":
-                # The case runner is the core's; the Python API to it comes with T.9b.
-                for run in ("json", "native"):
-                    params.append(
-                        pytest.param(
-                            vector,
-                            run,
-                            id=f"{run}:{vector['id']}",
-                            marks=pytest.mark.skip(reason=TEST_RUN_SKIP),
-                        )
-                    )
                 continue
             if given["kind"] == "statistics":
                 for run in ("json", "native"):
@@ -1152,6 +1297,12 @@ def test_vector(vector: dict[str, Any], run: str) -> None:
         return
     if vector["given"]["kind"] == "audit":
         run_audit(vector, run)
+        return
+    if vector["given"]["kind"] == "test_run":
+        run_test_run(vector, run)
+        return
+    if vector["given"]["kind"] == "read" and is_case_file_vector(vector):
+        run_read_case_file(vector, run)
         return
     (run_json if run == "json" else run_native)(vector)
 

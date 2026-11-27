@@ -51,6 +51,8 @@ function located(make, pointer) {
 
 /** The decision tables of one build (`build` names it). */
 function tables(native, expressions, rules, build) {
+  // The case runner (`cases.js`), made after this module.
+  let testing = null
   const { Expr, nodeOf, wrap } = expressions
   // The native table of each `DecisionTable`.
   const natives = new WeakMap()
@@ -223,6 +225,21 @@ function tables(native, expressions, rules, build) {
     }
 
     /**
+     * Run test cases against the table, as `RuleSet.test` does: the cases
+     * are evaluated by the compiled rule set (`ruleset`), and the test run
+     * names the table's hit policy (`output_order` included); its
+     * `rulesetDigest` is that of the compiled rule set.
+     */
+    test(files, testOptions) {
+      return testing.test('table', this, files, testOptions)
+    }
+
+    /** Run test cases against the table one at a time, as `RuleSet.iterTest` does. */
+    iterTest(files, testOptions) {
+      return testing.iterTest('table', this, files, testOptions)
+    }
+
+    /**
      * The decision table document of the JSON format (`spec/tables.md`,
      * *JSON*), for `JSON.stringify` (`Expr.toJSON` says how); `dumps(table)`
      * writes it exactly.
@@ -250,6 +267,10 @@ function tables(native, expressions, rules, build) {
     fromNativeTable: (made) => new DecisionTable(NATIVE, made),
     /** The table of the core of a `DecisionTable`. */
     tableNative: (table) => natives.get(table),
+    /** Give `DecisionTable.test` its runner (`cases.js`). */
+    useTesting: (api) => {
+      testing = api
+    },
   }
 }
 

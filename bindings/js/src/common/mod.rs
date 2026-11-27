@@ -13,6 +13,7 @@
 pub(crate) mod audit;
 pub(crate) mod build;
 pub(crate) mod bundles;
+pub(crate) mod cases;
 pub(crate) mod core;
 pub(crate) mod documents;
 pub(crate) mod out;

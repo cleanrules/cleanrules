@@ -36,7 +36,12 @@ describe(`the package (${build})`, () => {
       'Audit',
       'AuditedRule',
       'Bundle',
+      'Case',
+      'CaseFile',
       'CaseFileRef',
+      'CaseResult',
+      'CaseRun',
+      'Cases',
       'Cause',
       'CauseGroup',
       'CheckResult',
@@ -48,6 +53,7 @@ describe(`the package (${build})`, () => {
       'DecisionTable',
       'Diagnostic',
       'EvaluationError',
+      'Expectation',
       'Explanation',
       'Expr',
       'ExpressionError',
@@ -59,6 +65,7 @@ describe(`the package (${build})`, () => {
       'FormatError',
       'HitPolicyError',
       'LocalDate',
+      'Mismatch',
       'MissingFieldError',
       'NaiveDateTime',
       'NotModelled',
@@ -77,6 +84,7 @@ describe(`the package (${build})`, () => {
       'Summary',
       'TableOutput',
       'TableRow',
+      'TestRun',
       'TypeMismatchError',
       'Undecided',
       'UnsupportedError',
@@ -157,7 +165,7 @@ describe(`the package (${build})`, () => {
     }
     // The idiomatic API: each build makes its own classes, with the same members.
     const [napiRoot, wasmRoot] = await roots()
-    for (const name of ['Expr', 'Field', 'Const', 'Rule', 'RuleSet', 'Decision', 'DecisionTable', 'Bundle', 'CaseFileRef']) {
+    for (const name of ['Expr', 'Field', 'Const', 'Rule', 'RuleSet', 'Decision', 'DecisionTable', 'Bundle', 'CaseFileRef', 'Expectation', 'Case', 'Cases', 'CaseFile', 'CaseRun']) {
       assert.notEqual(napiRoot[name], wasmRoot[name], name)
       assert.deepEqual(members(wasmRoot[name]), members(napiRoot[name]), name)
     }
@@ -166,7 +174,7 @@ describe(`the package (${build})`, () => {
       assert.equal(wasmRoot[name].length, napiRoot[name].length, name)
     }
     // The shared classes are the same objects.
-    for (const name of ['Explanation', 'Summary', 'ZonedDateTime', 'CleanRulesError', 'ResultTree', 'TableOutput', 'TableRow', 'ActionContext']) {
+    for (const name of ['Explanation', 'Summary', 'ZonedDateTime', 'CleanRulesError', 'ResultTree', 'TableOutput', 'TableRow', 'ActionContext', 'TestRun', 'CaseResult', 'Mismatch']) {
       assert.equal(napiRoot[name], wasmRoot[name], name)
     }
     // The internal functions and classes the API uses (`src/*/build.rs`).
@@ -177,11 +185,11 @@ describe(`the package (${build})`, () => {
     }
     const internal = (layer) =>
       Object.keys(layer)
-        .filter((name) => /^(node|rule|decision|explanation|summary|action|audit|document|write|canonical|digest|grid|file|maxValues|bundle|caseFile)[A-Z]|^(NodeList|RuleList|Native[A-Z]\w*|stringifiable|checkCaseFileRef)$/.test(name))
+        .filter((name) => /^(node|rule|decision|explanation|summary|action|audit|document|write|canonical|digest|grid|file|maxValues|bundle|caseFile|cases|run)[A-Z]|^(NodeList|RuleList|Native[A-Z]\w*|stringifiable|checkCaseFileRef)$/.test(name))
         .sort()
     assert.deepEqual(internal(napiLayer), [...INTERNAL].sort())
     assert.deepEqual(internal(wasmLayer), [...INTERNAL].sort())
-    for (const name of ['NodeList', 'RuleList', 'NativeRule', 'NativeTable', 'NativeGrid', 'NativeTree']) {
+    for (const name of ['NodeList', 'RuleList', 'NativeRule', 'NativeTable', 'NativeGrid', 'NativeTree', 'NativeCaseFile', 'NativeCaseRun']) {
       assert.deepEqual(
         members(wasmLayer[name]).filter((member) => !WASM_ONLY.has(member)),
         members(napiLayer[name]),

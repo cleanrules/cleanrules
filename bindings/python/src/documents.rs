@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyTuple};
 
 use crate::bundles::PyBundle;
+use crate::cases::PyCases;
 use crate::errors::IntoPyResult;
 use crate::node::PyNode;
 use crate::rules::{PyRule, PyRuleSet};
@@ -59,9 +60,8 @@ pub(crate) fn ruleset_parts<'py>(
 
 /// Read a document: `("condition", Node)`, `("rule", Rule)`,
 /// `("ruleset", (rules, hit_policy, aggregate, logic, strict))`,
-/// `("decision_table", DecisionTable)` or `("bundle", Bundle)`; CSV holds a
-/// decision table. A case file (`spec/tests.md`) is `UnsupportedError`: Python
-/// has no type for it yet.
+/// `("decision_table", DecisionTable)`, `("bundle", Bundle)` or
+/// `("cases", Cases)` (`spec/tests.md`); CSV holds a decision table.
 #[pyfunction]
 #[pyo3(signature = (text, format, max_size=None, max_nesting=None, max_depth=None, max_table_size=None, max_path_segments=None))]
 #[allow(clippy::too_many_arguments)] // The limits are keyword arguments in Python.
@@ -95,18 +95,7 @@ pub(crate) fn load_document<'py>(
             "bundle",
             PyBundle { bundle: *bundle }.into_pyobject(py)?.into_any(),
         ),
-        Document::Cases(_) => {
-            let error = cleanrules::Error::new(
-                cleanrules::ErrorCode::Unsupported,
-                "case files (spec/tests.md) are not loaded in Python yet",
-            )
-            .with_hint(
-                "check one with cleanrules.Catalog({}).call(\"validate\", {\"document\": text}), \
-                 or read it with the Rust crate",
-            )
-            .unsupported("loads", "Python has no type for test cases yet");
-            return Err::<_, cleanrules::Error>(error).or_raise(py);
-        }
+        Document::Cases(cases) => ("cases", crate::cases::cases_object(py, cases)?),
         // The core's documents are `#[non_exhaustive]`.
         _ => {
             return Err(PyValueError::new_err(
@@ -194,8 +183,18 @@ pub(crate) fn dump_bundle(bundle: &Bound<'_, PyBundle>, format: &str) -> PyResul
     )
 }
 
-/// The document of a condition, rule, rule set, decision table or bundle, as
-/// the core holds it.
+/// The document of a case file's content, in `format` (`json` or `yaml`).
+#[pyfunction]
+pub(crate) fn dump_cases(cases: &Bound<'_, PyCases>, format: &str) -> PyResult<String> {
+    write(
+        cases.py(),
+        &Document::Cases(cases.get().cases.clone()),
+        format,
+    )
+}
+
+/// The document of a condition, rule, rule set, decision table, bundle or
+/// case file, as the core holds it.
 fn document_of(value: &Bound<'_, PyAny>) -> PyResult<Document> {
     if let Ok(node) = value.cast::<PyNode>() {
         Ok(Document::Condition(node.get().node.clone()))
@@ -207,9 +206,11 @@ fn document_of(value: &Bound<'_, PyAny>) -> PyResult<Document> {
         Ok(Document::DecisionTable(table.get().table.clone()))
     } else if let Ok(bundle) = value.cast::<PyBundle>() {
         Ok(Document::Bundle(Box::new(bundle.get().bundle.clone())))
+    } else if let Ok(cases) = value.cast::<PyCases>() {
+        Ok(Document::Cases(cases.get().cases.clone()))
     } else {
         Err(PyValueError::new_err(
-            "a condition, a rule, a rule set, a decision table or a bundle",
+            "a condition, a rule, a rule set, a decision table, a bundle or a case file",
         ))
     }
 }

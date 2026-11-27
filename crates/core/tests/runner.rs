@@ -1105,3 +1105,22 @@ fn a_case_file_too_large_to_load_is_its_error() {
         Some("raise the YAML size limit if the file is trusted")
     );
 }
+
+#[test]
+fn a_case_file_is_cloned_with_its_error() {
+    let ruleset = rules(RULES);
+    let files = [
+        file("cases/discounts.json", CASES),
+        file("bad.json", "[]"),
+        CaseFile::new(cases(FAILING)),
+    ];
+    let copies: Vec<CaseFile> = files.to_vec();
+    for (file, copy) in files.iter().zip(&copies) {
+        assert_eq!(file.path(), copy.path());
+        assert_eq!(file.digest(), copy.digest());
+    }
+    let error = copies[1].cases().unwrap_err();
+    assert_eq!(error.code(), ErrorCode::FormatError);
+    let runner = Runner::new(&ruleset);
+    assert_eq!(json(&runner.run(&files)), json(&runner.run(&copies)));
+}

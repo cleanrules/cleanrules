@@ -1,11 +1,12 @@
 // The idiomatic API of one build (the Node addon or the WebAssembly module):
 // conditions, rules, rule sets, decisions, result trees, decision tables,
-// bundles and documents over its native layer. Each entry point makes it for its build,
+// bundles, test cases and documents over its native layer. Each entry point makes it for its build,
 // once per native layer (`cleanrules` and `cleanrules/wasm` share it in one
 // realm); the classes of what decisions, explanations and summaries give back
 // (`results.js`) and the errors and markers are shared.
 
 import { bundles } from './bundles.js'
+import { cases } from './cases.js'
 import { documents } from './documents.js'
 import { expressions } from './expr.js'
 import { rules } from './rules.js'
@@ -15,10 +16,15 @@ import { trees } from './trees.js'
 /** The names of the API of a build, as each entry point exports them. */
 export const NAMES = Object.freeze([
   'Bundle',
+  'Case',
+  'CaseFile',
   'CaseFileRef',
+  'CaseRun',
+  'Cases',
   'Const',
   'Decision',
   'DecisionTable',
+  'Expectation',
   'Expr',
   'F',
   'Field',
@@ -54,19 +60,27 @@ export function api(native, build) {
     const ruleApi = rules(native, built, treeApi, build)
     const tableApi = tables(native, built, ruleApi, build)
     const bundleApi = bundles(native, ruleApi, tableApi, build)
-    const documentApi = documents(native, built, ruleApi, tableApi, bundleApi, build)
+    const caseApi = cases(native, ruleApi, tableApi, bundleApi, build)
+    for (const made of [ruleApi, tableApi, bundleApi]) made.useTesting(caseApi)
+    const documentApi = documents(native, built, ruleApi, tableApi, bundleApi, caseApi, build)
     const { Const, Expr, F, Field, and, constant, field, not, or } = built
     const { Decision, Rule, RuleSet } = ruleApi
     const { DecisionTable } = tableApi
     const { Bundle, CaseFileRef } = bundleApi
+    const { Case, CaseFile, CaseRun, Cases, Expectation } = caseApi
     const { evaluateTree, evaluateValueTree } = treeApi
     const { canonicalBytes, digest, dump, dumps, load, loads, ruleFromText } = documentApi
     found = Object.freeze({
       Bundle,
+      Case,
+      CaseFile,
       CaseFileRef,
+      CaseRun,
+      Cases,
       Const,
       Decision,
       DecisionTable,
+      Expectation,
       Expr,
       F,
       Field,

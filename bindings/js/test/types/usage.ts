@@ -491,3 +491,82 @@ void new Bundle(rules, { id: 'acme/a' })
 void new Bundle(new Rule('a', F.x.gt(1)), { id: 'a', revision: '1' })
 void [bundleRules, bundleSet, maxDepth, current, outputKeys, caseDigest, matches, relation, bundled, bundleText, bundleDigest]
 void [loggedDecision, nativeComparison, nativeDecision]
+
+// Test cases and the case runner (spec/tests.md).
+import {
+  Case,
+  CaseFile,
+  type CaseFiles,
+  CaseResult,
+  CaseRun,
+  type CaseStatus,
+  Cases,
+  Expectation,
+  type ExpectationKey,
+  type Interruption,
+  Mismatch,
+  TestRun,
+  type TestOptions,
+  type TestRunSummary,
+} from 'cleanrules'
+import { type CaseFileInput, type TestWriteOptions } from 'cleanrules/native'
+
+const expectation = new Expectation({ selected: ['vip'], output: { discount: decimal('0.15'), rate: float(1) }, unknown: [] })
+const nothing = new Expectation({ output: null })
+const testCase = new Case('vip', { customer: { years: 7 } }, { expect: expectation, description: 'a vip' })
+const caseSet = new Cases([testCase], { description: 'discounts', metadata: { owner: 'risk' } })
+const fileOfCases = new CaseFile(caseSet, { path: 'cases/discounts.json' })
+const readFile: CaseFile = CaseFile.read('version: 1', { path: 'cases/b.yaml', format: 'yaml' })
+const loadedCaseFile: Promise<CaseFile> = CaseFile.load('cases/discounts.json')
+const testFiles: CaseFiles = [fileOfCases, caseSet]
+const testOptions: TestOptions = { limits: { maxResults: 100, maxExplained: 0 }, cancel: () => false, signal: { aborted: false }, rulesetDigest: true }
+const testRun: TestRun = rules.test(testFiles, testOptions)
+const caseRun: CaseRun = rules.iterTest(caseSet)
+for (const result of caseRun) {
+  const status: CaseStatus = result.status
+  const keys: ExpectationKey[] = result.mismatches.map((m: Mismatch) => m.key)
+  void [status, keys, result.error?.code, result.explanationText, result.toJSON()]
+}
+const runSummary: TestRunSummary = caseRun.testRun().summary
+const stoppedBy: Interruption | undefined = runSummary.interrupted?.reason
+const laterReason: Interruption = 'deadline'
+const firstResult: CaseResult | undefined = testRun.results[0]
+const tableRun: TestRun = rules.test(caseSet)
+const bundleRun: TestRun = bundle.test((ref) => ref.path)
+const bundleIter: CaseRun = bundle.iterTest(() => new Uint8Array())
+const loadedCases: Loaded = caseSet
+const caseText: string = dumps(caseSet, { format: 'yaml' })
+const caseDigestText: string = digest(caseSet)
+const nativeFiles: CaseFileInput[] = [{ path: 'cases/a.json', content: '{}' }, { cases: document }]
+const nativeTestOptions: TestWriteOptions = { format: 'json', limits: { maxResults: 1 }, rulesetDigest: true, cancel: () => false }
+const nativeTest: string = document.test(nativeFiles, nativeTestOptions)
+// @ts-expect-error: a status is a closed set.
+const notAStatus: CaseStatus = 'skipped'
+// @ts-expect-error: an expected error is one of three codes.
+void new Expectation({ error: 'evaluation_error' })
+void [nothing, readFile, loadedCaseFile, stoppedBy, laterReason, firstResult, tableRun, bundleRun, bundleIter, loadedCases, caseText, caseDigestText]
+void [nativeTest, notAStatus, testRun.allPassed, String(testRun), caseRun.remaining, caseRun.isFinished, caseSet.get('vip')?.expect.isEmpty]
+
+// From the API review: precise types of test runs and case files.
+import type {
+  BundleEngine,
+  CasesDocument,
+  ExpectedErrorCode,
+  Interrupted,
+  TestRunBundle,
+  TestRunDocument,
+  TestRunFile,
+} from 'cleanrules'
+const expectedCode: ExpectedErrorCode = 'missing_field'
+const runPolicy: TablePolicy = testRun.hitPolicy
+const runEngine: BundleEngine = testRun.engine
+const runBundle: TestRunBundle | null = testRun.bundle
+const runFile: TestRunFile | undefined = testRun.files[0]
+const runInterrupted: Interrupted | null = testRun.summary.interrupted
+const runDocument: TestRunDocument = testRun.toJSON()
+const casesDocument: CasesDocument = caseSet.toJSON()
+const caseFragment = testCase.toJSON().expect?.error?.code
+const selectedIds: readonly string[] | undefined = expectation.selected
+// @ts-expect-error: a part not checked is left out, not null.
+void new Expectation({ selected: null })
+void [expectedCode, runPolicy, runEngine, runBundle, runFile, runInterrupted, runDocument.test_run.summary.total, casesDocument, caseFragment, selectedIds]

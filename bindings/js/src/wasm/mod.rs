@@ -8,6 +8,7 @@
 //! instance runs on one thread (a worker loads its own).
 
 pub(crate) mod build;
+pub(crate) mod cases;
 pub(crate) mod classes;
 pub(crate) mod documents;
 
@@ -21,6 +22,8 @@ use wasm_bindgen::prelude::*;
 
 use crate::common::audit::{RawAuditLimits, RawAuditOptions};
 use crate::common::bundles::RawCase;
+use crate::common::cases::{RawCaseFile, RawTestLimits, RawTestOptions, cases_of};
+use crate::common::core::DocumentCore;
 use crate::common::{LIMIT_NAMES, LIMITS, OBJECT, Outcome, Problem, Raw, RawLimits, RawOptions};
 
 /// The hooks of the JavaScript half: `read`, `error`, `call` and `actions`.
@@ -348,6 +351,109 @@ pub(crate) fn raw_cases(value: &JsValue) -> Result<Vec<RawCase>, JsValue> {
             other => Ok(RawCase::Wrong(other.describe())),
         })
         .collect()
+}
+
+/// The case files of `Document.test`, read once: none when they are left
+/// out. A case file document (`cases`) arrives as its JSON text
+/// (`lib/wasm-ready.js` writes it), which is read again here.
+pub(crate) fn raw_case_files(value: &JsValue) -> Result<Vec<RawCaseFile>, JsValue> {
+    let kind = raw(value);
+    if matches!(kind, Raw::Undefined | Raw::Null) {
+        return Ok(Vec::new());
+    }
+    if !Array::is_array(value) {
+        return Err(fail(crate::common::not_a_list("files", &kind)));
+    }
+    Array::from(value)
+        .iter()
+        .enumerate()
+        .map(|(i, item)| match raw(&item) {
+            Raw::Other(OBJECT) => {
+                // `lib/wasm-ready.js` gives a case file document as its JSON
+                // text, under its own member; anything left in `cases` is
+                // not a document.
+                let cases = match (member(&item, "cases")?, member(&item, CASES_TEXT)?) {
+                    (_, Raw::String(text)) => Some(cases_text(&text, i)),
+                    (Raw::Undefined | Raw::Null, _) => None,
+                    (other, _) => Some(Err(Problem::Type(format!(
+                        "files[{i}].cases is a Document that holds a case file, not {}",
+                        match other {
+                            Raw::Other(OBJECT) => "another object",
+                            other => other.describe(),
+                        }
+                    )))),
+                };
+                Ok(RawCaseFile::Given {
+                    path: member(&item, "path")?,
+                    content: member(&item, "content")?,
+                    cases,
+                })
+            }
+            other => Ok(RawCaseFile::Wrong(other.describe())),
+        })
+        .collect()
+}
+
+/// The member under which `lib/wasm-ready.js` gives the JSON text of a case
+/// file document passed as `cases`.
+const CASES_TEXT: &str = "__cleanrulesCasesText";
+
+/// The cases of a case file document given as the JSON text the core wrote
+/// of it: read again under limits that hold any document the core wrote
+/// (its own size, and no bound on nesting or depth), so a document read
+/// with larger limits than the defaults is not refused now.
+fn cases_text(text: &str, i: usize) -> crate::common::Outcome<cleanrules::cases::Cases> {
+    let mut limits = cleanrules::json::Limits::default().with_max_size(text.len());
+    limits.max_nesting = usize::MAX;
+    limits.max_depth = usize::MAX;
+    limits.max_path_segments = usize::MAX;
+    let document = cleanrules::format::read_document(text, &limits)?;
+    cases_of(&DocumentCore { document }, i)
+}
+
+/// The options of `Document.test`, read once, and its `cancel` callback.
+pub(crate) fn raw_test_options(
+    value: &JsValue,
+) -> Result<(RawTestOptions, Option<Function>), JsValue> {
+    let kind = raw(value);
+    if matches!(kind, Raw::Undefined | Raw::Null) {
+        return Ok((RawTestOptions::Absent, None));
+    }
+    if !matches!(kind, Raw::Other(OBJECT)) {
+        return Ok((RawTestOptions::Wrong(kind.describe()), None));
+    }
+    let limits = Reflect::get(value, &JsValue::from_str("limits"))?;
+    let limits = match raw(&limits) {
+        Raw::Undefined | Raw::Null => RawTestLimits::Absent,
+        Raw::Other(OBJECT) => RawTestLimits::Given {
+            max_results: member(&limits, "maxResults")?,
+            max_steps: member(&limits, "maxSteps")?,
+            max_explained: member(&limits, "maxExplained")?,
+        },
+        other => RawTestLimits::Wrong(other.describe()),
+    };
+    let cancel = Reflect::get(value, &JsValue::from_str("cancel"))?;
+    let cancel = match raw(&cancel) {
+        Raw::Undefined | Raw::Null => None,
+        _ => match cancel.dyn_into::<Function>() {
+            Ok(function) => Some(function),
+            Err(other) => {
+                return Err(TypeError::new(&format!(
+                    "options.cancel is a function that returns a boolean, not {}",
+                    raw(&other).describe()
+                ))
+                .into());
+            }
+        },
+    };
+    Ok((
+        RawTestOptions::Given {
+            format: member(value, "format")?,
+            limits,
+            ruleset_digest: member(value, "rulesetDigest")?,
+        },
+        cancel,
+    ))
 }
 
 /// A plain JavaScript object with these members, in order.

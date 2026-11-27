@@ -10,7 +10,8 @@ use wasm_bindgen::prelude::*;
 
 use super::{
     OrFail, call_action, call_actions, call_read, core_error, fail, nullable, object, raw,
-    raw_audit_options, raw_cases, raw_limits, raw_list, raw_options, raw_ruleset_digest,
+    raw_audit_options, raw_case_files, raw_cases, raw_limits, raw_list, raw_options,
+    raw_ruleset_digest, raw_test_options,
 };
 use crate::common::core::{
     ActionFailure, DecisionCore, DocumentCore, NodeCore, PathSegment, RulesCore, TreeKind,
@@ -203,6 +204,42 @@ impl Document {
     pub fn audit(&self, options: &JsValue) -> Result<String, JsValue> {
         let options = raw_audit_options(options)?;
         audit::document_as(&self.core, &options).or_fail()
+    }
+
+    /// Run test cases against the rules the document holds and write the
+    /// test run, as in the napi-rs build. `lib/wasm-ready.js` gives a case
+    /// file document (`cases`) as its JSON text.
+    ///
+    /// # Errors
+    ///
+    /// As in the napi-rs build.
+    pub fn test(&self, files: &JsValue, options: &JsValue) -> Result<String, JsValue> {
+        let files = raw_case_files(files)?;
+        let (options, cancel) = raw_test_options(options)?;
+        let mut raised = None;
+        let outcome = crate::common::cases::document_test(&self.core, files, &options, || {
+            let Some(cancel) = &cancel else {
+                return false;
+            };
+            if raised.is_some() {
+                return true;
+            }
+            match cancel.call0(&JsValue::NULL) {
+                Ok(answer) => answer.as_bool().unwrap_or_else(|| {
+                    raised =
+                        Some(js_sys::TypeError::new("options.cancel must return a boolean").into());
+                    true
+                }),
+                Err(error) => {
+                    raised = Some(error);
+                    true
+                }
+            }
+        });
+        if let Some(error) = raised {
+            return Err(error);
+        }
+        outcome.or_fail()
     }
 }
 

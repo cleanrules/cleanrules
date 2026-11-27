@@ -1,7 +1,7 @@
 // What the root entry exports besides the versions and the API of its build
 // (`lib/api/index.js`), the same in every build: the errors, the marker
 // values, and the classes of what decisions, explanations, summaries, audits,
-// result trees and decision tables give back.
+// test runs, result trees and decision tables give back.
 
 export {
   ActionError,
@@ -22,6 +22,7 @@ export {
   ActionContext,
   Audit,
   AuditedRule,
+  CaseResult,
   Cause,
   CauseGroup,
   CheckResult,
@@ -29,6 +30,7 @@ export {
   Diagnostic,
   Explanation,
   FieldUsage,
+  Mismatch,
   Note,
   NotModelled,
   Reason,
@@ -39,6 +41,7 @@ export {
   Summary,
   TableOutput,
   TableRow,
+  TestRun,
   Undecided,
 } from './api/results.js'
 export {

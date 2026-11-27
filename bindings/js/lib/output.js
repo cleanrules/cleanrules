@@ -5,7 +5,7 @@
 // this module turns each form into its JavaScript value. It converts only:
 // every value was decided by the core.
 
-import { Decimal, LocalDate, NaiveDateTime, zoned } from './values.js'
+import { Decimal, Float, LocalDate, NaiveDateTime, zoned } from './values.js'
 
 const MAX_SAFE = 2n ** 53n - 1n
 
@@ -40,8 +40,10 @@ class Close {
  * `objects` (by token), or `null` when there is none (a recorded decision
  * keeps only the type's name). Children before their parents, with an
  * explicit stack: a value given back may be as deep as data given as JSON.
+ * With `floats`, a float that holds an integer is `float(x)`, so that it
+ * reads back as a float (the values of a case file, which are written again).
  */
-function decode(form, objects) {
+function decode(form, objects, floats = false) {
   const tasks = [form]
   const done = []
   while (tasks.length > 0) {
@@ -60,22 +62,24 @@ function decode(form, objects) {
         tasks.push(task[1][i][1])
       }
     } else {
-      done.push(scalar(task, objects))
+      done.push(scalar(task, objects, floats))
     }
   }
   return done[0]
 }
 
 /** The JavaScript value of a form that is not a list or a map. */
-function scalar(form, objects) {
+function scalar(form, objects, floats) {
   if (form === null || typeof form !== 'object') {
     return form
   }
   switch (form[0]) {
     case 'i':
       return int(form[1])
-    case 'f':
-      return Number(form[1])
+    case 'f': {
+      const value = Number(form[1])
+      return floats && Number.isInteger(value) ? new Float(value) : value
+    }
     case 'd':
       return new Decimal(form[1])
     case 'D':

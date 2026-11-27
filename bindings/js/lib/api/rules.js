@@ -69,6 +69,8 @@ function checkActions(ruleList, pointer, omitActions) {
 
 /** The rules, rule sets and decisions of one build. */
 function rules(native, expressions, trees, build) {
+  // The case runner (`cases.js`), made after this module.
+  let testing = null
   const { Expr, constant, nodeOf, wrap, wrapJson } = expressions
   // The native decision and the objects of its input, of each `Decision`.
   let decisionParts
@@ -565,6 +567,31 @@ function rules(native, expressions, trees, build) {
     }
 
     /**
+     * Run test cases against the rule set (`spec/tests.md`, *Running
+     * cases*): each case's input is evaluated (never `run`: a test calls no
+     * action) and matched against its expectation, giving `passed`,
+     * `failed` with the keys that do not match, or `error`; a `TestRun`.
+     * `files` are `CaseFile`s and `Cases` (a file without a path), one or an
+     * array, in run order. Options: `limits` (`maxResults`, `maxSteps`, one
+     * step per rule for each case, and `maxExplained`, the failures
+     * explained, 5), `cancel` (a function asked before each case; the run
+     * stops, partial, when it returns true), `signal` (an `AbortSignal`, the
+     * same through `aborted`) and `rulesetDigest`.
+     */
+    test(files, testOptions) {
+      return testing.test('ruleset', this, files, testOptions)
+    }
+
+    /**
+     * Run test cases one at a time: a `CaseRun`, an iterator of
+     * `CaseResult`s, with the arguments of `test`. Leaving the loop early
+     * stops the run, and `run.testRun()` then gives a partial run.
+     */
+    iterTest(files, testOptions) {
+      return testing.iterTest('ruleset', this, files, testOptions)
+    }
+
+    /**
      * The rule set document of the JSON format (`spec/json-format.md`, *Rule
      * sets*), for `JSON.stringify` (`Expr.toJSON` says how; `dumps(ruleset)`
      * writes it exactly); an `UnsupportedError` for an action that is code
@@ -707,6 +734,10 @@ function rules(native, expressions, trees, build) {
     ruleSetNative: (ruleset) => natives.get(ruleset),
     /** A copy of `rule` with the action `action` (a function). */
     withAction: (rule, action) => new Rule(PRIVATE, rule, action),
+    /** Give `RuleSet.test` its runner (`cases.js`). */
+    useTesting: (api) => {
+      testing = api
+    },
   }
 }
 

@@ -192,8 +192,89 @@ A case file is a document of test cases
 [`docs/examples/cases/discounts.json`](../../docs/examples/cases/discounts.json)):
 each case has an id, an input, and what evaluating it must give (the
 selected rules, the output, the rules left unknown, or the error). The bundle
-records the digest of its bytes; `loads` does not load case files yet
-(`UnsupportedError`), and running them comes in a later release.
+records the digest of its bytes; *Test cases*, below, runs them.
+
+### Test cases
+
+A case file loads as `Cases` (`load`, `loads`; `dump`, `dumps`,
+`canonical_bytes` and `digest` take it), and `RuleSet.test` runs case files
+against the rules ([`spec/tests.md`](../../spec/tests.md), *Running cases*):
+
+```python
+from decimal import Decimal
+from cleanrules import Case, CaseFile, Cases, Expectation, ExpectedOutput
+
+rules = cleanrules.load("docs/examples/discounts.json")
+run = rules.test(["docs/examples/cases/discounts.json"])  # paths are read from disk
+run.all_passed  # True: every case ran and passed
+print(run)  # the core's text: each failure, explained, and the summary
+
+cases = Cases(
+    [
+        Case(
+            "vip-gets-15",
+            {"customer": {"years": 7}, "order": {"total": 1500}},
+            expect=Expectation(selected=["vip"], output={"discount": Decimal("0.15")}),
+        ),
+        Case(
+            "nobody",
+            {"customer": {"years": 1}},
+            expect=Expectation(output=ExpectedOutput.NOTHING_SELECTED),
+        ),
+    ],
+    description="discounts",
+)
+cleanrules.dumps(cases)  # {"version":1,"cases":{"description":"discounts","items":[...]}}
+
+for result in rules.iter_test([CaseFile(cases, path="cases/vip.json")], max_results=100):
+    print(result.status, result.id, [m.key for m in result.mismatches])
+```
+
+Three names, the same in every language: a `CaseFileRef` is a bundle's
+reference to a case file; a `Cases` is the content of a case file; a
+`CaseFile` is one file given to a run, its `path`, the `digest` of the bytes
+it was read from, and its `cases` or the `error` that keeps it from being read
+(`CaseFile(cases, path=...)`, `CaseFile.read(content, path=..., format=...)`,
+which reads YAML when the path ends in `.yaml` or `.yml`, and
+`CaseFile.load(path)`). The constructors of `Expectation`, `Case` and `Cases`
+go through the core, which refuses what a case file's reader refuses
+(`FormatError`). Their data (`input`, `output`, `outputs`, `metadata`, a
+mismatch's `expected` and `actual`) is a fresh copy on each access.
+
+`test()` gives a `TestRun` (immutable): `summary` (`total`, `passed`,
+`failed`, `error`, `partial`, `interrupted`), `results` in run order
+(`CaseResult`: `path`, `id`, `status`, `mismatches`, `error`,
+`explanation_text`), the header (`source`, `hit_policy`, `engine`, `files`,
+`bundle`, `limits`, `ruleset_digest` when asked for), `all_passed`,
+`to_dict()` (the test run document) and `str()` (the core's text). A case
+never stops the run: an error is that case's result, and a file that cannot
+be read is one `error` result. `max_results` and `max_steps` (one step per
+rule for each case) stop the run, partial; `max_explained` (the core's 5 when
+left out) bounds the failures explained; `cancel`, a callable asked between
+results (never while a case is evaluated: `threading.Event().is_set`, a
+deadline check), stops it too, and so does Ctrl-C during `test()`. A
+mismatch of `output` says `ExpectedOutput.NOTHING_SELECTED` where nothing
+was selected, and `None` only where nothing was given (with its `reason`).
+`iter_test()` gives the same run one result at a time (`CaseRun`, an
+iterator with `cancel()`, `summary`, `remaining`, `is_finished` and
+`test_run()`).
+
+| Leaving the loop early | Python | JavaScript |
+|---|---|---|
+| `break` | leaves the run where it is: it can go on, and is partial once `test_run()` or `cancel()` stops it | calls `return()`, which stops the run: it is partial (`cancelled`) |
+| `test_run()` / `testRun()` | stops the run, then gives it partial | gives the partial run |
+
+The `cancel` callable must not read its own run: there, `summary`,
+`remaining`, `is_finished`, `test_run()` and `next()` raise `TypeError`, and
+`run.cancel()` asks the run to stop, as returning `True` does.
+`bundle.test(directory_or_reader)` runs a bundle's own case files: the core
+picks how many bytes to load (a file in the directory larger than that is a
+`limit_exceeded` result, not read), checks each against its digest
+(`decision_mismatch` otherwise) and reads it under the bundle's limits. The
+GIL is released while each case is evaluated. `CaseStatus` is closed;
+`ExpectationKey` and `Interruption` may gain members, which arrive as plain
+strings. Comparing two versions of the rules on the same cases comes with
+task T.4.
 
 ### Auditing rules
 

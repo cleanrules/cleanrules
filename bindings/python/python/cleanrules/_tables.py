@@ -26,7 +26,10 @@ from cleanrules._rules import Aggregate, Decision, RuleSet, Summary
 from cleanrules.errors import RuleDefinitionError
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from cleanrules._audit import Audit
+    from cleanrules._cases import CaseFiles, CaseRun, TestRun
 
 __all__ = ["DecisionTable", "HeaderItem", "TableOutput", "TablePolicy", "TableRow"]
 
@@ -376,6 +379,59 @@ class DecisionTable:
         max_terms, max_steps = _check_options(max_terms, max_steps, ruleset_digest)
         native = _native.audit_decision_table(self._native, max_terms, max_steps, ruleset_digest)
         return Audit(native)
+
+    def test(
+        self,
+        files: CaseFiles,
+        *,
+        max_results: int | None = None,
+        max_steps: int | None = None,
+        max_explained: int | None = None,
+        cancel: Callable[[], object] | None = None,
+        ruleset_digest: bool = False,
+    ) -> TestRun:
+        """Run test cases against the table, as `RuleSet.test` does.
+
+        The cases are evaluated by the compiled rule set (`ruleset`); the test
+        run names the table's hit policy, `output_order` included, and its
+        `ruleset_digest` is that of the compiled rule set.
+        """
+        from cleanrules._cases import _files, _test  # pyright: ignore[reportPrivateUsage]
+
+        return _test(
+            "table",
+            self._native,
+            _files(files),
+            max_results=max_results,
+            max_steps=max_steps,
+            max_explained=max_explained,
+            cancel=cancel,
+            ruleset_digest=ruleset_digest,
+        )
+
+    def iter_test(
+        self,
+        files: CaseFiles,
+        *,
+        max_results: int | None = None,
+        max_steps: int | None = None,
+        max_explained: int | None = None,
+        cancel: Callable[[], object] | None = None,
+        ruleset_digest: bool = False,
+    ) -> CaseRun:
+        """Run test cases against the table one at a time, as `RuleSet.iter_test` does."""
+        from cleanrules._cases import _files, _iter_test  # pyright: ignore[reportPrivateUsage]
+
+        return _iter_test(
+            "table",
+            self._native,
+            _files(files),
+            max_results=max_results,
+            max_steps=max_steps,
+            max_explained=max_explained,
+            cancel=cancel,
+            ruleset_digest=ruleset_digest,
+        )
 
     def __setattr__(self, name: str, value: object) -> NoReturn:
         raise AttributeError(f"decision tables are immutable: cannot set {name!r}")

@@ -299,7 +299,8 @@ so the build does not use it.
 
 | Name | What |
 |---|---|
-| `Document.read(text, { format, limits }?)` | a condition, rule, rule set, decision table or bundle; `kind`, `write(format?)`, `canonicalBytes()`, `digest()` |
+| `Document.read(text, { format, limits }?)` | a condition, rule, rule set, decision table, bundle or case file; `kind`, `write(format?)`, `canonicalBytes()`, `digest()` |
+| `doc.test(files?, { format, limits, rulesetDigest, cancel }?)` | run case files against the rules of a rule set, table or bundle document; the test run as text, JSON or YAML (*Test cases*, below) |
 | `Document.makeBundle(rules, id, revision, cases?, limits?)`, `doc.compareBundle(other)` | a bundle of a rule set or table document, with `cases` an array of `{ path, content }`; the comparison of two bundles as JSON (*Bundles*, below) |
 | `RuleSet.read(text, { format, limits }?)`, `RuleSet.fromDocument(doc)` | a rule set (a rule document is a rule set of that rule; a CSV table is compiled) |
 | `ruleset.evaluate(data, limits?)`, `evaluateJson(text, limits?)` | one decision, from native data (at most `limits.maxValues` values of it) or from a JSON value |
@@ -648,9 +649,8 @@ bound the reading of texts and not decisions, is a `TypeError`.
 A case file is a document of test cases (`spec/tests.md`,
 `docs/examples/cases/discounts.json`): each case has an id, an input, and what
 evaluating it must give (the selected rules, the output, the rules left
-unknown, or the error). The bundle records the digest of its bytes; `loads`
-does not load case files yet (`UnsupportedError`), while `Document.read` of
-`cleanrules/native` reads, writes and hashes one as a document.
+unknown, or the error). The bundle records the digest of its bytes;
+`bundle.test(read)` runs them (*Test cases*, below).
 
 Reading a bundle checks its rule set digest against its rules, and, when it
 names this engine (`engine.isCurrent`), its contract against the one the
@@ -715,6 +715,77 @@ file is an `UnsupportedError`),
 (`AuditWriteOptions`), and give the text by default, or an audit document
 with `format: 'json'` or `'yaml'`. An audit is output only: `dumps` refuses
 it (use `JSON.stringify(report)` or `String(report)`).
+
+## Test cases
+
+```js
+const rules = loads(fs.readFileSync('docs/examples/discounts.json'))
+const run = rules.test([await CaseFile.load('docs/examples/cases/discounts.json')])
+run.allPassed        // true: every case ran and passed
+String(run)          // the core's text: each failure, explained, and the summary
+
+const cases = new Cases([
+  new Case('vip-gets-15', { customer: { years: 7 }, order: { total: 1500 } }, {
+    expect: new Expectation({ selected: ['vip'], output: { discount: decimal('0.15') } }),
+  }),
+  new Case('nobody', { customer: { years: 1 } }, { expect: new Expectation({ output: null }) }),
+])
+dumps(cases)         // {"version":1,"cases":{"items":[...]}}
+const deadline = performance.now() + 5000
+for (const result of rules.iterTest(cases, { limits: { maxResults: 100 }, cancel: () => performance.now() > deadline })) {
+  console.log(result.status, result.id, result.mismatches.map((m) => m.key))
+}
+```
+
+A case file loads as `Cases` (`loads`, `load`; `dumps`, `dump`,
+`canonicalBytes` and `digest` take it, and `JSON.stringify` writes floats
+that hold integers as `{"$float": 1}`, so they read back as floats; give them
+as `float(1)`). Three names, the same in every language: a `CaseFileRef` is a
+bundle's reference to a case file; a `Cases` is the content of a case file; a
+`CaseFile` is one file given to a run, its `path`, the `digest` of the bytes
+it was read from, and its `cases` or the `error` that keeps it from being read
+(`new CaseFile(cases, { path })`, `CaseFile.read(content, { path, format })`,
+YAML when the path ends in `.yaml` or `.yml`, and `await CaseFile.load(path)`
+in Node and Deno, a path or a `file:` URL). `Expectation`, `Case` and `Cases`
+are built through the core, which refuses what a case file's reader refuses
+(`FormatError`); all are frozen, and `toJSON()` of each writes its part of the
+case file. A part of an expectation that is not checked is left out, and
+reads back `undefined`; only `output` takes `null`, nothing selected.
+
+`ruleset.test(files, options)` (and `table.test`) gives a frozen `TestRun`:
+`summary` (`total`, `passed`, `failed`, `error`, `partial`, `interrupted`),
+`results` (`CaseResult`: `path`, `id`, `status`, `mismatches`, `error`,
+`explanationText`), the header (`source`, `hitPolicy`, `engine`, `files`,
+`bundle`, `limits`, `rulesetDigest`), `allPassed`, `toJSON()` (the test run
+document) and `toString()` (the core's text). The options are `limits: {
+maxResults, maxSteps, maxExplained }` (one step per rule for each case;
+`maxExplained` 5 by default), `cancel` (a function asked between results,
+never while a case is evaluated: a deadline is `() => performance.now() >
+deadline`), `signal` (an `AbortSignal`, seen only when the caller awaits
+between results, in an async loop over `iterTest`: a synchronous run never
+lets it be aborted), and `rulesetDigest`. A case never stops the run: an
+error is that case's result, and a file that cannot be read is one `error`
+result. `iterTest` gives the same run one result at a time (`CaseRun`, an
+iterator, with the iterator helpers where the runtime has them, and
+`cancel()`, `summary`, `remaining`, `isFinished` and `testRun()`).
+
+| Leaving the loop early | JavaScript | Python |
+|---|---|---|
+| `break` | calls `return()`, which stops the run: it is partial (`cancelled`) | leaves the run where it is: it can go on, and is partial once `test_run()` or `cancel()` stops it |
+| `testRun()` / `test_run()` | gives the partial run | stops the run, then gives it partial |
+
+The `cancel` callback must not read its own run: there, `summary`,
+`remaining`, `isFinished`, `testRun()` and `next()` throw a `TypeError`, and
+`run.cancel()` asks the run to stop, as returning `true` does.
+`bundle.test(read)` runs a bundle's own case files, `read` giving the bytes
+of each `CaseFileRef` synchronously; the core checks each against its digest
+and reads it under the bundle's limits, a file larger than its bound being a
+`limit_exceeded` result. In the
+native layer, `doc.test(files, options)` runs `files` (`{ path, content }`,
+or `{ path, cases: Document }` for a case file already read; a bundle's by the
+paths it gives) against the rules a document holds, and writes the test run
+as text (the default), JSON or YAML (`TestWriteOptions`, with `cancel`).
+Comparing two versions of the rules on the same cases comes with task T.4.
 
 ## Decision tables
 

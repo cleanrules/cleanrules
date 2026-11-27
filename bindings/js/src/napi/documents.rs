@@ -79,7 +79,7 @@ impl NativeTree {
 /// A decision table, immutable.
 #[napi]
 pub struct NativeTable {
-    core: TableCore,
+    pub(crate) core: TableCore,
 }
 
 #[napi]

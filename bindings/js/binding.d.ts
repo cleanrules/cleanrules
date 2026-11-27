@@ -193,6 +193,103 @@ export declare class Document {
    * number.
    */
   audit(options?: AuditWriteOptions | null): string
+  /**
+   * Run test cases (`spec/tests.md`, *Running cases*) against the rule
+   * set, decision table or bundle the document holds, and write the test
+   * run in `options.format`: its text (the default, as the command line
+   * prints it), or a `"json"` or `"yaml"` test run document. `files` are
+   * the case files in run order; a bundle's are found by the paths it
+   * gives, in its order, and checked against their digests.
+   *
+   * # Errors
+   *
+   * A `TypeError` for a document that holds no rules, a file or an option
+   * of the wrong type, or a `cancel` that does not return a boolean; a
+   * `RangeError` for a limit that is negative or not a whole number, or a
+   * bundle's case file that is not given; what `cancel` throws. A case
+   * file that cannot be read is a result, not an error.
+   */
+  test(files?: CaseFileInput[] | null, options?: TestWriteOptions | null): string
+}
+
+/**
+ * One case file given to a run: its path and its cases, or the error of
+ * reading it.
+ */
+export declare class NativeCaseFile {
+  /**
+   * Not a constructor: case files come from `caseFileRead` and
+   * `caseFileOf`.
+   *
+   * # Errors
+   *
+   * Always a `TypeError`, the same as the WebAssembly build's.
+   */
+  private constructor()
+  /** `[path, digest, error]`, as JSON. */
+  data(): string
+  /** Its case file document, or `null` for a file that cannot be read. */
+  cases(): Document | null
+}
+
+/** A run in progress, over the rules and case files it owns. */
+export declare class NativeCaseRun {
+  /**
+   * Not a constructor: runs come from `runRuleset`, `runTable` and
+   * `runBundle`.
+   *
+   * # Errors
+   *
+   * Always a `TypeError`, the same as the WebAssembly build's.
+   */
+  private constructor()
+  /**
+   * Give the run one more case file, before its first result.
+   *
+   * # Errors
+   *
+   * After the first result.
+   */
+  add(file: NativeCaseFile): void
+  /**
+   * Give a bundle's run the bundle's case files, in its order: `load`
+   * is given each file's path and the most bytes to load (the core's
+   * bound) and returns its bytes; the core checks each one against its
+   * digest. What `load` throws is thrown.
+   *
+   * # Errors
+   *
+   * What `load` throws; for a run that is not a bundle's.
+   */
+  addBundleFiles(load: (path: string, bound: number) => Uint8Array): void
+  /**
+   * Run the rest of the cases without giving the results one at a time;
+   * `cancel` is asked as `next` asks it.
+   */
+  finish(cancel?: (() => boolean) | null): void
+  /**
+   * The next result, as JSON, or `null` once the run is finished.
+   * `cancel`, a function that never throws and returns a boolean (the
+   * JavaScript half wraps the caller's), is asked before the item, when
+   * the core asks.
+   */
+  next(cancel?: (() => boolean) | null): string | null
+  /**
+   * Stop the run: it gives no more results, and is partial (cancelled)
+   * when a result remained.
+   */
+  stop(): void
+  /** The summary of the results given so far, as JSON. */
+  summary(): string
+  /** The results not given yet. */
+  remaining(): number
+  /** Whether the run gives no more results. */
+  finished(): boolean
+  /**
+   * The test run, made once, as JSON; a run that is not finished is
+   * stopped first.
+   */
+  testRun(): string
 }
 
 /**
@@ -759,6 +856,48 @@ export declare function canonicalCondition(node: Node): Uint8Array
 export declare function canonicalRule(rule: NativeRule): Uint8Array
 
 /**
+ * A case file given to `Document.test` (`spec/tests.md`, *Running cases*):
+ * its path, and its bytes or the case file document already read.
+ */
+export interface CaseFileInput {
+  /**
+   * The file's path, with `/` between segments: it names its cases in the
+   * results, and a path that ends in `.yaml` or `.yml` is read as YAML.
+   * For a bundle, the path the bundle gives it.
+   */
+  path?: string | null
+  /**
+   * The file's bytes (a string, as UTF-8), whose digest the test run
+   * records; not with `cases`.
+   */
+  content?: string | Uint8Array
+  /**
+   * A case file document already read, run as it is; not with `content`,
+   * and not for a bundle, whose files are checked against their digests.
+   */
+  cases?: Document
+}
+
+/**
+ * The case file of a case file document, with a path or without one.
+ *
+ * # Errors
+ *
+ * For a document of another kind.
+ */
+export declare function caseFileOf(document: Document, path?: string | undefined | null): NativeCaseFile
+
+/**
+ * The case file whose bytes are `bytes`: as YAML or JSON by its path's
+ * extension unless `format` says; the error of reading it is kept.
+ *
+ * # Errors
+ *
+ * A `RangeError` for a format other than `"json"` and `"yaml"`.
+ */
+export declare function caseFileRead(path: string | undefined | null, bytes: Uint8Array, format?: string | undefined | null): NativeCaseFile
+
+/**
  * Whether `content` is the case file of `path` and `digest`: whether the
  * SHA-256 digest of its bytes (a string's UTF-8 bytes) is `digest`.
  *
@@ -768,6 +907,25 @@ export declare function canonicalRule(rule: NativeRule): Uint8Array
  * nor bytes.
  */
 export declare function caseFileRefDigestMatches(path: string, digest: string, content: string | Uint8Array): boolean
+
+/**
+ * What the idiomatic `Cases` reads of a case file document, as JSON.
+ *
+ * # Errors
+ *
+ * For a document of another kind.
+ */
+export declare function casesData(document: Document): string
+
+/**
+ * A case file's content built from the JavaScript half's encoding, as a
+ * case file document (`common::cases::cases_new`).
+ *
+ * # Errors
+ *
+ * `FormatError` for what a case file cannot hold, as the reader refuses it.
+ */
+export declare function casesNew(text: string): Document
 
 /**
  * Check the path and digest of a case file (`spec/bundles.md`, *Cases*), for
@@ -1091,6 +1249,22 @@ export declare function ruleText(text: string | Uint8Array, limits?: Limits | nu
 export declare function ruleTree(decision: Decision, position: number): NativeTree
 
 /**
+ * A run of a bundle's case files (`NativeCaseRun.addBundleFiles`) against
+ * its rules.
+ *
+ * # Errors
+ *
+ * For a document that is not a bundle.
+ */
+export declare function runBundle(document: Document, maxResults: number | undefined | null, maxSteps: number | undefined | null, maxExplained: number | undefined | null, rulesetDigest: boolean): NativeCaseRun
+
+/** A run against a rule set, with limits the JavaScript half checked. */
+export declare function runRuleset(ruleset: RuleSet, maxResults: number | undefined | null, maxSteps: number | undefined | null, maxExplained: number | undefined | null, rulesetDigest: boolean): NativeCaseRun
+
+/** A run against a decision table. */
+export declare function runTable(table: NativeTable, maxResults: number | undefined | null, maxSteps: number | undefined | null, maxExplained: number | undefined | null, rulesetDigest: boolean): NativeCaseRun
+
+/**
  * Register the JavaScript half of the binding; `index.js` calls it once when
  * the package loads.
  *
@@ -1115,6 +1289,30 @@ export declare function stringifiable(text: string): string
  * `UnsupportedError` for CSV.
  */
 export declare function summaryWith(ruleset: RuleSet, actions: Array<boolean>, format: unknown): string
+
+/**
+ * The options of `Document.test` (`spec/tests.md`): how the test run is
+ * written, its limits, whether it carries the rule set digest, and a
+ * cancel callback.
+ */
+export interface TestWriteOptions {
+  /** The format: `"text"` (the default), `"json"` or `"yaml"`. */
+  format?: Format
+  /**
+   * The limits: `maxResults`, the most results given; `maxSteps`, the most
+   * steps, one per rule for each case (both unbounded by default); and
+   * `maxExplained`, the most failures explained (5).
+   */
+  limits?: { maxResults?: number | null; maxSteps?: number | null; maxExplained?: number | null } | null
+  /** Carry the rule set digest of the rules tested in the test run. */
+  rulesetDigest?: boolean
+  /**
+   * Asked before each case, never while one is evaluated: returning
+   * `true` stops the run, which is then partial. It returns a boolean;
+   * what it throws is thrown, the run stopped.
+   */
+  cancel?: (() => boolean) | null
+}
 
 /**
  * How one condition node is evaluated (`spec/ast.md`, *Evaluating one

@@ -39,6 +39,7 @@ from cleanrules.errors import (
 
 if TYPE_CHECKING:
     from cleanrules._audit import Audit
+    from cleanrules._cases import CaseFiles, CaseRun, TestRun
     from cleanrules._trees import ResultTree
 
 __all__ = [
@@ -779,6 +780,97 @@ class RuleSet(Sequence[Rule]):
 
         max_terms, max_steps = _check_options(max_terms, max_steps, ruleset_digest)
         return Audit(_native.audit_ruleset(self._native, max_terms, max_steps, ruleset_digest))
+
+    def test(
+        self,
+        files: CaseFiles,
+        *,
+        max_results: int | None = None,
+        max_steps: int | None = None,
+        max_explained: int | None = None,
+        cancel: Callable[[], object] | None = None,
+        ruleset_digest: bool = False,
+    ) -> TestRun:
+        """Run test cases against the rule set (`spec/tests.md`, *Running cases*).
+
+            run = rules.test(["cases/discounts.json"])
+            assert run.all_passed, str(run)
+
+        Each case's input is evaluated (`evaluate`, never `run`: a test calls
+        no action) and matched against its expectation; the result is
+        `passed`, `failed` with the keys that do not match, or `error`. A case
+        never stops the run, and a case file that cannot be read is one
+        `error` result. The GIL is released while each case is evaluated.
+
+        Args:
+            files: The case files, in run order: `CaseFile`s, `Cases` (a file
+                without a path) or paths, read from disk with
+                `CaseFile.load`; one of them alone, or an iterable.
+            max_results: Stop, partial, once that many results are given.
+            max_steps: Stop, partial, before the case that would take the
+                steps past it: a case costs one step per rule.
+            max_explained: Explain the first that many failures (the core's
+                default, 5, when left out): their results hold the text of the
+                decision's explanation.
+            cancel: A callable asked before each case, never while one is
+                evaluated: the run stops, partial, when it returns a true
+                value (such as `event.is_set`, or a deadline check). One
+                that raises stops the run, and its exception propagates.
+            ruleset_digest: Carry the rule set digest in the test run.
+
+        Raises:
+            OSError: If a path cannot be read: the caller's error, not a result.
+            TypeError: For an option of the wrong type, or a file that is not
+                a `CaseFile`, `Cases` or path.
+            ValueError: For a negative limit.
+        """
+        from cleanrules._cases import _files, _test  # pyright: ignore[reportPrivateUsage]
+
+        return _test(
+            "ruleset",
+            self._native,
+            _files(files),
+            max_results=max_results,
+            max_steps=max_steps,
+            max_explained=max_explained,
+            cancel=cancel,
+            ruleset_digest=ruleset_digest,
+        )
+
+    def iter_test(
+        self,
+        files: CaseFiles,
+        *,
+        max_results: int | None = None,
+        max_steps: int | None = None,
+        max_explained: int | None = None,
+        cancel: Callable[[], object] | None = None,
+        ruleset_digest: bool = False,
+    ) -> CaseRun:
+        """Run test cases one at a time: a `CaseRun`, an iterator of results.
+
+            run = rules.iter_test(files, max_results=1000)
+            for result in run:
+                show(result)
+            report = run.test_run()
+
+        The same run as `test`, with the same arguments, given incrementally:
+        each result before the next case is evaluated. Leaving the loop with
+        `break` leaves the run where it is (it can go on); asking for
+        `run.test_run()` then gives a partial run (`cancelled`).
+        """
+        from cleanrules._cases import _files, _iter_test  # pyright: ignore[reportPrivateUsage]
+
+        return _iter_test(
+            "ruleset",
+            self._native,
+            _files(files),
+            max_results=max_results,
+            max_steps=max_steps,
+            max_explained=max_explained,
+            cancel=cancel,
+            ruleset_digest=ruleset_digest,
+        )
 
     def __len__(self) -> int:
         return len(self._rules)

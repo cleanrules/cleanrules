@@ -165,18 +165,20 @@ describe('loads and dumps', () => {
     assert.ok(loads(yaml, { format: 'yaml', limits: { maxSize: 2 * 1024 * 1024 } }) instanceof Expr)
   })
 
-  test('case files are read as documents, but loads does not load them yet', () => {
-    // A case file (spec/tests.md): the native layer reads, writes and hashes it.
+  test('case files are read as documents, and loads gives their Cases', () => {
+    // A case file (spec/tests.md): the native layer reads, writes and hashes
+    // it; loads gives a Cases (test/cases.test.js has the rest).
     const text = '{"version":1,"cases":{"items":[{"id":"a","input":{"x":1},"expect":{"selected":["vip"]}}]}}'
     const document = native.Document.read(text)
     assert.equal(document.kind, 'cases')
     assert.equal(document.write(), text)
     assert.match(document.digest(), /^sha256:[0-9a-f]{64}$/)
-    throwsWith(() => loads(text), UnsupportedError, /case files/, (error) => {
-      assert.equal(error.context.operation, 'loads')
-    })
-    throwsWith(() => loads('version: 1\ncases: {items: []}\n', { format: 'yaml' }), UnsupportedError, /case files/)
-    // Errors in the file come first, located in it.
+    const cases = loads(text)
+    assert.ok(cases instanceof root.Cases)
+    assert.equal(dumps(cases), text)
+    assert.equal(digest(cases), document.digest())
+    assert.equal(loads('version: 1\ncases: {items: []}\n', { format: 'yaml' }).length, 0)
+    // Errors in the file are located in it.
     throwsWith(() => loads('{"version":1,"cases":{"items":[{"id":"a"}]}}'), FormatError, /.+/, (error) => {
       assert.equal(error.context.pointer, '/cases/items/0/input')
     })
@@ -227,7 +229,7 @@ describe('loads and dumps', () => {
   })
 
   test('what dumps and loads refuse', () => {
-    throwsWith(() => dumps({}), TypeError, /dumps takes a condition, a rule, a rule set, a decision table, a bundle or a decision, not a Object/)
+    throwsWith(() => dumps({}), TypeError, /dumps takes a condition, a rule, a rule set, a decision table, a bundle, a case file or a decision, not a Object/)
     throwsWith(() => dumps(F.x.gt(1), { formt: 'json' }), TypeError, /unknown option "formt"/)
     throwsWith(() => loads('{}', { action: {} }), TypeError, /unknown option "action"/)
     throwsWith(() => loads('{}'), FormatError, /.+/)
@@ -357,7 +359,7 @@ describe('canonicalBytes and digest', () => {
       throwsWith(() => call(F.x.add(1)), ExpressionError, /only a condition can be a document, not the value x \+ 1/, (error) => {
         assert.match(error.hint, /F\.x\.gt\(0\)/)
       })
-      throwsWith(() => call({}), TypeError, new RegExp(`${name} takes a condition, a rule, a rule set, a decision table or a bundle, not a Object`))
+      throwsWith(() => call({}), TypeError, new RegExp(`${name} takes a condition, a rule, a rule set, a decision table, a bundle or a case file, not a Object`))
       throwsWith(() => call(dumps(F.x.gt(1))), TypeError, /not the string/)
     }
   })

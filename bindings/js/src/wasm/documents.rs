@@ -68,7 +68,7 @@ impl NativeTree {
 /// A decision table, immutable.
 #[wasm_bindgen]
 pub struct NativeTable {
-    core: TableCore,
+    pub(crate) core: TableCore,
 }
 
 #[wasm_bindgen]

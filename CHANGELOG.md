@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Case files and the case runner in Python and JavaScript (task T.9b, first
+  part; [`spec/tests.md`](spec/tests.md)). Case files load as `Cases`
+  (`load`/`loads`; `dump`/`dumps`, `canonical_bytes`/`canonicalBytes` and
+  `digest` take them) with `Case` and `Expectation`, built through the core's
+  constructors; `CaseFile` is one file given to a run (`CaseFile(cases,
+  path=...)`, `CaseFile.read(content, path=..., format=...)` /
+  `CaseFile.read(content, { path, format })`, `CaseFile.load(path)`), with
+  its `path`, `digest`, and `cases` or `error`. JavaScript writes floats that
+  hold integers as `{"$float": n}` in `toJSON()` (of `Cases`, `Case` and
+  `Expectation`) and gives them back as `float(x)` in case files, so they
+  stay floats; a part of a JavaScript expectation that is not checked is
+  `undefined`, and only `output` takes `null` (nothing selected); Python
+  gives `ExpectedOutput.NOTHING_SELECTED`, in expectations and in output
+  mismatches, and fresh copies of every value on each access.
+  `RuleSet.test`, `DecisionTable.test` and `Bundle.test` (a reader or, in
+  Python, a directory; the core picks how many bytes to load, checks
+  digests and reads under the bundle's limits) give an immutable `TestRun`
+  (`summary`, `results` of `CaseResult` with `Mismatch`es, the header,
+  `all_passed`/`allPassed`, `to_dict()`/`toJSON()`, the core's text through
+  `str()`/`String()`; counts, `all_passed` and `is_current` are the core's),
+  with `max_results`, `max_steps` and `max_explained` (JavaScript: `limits:
+  { maxResults, maxSteps, maxExplained }`), a `cancel` callable asked
+  between results (JavaScript also takes an `AbortSignal` as `signal`, seen
+  when the caller awaits between results) and
+  `ruleset_digest`/`rulesetDigest`. `iter_test`/`iterTest` give a `CaseRun`,
+  an iterator over the core's owned cursor (`TestRunState`) with `cancel()`,
+  `summary`, `remaining`, `is_finished`/`isFinished` and
+  `test_run()`/`testRun()`; leaving a JavaScript `for...of` loop stops the
+  run, a Python `break` leaves it where it is, and `test_run()` of a run not
+  finished gives a partial, `cancelled` run. A `cancel` callback cannot read
+  its own run (`TypeError`), and `cancel()` there stops it. Python releases
+  the GIL while each case is evaluated and stops a `test()` on Ctrl-C.
+  JavaScript's native layer gains `Document.test(files, options)`
+  (`CaseFileInput`, `TestWriteOptions`), which writes the test run as text,
+  JSON or YAML. The Python and JavaScript (Node, wasm, Deno) conformance
+  runners run the `test_run` vectors and every `format/cases` vector on both
+  routes (the `statistics` vectors stay skipped). In the core, `CaseFile` is
+  `Clone`, its cases shared (`Arc`). The comparator (T.4) comes to the
+  bindings later.
 - Statistics and coverage of a run (task T.10;
   [`spec/tests.md`](spec/tests.md), *Statistics*): in the Rust core,
   `cases::Runner::with_statistics(true)` counts, from each case's decision
@@ -312,10 +351,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     anywhere, and a null out of range in metadata and expected values.
     `ValueContext::Expected`, `Document::Cases` and `format::write_cases`.
   - C ABI: `CR_DOCUMENT_CASES`, read, written and hashed as any document.
-  - Python and JavaScript: `loads`/`load` refuse a case file with
-    `UnsupportedError` (`operation` `loads`), after the reader's own errors;
-    JavaScript's `Document.read` of `cleanrules/native` reads it (`kind`
-    `"cases"`).
+  - Python and JavaScript: `loads`/`load` read a case file as `Cases` (task
+    T.9b, above); JavaScript's `Document.read` of `cleanrules/native` reads
+    it too (`kind` `"cases"`).
   - Beta: C++ `cr::document_content::cases`; Java `DocumentKind.CASES`, read
     through `ffi.Document`; Java, Scala and Go `loads`/`Loads` refuse a case
     file with `unsupported`, with `operation` and `reason`.

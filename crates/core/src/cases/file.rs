@@ -6,6 +6,8 @@
 //! file given to a run: its path, when it has one, and its cases, or the
 //! error that keeps it from being read.
 
+use std::sync::Arc;
+
 use super::{Case, Cases};
 use crate::bundle::{Bundle, CaseFileRef};
 use crate::digest::Digest;
@@ -35,7 +37,25 @@ pub enum CaseFileBytes {
 pub struct CaseFile {
     path: Option<String>,
     digest: Option<Digest>,
-    content: Result<Cases>,
+    /// Shared, so that a copy of the file is cheap.
+    content: Result<Arc<Cases>>,
+}
+
+/// A copy of the case file, the error of one that cannot be read included
+/// (as [`crate::Error`] is not `Clone`, the copy keeps its cause as a
+/// message): a binding keeps its case files and gives them to more than one
+/// run.
+impl Clone for CaseFile {
+    fn clone(&self) -> Self {
+        Self {
+            path: self.path.clone(),
+            digest: self.digest,
+            content: match &self.content {
+                Ok(cases) => Ok(Arc::clone(cases)),
+                Err(error) => Err(error.duplicate()),
+            },
+        }
+    }
 }
 
 impl CaseFile {
@@ -45,7 +65,7 @@ impl CaseFile {
         Self {
             path: None,
             digest: None,
-            content: Ok(cases),
+            content: Ok(Arc::new(cases)),
         }
     }
 
@@ -75,7 +95,7 @@ impl CaseFile {
         limits: &Limits,
     ) -> Self {
         let content = read_document_as(bytes, format, limits).and_then(|document| match document {
-            Document::Cases(cases) => Ok(cases),
+            Document::Cases(cases) => Ok(Arc::new(cases)),
             other => Err(not_cases(&other)),
         });
         Self {
@@ -232,7 +252,7 @@ impl CaseFile {
     ///
     /// The error of reading the file, which running it gives as its result.
     pub fn cases(&self) -> std::result::Result<&Cases, &Error> {
-        self.content.as_ref()
+        self.content.as_ref().map(|cases| &**cases)
     }
 
     /// The case with the id `id`, when the file was read and has it: with
@@ -245,7 +265,7 @@ impl CaseFile {
     /// The results running it alone gives: one per case, or one for a file
     /// that cannot be read.
     pub(crate) fn results(&self) -> usize {
-        self.content.as_ref().map_or(1, Cases::len)
+        self.content.as_ref().map_or(1, |cases| cases.len())
     }
 }
 

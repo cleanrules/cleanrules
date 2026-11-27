@@ -224,7 +224,7 @@ fn number(n: u64) -> Json {
 impl DocumentCore {
     /// The bundle a bundle document holds; the JavaScript half asks only for
     /// those, so any other document is a bug.
-    fn held(&self) -> Outcome<&Bundle> {
+    pub(crate) fn held(&self) -> Outcome<&Bundle> {
         match &self.document {
             Document::Bundle(bundle) => Ok(bundle),
             _ => Err(Problem::Internal(

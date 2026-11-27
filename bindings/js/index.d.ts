@@ -672,6 +672,33 @@ export declare class RuleSet implements Iterable<Rule> {
    */
   audit(options?: AuditOptions | null): Audit
   /**
+   * Run test cases against the rule set (`spec/tests.md`, *Running cases*):
+   * each case's input is evaluated (never `run`: a test calls no action) and
+   * matched against its expectation, giving `passed`, `failed` with the keys
+   * that do not match, or `error`. A case never stops the run; a case file
+   * that cannot be read is one `error` result. What `cancel` throws is
+   * thrown; a `RangeError` for a limit that is negative or not a whole
+   * number; a `TypeError` for an unknown option or a file that is not a
+   * `CaseFile` or `Cases`.
+   *
+   * @example
+   * const run = rules.test([await CaseFile.load('cases/discounts.json')])
+   * if (!run.allPassed) console.log(String(run))
+   */
+  test(files: CaseFiles, options?: TestOptions | null): TestRun
+  /**
+   * Run test cases one at a time: a `CaseRun`, an iterator of results, with
+   * the arguments of `test`. Leaving the loop early stops the run, and
+   * `run.testRun()` then gives a partial run (`cancelled`).
+   *
+   * @example
+   * const deadline = performance.now() + 5000
+   * const run = rules.iterTest(files, { cancel: () => performance.now() > deadline })
+   * for (const result of run) show(result)
+   * const report = run.testRun()
+   */
+  iterTest(files: CaseFiles, options?: TestOptions | null): CaseRun
+  /**
    * The rule set document of the JSON format (`{ version, ruleset }`), as an
    * object for `JSON.stringify`: a float that holds an integer is `{"$float":
    * n}`, so the text reads back as the same rule set, except that a float zero
@@ -1236,6 +1263,14 @@ export declare class DecisionTable {
    */
   audit(options?: AuditOptions | null): Audit
   /**
+   * Run test cases against the table, as `RuleSet.test` does: the cases are
+   * evaluated by the compiled rule set (`ruleset`), and the test run names
+   * the table's hit policy (`output_order` included).
+   */
+  test(files: CaseFiles, options?: TestOptions | null): TestRun
+  /** Run test cases against the table one at a time, as `RuleSet.iterTest` does. */
+  iterTest(files: CaseFiles, options?: TestOptions | null): CaseRun
+  /**
    * The decision table document of the JSON format, as an object for
    * `JSON.stringify`: a float that holds an integer is `{"$float": n}`, so the
    * text reads back as the same table, except that a float zero loses its sign
@@ -1444,6 +1479,17 @@ export declare class Bundle {
    * bundle does not refer to.
    */
   caseDigestMatches(path: string, content: string | Uint8Array): boolean
+  /**
+   * Run the bundle's case files against its rules (`spec/tests.md`, *Case
+   * files of a bundle*), in its order: `read` gives the bytes of each one,
+   * synchronously (a file the caller cannot open is the caller's error: what
+   * `read` throws is thrown). A file whose bytes are not the ones the bundle
+   * records is one `decision_mismatch` result; files are read under the
+   * limits the bundle records. The options are `RuleSet.test`'s.
+   */
+  test(read: (ref: CaseFileRef) => string | Uint8Array, options?: TestOptions | null): TestRun
+  /** Run the bundle's case files one at a time, as `RuleSet.iterTest` does. */
+  iterTest(read: (ref: CaseFileRef) => string | Uint8Array, options?: TestOptions | null): CaseRun
   /** Compare with another bundle; symmetric: `b.compare(a)` gives the same result. */
   compare(other: Bundle): BundleComparison
   /**
@@ -1453,13 +1499,339 @@ export declare class Bundle {
   toJSON(): BundleDocument
 }
 
+// --- Test cases ----------------------------------------------------------
+
+/** The error codes a case may expect: those evaluating an input given as JSON raises. */
+export type ExpectedErrorCode = 'missing_field' | 'type_mismatch' | 'hit_policy_error'
+
+/**
+ * The parts of an expectation (`spec/tests.md`, *Expectations*). Leave out a
+ * part that is not checked; only `output` takes `null` (nothing selected).
+ */
+export interface ExpectationParts {
+  /** The effective ids of the rules expected to be selected, in selection order. */
+  selected?: Iterable<string>
+  /**
+   * The expected single output: an object whose keys the output has, with
+   * equal values (its other keys are not checked), or `null`: nothing is
+   * selected. Floats that hold integers are given as `float(x)`.
+   */
+  output?: Metadata | null
+  /** The expected outputs of the selected rules, in selection order, each as `output`. */
+  outputs?: Iterable<Metadata>
+  /** The ids of the rules expected to be unknown, in any order. */
+  unknown?: Iterable<string>
+  /** The code of the error evaluation must raise, alone. */
+  error?: ExpectedErrorCode
+}
+
+/** An expectation as a case file writes it (`spec/tests.md`, *Expectations*). */
+export interface ExpectationDocument {
+  selected?: string[]
+  output?: Record<string, unknown> | null
+  outputs?: Array<Record<string, unknown>>
+  unknown?: string[]
+  error?: { code: ExpectedErrorCode }
+}
+
+/** A case as a case file writes it (`spec/tests.md`, *Cases*). */
+export interface CaseDocument {
+  id: string
+  description?: string
+  input: unknown
+  expect?: ExpectationDocument
+}
+
+/** A case file document (`spec/tests.md`, *Case files*). */
+export interface CasesDocument {
+  version: 1
+  cases: { description?: string; metadata?: Record<string, unknown>; items: CaseDocument[] }
+}
+
+/**
+ * What evaluating a case's input must give; frozen. Built through the core,
+ * which refuses what a case file's reader refuses (`FormatError`). A part
+ * that is not checked is `undefined`.
+ */
+export declare class Expectation {
+  constructor(parts?: ExpectationParts | null)
+  /** The rules expected to be selected. */
+  readonly selected?: readonly string[]
+  /** The expected single output, or `null` for nothing selected. */
+  readonly output?: Readonly<Record<string, Value>> | null
+  /** The expected outputs. */
+  readonly outputs?: ReadonlyArray<Readonly<Record<string, Value>>>
+  /** The rules expected to be unknown, sorted by code point. */
+  readonly unknown?: readonly string[]
+  /** The code of the error expected. */
+  readonly error?: ExpectedErrorCode
+  /** Whether nothing is checked but that evaluation does not fail. */
+  readonly isEmpty: boolean
+  /** The expectation as a case file writes it, floats that hold integers as `{"$float": n}`. */
+  toJSON(): ExpectationDocument
+}
+
+export interface CaseOptions {
+  /** What evaluating the input must give; by default, only that evaluation does not fail. */
+  expect?: Expectation | null
+  /** What the case shows. */
+  description?: string | null
+}
+
+/** One test case (`spec/tests.md`, *Cases*): an id, an input and an expectation; frozen. */
+export declare class Case {
+  /**
+   * @param id Names the case, unique in its file: a non-empty string, compared exactly.
+   * @param input The data the rules evaluate, as native data.
+   */
+  constructor(id: string, input: unknown, options?: CaseOptions | null)
+  readonly id: string
+  /** The input as the core holds it, as native data (frozen); a float that holds an integer is a `Float`. */
+  readonly input: Value
+  readonly expect: Expectation
+  readonly description: string | null
+  /** The case as a case file writes it, floats that hold integers as `{"$float": n}`. */
+  toJSON(): CaseDocument
+}
+
+export interface CasesOptions {
+  /** What the file holds. */
+  description?: string | null
+  /** Data about the file, as a rule's metadata. */
+  metadata?: Metadata | null
+}
+
+/**
+ * The content of a case file document (`spec/tests.md`, *Case files*): its
+ * cases, in the order they run, ids unique; frozen. `loads`, `load`,
+ * `dumps`, `dump`, `canonicalBytes` and `digest` take it.
+ */
+export declare class Cases implements Iterable<Case> {
+  constructor(items?: Iterable<Case> | null, options?: CasesOptions | null)
+  readonly items: readonly Case[]
+  readonly description: string | null
+  readonly metadata: Readonly<Record<string, Value>>
+  readonly length: number
+  /** The case with the id `id`, compared exactly. */
+  get(id: string): Case | undefined
+  [Symbol.iterator](): Iterator<Case>
+  /** The case file document, for `JSON.stringify`: floats that hold integers as `{"$float": n}`. */
+  toJSON(): CasesDocument
+}
+
+export interface CaseFileOptions {
+  /** The file's path, with `/` between segments: a case is its path and its id. */
+  path?: string | null
+}
+
+/**
+ * One case file given to a run (`spec/tests.md`, *Running cases*): its path,
+ * the digest of the bytes it was read from, and its cases or the error of
+ * reading it, which running it gives as its one result; frozen.
+ */
+export declare class CaseFile {
+  constructor(cases: Cases, options?: CaseFileOptions | null)
+  /**
+   * The case file whose bytes are `content`, read under the default limits:
+   * as YAML when `path` ends in `.yaml` or `.yml`, as JSON otherwise, unless
+   * `format` says. An error reading it is kept in `error`, not thrown.
+   */
+  static read(content: string | Uint8Array, options?: { path?: string | null; format?: 'json' | 'yaml' | null } | null): CaseFile
+  /** The case file at `path`, read from disk as `read` reads it. In Node and Deno. */
+  static load(path: string | URLLike): Promise<CaseFile>
+  readonly path: string | null
+  /** The SHA-256 digest of the bytes it was read from, or `null`. */
+  readonly digest: string | null
+  /** The cases, or `null` for a file that cannot be read. */
+  readonly cases: Cases | null
+  /** The error of reading it, or `null`. */
+  readonly error: CleanRulesError | null
+  /** The case with the id `id`, when the file was read and has it. */
+  case(id: string): Case | undefined
+}
+
+/** The case files of a run: `CaseFile`s and `Cases` (a file without a path), one or an iterable. */
+export type CaseFiles = CaseFile | Cases | Iterable<CaseFile | Cases>
+
+/** The limits of a test run (`spec/tests.md`, *Batches and interruption*). */
+export interface TestRunLimits {
+  /** The most results given, files that cannot be read included; `null` for no limit. */
+  readonly maxResults: number | null
+  /** The most steps, one per rule for each case; `null` for no limit. */
+  readonly maxSteps: number | null
+  /** The most failed cases explained, the first ones in run order (5). */
+  readonly maxExplained: number
+}
+
+export interface TestOptions {
+  /** Each a whole number from 0; left out, no limit (and 5 for `maxExplained`). */
+  limits?: { maxResults?: number | null; maxSteps?: number | null; maxExplained?: number | null } | null
+  /** Asked before each case, never while one is evaluated: the run stops, partial, when it returns true. */
+  cancel?: (() => unknown) | null
+  /**
+   * Asked as `cancel` is, through `aborted`: seen only when the caller
+   * awaits between results (`iterTest` in an async loop), since a
+   * synchronous run never lets it be aborted. For a deadline in a
+   * synchronous run, give `cancel: () => performance.now() > deadline`.
+   */
+  signal?: { readonly aborted: boolean } | null
+  /** Carry the rule set digest of the rules tested in the test run. */
+  rulesetDigest?: boolean | null
+}
+
+/** A result's status: a closed set. */
+export type CaseStatus = 'passed' | 'failed' | 'error'
+
+/** A key of an expectation; a later version may add keys. */
+export type ExpectationKey = 'selected' | 'output' | 'outputs' | 'unknown' | 'error' | (string & {})
+
+/** Why a run stopped before its last result; a later version may add reasons. */
+export type Interruption = 'max_results' | 'max_steps' | 'cancelled' | (string & {})
+
+/** A key of an expectation that does not match (`spec/tests.md`, *Test runs*). */
+export declare class Mismatch {
+  private constructor()
+  readonly key: ExpectationKey
+  /** What the case expects: rule ids, an output (or `null`), outputs, or an error code. */
+  readonly expected: unknown
+  /** What was given, in the same form (for `error`, the error raised or `null`); `undefined` when nothing was. */
+  readonly actual: unknown
+  /** Why nothing was given to compare, or `null`. */
+  readonly reason: string | null
+}
+
+/** The result of one case, or of a case file that cannot be run. */
+export declare class CaseResult {
+  private constructor()
+  readonly path: string | null
+  /** The case's id; `null` for a case file that cannot be run. */
+  readonly id: string | null
+  readonly status: CaseStatus
+  readonly mismatches: readonly Mismatch[]
+  readonly error: CleanRulesError | null
+  /** For a failed case explained, the text of its decision's explanation. */
+  readonly explanationText: string | null
+  /** The result's JSON form, as a test run document writes it. */
+  toJSON(): Record<string, unknown>
+}
+
+/** How a partial run stopped. */
+export interface Interrupted {
+  readonly reason: Interruption
+  /** The results it did not give, among the case files given to it. */
+  readonly remaining: number
+}
+
+/** The counts of a run's results, and how a partial run stopped. */
+export interface TestRunSummary {
+  readonly total: number
+  readonly passed: number
+  readonly failed: number
+  readonly error: number
+  readonly partial: boolean
+  readonly interrupted: Interrupted | null
+}
+
+/** A case file given to a run, as the test run lists it. */
+export interface TestRunFile {
+  readonly path: string | null
+  /** The digest of its bytes, when it was read from bytes. */
+  readonly digest: string | null
+}
+
+/** The bundle whose case files a run ran. */
+export interface TestRunBundle {
+  readonly id: string
+  readonly revision: string
+}
+
+/** A test run document (`spec/tests.md`, *Test runs*); its members as the format names them. */
+export interface TestRunDocument {
+  version: 1
+  test_run: {
+    source: string
+    hit_policy: TablePolicy
+    aggregate?: Aggregate
+    logic: string
+    strict?: true
+    ruleset_digest?: string
+    engine: { name: string; version: string; limits: Record<BundleLimitName, number> }
+    bundle?: { id: string; revision: string }
+    files: Array<{ path?: string; digest?: string }>
+    limits: { max_explained: number; max_results?: number; max_steps?: number }
+    summary: {
+      total: number
+      passed: number
+      failed: number
+      error: number
+      partial: boolean
+      interrupted?: { reason: Interruption; remaining: number }
+    }
+    results: Array<Record<string, unknown>>
+    [key: string]: unknown
+  }
+}
+
+/** The results of a run and their summary (`spec/tests.md`, *Test runs*); frozen. */
+export declare class TestRun {
+  private constructor()
+  /** What was tested: `'ruleset'` or `'decision_table'` (a later version may add sources). */
+  readonly source: 'ruleset' | 'decision_table' | (string & {})
+  readonly hitPolicy: TablePolicy
+  readonly aggregate: Aggregate | null
+  readonly logic: string
+  readonly strict: boolean
+  /** The rule set digest of the rules tested, when asked for; otherwise `null`. */
+  readonly rulesetDigest: string | null
+  /** The engine that ran the cases, and the limits its case files were read with (a bundle's, for its cases). */
+  readonly engine: BundleEngine
+  /** The bundle's id and revision, for a bundle's cases. */
+  readonly bundle: TestRunBundle | null
+  /** The case files given to the run, in order. */
+  readonly files: readonly TestRunFile[]
+  readonly limits: TestRunLimits
+  readonly summary: TestRunSummary
+  readonly results: readonly CaseResult[]
+  /** Whether every case ran and passed: no failure, no error, and not partial. */
+  readonly allPassed: boolean
+  /** The test run document of the JSON format, for `JSON.stringify`. */
+  toJSON(): TestRunDocument
+  /** The test run as text, the same in every language. */
+  toString(): string
+}
+
+/**
+ * A run in progress: an iterator of its results, one at a time, in run
+ * order, with the iterator helpers where the runtime has them. Leaving a
+ * `for...of` loop early stops it (in Python, a `break` leaves the run where
+ * it is); `testRun()` gives its test run, partial when it stopped early. Its
+ * `cancel` callback must not read it: there, its members throw a
+ * `TypeError`, and `cancel()` asks it to stop.
+ */
+export declare class CaseRun implements IterableIterator<CaseResult> {
+  private constructor()
+  next(): IteratorResult<CaseResult, undefined>
+  return(): IteratorResult<CaseResult, undefined>
+  [Symbol.iterator](): CaseRun
+  /** Stop the run now: it gives no more results, and is partial when a result remained. */
+  cancel(): void
+  /** The summary of the results given so far. */
+  readonly summary: TestRunSummary
+  /** The results not given yet. */
+  readonly remaining: number
+  /** Whether the run gives no more results. */
+  readonly isFinished: boolean
+  /** The test run, the same object each time; a run that is not finished is stopped first. */
+  testRun(): TestRun
+}
+
 // --- Documents -----------------------------------------------------------
 
 /** A document format: JSON, YAML, the text syntax of rules, or CSV for decision tables. */
 export type Format = 'json' | 'yaml' | 'text' | 'csv'
 
 /** What a document holds. */
-export type Loaded = Expr | Rule | RuleSet | DecisionTable | Bundle
+export type Loaded = Expr | Rule | RuleSet | DecisionTable | Bundle | Cases
 
 /** An action registry: each name with its function. */
 export type Actions = Readonly<Record<string, Action>> | ReadonlyMap<string, Action>
