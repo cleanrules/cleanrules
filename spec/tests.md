@@ -1,6 +1,6 @@
 # Test cases
 
-**Status:** draft, format version `1` (tasks T.1, T.2 and T.3). JSON Schemas:
+**Status:** draft, format version `1` (tasks T.1, T.2, T.3 and T.10). JSON Schemas:
 [`schemas/v1/cases.schema.json`](schemas/v1/cases.schema.json) for case files
 and [`schemas/v1/test_run.schema.json`](schemas/v1/test_run.schema.json) for
 the results of running them.
@@ -16,8 +16,10 @@ Cases are run with `evaluate`, never with `run`: a test never calls an action
 (`rules.md`, *Actions*), so it gives the same result whether the rules' actions
 are bound or not, and it can be run any number of times. Running cases gives a
 result per case and a summary (*Running cases*, *Test runs*), one result at a
-time and with limits (*Batches and interruption*); comparing two versions on
-the same cases (task T.4) builds on it.
+time and with limits (*Batches and interruption*), and, when asked, what the
+cases made each rule and condition do and which parts of the rules they never
+reached (*Statistics*); comparing two versions on the same cases (task T.4)
+builds on it.
 
 ```json
 {
@@ -371,7 +373,8 @@ gives the same decision and the same explanation.
 A run is **incremental**: it gives its results one at a time, in run order,
 each before the next case is evaluated, so a caller can show, store or drop
 each result as it comes, and the run itself keeps only the counts of its
-summary (*Test runs*) between results.
+summary (*Test runs*), and of its statistics when they are asked for
+(*Statistics*), between results.
 
 A run ends when every case has a result, or when it is **interrupted**: then
 it gives no more results, and it is **partial**. Before each item (a case, or
@@ -467,6 +470,7 @@ it is output only: readers reject it with `unsupported`.
 | `limits` | yes | object: `max_explained`, and `max_results` and `max_steps` when they are set, ints |
 | `summary` | yes | object: the summary (below) |
 | `results` | yes | array of results, in run order (below) |
+| `statistics` | when asked for | object: the run's statistics and coverage (*Statistics*, *JSON*) |
 
 The **summary**:
 
@@ -560,6 +564,242 @@ ERROR   cases/strict.json
   when it has one.
 - The summary: the number of results and how many of each status; and, for a
   partial run, `Partial run: interrupted by <reason>, <n> not run`.
+- The statistics, when the run has them (*Statistics*, *Text*).
+
+## Statistics
+
+A run can also count what its cases made the rules do: how many times each
+rule was selected and fired, how many times each of its conditions was
+`TRUE`, `FALSE` or `UNKNOWN`, and so which parts of the rules the cases never
+reached, their **coverage**. These are the run's **statistics**. The caller
+asks for them; a run that is not asked counts nothing more.
+
+The statistics are counted while the run goes, from each case's decision,
+before the next case is evaluated, as the rest of its result is (*Explaining
+failures*): the run keeps the counts, and no result tree. A result tree has
+one child per operand of `and`, `or` and `not` and a truth value for each
+(`json-format.md`, *Result trees*), so one evaluation per case gives every
+count: each rule's status, and the truth values of its tests in pre-order.
+
+They count the **decisions** of the run: every case whose evaluation gives a
+decision counts, whatever its expectation and its result, `passed` or
+`failed`. So a case file of inputs without expectations measures what those
+inputs reach. A case whose evaluation raises an error gives no decision: it
+counts as a case and nowhere else. A file that cannot be read counts
+nowhere. A partial run counts the cases it ran (*Batches and interruption*).
+
+### Rules
+
+For each rule of the rules tested, in rule order (a decision table's are the
+rules it compiles to, `tables.md`, *Compiling*), the statistics count the
+decisions in which:
+
+| Count | The rule |
+|---|---|
+| `selected` | was selected by the hit policy |
+| `fired` | fired (`rules.md`, *Evaluation*): its condition is `TRUE`, whether the hit policy selected it or not |
+| `not_fired` | did not fire, its condition being `FALSE` |
+| `unknown` | did not fire, its condition being `UNKNOWN` |
+
+`fired`, `not_fired` and `unknown` add up to the number of decisions, and
+`selected` is at most `fired`. An explanation's rule status `fired`
+(`explain.md`, *Rule status*) is narrower: a rule that fired and was not
+selected, which these counts give as `fired` minus `selected`. A rule is
+located by a JSON Pointer into the document of the rules tested: the rule
+(`/ruleset/rules/1`), or a decision table's row (`/decision_table/rows/1`);
+for a bundle's rules, under `/bundle`.
+
+### Conditions
+
+For each rule, the statistics count the truth values of its **conditions**,
+the elementary parts of its condition that a case can make `TRUE` or `FALSE`
+on their own:
+
+- in a rule set, the **tests** of the rule's condition (`audit.md`, *What the
+  audit reads*, *Tests*): every node in a condition position other than
+  `and`, `or` and `not`, such as a comparison, `in`, `between` (one test, not
+  its two halves), `is_null`, a string test, or a field or constant used as
+  a condition; in depth-first pre-order;
+- in a decision table, the tests of the **input cells** of the rule's row
+  that are not `-`, in input order: each cell holds one test, under a `not`
+  for `NOT IN`, `NOT BETWEEN` and the other negated cells, and its test is
+  counted, as in a rule set, with the test's truth value and `op` (`in` for
+  `NOT IN ('ES', 'PT')`). The row's conjunction is the rule's own condition,
+  counted by the rule.
+
+Each condition is located by a JSON Pointer into the document of the rules
+tested, as an audit locates it (`audit.md`, *JSON*, *Documents*): a node of a
+rule set (`/ruleset/rules/1/when/operands/0`) or, for a cell's test, the cell
+of a decision table (`/decision_table/rows/1/inputs/0`), since a cell is
+text; for a bundle's rules, under `/bundle`.
+Its counts are the decisions in which it was `TRUE`, `FALSE` and `UNKNOWN`,
+which add up to the number of decisions.
+
+*Rationale.* Tests are the granularity of condition coverage: what a test
+gives is what the data decides, while the truth value of a connective follows
+from its operands' in each case. With the rules' own counts, which are the
+truth values of whole conditions, they measure both condition and decision
+coverage. Tests are the leaves of a condition's diagram (`visual.md`,
+*Conditions*: every node other than `and`, `or` and `not`, a `between` one
+leaf), what an audit reads (`audit.md`), and what the cells of a table hold,
+so they name the same things. A node of a test, such as an arithmetic
+expression, has a value and no truth value of its own.
+
+### Outputs
+
+For a decision table, the statistics count, for each output column with
+output values (`tables.md`, *Model*), in column order, how many times each of
+its values was given: the selections of rows whose cell in that column holds
+that value (a cell holds a constant equal to one of them, `tables.md`,
+*Output cells*), in all the decisions, whatever the hit policy. A rule set's
+outputs, and the columns of a table without output values, can hold any
+value, and are not counted.
+
+### Coverage
+
+The coverage reports, for each **measure**, how many of its items the cases
+reached at least once (`covered`), out of how many can be reached (`total`),
+and which ones they never reached (`missed`). The measures, in this order:
+
+| Measure | Items | An item is reached when |
+|---|---|---|
+| `rule_selected` | the rules | the rule's `selected` is not 0 |
+| `rule_fired` | the rules | its `fired` is not 0 |
+| `rule_not_fired` | the rules | its `not_fired` is not 0 |
+| `rule_unknown` | the rules | its `unknown` is not 0 |
+| `condition_true` | the conditions of every rule | the condition's `true` is not 0 |
+| `condition_false` | the conditions of every rule | its `false` is not 0 |
+| `condition_unknown` | the conditions of every rule | its `unknown` is not 0 |
+| `output_value` | the output values of a decision table (*Outputs*) | the value's `selected` is not 0 |
+
+`output_value` is reported for a decision table with output values only.
+
+An item that reads no field, a **constant** one (`audit.md`, *What the audit
+reads*: a node that reads no field), has the same truth value for every
+input: a test such as `TRUE` or `1 > 2`, or a rule whose condition reads no
+field, such as a decision table's row whose cells are all `-`, whose
+condition is `TRUE`. It can never reach the measures of the other truth
+values: a rule whose condition is `TRUE` never has `not_fired` or `unknown`,
+one whose condition is `FALSE` or `UNKNOWN` never fires nor is selected, and
+a test is never counted under the other two truth values. Such an item is
+**unreachable** in those measures: it is left out of their `total` and
+`missed`, and counted in their `unreachable`, so that full coverage is
+always possible and the reader still sees what was left out. A constant
+item counts in the other measures as any other.
+
+The items missed are listed in the order of the statistics: rules in rule
+order, conditions in rule order and then in their own order, and output
+values by column and then in their column's order. A rule that never fires
+is a rule whose output the cases never check; a condition never `FALSE`
+does not show that the rule needs it; a rule never `UNKNOWN` was never given
+missing or null data.
+
+### JSON
+
+The statistics are the `statistics` member of a test run (*Test runs*), an
+object:
+
+| Key | Required | JSON type |
+|---|---|---|
+| `cases` | yes | int: the cases run, with or without a decision |
+| `decisions` | yes | int: the cases whose evaluation gave a decision |
+| `rules` | yes | array of rules, in rule order (below) |
+| `outputs` | for a decision table | array, in column order, of each output column with output values: `{"output", "values"}`, its name and, in the column's order, each value as `{"value", "selected"}`, the value in the JSON encoding of values (`json-format.md`, *Values*) and its count |
+| `coverage` | yes | array of measures, in the order of the *Coverage* table (below) |
+
+A **rule**:
+
+| Key | Required | JSON type |
+|---|---|---|
+| `name` | yes | string: the rule's name, as decisions and audits name rules |
+| `id` | when the rule has one | string: its id (`rules.md`, *Identity*) |
+| `row` | for a decision table | int: the row's position in the table, from 0, as in an audit (`audit.md`, *JSON*) |
+| `pointer` | yes | string: the rule's JSON Pointer (*Rules*) |
+| `selected`, `fired`, `not_fired`, `unknown` | yes | ints: the counts of *Rules* |
+| `conditions` | yes | array of conditions, in their order (*Conditions*): each `{"pointer", "op", "true", "false", "unknown"}`, its JSON Pointer, the `op` of its test's node and its counts |
+
+A **measure**:
+
+| Key | Required | JSON type |
+|---|---|---|
+| `measure` | yes | string: the measure (*Coverage*) |
+| `covered` | yes | int: the items reached |
+| `total` | yes | int: the items that can be reached |
+| `unreachable` | when not 0 | int: the constant items left out of `total` and `missed` (*Coverage*) |
+| `missed` | yes | array of the items not reached, in order, each with its place: `{"rule", "pointer"}` for a rule (the rule's pointer) and for a condition (the condition's), and `{"output", "value", "pointer"}` for an output value, the pointer to the value in its output's `values` (`/decision_table/outputs/0/values/2`) |
+
+```json
+{
+  "cases": 3,
+  "decisions": 3,
+  "rules": [
+    {
+      "name": "vip", "pointer": "/ruleset/rules/0",
+      "selected": 1, "fired": 1, "not_fired": 1, "unknown": 1,
+      "conditions": [
+        { "pointer": "/ruleset/rules/0/when/operands/0", "op": "gt", "true": 2, "false": 0, "unknown": 1 },
+        { "pointer": "/ruleset/rules/0/when/operands/1", "op": "gt", "true": 2, "false": 1, "unknown": 0 }
+      ]
+    }
+  ],
+  "coverage": [
+    { "measure": "rule_selected", "covered": 1, "total": 1, "missed": [] },
+    { "measure": "rule_fired", "covered": 1, "total": 1, "missed": [] },
+    { "measure": "rule_not_fired", "covered": 1, "total": 1, "missed": [] },
+    { "measure": "rule_unknown", "covered": 1, "total": 1, "missed": [] },
+    { "measure": "condition_true", "covered": 2, "total": 2, "missed": [] },
+    { "measure": "condition_false", "covered": 1, "total": 2, "missed": [{ "rule": "vip", "pointer": "/ruleset/rules/0/when/operands/0" }] },
+    { "measure": "condition_unknown", "covered": 1, "total": 2, "missed": [{ "rule": "vip", "pointer": "/ruleset/rules/0/when/operands/1" }] }
+  ]
+}
+```
+
+Counts are exact ints. Writers write the keys in the order of their tables,
+and every array even when it is empty. Within format version 1, new
+measures, new counts and new optional keys may be added: consumers ignore
+those they do not know, and show a measure they do not know from its
+`measure`, `covered`, `total`, `unreachable` and `missed`, whose items may
+have other keys.
+
+*Rationale.* The statistics are a member of the test run, not a document of
+their own: they are counted over the run's cases, so what they mean depends
+on what the run says, the rules tested, the case files, and whether the run
+was partial, and one document keeps them together. The coverage repeats what
+the counts say, so that a report or a command line shows what was missed
+without deriving it.
+
+### Text
+
+*Not checked by vectors: the core's snapshot tests fix it.*
+
+The text of the statistics, which the text of a test run ends with when the
+run has them:
+
+```text
+Statistics of 3 cases: 3 decisions
+  vip: selected 1, fired 1, not fired 1, unknown 1
+Coverage:
+  rules selected: 1 of 1
+  rules fired: 1 of 1
+  rules not fired: 1 of 1
+  rules unknown: 1 of 1
+  conditions true: 2 of 2
+  conditions false: 1 of 2
+    vip  gt at /ruleset/rules/0/when/operands/0
+  conditions unknown: 1 of 2
+    vip  gt at /ruleset/rules/0/when/operands/1
+```
+
+- `Statistics of <n> cases: <d> decisions`.
+- One line per rule, in rule order: its name and its four counts.
+- `Coverage:` and one line per measure, `<what> <how>: <covered> of
+  <total>` (`rules selected`, …, `conditions unknown`, `output values`),
+  followed by `, <n> unreachable` when it has unreachable items, and then by
+  its items missed, one per line and indented further: a rule by its name; a
+  condition in a rule set as `<rule>  <op> at <pointer>`, and in a decision
+  table as `<op> at row <label>, input <header> (<pointer>)`, as an audit
+  writes a cell (`audit.md`, *Text*), the row's label naming the rule; an
+  output value as `<output> = <value>`, the value in compact JSON.
 
 ## Not yet
 
@@ -590,3 +830,11 @@ existing case files mean.*
 - A limit of time: runs are bounded by results and steps, which are
   deterministic, and a deadline is a cancellation (*Batches and
   interruption*).
+- Statistics beyond counts of truth values: the counts of a connective
+  (`and`, `or`, `not`), pairs of conditions (modified condition/decision
+  coverage), the values of the outputs of a rule set or of a column without
+  output values, the counts of errors by code, statistics over the cases
+  whose evaluation raises an error, and statistics under a graded logic
+  (degrees, once rules fire to degrees).
+- Statistics without a test run: over a batch of inputs given as data (a
+  table in Arrow, task I), rather than as the cases of case files.

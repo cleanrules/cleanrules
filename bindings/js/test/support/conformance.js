@@ -67,6 +67,7 @@ export const SKIPS = {
   audit_document:
     'the idiomatic API audits rule sets and decision tables (RuleSet.audit, DecisionTable.audit), so audit vectors of other documents (a bundle, a rule, a condition, a case file) run in the json route, through Document.audit and the core\'s audit_document',
   test_run: 'test runs (spec/tests.md, Running cases) are made by the core and checked by its runner; the JavaScript API runs cases from task T.9b',
+  statistics: "statistics of a run (spec/tests.md, Statistics) are made by the core and checked by its runner; the JavaScript API does not gather them yet",
 }
 
 /**
@@ -1639,6 +1640,7 @@ not
     current = `${route}:${vector.get('id')}`
     if (vector.get('given').get('kind') === 'tool') return { skip: 'agents' }
     if (vector.get('given').get('kind') === 'test_run') return { skip: 'test_run' }
+    if (vector.get('given').get('kind') === 'statistics') return { skip: 'statistics' }
     const logic = vector.get('given').get('logic')
     if (logic !== undefined && logic !== 'boolean') return { skip: 'graded' }
     try {

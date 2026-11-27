@@ -558,3 +558,5 @@ jobs:
       - run: python3 conformance/tools/canonical_vectors.py --check
       # The case runner's vectors: generated files up to date.
       - run: python3 conformance/tools/test_run_vectors.py --check
+      # The statistics vectors: generated file up to date.
+      - run: python3 conformance/tools/statistics_vectors.py --check

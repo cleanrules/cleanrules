@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "test_run": {
+    "source": "ruleset",
+    "hit_policy": "first",
+    "logic": "boolean",
+    "engine": {
+      "name": "cleanrules",
+      "version": "1.0.0",
+      "limits": {
+        "max_size": 16777216,
+        "max_nesting": 1024,
+        "max_depth": 256,
+        "max_path_segments": 256,
+        "max_table_size": 2097152,
+        "max_values": 1000000
+      }
+    },
+    "files": [],
+    "limits": {
+      "max_explained": 5
+    },
+    "summary": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "error": 0,
+      "partial": false
+    },
+    "results": [],
+    "statistics": {
+      "cases": 3,
+      "decisions": 2,
+      "rules": [
+        {
+          "name": "a",
+          "pointer": "/ruleset/rules/0",
+          "selected": 1,
+          "fired": 1,
+          "not_fired": 1,
+          "unknown": 0,
+          "conditions": [
+            {
+              "pointer": "/ruleset/rules/0/when",
+              "true": 1,
+              "false": 1,
+              "unknown": 0
+            }
+          ]
+        },
+        {
+          "name": "b",
+          "pointer": "/ruleset/rules/1",
+          "selected": 1,
+          "fired": 2,
+          "not_fired": 0,
+          "unknown": 0,
+          "conditions": [
+            {
+              "pointer": "/ruleset/rules/1/when",
+              "op": "lt",
+              "true": 2,
+              "false": 0,
+              "unknown": 0
+            }
+          ]
+        }
+      ],
+      "coverage": [
+        {
+          "measure": "rule_selected",
+          "covered": 2,
+          "total": 2,
+          "missed": []
+        },
+        {
+          "measure": "rule_fired",
+          "covered": 2,
+          "total": 2,
+          "missed": []
+        },
+        {
+          "measure": "rule_not_fired",
+          "covered": 1,
+          "total": 2,
+          "missed": [
+            {
+              "rule": "b",
+              "pointer": "/ruleset/rules/1"
+            }
+          ]
+        },
+        {
+          "measure": "rule_unknown",
+          "covered": 0,
+          "total": 2,
+          "missed": [
+            {
+              "rule": "a",
+              "pointer": "/ruleset/rules/0"
+            },
+            {
+              "rule": "b",
+              "pointer": "/ruleset/rules/1"
+            }
+          ]
+        },
+        {
+          "measure": "condition_true",
+          "covered": 2,
+          "total": 2,
+          "missed": []
+        },
+        {
+          "measure": "condition_false",
+          "covered": 1,
+          "total": 2,
+          "missed": [
+            {
+              "rule": "b",
+              "pointer": "/ruleset/rules/1/when"
+            }
+          ]
+        },
+        {
+          "measure": "condition_unknown",
+          "covered": 0,
+          "total": 2,
+          "missed": [
+            {
+              "rule": "a",
+              "pointer": "/ruleset/rules/0/when"
+            },
+            {
+              "rule": "b",
+              "pointer": "/ruleset/rules/1/when"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

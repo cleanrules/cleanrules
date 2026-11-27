@@ -1024,6 +1024,10 @@ TEST_RUN_SKIP = (
     "test runs (spec/tests.md, Running cases) are made by the core and checked by its runner;"
     " the binding runs cases from task T.9b"
 )
+STATISTICS_SKIP = (
+    "statistics of a run (spec/tests.md, Statistics) are made by the core and checked by its"
+    " runner; the binding does not gather them yet"
+)
 
 
 def collect() -> list[Any]:
@@ -1074,6 +1078,17 @@ def collect() -> list[Any]:
                             run,
                             id=f"{run}:{vector['id']}",
                             marks=pytest.mark.skip(reason=TEST_RUN_SKIP),
+                        )
+                    )
+                continue
+            if given["kind"] == "statistics":
+                for run in ("json", "native"):
+                    params.append(
+                        pytest.param(
+                            vector,
+                            run,
+                            id=f"{run}:{vector['id']}",
+                            marks=pytest.mark.skip(reason=STATISTICS_SKIP),
                         )
                     )
                 continue

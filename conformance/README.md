@@ -12,6 +12,7 @@ conformance/
   tools/decimal_vectors.py      the decimal oracle: writes and checks vectors
   tools/canonical_vectors.py    the canonical-bytes oracle: writes and checks vectors
   tools/test_run_vectors.py     writes and checks the case runner's vectors (tests/)
+  tools/statistics_vectors.py   writes and checks the statistics vectors (tests/statistics.json)
 ```
 
 ## Vector files
@@ -63,6 +64,7 @@ A vector file is a JSON document:
 | `bundle_compare` | `a`, `b`: two bundle documents | read both, then compare `a` with `b` (`spec/bundles.md`, *Comparing bundles*) | `comparison`: `relation`, `identical` and `differences` |
 | `audit` | `document` (a rule set, decision table, bundle or rule document, or one without rules); optional `limits` (`max_terms`, `max_steps`, `spec/audit.md`, *Limits*) and `ruleset_digest` (`true`: ask for the digest in the report) | `audit_document` (`spec/audit.md`, *Documents*) | `audit`: the report without the `message` and `witness` of each diagnostic (below); or `error` |
 | `test_run` | `document` (a rule set, decision table or bundle document: the rules); `cases` (a case file document, run without a path) or `files` (an array of `{"path", "text"}`: case files with their paths and contents as UTF-8 text, in order; for a bundle, the files it names, looked up by path); optional `limits` (`max_results`, `max_steps`, `max_explained`), `cancel_after` (an int: the run is given a cancel callback that says so when it is asked after that many results) and `ruleset_digest` (`true`) | run the cases against the rules (`spec/tests.md`, *Running cases*): from a bundle, its case files checked against their digests | `test_run`: the test run, with each error (a result's `error`, and the `actual` of an `error` mismatch) written with its code and compared fields only, and `engine.version`, which the runner first sets to its own engine's |
+| `statistics` | as `test_run`, without `cancel_after` and `ruleset_digest` | run the cases against the rules gathering statistics (`spec/tests.md`, *Statistics*) | `statistics`: the run's statistics, compared as they are |
 | `draw` | `format` (`dot`, `mermaid`, `html` or `html_fragment`), `document` (a condition, rule, rule set or decision table document); optional `input`, with a rule set or a table; optional `limits` (`max_diagram_size`) | `draw_document` (`spec/visual.md`); with an `input`, the rule set (or the table's rule set) evaluates it, and the runner draws the decision's explanation for a rule set (`draw_explanation`), and the table with the decision for a table (`draw_document` with the decision) | `diagram`: the exact text, compared as a string, or `error` (`code` and `name`) |
 
 Optional flags such as `strict` are omitted when false. A bundle's `engine.version`
@@ -194,6 +196,13 @@ output, never stopping at the first one.
   CI), whose expected results are written by hand from the spec; it computes
   only the digests of case files and bundles, with the canonical-bytes
   oracle.
+- **Statistics** (`spec/tests.md`, *Statistics*): the core's runner runs the
+  `statistics` vectors; the C ABI, Python, C++, JavaScript, Java, Scala and Go
+  runners skip them in every route, count them and say why (`statistics` in
+  the JavaScript, Go and JVM reports), until a binding gathers statistics.
+  They are written by `tools/statistics_vectors.py` (`--write`; `--check` in
+  CI): every count is written by hand from the spec, and the script derives
+  only the coverage from the counts, with the table of measures.
 - **Diagrams in the bindings**: until each binding draws diagrams (phase V.2),
   the Python, C++, JavaScript, Java, Scala and Go runners skip the `draw`
   vectors, count them and state the reason (`diagram` in the JavaScript, Go

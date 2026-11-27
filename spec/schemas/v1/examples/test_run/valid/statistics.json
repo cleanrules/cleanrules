@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "test_run": {
+    "source": "ruleset",
+    "hit_policy": "priority",
+    "logic": "boolean",
+    "engine": {
+      "name": "cleanrules",
+      "version": "1.0.0",
+      "limits": {
+        "max_size": 16777216,
+        "max_nesting": 1024,
+        "max_depth": 256,
+        "max_path_segments": 256,
+        "max_table_size": 2097152,
+        "max_values": 1000000
+      }
+    },
+    "files": [
+      {}
+    ],
+    "limits": {
+      "max_explained": 5
+    },
+    "summary": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0,
+      "error": 0,
+      "partial": false
+    },
+    "results": [
+      {
+        "id": "es-vip",
+        "status": "passed"
+      },
+      {
+        "id": "fr-loyal",
+        "status": "passed"
+      },
+      {
+        "id": "unknown-years",
+        "status": "passed"
+      },
+      {
+        "id": "es-new",
+        "status": "passed"
+      }
+    ],
+    "statistics": {
+      "cases": 4,
+      "decisions": 4,
+      "rules": [
+        {
+          "name": "vip",
+          "id": "VIP-1",
+          "pointer": "/ruleset/rules/0",
+          "selected": 1,
+          "fired": 1,
+          "not_fired": 3,
+          "unknown": 0,
+          "conditions": [
+            {
+              "pointer": "/ruleset/rules/0/when/operands/0",
+              "op": "gt",
+              "true": 1,
+              "false": 2,
+              "unknown": 1
+            },
+            {
+              "pointer": "/ruleset/rules/0/when/operands/1",
+              "op": "gt",
+              "true": 2,
+              "false": 2,
+              "unknown": 0
+            }
+          ]
+        },
+        {
+          "name": "loyal",
+          "pointer": "/ruleset/rules/1",
+          "selected": 1,
+          "fired": 1,
+          "not_fired": 2,
+          "unknown": 1,
+          "conditions": [
+            {
+              "pointer": "/ruleset/rules/1/when/operands/0",
+              "op": "between",
+              "true": 1,
+              "false": 2,
+              "unknown": 1
+            },
+            {
+              "pointer": "/ruleset/rules/1/when/operands/1/operand",
+              "op": "in",
+              "true": 2,
+              "false": 1,
+              "unknown": 1
+            }
+          ]
+        },
+        {
+          "name": "new",
+          "pointer": "/ruleset/rules/2",
+          "selected": 1,
+          "fired": 1,
+          "not_fired": 3,
+          "unknown": 0,
+          "conditions": [
+            {
+              "pointer": "/ruleset/rules/2/when",
+              "op": "is_null",
+              "true": 1,
+              "false": 3,
+              "unknown": 0
+            }
+          ]
+        }
+      ],
+      "coverage": [
+        {
+          "measure": "rule_selected",
+          "covered": 3,
+          "total": 3,
+          "missed": []
+        },
+        {
+          "measure": "rule_fired",
+          "covered": 3,
+          "total": 3,
+          "missed": []
+        },
+        {
+          "measure": "rule_not_fired",
+          "covered": 3,
+          "total": 3,
+          "missed": []
+        },
+        {
+          "measure": "rule_unknown",
+          "covered": 1,
+          "total": 3,
+          "missed": [
+            {
+              "rule": "vip",
+              "pointer": "/ruleset/rules/0"
+            },
+            {
+              "rule": "new",
+              "pointer": "/ruleset/rules/2"
+            }
+          ]
+        },
+        {
+          "measure": "condition_true",
+          "covered": 5,
+          "total": 5,
+          "missed": []
+        },
+        {
+          "measure": "condition_false",
+          "covered": 5,
+          "total": 5,
+          "missed": []
+        },
+        {
+          "measure": "condition_unknown",
+          "covered": 3,
+          "total": 5,
+          "missed": [
+            {
+              "rule": "vip",
+              "pointer": "/ruleset/rules/0/when/operands/1"
+            },
+            {
+              "rule": "new",
+              "pointer": "/ruleset/rules/2/when"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

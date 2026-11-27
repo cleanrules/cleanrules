@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Statistics and coverage of a run (task T.10;
+  [`spec/tests.md`](spec/tests.md), *Statistics*): in the Rust core,
+  `cases::Runner::with_statistics(true)` counts, from each case's decision
+  and before the next case is evaluated (no result tree is kept), how many
+  times each rule was selected, fired (its condition `TRUE`, selected or
+  not), did not fire or was unknown, and how many times each of its
+  conditions was `TRUE`, `FALSE` or `UNKNOWN`: the tests of a rule set's
+  conditions (every node other than `and`, `or` and `not`, located by a JSON
+  Pointer, as the audit reads them) and the tests of a decision table's input
+  cells (under a cell's `NOT`, its test, at the cell); for a table, also how
+  many times each output value was given. Rules carry their pointer (the
+  rule, or a table's row). A case whose evaluation raises an error counts
+  only as a case. `Statistics::coverage()` gives, for each `CoverageMeasure`
+  (`rule_selected`, `rule_fired`, `rule_not_fired`, `rule_unknown`,
+  `condition_true`, `condition_false`, `condition_unknown`, `output_value`),
+  the items reached, the items that can be reached, the `unreachable` ones
+  (rules and tests that read no field, such as a catch-all row, cannot reach
+  the measures of other truth values: they are left out of `total` and
+  `missed`), and each `Missed` item with its pointer. They are the optional
+  `statistics` member of a test run document (`TestRun::statistics`,
+  `format::write_statistics`, schema in `test_run.schema.json`), end the test
+  run's text, and are given as the run goes by
+  `Runner::statistics(&TestRunState)` and `CaseRun::statistics()`; the run
+  lays its counts out at its first result, in its `TestRunState`, so building
+  a runner costs nothing more. 9 conformance vectors of the new kind
+  `statistics` (`conformance/vectors/tests/statistics.json`, written by
+  `conformance/tools/statistics_vectors.py`), which the binding runners skip
+  and count until a binding gathers statistics; example
+  `docs/examples/statistics.rs`.
 - Case runner with incremental batches (tasks T.2 and T.3;
   [`spec/tests.md`](spec/tests.md), *Running cases*, *Test runs*): in the
   Rust core, `cases::Runner` (for a rule set, `Runner::for_table` and

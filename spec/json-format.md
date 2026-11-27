@@ -831,8 +831,9 @@ it is empty.
 ## Test runs
 
 A test run document has the content key `"test_run"`: the results of running
-test cases against rules, one per case, and their summary. Its keys and what
-they hold are in [`tests.md`](tests.md) (*Test runs*). Like an audit, it is
+test cases against rules, one per case, their summary and, when asked for,
+their statistics. Its keys and what they hold are in [`tests.md`](tests.md)
+(*Test runs*, *Statistics*). Like an audit, it is
 output only, so readers reject it with `unsupported`, and the *Versioning*
 rules apply: it was added to version 1, and consumers should expect new
 optional keys and new reasons of interruption. Writers write its keys in the

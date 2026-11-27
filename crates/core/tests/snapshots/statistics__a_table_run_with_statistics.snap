@@ -1,0 +1,31 @@
+---
+source: crates/core/tests/statistics.rs
+assertion_line: 181
+expression: run.to_string()
+---
+Test run of a decision table: 4 rules, hit policy output_order, logic boolean
+FAILED  cases/risks.json  "adult-fr"
+          selected: expected ["row_3"], actual ["abroad","row_3"]
+3 results: 2 passed, 1 failed, 0 errors
+Statistics of 3 cases: 3 decisions
+  blocked: selected 0, fired 0, not fired 3, unknown 0
+  abroad: selected 1, fired 1, not fired 2, unknown 0
+  young: selected 1, fired 1, not fired 1, unknown 1
+  row_3: selected 3, fired 3, not fired 0, unknown 0
+Coverage:
+  rules selected: 3 of 4
+    blocked
+  rules fired: 3 of 4
+    blocked
+  rules not fired: 3 of 3, 1 unreachable
+  rules unknown: 1 of 3, 1 unreachable
+    blocked
+    abroad
+  conditions true: 2 of 3
+    eq at row blocked, input country (/decision_table/rows/3/inputs/1)
+  conditions false: 3 of 3
+  conditions unknown: 1 of 3
+    eq at row blocked, input country (/decision_table/rows/3/inputs/1)
+    in at row abroad, input country (/decision_table/rows/1/inputs/1)
+  output values: 3 of 4
+    risk = "very_high"

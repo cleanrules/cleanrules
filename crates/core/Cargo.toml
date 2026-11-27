@@ -87,3 +87,8 @@ path = "../../docs/examples/audit.rs"
 [[example]]
 name = "test_run"
 path = "../../docs/examples/test_run.rs"
+
+# The example of a run's statistics and coverage in the documentation (task T.10).
+[[example]]
+name = "statistics"
+path = "../../docs/examples/statistics.rs"

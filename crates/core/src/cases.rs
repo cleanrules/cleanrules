@@ -31,6 +31,7 @@
 
 mod file;
 mod run;
+mod statistics;
 mod text;
 
 use std::collections::BTreeSet;
@@ -42,6 +43,10 @@ pub use file::CaseFile;
 pub use run::{
     CaseResult, CaseRun, CaseStatus, DEFAULT_MAX_EXPLAINED, ExpectationKey, Interrupted,
     Interruption, Mismatch, Runner, Summary, TestRun, TestRunFile, TestRunLimits, TestRunState,
+};
+pub use statistics::{
+    ConditionStatistics, Coverage, CoverageMeasure, Missed, OutputStatistics,
+    OutputValueStatistics, RuleStatistics, Statistics,
 };
 
 use crate::error::{Error, ErrorCode, Result};

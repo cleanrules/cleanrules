@@ -21,7 +21,7 @@ pub(crate) mod csv;
 mod grid;
 
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::ast::{Kind, Node};
 use crate::error::{Error, ErrorCode, Result};
@@ -455,6 +455,46 @@ impl DecisionTable {
     #[must_use]
     pub fn into_ruleset(self) -> RuleSet {
         self.ruleset
+    }
+
+    /// The row of each rule of the compiled rule set, in rule order: rules
+    /// are named after their rows, and are sorted under `output_order`.
+    pub(crate) fn rule_rows(&self) -> Vec<usize> {
+        let labels: BTreeMap<String, usize> = self
+            .rows
+            .iter()
+            .enumerate()
+            .map(|(r, row)| (label(r, row), r))
+            .collect();
+        self.ruleset
+            .rules()
+            .iter()
+            .enumerate()
+            .map(|(i, rule)| labels.get(rule.name()).copied().unwrap_or(i))
+            .collect()
+    }
+
+    /// For each row, the position of each output cell in its column's
+    /// values, for the outputs that have values, in column order; `None` for
+    /// an empty cell (`spec/tables.md`, *Output cells*).
+    pub(crate) fn output_value_positions(&self) -> Vec<Vec<Option<usize>>> {
+        let indexes: Vec<ValueIndex<'_>> = self
+            .outputs
+            .iter()
+            .map(|o| ValueIndex::new(&o.values))
+            .collect();
+        self.rows
+            .iter()
+            .map(|row| {
+                row.outputs
+                    .iter()
+                    .zip(&self.outputs)
+                    .zip(&indexes)
+                    .filter(|((_, output), _)| !output.values.is_empty())
+                    .map(|((cell, _), index)| rank(cell.as_ref(), index))
+                    .collect()
+            })
+            .collect()
     }
 }
 

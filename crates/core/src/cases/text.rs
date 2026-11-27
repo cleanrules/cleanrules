@@ -4,8 +4,10 @@
 use std::fmt;
 
 use super::run::{CaseStatus, Mismatch, TestRun};
+use super::statistics::{MissedRef, Statistics};
 use crate::error::Error;
 use crate::format::test_run::mismatch_values;
+use crate::format::write_value;
 use crate::json::{Json, to_string};
 use crate::rules::RulesSource;
 
@@ -128,6 +130,71 @@ impl fmt::Display for TestRun {
                 interrupted.reason.as_str(),
                 interrupted.remaining
             )?;
+        }
+        if let Some(statistics) = &self.statistics {
+            write!(f, "{statistics}")?;
+        }
+        Ok(())
+    }
+}
+
+/// The text of a run's statistics (`spec/tests.md`, *Statistics*, *Text*),
+/// which ends the text of a test run that has them.
+impl fmt::Display for Statistics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "Statistics of {}: {}",
+            plural(self.cases, "case", "cases"),
+            plural(self.decisions, "decision", "decisions")
+        )?;
+        for rule in &self.rules {
+            writeln!(
+                f,
+                "  {}: selected {}, fired {}, not fired {}, unknown {}",
+                rule.name, rule.selected, rule.fired, rule.not_fired, rule.unknown
+            )?;
+        }
+        writeln!(f, "Coverage:")?;
+        for measure in self.measures() {
+            write!(
+                f,
+                "  {}: {} of {}",
+                measure.measure.words(),
+                measure.covered,
+                measure.total
+            )?;
+            if measure.unreachable > 0 {
+                write!(f, ", {} unreachable", measure.unreachable)?;
+            }
+            writeln!(f)?;
+            for item in measure.missed {
+                match item {
+                    MissedRef::Rule(rule) => writeln!(f, "    {}", rule.name)?,
+                    MissedRef::Condition(rule, condition) => {
+                        let header = condition.column().and_then(|c| self.input_header(c));
+                        match (rule.row, header) {
+                            // The row's label names the rule, as in an audit.
+                            (Some(_), Some(header)) => writeln!(
+                                f,
+                                "    {} at row {}, input {header} ({})",
+                                condition.op, rule.name, condition.pointer
+                            )?,
+                            _ => writeln!(
+                                f,
+                                "    {}  {} at {}",
+                                rule.name, condition.op, condition.pointer
+                            )?,
+                        }
+                    }
+                    MissedRef::OutputValue(output, value) => writeln!(
+                        f,
+                        "    {} = {}",
+                        output.output,
+                        to_string(&write_value(&value.value))
+                    )?,
+                }
+            }
         }
         Ok(())
     }

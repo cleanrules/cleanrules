@@ -11,6 +11,7 @@ mod explain;
 mod logic;
 pub mod result;
 mod rules;
+mod statistics;
 pub(crate) mod table;
 pub(crate) mod test_run;
 pub mod value;
@@ -35,6 +36,7 @@ pub use result::{
     write_graded_truth, write_path, write_reason, write_result, write_truth,
 };
 pub use rules::{write_decision, write_rule, write_ruleset};
+pub use statistics::write_statistics;
 pub use table::write_table;
 pub use test_run::{write_case_result, write_test_run};
 pub use value::{ValueContext, read_value, write_value};

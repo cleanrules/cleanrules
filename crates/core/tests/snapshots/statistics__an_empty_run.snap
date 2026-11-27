@@ -1,0 +1,22 @@
+---
+source: crates/core/tests/statistics.rs
+assertion_line: 279
+expression: statistics.to_string()
+---
+Statistics of 0 cases: 0 decisions
+  a: selected 0, fired 0, not fired 0, unknown 0
+Coverage:
+  rules selected: 0 of 1
+    a
+  rules fired: 0 of 1
+    a
+  rules not fired: 0 of 1
+    a
+  rules unknown: 0 of 1
+    a
+  conditions true: 0 of 1
+    a  gt at /ruleset/rules/0/when
+  conditions false: 0 of 1
+    a  gt at /ruleset/rules/0/when
+  conditions unknown: 0 of 1
+    a  gt at /ruleset/rules/0/when

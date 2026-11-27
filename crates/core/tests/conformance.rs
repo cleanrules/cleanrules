@@ -695,10 +695,10 @@ fn compared_errors(written: &mut Json) {
     }
 }
 
-/// A `test_run` vector (`spec/tests.md`, *Running cases*): run the cases of
-/// `cases` or `files` against the rules of `document`, then compare the test
-/// run with its errors reduced to their compared fields.
-fn run_test_run(vector: &Json) -> Result<(), String> {
+/// The test run of a `test_run` or `statistics` vector: the cases of
+/// `cases` or `files` run against the rules of `document`, gathering
+/// statistics or not.
+fn test_run_of(vector: &Json, statistics: bool) -> Result<cleanrules::cases::TestRun, String> {
     let given = get(vector, "given").unwrap();
     let limits = Limits::default();
     let document = read_document(&to_string(get(given, "document").unwrap()), &limits)
@@ -753,9 +753,10 @@ fn run_test_run(vector: &Json) -> Result<(), String> {
         Document::Bundle(bundle) => Runner::for_bundle(bundle),
         _ => return Err("not rules".into()),
     }
-    .with_limits(run_limits);
+    .with_limits(run_limits)
+    .with_statistics(statistics);
     let digest = matches!(get(given, "ruleset_digest"), Some(Json::Bool(true)));
-    let report = match get(given, "cancel_after") {
+    Ok(match get(given, "cancel_after") {
         Some(Json::Number(n)) => {
             let after = usize::try_from(n.as_i128().unwrap()).unwrap();
             let mut asked = 0;
@@ -766,7 +767,26 @@ fn run_test_run(vector: &Json) -> Result<(), String> {
         }
         _ => runner.run(&files),
     }
-    .with_ruleset_digest(digest);
+    .with_ruleset_digest(digest))
+}
+
+/// A `statistics` vector (`spec/tests.md`, *Statistics*): run the cases as a
+/// `test_run` vector does, gathering statistics, and compare them.
+fn run_statistics(vector: &Json) -> Result<(), String> {
+    let report = test_run_of(vector, true)?;
+    let written = report
+        .statistics
+        .as_ref()
+        .map(cleanrules::format::write_statistics)
+        .ok_or("the run gathered no statistics")?;
+    compare(Ok(written), get(vector, "expect").unwrap(), "statistics")
+}
+
+/// A `test_run` vector (`spec/tests.md`, *Running cases*): run the cases of
+/// `cases` or `files` against the rules of `document`, then compare the test
+/// run with its errors reduced to their compared fields.
+fn run_test_run(vector: &Json) -> Result<(), String> {
+    let report = test_run_of(vector, false)?;
     let mut written = cleanrules::format::write_test_run(&report);
     compared_errors(&mut written);
     // The expected `engine.version` is this engine's, whichever it is
@@ -814,6 +834,9 @@ fn run(vector: &Json) -> Result<(), String> {
     }
     if kind == "test_run" {
         return run_test_run(vector);
+    }
+    if kind == "statistics" {
+        return run_statistics(vector);
     }
     let limits = Limits::default();
     let node_key = if kind == "condition" {
@@ -902,6 +925,7 @@ fn conformance_vectors() {
                         | "canonical"
                         | "audit"
                         | "test_run"
+                        | "statistics"
                 ) {
                     *pending.entry(kind.to_owned()).or_default() += 1;
                     continue;

@@ -1,0 +1,231 @@
+{
+  "version": 1,
+  "test_run": {
+    "source": "decision_table",
+    "hit_policy": "output_order",
+    "logic": "boolean",
+    "engine": {
+      "name": "cleanrules",
+      "version": "1.0.0",
+      "limits": {
+        "max_size": 16777216,
+        "max_nesting": 1024,
+        "max_depth": 256,
+        "max_path_segments": 256,
+        "max_table_size": 2097152,
+        "max_values": 1000000
+      }
+    },
+    "files": [
+      {}
+    ],
+    "limits": {
+      "max_explained": 5
+    },
+    "summary": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "error": 0,
+      "partial": false
+    },
+    "results": [
+      {
+        "id": "child-es",
+        "status": "passed"
+      },
+      {
+        "id": "adult-fr",
+        "status": "passed"
+      },
+      {
+        "id": "unknown-es",
+        "status": "passed"
+      }
+    ],
+    "statistics": {
+      "cases": 3,
+      "decisions": 3,
+      "rules": [
+        {
+          "name": "blocked",
+          "row": 3,
+          "pointer": "/decision_table/rows/3",
+          "selected": 0,
+          "fired": 0,
+          "not_fired": 3,
+          "unknown": 0,
+          "conditions": [
+            {
+              "pointer": "/decision_table/rows/3/inputs/1",
+              "op": "eq",
+              "true": 0,
+              "false": 3,
+              "unknown": 0
+            }
+          ]
+        },
+        {
+          "name": "abroad",
+          "row": 1,
+          "pointer": "/decision_table/rows/1",
+          "selected": 1,
+          "fired": 1,
+          "not_fired": 2,
+          "unknown": 0,
+          "conditions": [
+            {
+              "pointer": "/decision_table/rows/1/inputs/1",
+              "op": "in",
+              "true": 2,
+              "false": 1,
+              "unknown": 0
+            }
+          ]
+        },
+        {
+          "name": "young",
+          "row": 0,
+          "pointer": "/decision_table/rows/0",
+          "selected": 1,
+          "fired": 1,
+          "not_fired": 1,
+          "unknown": 1,
+          "conditions": [
+            {
+              "pointer": "/decision_table/rows/0/inputs/0",
+              "op": "lt",
+              "true": 1,
+              "false": 1,
+              "unknown": 1
+            }
+          ]
+        },
+        {
+          "name": "row_3",
+          "row": 2,
+          "pointer": "/decision_table/rows/2",
+          "selected": 3,
+          "fired": 3,
+          "not_fired": 0,
+          "unknown": 0,
+          "conditions": []
+        }
+      ],
+      "outputs": [
+        {
+          "output": "risk",
+          "values": [
+            {
+              "value": "very_high",
+              "selected": 0
+            },
+            {
+              "value": "high",
+              "selected": 1
+            },
+            {
+              "value": "medium",
+              "selected": 1
+            },
+            {
+              "value": "low",
+              "selected": 3
+            }
+          ]
+        }
+      ],
+      "coverage": [
+        {
+          "measure": "rule_selected",
+          "covered": 3,
+          "total": 4,
+          "missed": [
+            {
+              "rule": "blocked",
+              "pointer": "/decision_table/rows/3"
+            }
+          ]
+        },
+        {
+          "measure": "rule_fired",
+          "covered": 3,
+          "total": 4,
+          "missed": [
+            {
+              "rule": "blocked",
+              "pointer": "/decision_table/rows/3"
+            }
+          ]
+        },
+        {
+          "measure": "rule_not_fired",
+          "covered": 3,
+          "total": 3,
+          "unreachable": 1,
+          "missed": []
+        },
+        {
+          "measure": "rule_unknown",
+          "covered": 1,
+          "total": 3,
+          "unreachable": 1,
+          "missed": [
+            {
+              "rule": "blocked",
+              "pointer": "/decision_table/rows/3"
+            },
+            {
+              "rule": "abroad",
+              "pointer": "/decision_table/rows/1"
+            }
+          ]
+        },
+        {
+          "measure": "condition_true",
+          "covered": 2,
+          "total": 3,
+          "missed": [
+            {
+              "rule": "blocked",
+              "pointer": "/decision_table/rows/3/inputs/1"
+            }
+          ]
+        },
+        {
+          "measure": "condition_false",
+          "covered": 3,
+          "total": 3,
+          "missed": []
+        },
+        {
+          "measure": "condition_unknown",
+          "covered": 1,
+          "total": 3,
+          "missed": [
+            {
+              "rule": "blocked",
+              "pointer": "/decision_table/rows/3/inputs/1"
+            },
+            {
+              "rule": "abroad",
+              "pointer": "/decision_table/rows/1/inputs/1"
+            }
+          ]
+        },
+        {
+          "measure": "output_value",
+          "covered": 3,
+          "total": 4,
+          "missed": [
+            {
+              "output": "risk",
+              "value": "very_high",
+              "pointer": "/decision_table/outputs/0/values/0"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

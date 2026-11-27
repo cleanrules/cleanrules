@@ -9,6 +9,7 @@
 //! [`TestRunState`], through [`Runner::next_result`].
 
 use super::file::CaseFile;
+use super::statistics::{Counts, Layout, Statistics, outcomes};
 use super::{Case, Expectation, ExpectedOutput};
 use crate::bundle::{Bundle, BundleId, BundleRules, ENGINE_NAME, ENGINE_VERSION, EngineLimits};
 use crate::digest::Digest;
@@ -401,7 +402,8 @@ enum Item<'c> {
 
 /// Where a run is, owned by the caller: the cursor that
 /// [`Runner::next_result`] moves over the same case files, with the counts
-/// of the summary. A binding keeps it next to its rules and files.
+/// of the summary and, when the runner gathers them, of the statistics. A
+/// binding keeps it next to its rules and files.
 #[derive(Clone, Debug, Default)]
 pub struct TestRunState {
     /// The file of the next item.
@@ -413,6 +415,9 @@ pub struct TestRunState {
     explained: usize,
     summary: Summary,
     finished: bool,
+    /// The layout and counts of the statistics, made at the first result of
+    /// a runner that gathers them.
+    statistics: Option<(Layout, Counts)>,
 }
 
 impl TestRunState {
@@ -486,11 +491,15 @@ impl TestRunState {
 #[derive(Clone, Debug)]
 pub struct Runner<'r> {
     ruleset: &'r RuleSet,
+    /// The decision table tested, when it is one.
+    table: Option<&'r DecisionTable>,
     source: RulesSource,
     hit_policy: TablePolicy,
     limits: TestRunLimits,
     engine_limits: EngineLimits,
     bundle: Option<(BundleId, crate::bundle::Revision)>,
+    /// Whether the runner gathers statistics.
+    statistics: bool,
 }
 
 impl<'r> Runner<'r> {
@@ -499,11 +508,13 @@ impl<'r> Runner<'r> {
     pub fn new(ruleset: &'r RuleSet) -> Self {
         Self {
             ruleset,
+            table: None,
             source: RulesSource::RuleSet,
             hit_policy: TablePolicy::of_ruleset(ruleset.hit_policy()),
             limits: TestRunLimits::default(),
             engine_limits: EngineLimits::default(),
             bundle: None,
+            statistics: false,
         }
     }
 
@@ -512,6 +523,7 @@ impl<'r> Runner<'r> {
     #[must_use]
     pub fn for_table(table: &'r DecisionTable) -> Self {
         Self {
+            table: Some(table),
             source: RulesSource::DecisionTable,
             hit_policy: table.config().hit_policy,
             ..Self::new(table.ruleset())
@@ -555,6 +567,67 @@ impl<'r> Runner<'r> {
         self.limits
     }
 
+    /// This runner, gathering the statistics of its runs or not
+    /// (`spec/tests.md`, *Statistics*): counted from each case's decision
+    /// before the next case is evaluated, and given in the test run
+    /// ([`TestRun::statistics`]) and by [`Runner::statistics`]. Building a
+    /// runner costs nothing more: the run lays its counts out at its first
+    /// result, in its [`TestRunState`].
+    ///
+    /// ```
+    /// use cleanrules::cases::{Case, CaseFile, Cases, Runner};
+    /// use cleanrules::{Map, Value};
+    ///
+    /// let rules = cleanrules::text::parse("RULE adult IF age >= 18", &Default::default())?
+    ///     .into_ruleset()?;
+    /// let mut input = Map::new();
+    /// input.insert("age", Value::Int(20));
+    /// let files = [CaseFile::new(Cases::new([Case::new("one", Value::Map(input))?])?)];
+    /// let run = Runner::new(&rules).with_statistics(true).run(&files);
+    /// let statistics = run.statistics.expect("asked for");
+    /// assert_eq!((statistics.rules[0].fired, statistics.rules[0].not_fired), (1, 0));
+    /// assert!(statistics.to_string().starts_with("Statistics of 1 case: 1 decision"));
+    /// # Ok::<(), cleanrules::Error>(())
+    /// ```
+    #[must_use]
+    pub fn with_statistics(mut self, gather: bool) -> Self {
+        self.statistics = gather;
+        self
+    }
+
+    /// Whether the runner gathers statistics.
+    #[must_use]
+    pub fn gathers_statistics(&self) -> bool {
+        self.statistics
+    }
+
+    /// The statistics of the results that `state` has given so far, when
+    /// the runner gathers them: of a finished run, its statistics. `None`
+    /// when the runner does not gather them, or when `state` gave results
+    /// without counting them (a runner that did not gather them moved it).
+    #[must_use]
+    pub fn statistics(&self, state: &TestRunState) -> Option<Statistics> {
+        if !self.statistics {
+            return None;
+        }
+        let prefix = if self.bundle.is_some() { "/bundle" } else { "" };
+        if let Some((_, counts)) = &state.statistics {
+            return Some(counts.statistics(self.ruleset, self.table, prefix));
+        }
+        debug_assert_eq!(
+            state.summary.total(),
+            0,
+            "statistics asked of a run whose results were not counted"
+        );
+        (state.summary.total() == 0).then(|| {
+            Counts::new(&Layout::new(self.ruleset, self.table)).statistics(
+                self.ruleset,
+                self.table,
+                prefix,
+            )
+        })
+    }
+
     /// Run `files` one result at a time, in run order (`spec/tests.md`,
     /// *Batches and interruption*).
     #[must_use]
@@ -596,6 +669,13 @@ impl<'r> Runner<'r> {
         if state.finished {
             return None;
         }
+        // Counting starts with the run: a state that gave results without
+        // counting them never counts.
+        if self.statistics && state.statistics.is_none() && state.summary.total() == 0 {
+            let layout = Layout::new(self.ruleset, self.table);
+            let counts = Counts::new(&layout);
+            state.statistics = Some((layout, counts));
+        }
         let Some(item) = state.peek(files) else {
             state.finished = true;
             return None;
@@ -614,7 +694,12 @@ impl<'r> Runner<'r> {
         let result = match item {
             Item::Case(case) => {
                 let explain = state.explained < self.limits.max_explained;
-                let result = self.check(path, case, explain);
+                let counts = if self.statistics {
+                    state.statistics.as_mut()
+                } else {
+                    None
+                };
+                let result = self.check(path, case, explain, counts);
                 if result.explanation_text.is_some() {
                     state.explained += 1;
                 }
@@ -647,6 +732,7 @@ impl<'r> Runner<'r> {
         results: Vec<CaseResult>,
     ) -> TestRun {
         state.stop(files, Interruption::Cancelled);
+        let statistics = self.statistics(&state);
         debug_assert_eq!(
             results.len(),
             state.summary.total(),
@@ -672,19 +758,22 @@ impl<'r> Runner<'r> {
             limits: self.limits,
             summary: state.summary,
             results,
+            statistics,
             digest: self.ruleset.digest(),
         }
     }
 
     /// Run one case, without a path; a failure is explained when
-    /// `max_explained` is not 0.
+    /// `max_explained` is not 0. It is no run's case, so no statistics count
+    /// it.
     #[must_use]
     pub fn run_case(&self, case: &Case) -> CaseResult {
-        self.check(None, case, self.limits.max_explained > 0)
+        self.check(None, case, self.limits.max_explained > 0, None)
     }
 
     /// Evaluate a case's input again, as a run does: the decision of a
     /// failure, to explain or draw (`spec/tests.md`, *Explaining failures*).
+    /// No statistics count it.
     ///
     /// # Errors
     ///
@@ -728,11 +817,26 @@ impl<'r> Runner<'r> {
         cancel().then_some(Interruption::Cancelled)
     }
 
-    /// Run one case (`spec/tests.md`, *Matching*).
-    fn check(&self, path: Option<&str>, case: &Case, explain_failure: bool) -> CaseResult {
+    /// Run one case (`spec/tests.md`, *Matching*), counting its decision
+    /// in `counts` when the run gathers statistics.
+    fn check(
+        &self,
+        path: Option<&str>,
+        case: &Case,
+        explain_failure: bool,
+        counts: Option<&mut (Layout, Counts)>,
+    ) -> CaseResult {
         let expect = case.expect();
         let mut result = CaseResult::new(path, Some(case.id()), CaseStatus::Passed);
-        match self.ruleset.evaluate(case.input()) {
+        let evaluated = self.ruleset.evaluate(case.input());
+        if let Some(gathered) = counts {
+            let (layout, counts) = gathered;
+            match &evaluated {
+                Ok(decision) => counts.decision(layout, outcomes(decision, layout)),
+                Err(_) => counts.error(),
+            }
+        }
+        match evaluated {
             Err(error) => match expect.error() {
                 None => {
                     result.status = CaseStatus::Error;
@@ -878,6 +982,13 @@ impl<'c> CaseRun<'c> {
         self.state.remaining(self.files)
     }
 
+    /// The statistics of the results given so far, when the runner gathers
+    /// them ([`Runner::with_statistics`]).
+    #[must_use]
+    pub fn statistics(&self) -> Option<Statistics> {
+        self.runner.statistics(&self.state)
+    }
+
     /// The test run of this run, with `results`: the results it gave, in
     /// order. A run that is not finished, because the caller stopped taking
     /// its results, is stopped first and so is partial (cancelled).
@@ -943,6 +1054,9 @@ pub struct TestRun {
     pub summary: Summary,
     /// The results, in run order.
     pub results: Vec<CaseResult>,
+    /// The statistics, when the runner gathered them
+    /// ([`Runner::with_statistics`]).
+    pub statistics: Option<Statistics>,
     /// The rule set digest, kept for [`TestRun::with_ruleset_digest`].
     digest: Digest,
 }

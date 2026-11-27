@@ -647,6 +647,79 @@
             }
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Run test cases against rules gathering statistics (spec/tests.md, Statistics).",
+          "properties": {
+            "kind": {
+              "const": "statistics"
+            },
+            "document": {
+              "type": "object",
+              "description": "The rules: a rule set, decision table or bundle document (spec/json-format.md)."
+            },
+            "cases": {
+              "type": "object",
+              "description": "A case file document, run without a path."
+            },
+            "files": {
+              "type": "array",
+              "description": "Case files with their paths and contents as UTF-8 text, in order; for a bundle, the files it names, by path.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "max_results": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "max_steps": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "max_explained": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "document"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "cases"
+              ]
+            },
+            {
+              "required": [
+                "files"
+              ]
+            }
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -810,6 +883,10 @@
         "test_run": {
           "type": "object",
           "description": "The test run (spec/tests.md, Test runs), with each error written with its code and compared fields only, which the runner compares as errors are (conformance/README.md, Comparing)."
+        },
+        "statistics": {
+          "$ref": "https://cleanrules.github.io/schemas/v1/test_run.schema.json#/$defs/statistics",
+          "description": "The statistics of the run (spec/tests.md, Statistics, JSON), compared as they are."
         }
       },
       "additionalProperties": false

@@ -1,0 +1,25 @@
+---
+source: crates/core/tests/statistics.rs
+assertion_line: 136
+expression: run.to_string()
+---
+Test run of a rule set: 3 rules, hit policy first, logic boolean
+FAILED  cases/discounts.json  "fr-loyal"
+          selected: expected ["vip"], actual ["loyal"]
+4 results: 3 passed, 1 failed, 0 errors
+Statistics of 4 cases: 4 decisions
+  vip: selected 1, fired 1, not fired 3, unknown 0
+  loyal: selected 1, fired 1, not fired 2, unknown 1
+  new: selected 1, fired 1, not fired 3, unknown 0
+Coverage:
+  rules selected: 3 of 3
+  rules fired: 3 of 3
+  rules not fired: 3 of 3
+  rules unknown: 1 of 3
+    vip
+    new
+  conditions true: 5 of 5
+  conditions false: 5 of 5
+  conditions unknown: 3 of 5
+    vip  gt at /ruleset/rules/0/when/operands/1
+    new  is_null at /ruleset/rules/2/when

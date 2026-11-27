@@ -2,7 +2,7 @@
 
 use crate::bundle::{ENGINE_NAME, ENGINE_VERSION};
 use crate::cases::{CaseResult, ExpectedOutput, Mismatch, Summary, TestRun};
-use crate::format::{write_error, write_value};
+use crate::format::{write_error, write_statistics, write_value};
 use crate::json::{Json, JsonNumber};
 use crate::value::Map;
 
@@ -101,6 +101,9 @@ pub fn write_test_run(run: &TestRun) -> Json {
         "results".into(),
         Json::Array(run.results.iter().map(write_case_result).collect()),
     ));
+    if let Some(statistics) = &run.statistics {
+        members.push(("statistics".into(), write_statistics(statistics)));
+    }
     Json::Object(members)
 }
 

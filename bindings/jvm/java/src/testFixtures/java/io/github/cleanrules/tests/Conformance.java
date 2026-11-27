@@ -178,7 +178,11 @@ class Conformance {
             Map.entry(
                     "test_run",
                     "test runs (spec/tests.md, Running cases) are made by the core and checked by its "
-                            + "runner; the Java and Scala APIs are beta and do not run cases yet (docs/PLAN.md, T.3)"));
+                            + "runner; the Java and Scala APIs are beta and do not run cases yet (docs/PLAN.md, T.3)"),
+            Map.entry(
+                    "statistics",
+                    "statistics of a run (spec/tests.md, Statistics) are made by the core and checked by its "
+                            + "runner; the Java and Scala APIs are beta and do not run cases yet (docs/PLAN.md, T.10)"));
 
     /** The exception class of each error code (spec/errors.md, Codes). */
     private static final Map<String, Class<? extends CleanRulesException>> CLASSES = Map.ofEntries(
@@ -303,6 +307,9 @@ class Conformance {
         }
         if ("test_run".equals(kind)) {
             return new Outcome(null, "test_run");
+        }
+        if ("statistics".equals(kind)) {
+            return new Outcome(null, "statistics");
         }
         if ("draw".equals(kind)) {
             return new Outcome(null, "diagram");

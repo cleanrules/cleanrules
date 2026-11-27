@@ -37,8 +37,6 @@ mod text;
 /// What was audited: a rule set, or a decision table. Shared with test runs.
 pub use crate::rules::RulesSource;
 
-use std::collections::BTreeMap;
-
 use check::Auditor;
 use read::Part;
 
@@ -49,7 +47,7 @@ use crate::error::{Error, ErrorCode, Result, Segment};
 use crate::format::Document;
 use crate::logic::{Kleene, LogicName};
 use crate::rules::{Aggregate, HitPolicy, RuleSet};
-use crate::table::{DecisionTable, TablePolicy, label};
+use crate::table::{DecisionTable, TablePolicy};
 use crate::value::{Group, Value};
 
 /// The bounds of an audit (`spec/audit.md`, *Limits*).
@@ -606,19 +604,8 @@ pub fn audit(ruleset: &RuleSet, limits: &AuditLimits) -> Result<Audit> {
 pub fn audit_table(table: &DecisionTable, limits: &AuditLimits) -> Result<Audit> {
     let ruleset = table.ruleset();
     let logic = crisp(ruleset)?;
-    let labels: BTreeMap<String, usize> = table
-        .rows()
-        .iter()
-        .enumerate()
-        .map(|(r, row)| (label(r, row), r))
-        .collect();
     // Each rule's row: rules are named after their rows.
-    let rows: Vec<usize> = ruleset
-        .rules()
-        .iter()
-        .enumerate()
-        .map(|(i, rule)| labels.get(rule.name()).copied().unwrap_or(i))
-        .collect();
+    let rows: Vec<usize> = table.rule_rows();
     let row_pointers: Vec<String> = rows
         .iter()
         .map(|r| format!("/decision_table/rows/{r}"))
